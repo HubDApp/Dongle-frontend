@@ -8,7 +8,7 @@ The Dongle frontend is the user-facing application that powers discovery, review
 
 The frontend is responsible for presenting on-chain data in a usable interface and enabling users, developers, and admins to interact with the Dongle protocol through their wallets.
 
-⸻
+
 
 Core Features
 
@@ -34,7 +34,6 @@ Wallet Integration
 	•	All write actions (reviews, verification requests, admin decisions) require wallet signatures
 	•	Read-only access is available without a wallet connection
 
-⸻
 
 How the Frontend Works
 
@@ -54,7 +53,6 @@ The frontend interacts with multiple deployed contracts:
 
 Contract addresses are configured via environment variables to support multiple networks (testnet and mainnet).
 
-⸻
 
 User Roles
 
@@ -73,7 +71,6 @@ Admins / Verifiers
 	•	Approve, reject, suspend, or revoke verification
 	•	Manage verification policies and fees (if enabled in the UI)
 
-⸻
 
 Frontend Architecture
 	•	Framework: Modern React-based stack (e.g., Next.js or Vite)
