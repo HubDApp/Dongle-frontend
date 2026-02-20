@@ -37,8 +37,8 @@ jobs:
         run: npm ci
 
       - name: Run ESLint
-        # Using the 'compact' format often triggers GitHub's built-in matcher automatically
-        run: npx eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format compact
+        # Using 'stylish' (built-in) which works great with GitHub Action annotations
+        run: npx eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish
         continue-on-error: false
 
       - name: Build Project
