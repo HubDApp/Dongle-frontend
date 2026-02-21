@@ -1,8 +1,50 @@
+"use client";
+
 import Image from "next/image";
+import { useWallet } from "@/context/wallet.context";
 
 export default function Home() {
+  const { isConnected, isConnecting, publicKey, connectWallet, disconnectWallet } =
+    useWallet();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black relative">
+      {/* Wallet Header */}
+      <div className="absolute top-4 right-4 sm:top-8 sm:right-8 z-50">
+        {isConnected ? (
+          <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-full shadow-sm">
+            <div className="h-2.5 w-2.5 bg-green-500 rounded-full ml-2 animate-pulse" />
+            <span className="text-sm font-mono text-zinc-600 dark:text-zinc-400">
+              {publicKey ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}` : "Connected"}
+            </span>
+            <button
+              onClick={disconnectWallet}
+              className="text-sm px-4 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-full transition-colors text-zinc-900 dark:text-zinc-100"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={connectWallet}
+            disabled={isConnecting}
+            className="flex items-center justify-center min-w-[140px] text-sm px-6 py-2.5 bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 rounded-full transition-colors shadow-sm font-medium disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isConnecting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Connecting...
+              </>
+            ) : (
+              "Connect Wallet"
+            )}
+          </button>
+        )}
+      </div>
+
       <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
         <Image
           className="dark:invert"
