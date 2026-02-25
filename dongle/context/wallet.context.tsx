@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { walletService } from "@/services/wallet/wallet.service";
 
 interface WalletContextType {
   publicKey: string | null;
@@ -19,20 +20,29 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
 
-  // Initialize from local storage to persist connection state across sessions
   useEffect(() => {
-    try {
-      const storedState = localStorage.getItem(WALLET_STORAGE_KEY);
-      if (storedState) {
-        const { publicKey: storedKey, isConnected: storedConnected } = JSON.parse(storedState);
-        if (storedConnected && storedKey) {
-          setPublicKey(storedKey);
-          setIsConnected(true);
+    const restoreWalletState = async () => {
+      try {
+        const storedState = localStorage.getItem(WALLET_STORAGE_KEY);
+        if (storedState) {
+          const { publicKey: storedKey, isConnected: storedConnected } = JSON.parse(storedState);
+          if (storedConnected && storedKey) {
+            const isStillConnected = await walletService.isConnected();
+            if (isStillConnected) {
+              const currentKey = await walletService.getPublicKey();
+              setPublicKey(currentKey);
+              setIsConnected(true);
+            } else {
+              localStorage.removeItem(WALLET_STORAGE_KEY);
+            }
+          }
         }
+      } catch (error) {
+        console.error("Failed to restore wallet state:", error);
+        localStorage.removeItem(WALLET_STORAGE_KEY);
       }
-    } catch (error) {
-      console.error("Failed to restore wallet state:", error);
-    }
+    };
+    restoreWalletState();
   }, []);
 
   const connectWallet = useCallback(async () => {
@@ -40,17 +50,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     
     setIsConnecting(true);
     try {
-      // Placeholder logic for connecting wallet. 
-      // To be replaced with actual provider integration (e.g. Solana Wallet Adapter) in Task #3
-      await new Promise((resolve) => setTimeout(resolve, 800)); // Simulate connection delay
-      
-      const mockPublicKey = "E9G8...ProfessionalPublicKey...2kP1"; // Mocked base58-like public key
-      setPublicKey(mockPublicKey);
+      const address = await walletService.connectWallet();
+      setPublicKey(address);
       setIsConnected(true);
       
-      // Persist state
       localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify({
-        publicKey: mockPublicKey,
+        publicKey: address,
         isConnected: true
       }));
     } catch (error) {
