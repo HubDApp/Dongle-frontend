@@ -35,7 +35,7 @@ export default function Features() {
         <div className="mb-16 text-center">
           <h2 className="text-3xl font-bold mb-4">Why Dongle?</h2>
           <p className="text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">
-            We're building the infrastructure for a more trustworthy decentralized ecosystem.
+            We&apos;re building the infrastructure for a more trustworthy decentralized ecosystem.
           </p>
         </div>
         
