@@ -1,94 +1,119 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { walletService } from "@/services/wallet/wallet.service";
+import { sessionService } from "@/services/auth/session.service";
 
-interface WalletContextType {
-  publicKey: string | null;
+interface WalletState {
+  address: string | null;
   isConnected: boolean;
   isConnecting: boolean;
-  connectWallet: () => Promise<void>;
-  disconnectWallet: () => void;
+  error: string | null;
 }
 
-const WalletContext = createContext<WalletContextType | undefined>(undefined);
+interface WalletContextValue extends WalletState {
+  connect: () => Promise<string>;
+  disconnect: () => void;
+}
 
-const WALLET_STORAGE_KEY = "dongle_wallet_state";
+const WalletContext = createContext<WalletContextValue | undefined>(undefined);
 
-export function WalletProvider({ children }: { children: ReactNode }) {
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<WalletState>({
+    address: null,
+    isConnected: false,
+    isConnecting: true,
+    error: null,
+  });
 
   useEffect(() => {
-    const restoreWalletState = async () => {
+    async function checkConnection() {
       try {
-        const storedState = localStorage.getItem(WALLET_STORAGE_KEY);
-        if (storedState) {
-          const { publicKey: storedKey, isConnected: storedConnected } = JSON.parse(storedState);
-          if (storedConnected && storedKey) {
-            const isStillConnected = await walletService.isConnected();
-            if (isStillConnected) {
-              const currentKey = await walletService.getPublicKey();
-              setPublicKey(currentKey);
-              setIsConnected(true);
-            } else {
-              localStorage.removeItem(WALLET_STORAGE_KEY);
-            }
-          }
+        const connected = await walletService.isConnected();
+        if (connected) {
+          const address = await walletService.getPublicKey();
+          setState({
+            address,
+            isConnected: true,
+            isConnecting: false,
+            error: null,
+          });
+        } else {
+          setState({
+            address: null,
+            isConnected: false,
+            isConnecting: false,
+            error: null,
+          });
         }
-      } catch (error) {
-        console.error("Failed to restore wallet state:", error);
-        localStorage.removeItem(WALLET_STORAGE_KEY);
+      } catch (err: any) {
+        setState({
+          address: null,
+          isConnected: false,
+          isConnecting: false,
+          error: err.message,
+        });
       }
-    };
-    restoreWalletState();
+    }
+    checkConnection();
   }, []);
 
-  const connectWallet = useCallback(async () => {
-    if (isConnected) return;
-    
-    setIsConnecting(true);
+  const connect = useCallback(async (): Promise<string> => {
+    setState((prev) => ({ ...prev, isConnecting: true, error: null }));
     try {
       const address = await walletService.connectWallet();
-      setPublicKey(address);
-      setIsConnected(true);
-      
-      localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify({
-        publicKey: address,
-        isConnected: true
-      }));
-    } catch (error) {
-      console.error("Wallet connection failed:", error);
-    } finally {
-      setIsConnecting(false);
+      sessionService.createSession(address);
+      setState({
+        address,
+        isConnected: true,
+        isConnecting: false,
+        error: null,
+      });
+      return address;
+    } catch (err: any) {
+      setState({
+        address: null,
+        isConnected: false,
+        isConnecting: false,
+        error: err.message,
+      });
+      throw err;
     }
-  }, [isConnected]);
-
-  const disconnectWallet = useCallback(() => {
-    setPublicKey(null);
-    setIsConnected(false);
-    localStorage.removeItem(WALLET_STORAGE_KEY);
   }, []);
 
+  const disconnect = useCallback(() => {
+    walletService.disconnectWallet();
+    sessionService.clearSession();
+    setState({
+      address: null,
+      isConnected: false,
+      isConnecting: false,
+      error: null,
+    });
+  }, []);
+
+  const value = useMemo(
+    () => ({ ...state, connect, disconnect }),
+    [state, connect, disconnect]
+  );
+
   return (
-    <WalletContext.Provider
-      value={{
-        publicKey,
-        isConnected,
-        isConnecting,
-        connectWallet,
-        disconnectWallet,
-      }}
-    >
+    <WalletContext.Provider value={value}>
       {children}
     </WalletContext.Provider>
   );
 }
 
-export function useWallet(): WalletContextType {
+export function useWallet() {
   const context = useContext(WalletContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useWallet must be used within a WalletProvider");
   }
   return context;
