@@ -60,12 +60,12 @@ export const walletService = {
   },
 
   // Signs a transaction XDR with Freighter
-  async signTransaction(xdr: string, network: string): Promise<string> {
-    const { signedTransaction, error } = await signTransaction(xdr, { network });
-    if (error || !signedTransaction) {
+  async signTransaction(xdr: string, networkPassphrase: string): Promise<string> {
+    const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase });
+    if (error || !signedTxXdr) {
       throw new Error(error ?? "Transaction signing failed");
     }
-    return signedTransaction;
+    return signedTxXdr;
   },
 
   // Freighter has no disconnect API — context handles clearing state on its end

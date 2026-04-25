@@ -5,8 +5,6 @@ import {
   Account, 
   BASE_FEE, 
   xdr,
-  ScInt,
-  ScString,
   nativeToScVal
 } from "stellar-sdk";
 import { SOROBAN_CONFIG, DONGLE_CONTRACTS } from "@/constants/contracts";
@@ -79,7 +77,7 @@ export const sorobanService = {
       const xdrString = tx.toXDR();
       const signedXdr = await walletService.signTransaction(
         xdrString, 
-        SOROBAN_CONFIG.NETWORK_PASSPHRASE === "Test SDF Network ; September 2015" ? "TESTNET" : "PUBLIC"
+        SOROBAN_CONFIG.NETWORK_PASSPHRASE
       );
 
       // 7. Submit to RPC
@@ -91,15 +89,15 @@ export const sorobanService = {
 
       // 8. Poll for status
       let getResponse = await server.getTransaction(sendResponse.hash);
-      while (getResponse.status === "NOT_FOUND" || getResponse.status === "PENDING") {
+      while (getResponse.status === "NOT_FOUND") {
         await new Promise(resolve => setTimeout(resolve, 2000));
         getResponse = await server.getTransaction(sendResponse.hash);
       }
 
       if (getResponse.status === "SUCCESS") {
-        console.log("[SorobanService] Registration successful:", getResponse.hash);
+        console.log("[SorobanService] Registration successful:", sendResponse.hash);
         return {
-          hash: getResponse.hash,
+          hash: sendResponse.hash,
           status: "SUCCESS"
         };
       } else {
