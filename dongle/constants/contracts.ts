@@ -1,0 +1,13 @@
+/**
+ * Contract IDs and network configuration for Dongle protocol.
+ */
+export const DONGLE_CONTRACTS = {
+  PROJECT_REGISTRY: "CCV25B6H7F4N5W7O6N5Q6N5Q6N5Q6N5Q6N5Q6N5Q6N5Q6N5Q6N5Q6N5Q6N5Q6N", // Placeholder
+  REVIEW_REGISTRY: "CDONGLE_REVIEW_REGISTRY_PLACEHOLDER",
+  VERIFICATION_REGISTRY: "CDONGLE_VERIFICATION_REGISTRY_PLACEHOLDER",
+};
+
+export const SOROBAN_CONFIG = {
+  RPC_URL: "https://soroban-testnet.stellar.org:443",
+  NETWORK_PASSPHRASE: "Test SDF Network ; September 2015",
+};

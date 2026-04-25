@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useWallet } from "@/context/wallet.context";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
 export default function Navbar() {
   const { isConnected, isConnecting, publicKey, connectWallet, disconnectWallet } = useWallet();
@@ -23,31 +25,37 @@ export default function Navbar() {
             <Link href="/verify" className="hover:text-black dark:hover:text-white transition-colors">
               Verify
             </Link>
+            <Link href="/projects/new" className="hover:text-black dark:hover:text-white transition-colors flex items-center gap-1">
+              Register <Badge variant="primary">Dev</Badge>
+            </Link>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           {isConnected ? (
-            <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-full shadow-sm">
+            <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-[1.5rem] shadow-sm">
               <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
               <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
                 {publicKey ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}` : "Connected"}
               </span>
-              <button
+              <Button
                 onClick={disconnectWallet}
-                className="text-xs px-3 py-1 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-full transition-colors border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100"
+                variant="outline"
+                size="sm"
+                className="rounded-full text-xs py-1 px-3 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
               >
                 Disconnect
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
               onClick={connectWallet}
-              disabled={isConnecting}
-              className="px-5 py-2 bg-black dark:bg-white text-white dark:text-black text-sm font-medium rounded-full hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
+              isLoading={isConnecting}
+              size="sm"
+              className="rounded-full"
             >
               {isConnecting ? "Connecting..." : "Connect Wallet"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
