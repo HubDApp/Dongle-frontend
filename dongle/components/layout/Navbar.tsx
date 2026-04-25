@@ -23,6 +23,11 @@ export default function Navbar() {
             <Link href="/verify" className="hover:text-black dark:hover:text-white transition-colors">
               Verify
             </Link>
+            {isConnected && (
+              <Link href="/admin" className="hover:text-black dark:hover:text-white transition-colors">
+                Admin
+              </Link>
+            )}
           </div>
         </div>
 

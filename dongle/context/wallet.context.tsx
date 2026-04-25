@@ -45,6 +45,31 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     restoreWalletState();
   }, []);
 
+  // Poll for account changes
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const currentKey = await walletService.getPublicKey();
+        if (currentKey !== publicKey) {
+          console.info("Account change detected:", currentKey);
+          setPublicKey(currentKey);
+          localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify({
+            publicKey: currentKey,
+            isConnected: true
+          }));
+        }
+      } catch (error) {
+        console.error("Error checking account change:", error);
+        // If we can't get the public key anymore, it might mean the user disconnected from Freighter
+        disconnectWallet();
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [isConnected, publicKey]);
+
   const connectWallet = useCallback(async () => {
     if (isConnected) return;
     
