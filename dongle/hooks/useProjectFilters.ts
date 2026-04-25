@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useSyncExternalStore } from "react";
 import { projects, type Project, type ProjectCategory } from "@/data/projects";
 
 export type SortOption = "rating" | "recency" | "reviews";
@@ -18,7 +18,6 @@ const DEFAULT_STATE: ProjectFiltersState = {
 };
 
 function loadPersistedState(): ProjectFiltersState {
-  if (typeof window === "undefined") return DEFAULT_STATE;
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_STATE;
@@ -40,15 +39,22 @@ function persistState(state: ProjectFiltersState): void {
   }
 }
 
-export function useProjectFilters(limit?: number) {
-  const [filters, setFilters] = useState<ProjectFiltersState>(DEFAULT_STATE);
-  const [hydrated, setHydrated] = useState(false);
+// useSyncExternalStore snapshot helpers — no-op subscribe since we own all writes
+const subscribe = () => () => {};
 
-  // Restore persisted state after hydration to avoid SSR mismatch
-  useEffect(() => {
-    setFilters(loadPersistedState());
-    setHydrated(true);
-  }, []);
+export function useProjectFilters(limit?: number) {
+  // useSyncExternalStore gives us the correct SSR snapshot on server and the
+  // real sessionStorage value on the client — no setState inside an effect needed.
+  const hydrated = useSyncExternalStore(
+    subscribe,
+    () => true,   // client snapshot: always mounted
+    () => false,  // server snapshot: not yet mounted
+  );
+
+  // Lazy initializer reads sessionStorage once on first client render
+  const [filters, setFilters] = useState<ProjectFiltersState>(() =>
+    typeof window !== "undefined" ? loadPersistedState() : DEFAULT_STATE
+  );
 
   const setCategory = useCallback((category: ProjectCategory) => {
     setFilters((prev) => {
@@ -67,7 +73,7 @@ export function useProjectFilters(limit?: number) {
   }, []);
 
   const filtered = useMemo<Project[]>(() => {
-    let result =
+    const result =
       filters.category === "All"
         ? [...projects]
         : projects.filter((p) => p.category === filters.category);

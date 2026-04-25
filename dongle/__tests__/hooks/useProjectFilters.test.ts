@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useProjectFilters } from "@/hooks/useProjectFilters";
 import { projects } from "@/data/projects";
