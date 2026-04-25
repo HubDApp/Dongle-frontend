@@ -16,9 +16,9 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-sm mb-4">Platform</h4>
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-              <li><Link href="/discover" className="hover:text-black dark:hover:text-white">Discover</Link></li>
-              <li><Link href="/reviews" className="hover:text-black dark:hover:text-white">Reviews</Link></li>
-              <li><Link href="/verify" className="hover:text-black dark:hover:text-white">Verification</Link></li>
+              <li><Link href="/" className="hover:text-black dark:hover:text-white">Home</Link></li>
+              <li><Link href="/submit" className="hover:text-black dark:hover:text-white">Submit</Link></li>
+              <li><Link href="/profile" className="hover:text-black dark:hover:text-white">Profile</Link></li>
             </ul>
           </div>
           <div>
