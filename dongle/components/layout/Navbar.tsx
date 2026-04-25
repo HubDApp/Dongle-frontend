@@ -23,6 +23,9 @@ export default function Navbar() {
             <Link href="/verify" className="hover:text-black dark:hover:text-white transition-colors">
               Verify
             </Link>
+            <Link href="/projects/new" className="hover:text-black dark:hover:text-white transition-colors flex items-center gap-1">
+              Register <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full">Dev</span>
+            </Link>
           </div>
         </div>
 
