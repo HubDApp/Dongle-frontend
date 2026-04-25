@@ -112,6 +112,51 @@ export const sorobanService = {
   },
 
   /**
+   * Mock method to request verification for a project.
+   */
+  async requestVerification(projectId: string) {
+    try {
+      console.log(`[SorobanService] Requesting verification for project: ${projectId}`);
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return {
+        hash: "mock_verification_hash_" + Math.random().toString(36).substring(7),
+        status: "SUCCESS"
+      };
+    } catch (error) {
+      console.error("[SorobanService] Error requesting verification:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Mock method to get the verification status of a project.
+   */
+  async getVerificationStatus(projectId: string): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
+    try {
+      console.log(`[SorobanService] Getting verification status for: ${projectId}`);
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For demonstration, we can return 'PENDING' if a certain string is passed,
+      // or randomly determine status. We'll return a random status for the mock,
+      // but biased towards 'PENDING' for newly submitted ones.
+      
+      if (!projectId || projectId.length < 3) return "NONE";
+      
+      // Simple hash to keep it deterministic per session
+      const mockStatus = parseInt(projectId, 36) % 3;
+      if (mockStatus === 0) return "VERIFIED";
+      if (mockStatus === 1) return "PENDING";
+      return "REJECTED";
+      
+    } catch (error) {
+      console.error("[SorobanService] Error getting verification status:", error);
+      return "NONE";
+    }
+  },
+
+  /**
    * Helper to get RPC server instance.
    */
   getServer() {
