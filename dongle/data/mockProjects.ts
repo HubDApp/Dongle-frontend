@@ -8,14 +8,6 @@ export interface Project {
   createdAt: string; // ISO date string
 }
 
-const categories = [
-  "DeFi / DEX",
-  "Gaming / NFT",
-  "Infrastructure",
-  "DAOs / Governance",
-  "Social / Community"
-];
-
 // Helper to generate deterministic but seemingly random dates
 const generateDate = (index: number) => {
   const baseDate = new Date("2023-01-01T00:00:00Z").getTime();
@@ -48,14 +40,16 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Lumen Lend",
     category: "DeFi / DEX",
-    description: "Decentralized lending and borrowing protocol for Stellar assets.",
+    description:
+      "Decentralized lending and borrowing protocol for Stellar assets.",
     rating: 4.2,
     reviews: 45,
   },
   {
     name: "DAO Builder",
     category: "DAOs / Governance",
-    description: "Create and manage your decentralized autonomous organization easily.",
+    description:
+      "Create and manage your decentralized autonomous organization easily.",
     rating: 4.6,
     reviews: 156,
   },
@@ -83,25 +77,35 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Yield Farm",
     category: "DeFi / DEX",
-    description: "Maximize your returns with automated yield farming strategies.",
+    description:
+      "Maximize your returns with automated yield farming strategies.",
     rating: 4.3,
     reviews: 112,
-  }
+  },
 ];
 
 // Generate 50+ projects by duplicating and modifying base projects
-export const mockProjects: Project[] = Array.from({ length: 60 }).map((_, i) => {
-  const base = baseProjects[i % baseProjects.length];
-  const iteration = Math.floor(i / baseProjects.length);
-  
-  return {
-    id: `proj-${i}`,
-    name: iteration === 0 ? base.name! : `${base.name} V${iteration + 1}`,
-    category: base.category!,
-    description: base.description!,
-    // Add some variance to ratings and reviews for sorting testing
-    rating: Number((Math.max(1, base.rating! - (iteration * 0.1) + (Math.sin(i) * 0.5))).toFixed(1)),
-    reviews: Math.max(0, base.reviews! + Math.floor(Math.cos(i) * 50) + iteration * 10),
-    createdAt: generateDate(i),
-  };
-});
+export const mockProjects: Project[] = Array.from({ length: 60 }).map(
+  (_, i) => {
+    const base = baseProjects[i % baseProjects.length];
+    const iteration = Math.floor(i / baseProjects.length);
+
+    return {
+      id: `proj-${i}`,
+      name: iteration === 0 ? base.name! : `${base.name} V${iteration + 1}`,
+      category: base.category!,
+      description: base.description!,
+      // Add some variance to ratings and reviews for sorting testing
+      rating: Number(
+        Math.max(1, base.rating! - iteration * 0.1 + Math.sin(i) * 0.5).toFixed(
+          1,
+        ),
+      ),
+      reviews: Math.max(
+        0,
+        base.reviews! + Math.floor(Math.cos(i) * 50) + iteration * 10,
+      ),
+      createdAt: generateDate(i),
+    };
+  },
+);

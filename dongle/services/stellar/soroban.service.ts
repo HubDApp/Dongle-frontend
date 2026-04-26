@@ -1,11 +1,10 @@
-import { 
-  rpc, 
-  Contract, 
-  TransactionBuilder, 
-  Account, 
-  BASE_FEE, 
-  xdr,
-  nativeToScVal
+import {
+  rpc,
+  Contract,
+  TransactionBuilder,
+  Account,
+  BASE_FEE,
+  nativeToScVal,
 } from "stellar-sdk";
 import { SOROBAN_CONFIG, DONGLE_CONTRACTS } from "@/constants/contracts";
 import { walletService } from "@/services/wallet/wallet.service";
@@ -30,22 +29,24 @@ export const sorobanService = {
       let publicKey: string;
       try {
         publicKey = await walletService.getPublicKey();
-      } catch (e) {
-        console.warn("[SorobanService] No wallet connected, using mock registration");
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch {
+        console.warn(
+          "[SorobanService] No wallet connected, using mock registration",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         return {
           hash: "mock_hash_" + Math.random().toString(36).substring(7),
-          status: "SUCCESS"
+          status: "SUCCESS",
         };
       }
-      
+
       // 1. Fetch account sequence
-      const account = await server.getLatestLedger(); // Just to check connection
-      
+      await server.getLatestLedger(); // Just to check connection
+
       // In a real scenario, we'd load the account from Horizon or RPC
       // For transaction building, we need the account object
       const source = new Account(publicKey, "0"); // Sequence will be filled by build process or manually
-      
+
       // 2. Initialize contract
       const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
 
@@ -76,32 +77,44 @@ export const sorobanService = {
       // 6. Sign with Freighter
       const xdrString = tx.toXDR();
       const signedXdr = await walletService.signTransaction(
-        xdrString, 
-        SOROBAN_CONFIG.NETWORK_PASSPHRASE
+        xdrString,
+        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
       );
 
       // 7. Submit to RPC
-      const sendResponse = await server.sendTransaction(TransactionBuilder.fromXDR(signedXdr, SOROBAN_CONFIG.NETWORK_PASSPHRASE));
-      
+      const sendResponse = await server.sendTransaction(
+        TransactionBuilder.fromXDR(
+          signedXdr,
+          SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+        ),
+      );
+
       if (sendResponse.status === "ERROR") {
-        throw new Error("Transaction failed: " + JSON.stringify(sendResponse.errorResult));
+        throw new Error(
+          "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+        );
       }
 
       // 8. Poll for status
       let getResponse = await server.getTransaction(sendResponse.hash);
       while (getResponse.status === "NOT_FOUND") {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         getResponse = await server.getTransaction(sendResponse.hash);
       }
 
       if (getResponse.status === "SUCCESS") {
-        console.log("[SorobanService] Registration successful:", sendResponse.hash);
+        console.log(
+          "[SorobanService] Registration successful:",
+          sendResponse.hash,
+        );
         return {
           hash: sendResponse.hash,
-          status: "SUCCESS"
+          status: "SUCCESS",
         };
       } else {
-        throw new Error("Transaction failed with status: " + getResponse.status);
+        throw new Error(
+          "Transaction failed with status: " + getResponse.status,
+        );
       }
     } catch (error) {
       console.error("[SorobanService] Error registering project:", error);
@@ -114,12 +127,15 @@ export const sorobanService = {
    */
   async requestVerification(projectId: string) {
     try {
-      console.log(`[SorobanService] Requesting verification for project: ${projectId}`);
+      console.log(
+        `[SorobanService] Requesting verification for project: ${projectId}`,
+      );
       // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       return {
-        hash: "mock_verification_hash_" + Math.random().toString(36).substring(7),
-        status: "SUCCESS"
+        hash:
+          "mock_verification_hash_" + Math.random().toString(36).substring(7),
+        status: "SUCCESS",
       };
     } catch (error) {
       console.error("[SorobanService] Error requesting verification:", error);
@@ -130,26 +146,32 @@ export const sorobanService = {
   /**
    * Mock method to get the verification status of a project.
    */
-  async getVerificationStatus(projectId: string): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
+  async getVerificationStatus(
+    projectId: string,
+  ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
     try {
-      console.log(`[SorobanService] Getting verification status for: ${projectId}`);
+      console.log(
+        `[SorobanService] Getting verification status for: ${projectId}`,
+      );
       // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       // For demonstration, we can return 'PENDING' if a certain string is passed,
       // or randomly determine status. We'll return a random status for the mock,
       // but biased towards 'PENDING' for newly submitted ones.
-      
+
       if (!projectId || projectId.length < 3) return "NONE";
-      
+
       // Simple hash to keep it deterministic per session
       const mockStatus = parseInt(projectId, 36) % 3;
       if (mockStatus === 0) return "VERIFIED";
       if (mockStatus === 1) return "PENDING";
       return "REJECTED";
-      
     } catch (error) {
-      console.error("[SorobanService] Error getting verification status:", error);
+      console.error(
+        "[SorobanService] Error getting verification status:",
+        error,
+      );
       return "NONE";
     }
   },
@@ -159,5 +181,5 @@ export const sorobanService = {
    */
   getServer() {
     return server;
-  }
+  },
 };

@@ -5,16 +5,21 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useWallet } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { isConnected, isConnecting, publicKey, connectWallet, disconnectWallet } = useWallet();
+  const {
+    isConnected,
+    isConnecting,
+    publicKey,
+    connectWallet,
+    disconnectWallet,
+  } = useWallet();
 
   const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/submit", label: "Submit" },
+    { href: "/discover", label: "Discover" },
+    { href: "/projects/new", label: "Submit Project" },
     { href: "/profile", label: "Profile" },
   ];
 
@@ -46,10 +51,12 @@ export default function Navbar() {
 
         <div className="flex items-center gap-4">
           {isConnected ? (
-            <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-[1.5rem] shadow-sm">
+            <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-2xl shadow-sm">
               <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
               <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
-                {publicKey ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}` : "Connected"}
+                {publicKey
+                  ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}`
+                  : "Connected"}
               </span>
               <Button
                 onClick={disconnectWallet}
@@ -76,8 +83,18 @@ export default function Navbar() {
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden p-2 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
             </svg>
           </button>
         </div>
@@ -107,4 +124,3 @@ export default function Navbar() {
     </nav>
   );
 }
-
