@@ -32,20 +32,21 @@ export default function Navbar() {
           <Link href="/" className="text-xl font-bold tracking-tighter">
             DONGLE
           </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`transition-colors ${
-                  isActive(link.href)
-                    ? "text-black dark:text-white"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                }`}
-              >
-                {link.label}
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+            <Link href="/discover" className="hover:text-black dark:hover:text-white transition-colors">
+              Discover
+            </Link>
+            <Link href="/reviews" className="hover:text-black dark:hover:text-white transition-colors">
+              Reviews
+            </Link>
+            <Link href="/verify" className="hover:text-black dark:hover:text-white transition-colors">
+              Verify
+            </Link>
+            {isConnected && (
+              <Link href="/admin" className="hover:text-black dark:hover:text-white transition-colors">
+                Admin
               </Link>
-            ))}
+            )}
           </div>
         </div>
 
