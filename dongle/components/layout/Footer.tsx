@@ -6,27 +6,73 @@ export default function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="col-span-1 md:col-span-2">
-            <Link href="/" className="text-xl font-bold tracking-tighter mb-4 block">
+            <Link
+              href="/"
+              className="text-xl font-bold tracking-tighter mb-4 block"
+            >
               DONGLE
             </Link>
             <p className="text-zinc-500 dark:text-zinc-400 max-w-sm text-sm">
-              The decentralized app store for Stellar. Discovery, reviews, and verification powered by on-chain transparency.
+              The decentralized app store for Stellar. Discovery, reviews, and
+              verification powered by on-chain transparency.
             </p>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-4">Platform</h4>
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-              <li><Link href="/" className="hover:text-black dark:hover:text-white">Home</Link></li>
-              <li><Link href="/projects/new" className="hover:text-black dark:hover:text-white">Submit</Link></li>
-              <li><Link href="/profile" className="hover:text-black dark:hover:text-white">Profile</Link></li>
+              <li>
+                <Link
+                  href="/"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Home
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/projects/new"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Submit
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/profile"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Profile
+                </Link>
+              </li>
             </ul>
           </div>
           <div>
             <h4 className="font-semibold text-sm mb-4">Developers</h4>
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-              <li><Link href="/docs" className="hover:text-black dark:hover:text-white">Documentation</Link></li>
-              <li><Link href="/listing" className="hover:text-black dark:hover:text-white">Submit App</Link></li>
-              <li><Link href="https://github.com" className="hover:text-black dark:hover:text-white">GitHub</Link></li>
+              <li>
+                <Link
+                  href="/docs"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Documentation
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/listing"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Submit App
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="https://github.com"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  GitHub
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
@@ -35,8 +81,18 @@ export default function Footer() {
             © {new Date().getFullYear()} Dongle Protocol. All rights reserved.
           </p>
           <div className="flex gap-6 text-xs text-zinc-500 dark:text-zinc-400">
-            <Link href="/privacy" className="hover:text-black dark:hover:text-white">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-black dark:hover:text-white">Terms of Service</Link>
+            <Link
+              href="/privacy"
+              className="hover:text-black dark:hover:text-white"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-black dark:hover:text-white"
+            >
+              Terms of Service
+            </Link>
           </div>
         </div>
       </div>
