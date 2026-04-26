@@ -1,16 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { mockProjects } from "@/data/mockProjects";
-import { ProjectCard } from "@/components/projects/ProjectCard";
-
-export default function FeaturedProjects() {
-  // Get top 3 highest rated projects for the featured section
-  const featuredProjects = [...mockProjects]
-    .sort((a, b) => b.rating - a.rating)
-    .slice(0, 3);
 import { useProjectFilters, type SortOption } from "@/hooks/useProjectFilters";
 import { ALL_CATEGORIES, type ProjectCategory } from "@/data/projects";
+import { ProjectCard } from "@/components/projects/ProjectCard";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "rating", label: "Top Rated" },
@@ -55,14 +48,7 @@ export default function FeaturedProjects() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {featuredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-10">
-          {/* Category pills */}
           <div
             className="flex flex-wrap gap-2"
             role="group"
@@ -84,7 +70,6 @@ export default function FeaturedProjects() {
             ))}
           </div>
 
-          {/* Sort select */}
           <div className="sm:ml-auto">
             <label htmlFor="sort-select" className="sr-only">
               Sort projects
@@ -104,9 +89,7 @@ export default function FeaturedProjects() {
           </div>
         </div>
 
-        {/* Grid */}
         {!hydrated ? (
-          // Skeleton to avoid layout shift during hydration
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
@@ -127,43 +110,7 @@ export default function FeaturedProjects() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {filtered.map((project) => (
-              <div
-                key={project.id}
-                className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all"
-              >
-                <div className="w-full aspect-video bg-zinc-100 dark:bg-zinc-800 rounded-2xl mb-6 overflow-hidden relative">
-                  <div className="absolute inset-0 flex items-center justify-center text-zinc-300 dark:text-zinc-700 font-bold text-lg">
-                    {project.name[0]}
-                  </div>
-                </div>
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
-                    {project.category}
-                  </span>
-                  <div
-                    className="flex items-center gap-1 text-sm font-bold"
-                    aria-label={`Rating: ${project.rating}`}
-                  >
-                    <svg
-                      className="w-4 h-4 text-yellow-500 fill-current"
-                      viewBox="0 0 20 20"
-                      aria-hidden="true"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    {project.rating}
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">
-                  {project.name}
-                </h3>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 line-clamp-2">
-                  {project.description}
-                </p>
-                <div className="text-xs text-zinc-400 dark:text-zinc-500">
-                  {project.reviews} reviews
-                </div>
-              </div>
+              <ProjectCard key={project.id} project={project} />
             ))}
           </div>
         )}
