@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/context/wallet.context";
+import { Toaster } from "sonner";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 
 const geistSans = Geist({

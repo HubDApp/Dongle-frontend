@@ -3,6 +3,7 @@ import {
   isAllowed,
   isConnected as freighterIsConnected,
   requestAccess,
+  signTransaction,
 } from "@stellar/freighter-api";
 
 export const walletService = {
@@ -56,6 +57,15 @@ export const walletService = {
     } catch {
       return false;
     }
+  },
+
+  // Signs a transaction XDR with Freighter
+  async signTransaction(xdr: string, networkPassphrase: string): Promise<string> {
+    const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase });
+    if (error || !signedTxXdr) {
+      throw new Error(error ?? "Transaction signing failed");
+    }
+    return signedTxXdr;
   },
 
   // Freighter has no disconnect API — context handles clearing state on its end

@@ -1,6 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { mockProjects } from "@/data/mockProjects";
+import { ProjectCard } from "@/components/projects/ProjectCard";
+
+export default function FeaturedProjects() {
+  // Get top 3 highest rated projects for the featured section
+  const featuredProjects = [...mockProjects]
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 3);
 import { useProjectFilters, type SortOption } from "@/hooks/useProjectFilters";
 import { ALL_CATEGORIES, type ProjectCategory } from "@/data/projects";
 
@@ -47,6 +55,11 @@ export default function FeaturedProjects() {
           </Link>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {featuredProjects.map((project) => (
+            <ProjectCard key={project.id} project={project} />
+          ))}
+        </div>
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-10">
           {/* Category pills */}
