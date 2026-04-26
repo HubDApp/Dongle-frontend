@@ -2,7 +2,6 @@
 
 import React from "react";
 import ProjectForm from "@/components/projects/ProjectForm";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { useWallet } from "@/context/wallet.context";
 import { Wallet2, ShieldCheck, Zap, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/Button";
