@@ -11,13 +11,16 @@ import { walletService } from "@/services/wallet/wallet.service";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL);
 
-export interface ProjectRegistrationParams {
+export interface ProjectData {
+  id: string;
   name: string;
   category: string;
   description: string;
   url: string;
   logoUrl: string;
   docsUrl: string;
+  owner: string;
+  createdAt: string;
 }
 
 export const sorobanService = {
@@ -173,6 +176,154 @@ export const sorobanService = {
         error,
       );
       return "NONE";
+    }
+  },
+
+  /**
+   * Mock method to get project details by ID.
+   */
+  async getProject(projectId: string): Promise<ProjectData | null> {
+    try {
+      console.log(`[SorobanService] Getting project details for: ${projectId}`);
+      // Simulate network delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Mock data - in real implementation, this would query the contract
+      const mockProjects: ProjectData[] = [
+        {
+          id: "soroban-swap",
+          name: "Soroban Swap",
+          category: "defi",
+          description: "Next-generation automated market maker on Soroban.",
+          url: "https://soroban-swap.com",
+          logoUrl: "https://example.com/logo1.png",
+          docsUrl: "https://docs.soroban-swap.com",
+          owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H", // Mock owner
+          createdAt: "2024-11-10T00:00:00Z",
+        },
+        {
+          id: "stellar-guardians",
+          name: "Stellar Guardians",
+          category: "gaming",
+          description: "A decentralized strategy game with on-chain assets.",
+          url: "https://stellar-guardians.com",
+          logoUrl: "https://example.com/logo2.png",
+          docsUrl: "https://docs.stellar-guardians.com",
+          owner: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674CH", // Mock owner
+          createdAt: "2024-09-22T00:00:00Z",
+        },
+        // Add more mock projects as needed
+      ];
+
+      return mockProjects.find(p => p.id === projectId) || null;
+    } catch (error) {
+      console.error("[SorobanService] Error getting project:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Updates an existing project in the Project Registry contract.
+   */
+  async updateProject(projectId: string, params: ProjectRegistrationParams) {
+    try {
+      let publicKey: string;
+      try {
+        publicKey = await walletService.getPublicKey();
+      } catch {
+        console.warn(
+          "[SorobanService] No wallet connected, using mock update",
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return {
+          hash: "mock_update_hash_" + Math.random().toString(36).substring(7),
+          status: "SUCCESS",
+        };
+      }
+
+      // Check ownership - in real implementation, contract would enforce this
+      const project = await this.getProject(projectId);
+      if (!project) {
+        throw new Error("Project not found");
+      }
+      if (project.owner !== publicKey) {
+        throw new Error("Only project owner can update the project");
+      }
+
+      // 1. Fetch account sequence
+      await server.getLatestLedger();
+
+      const source = new Account(publicKey, "0");
+
+      // 2. Initialize contract
+      const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
+
+      // 3. Prepare arguments
+      // Assuming contract method: update_project(id: String, name: String, category: String, description: String, url: String, logo_url: String, docs_url: String)
+      const args = [
+        nativeToScVal(projectId),
+        nativeToScVal(params.name),
+        nativeToScVal(params.category),
+        nativeToScVal(params.description),
+        nativeToScVal(params.url),
+        nativeToScVal(params.logoUrl),
+        nativeToScVal(params.docsUrl),
+      ];
+
+      // 4. Build transaction
+      const tx = new TransactionBuilder(source, {
+        fee: BASE_FEE,
+        networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+      })
+        .addOperation(contract.call("update_project", ...args))
+        .setTimeout(30)
+        .build();
+
+      // 5. Sign with Freighter
+      const xdrString = tx.toXDR();
+      const signedXdr = await walletService.signTransaction(
+        xdrString,
+        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+      );
+
+      // 6. Submit to RPC
+      const sendResponse = await server.sendTransaction(
+        TransactionBuilder.fromXDR(
+          signedXdr,
+          SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+        ),
+      );
+
+      if (sendResponse.status === "ERROR") {
+        throw new Error(
+          "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+        );
+      }
+
+      // 7. Poll for status
+      let getResponse = await server.getTransaction(sendResponse.hash);
+      while (getResponse.status === "NOT_FOUND") {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        getResponse = await server.getTransaction(sendResponse.hash);
+      }
+
+      if (getResponse.status === "SUCCESS") {
+        console.log(
+          "[SorobanService] Update successful:",
+          sendResponse.hash,
+        );
+        return {
+          hash: sendResponse.hash,
+          status: "SUCCESS",
+        };
+      } else {
+        throw new Error(
+          "Transaction failed with status: " + getResponse.status,
+        );
+      }
+    } catch (error) {
+      console.error("[SorobanService] Error updating project:", error);
+      throw error;
     }
   },
 

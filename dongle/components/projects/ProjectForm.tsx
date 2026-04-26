@@ -44,7 +44,19 @@ const categories = [
   { value: "social", label: "Social / Community" },
 ];
 
-export default function ProjectForm() {
+type ProjectFormProps = {
+  mode?: "create" | "edit";
+  initialData?: Partial<ProjectFormValues>;
+  projectId?: string;
+  onSubmit?: (data: ProjectFormValues) => Promise<void>;
+};
+
+export default function ProjectForm({
+  mode = "create",
+  initialData,
+  projectId,
+  onSubmit: customOnSubmit,
+}: ProjectFormProps = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -56,16 +68,20 @@ export default function ProjectForm() {
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
-      name: "",
-      category: "",
-      description: "",
-      url: "",
-      logoUrl: "",
-      docsUrl: "",
+      name: initialData?.name || "",
+      category: initialData?.category || "",
+      description: initialData?.description || "",
+      url: initialData?.url || "",
+      logoUrl: initialData?.logoUrl || "",
+      docsUrl: initialData?.docsUrl || "",
     },
   });
 
   const onSubmit = async (data: ProjectFormValues) => {
+    if (customOnSubmit) {
+      return customOnSubmit(data);
+    }
+
     setIsSubmitting(true);
     const promise = sorobanService.registerProject(data);
 
@@ -96,10 +112,12 @@ export default function ProjectForm() {
         </div>
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
-            Register Project
+            {mode === "edit" ? "Edit Project" : "Register Project"}
           </h2>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
-            Onboard your dApp to the Dongle ecosystem.
+            {mode === "edit"
+              ? "Update your project's information."
+              : "Onboard your dApp to the Dongle ecosystem."}
           </p>
         </div>
       </div>
@@ -156,13 +174,17 @@ export default function ProjectForm() {
           size="lg"
           rightIcon={<CheckCircle2 className="w-5 h-5" />}
         >
-          {isSubmitting ? "Processing Transaction..." : "Submit Registration"}
+          {isSubmitting
+            ? "Processing Transaction..."
+            : mode === "edit"
+            ? "Update Project"
+            : "Submit Registration"}
         </Button>
 
         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 px-8">
-          By submitting, you agree to have your project details stored on the
-          Stellar network. A small transaction fee will be required for on-chain
-          registration.
+          {mode === "edit"
+            ? "By updating, you agree to have your project details updated on the Stellar network."
+            : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
         </p>
       </form>
     </Card>
