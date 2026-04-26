@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { stellarService } from "@/services/stellar/stellar.service";
 import { useWallet } from "@/context/wallet.context";
 import type { Horizon } from "stellar-sdk";
+import { toast } from "sonner";
 
 interface UseStellarAccountReturn {
   account: Horizon.AccountResponse | null;
@@ -47,6 +48,7 @@ export function useStellarAccount(): UseStellarAccountReturn {
       setAccount(null);
       setBalances(null);
       console.error("[useStellarAccount] Error fetching account data:", err);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
