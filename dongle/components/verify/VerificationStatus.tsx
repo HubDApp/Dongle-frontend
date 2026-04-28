@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { sorobanService } from "@/services/stellar/soroban.service";
@@ -15,8 +15,8 @@ interface VerificationStatusProps {
 }
 
 export default function VerificationStatus({ initialProjectId }: VerificationStatusProps) {
-  const [projectId, setProjectId] = useState(initialProjectId || "");
-  const [searchInput, setSearchInput] = useState("");
+  const [projectId, setProjectId] = useState(initialProjectId ?? "");
+  const [searchInput, setSearchInput] = useState(initialProjectId ?? "");
   const [status, setStatus] = useState<Status>("NONE");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,13 +34,14 @@ export default function VerificationStatus({ initialProjectId }: VerificationSta
     }
   };
 
-  useEffect(() => {
+  // Run once on mount — initialProjectId is intentionally excluded from deps
+  // because we only want to trigger the initial fetch, not re-fetch on every render
+  React.useEffect(() => {
     if (initialProjectId) {
-      setProjectId(initialProjectId);
-      setSearchInput(initialProjectId);
-      fetchStatus(initialProjectId);
+      void (async () => { await fetchStatus(initialProjectId); })();
     }
-  }, [initialProjectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

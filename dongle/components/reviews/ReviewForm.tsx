@@ -13,9 +13,7 @@ interface ReviewFormProps {
 }
 
 export default function ReviewForm({
-  projectId,
   projectName,
-  userAddress,
   initialReview,
   onSubmit,
   onCancel,
