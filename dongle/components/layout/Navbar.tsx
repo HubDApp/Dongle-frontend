@@ -19,6 +19,8 @@ export default function Navbar() {
 
   const navLinks = [
     { href: "/discover", label: "Discover" },
+    { href: "/reviews", label: "Reviews" },
+    { href: "/verify", label: "Verify" },
     { href: "/projects/new", label: "Submit Project" },
     { href: "/profile", label: "Profile" },
   ];

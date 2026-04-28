@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
+import { useState } from "react";
 import { useWallet } from "@/context/wallet.context";
 import { reviewService } from "@/services/review/review.service";
 import { Review, Project } from "@/types/review";
@@ -16,14 +15,11 @@ const MOCK_PROJECTS: Project[] = [
 
 export default function ReviewsPage() {
   const { isConnected, publicKey, connectWallet } = useWallet();
-  const [reviews, setReviews] = useState<Review[]>([]);
+  // Lazy initializer — reads from service once on mount, no effect needed
+  const [reviews, setReviews] = useState<Review[]>(() => reviewService.getReviews());
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-  useEffect(() => {
-    setReviews(reviewService.getReviews());
-  }, []);
 
   const handleAddReview = (project: Project) => {
     if (!isConnected) {
@@ -75,7 +71,6 @@ export default function ReviewsPage() {
   };
 
   return (
-    <LayoutWrapper>
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
@@ -133,6 +128,5 @@ export default function ReviewsPage() {
           </div>
         </div>
       </div>
-    </LayoutWrapper>
   );
 }
