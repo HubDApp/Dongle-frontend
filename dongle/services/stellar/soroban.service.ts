@@ -23,6 +23,15 @@ export interface ProjectData {
   createdAt: string;
 }
 
+export interface ProjectRegistrationParams {
+  name: string;
+  category: string;
+  description: string;
+  url: string;
+  logoUrl?: string;
+  docsUrl?: string;
+}
+
 export const sorobanService = {
   /**
    * Registers a new project in the Project Registry contract.

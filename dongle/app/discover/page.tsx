@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
+import { useState, useMemo } from "react";
 import { mockProjects } from "@/data/mockProjects";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { Button } from "@/components/ui/Button";
@@ -12,10 +11,9 @@ const ITEMS_PER_PAGE = 9;
 export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [sortBy, setSortBy] = useState<"rating" | "newest" | "popular">(
-    "rating",
-  );
-  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const [sortBy, setSortBy] = useState<"rating" | "newest" | "popular">("rating");
+  // page resets to 1 whenever filters change via the setter helpers below
+  const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const categories = [
@@ -23,11 +21,8 @@ export default function DiscoverPage() {
     ...Array.from(new Set(mockProjects.map((p) => p.category))),
   ];
 
-  // Apply filters and sorting
   const filteredAndSortedProjects = useMemo(() => {
     let result = mockProjects;
-
-    // Apply Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -36,46 +31,37 @@ export default function DiscoverPage() {
           p.description.toLowerCase().includes(q),
       );
     }
-
-    // Apply Category Filter
     if (selectedCategory !== "All") {
       result = result.filter((p) => p.category === selectedCategory);
     }
-
-    // Apply Sorting
     result = [...result].sort((a, b) => {
       if (sortBy === "rating") return b.rating - a.rating;
       if (sortBy === "popular") return b.reviews - a.reviews;
       if (sortBy === "newest")
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       return 0;
     });
-
     return result;
   }, [searchQuery, selectedCategory, sortBy]);
 
+  const visibleCount = page * ITEMS_PER_PAGE;
   const visibleProjects = filteredAndSortedProjects.slice(0, visibleCount);
   const hasMore = visibleCount < filteredAndSortedProjects.length;
 
   const handleLoadMore = () => {
     setIsLoadingMore(true);
-    // Simulate network delay for loading chunks
     setTimeout(() => {
-      setVisibleCount((prev) => prev + ITEMS_PER_PAGE);
+      setPage((p) => p + 1);
       setIsLoadingMore(false);
     }, 600);
   };
 
-  // Reset pagination when filters change
-  React.useEffect(() => {
-    setVisibleCount(ITEMS_PER_PAGE);
-  }, [searchQuery, selectedCategory, sortBy]);
+  const handleSearchChange = (q: string) => { setSearchQuery(q); setPage(1); };
+  const handleCategoryChange = (cat: string) => { setSelectedCategory(cat); setPage(1); };
+  const handleSortChange = (s: "rating" | "newest" | "popular") => { setSortBy(s); setPage(1); };
 
   return (
-    <LayoutWrapper>
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4">
           {/* Header & Controls */}
           <div className="mb-12">
@@ -95,7 +81,7 @@ export default function DiscoverPage() {
                   placeholder="Search projects by name or description..."
                   className="w-full pl-12 pr-4 py-3 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                 />
               </div>
 
@@ -104,7 +90,7 @@ export default function DiscoverPage() {
                   {categories.map((cat) => (
                     <button
                       key={cat}
-                      onClick={() => setSelectedCategory(cat)}
+                      onClick={() => handleCategoryChange(cat)}
                       className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                         selectedCategory === cat
                           ? "bg-blue-500 text-white"
@@ -121,7 +107,7 @@ export default function DiscoverPage() {
                 <select
                   value={sortBy}
                   onChange={(e) =>
-                    setSortBy(e.target.value as "rating" | "newest" | "popular")
+                    handleSortChange(e.target.value as "rating" | "newest" | "popular")
                   }
                   className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
@@ -152,8 +138,8 @@ export default function DiscoverPage() {
                 variant="outline"
                 className="mt-6"
                 onClick={() => {
-                  setSearchQuery("");
-                  setSelectedCategory("All");
+                  handleSearchChange("");
+                  handleCategoryChange("All");
                 }}
               >
                 Clear Filters
@@ -182,6 +168,5 @@ export default function DiscoverPage() {
           </div>
         </div>
       </main>
-    </LayoutWrapper>
   );
 }

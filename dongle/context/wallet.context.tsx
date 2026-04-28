@@ -21,6 +21,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
 
+  // Declared first so the polling effect below can reference it
+  const disconnectWallet = useCallback(() => {
+    setPublicKey(null);
+    setIsConnected(false);
+    localStorage.removeItem(WALLET_STORAGE_KEY);
+    toast.success("Wallet disconnected");
+  }, []);
+
+  // Restore wallet state on mount
   useEffect(() => {
     const restoreWalletState = async () => {
       try {
@@ -46,7 +55,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     restoreWalletState();
   }, []);
 
-  // Poll for account changes
+  // Poll for account changes while connected
   useEffect(() => {
     if (!isConnected) return;
 
@@ -58,32 +67,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           setPublicKey(currentKey);
           localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify({
             publicKey: currentKey,
-            isConnected: true
+            isConnected: true,
           }));
         }
       } catch (error) {
         console.error("Error checking account change:", error);
-        // If we can't get the public key anymore, it might mean the user disconnected from Freighter
         disconnectWallet();
       }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [isConnected, publicKey]);
+  }, [isConnected, publicKey, disconnectWallet]);
 
   const connectWallet = useCallback(async () => {
     if (isConnected) return;
-    
+
     setIsConnecting(true);
     const toastId = toast.loading("Connecting to Freighter...");
     try {
       const address = await walletService.connectWallet();
       setPublicKey(address);
       setIsConnected(true);
-      
       localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify({
         publicKey: address,
-        isConnected: true
+        isConnected: true,
       }));
       toast.success("Wallet connected successfully", { id: toastId });
     } catch (error) {
@@ -94,13 +101,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setIsConnecting(false);
     }
   }, [isConnected]);
-
-  const disconnectWallet = useCallback(() => {
-    setPublicKey(null);
-    setIsConnected(false);
-    localStorage.removeItem(WALLET_STORAGE_KEY);
-    toast.success("Wallet disconnected");
-  }, []);
 
   return (
     <WalletContext.Provider

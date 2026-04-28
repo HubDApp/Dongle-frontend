@@ -54,9 +54,8 @@ type ProjectFormProps = {
 export default function ProjectForm({
   mode = "create",
   initialData,
-  projectId,
   onSubmit: customOnSubmit,
-}: ProjectFormProps = {}) {
+}: Omit<ProjectFormProps, "projectId"> & { projectId?: string } = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 

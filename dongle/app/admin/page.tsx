@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
+import { useState } from "react";
 import { useWallet } from "@/context/wallet.context";
 
 interface VerificationRequest {
@@ -22,16 +21,9 @@ export default function AdminDashboard() {
   const { isConnected, publicKey } = useWallet();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
-  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Simple mock: assume any connected wallet is admin for this demo
-  useEffect(() => {
-    if (isConnected && publicKey) {
-      setIsAdmin(true);
-    } else {
-      setIsAdmin(false);
-    }
-  }, [isConnected, publicKey]);
+  // Derive admin status directly — no effect needed
+  const isAdmin = isConnected && Boolean(publicKey);
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
     setRequests(prev => prev.map(req => 
@@ -45,8 +37,7 @@ export default function AdminDashboard() {
 
   if (!isAdmin) {
     return (
-      <LayoutWrapper>
-        <div className="container mx-auto px-4 py-32 flex flex-col items-center justify-center text-center">
+        <div className="container mx-auto px-4 py-32 flex flex-col items-center justify-center text-center min-h-screen">
           <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center text-red-500 mb-6">
             <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m11 1a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -57,12 +48,10 @@ export default function AdminDashboard() {
             Please connect an authorized admin wallet to access this dashboard.
           </p>
         </div>
-      </LayoutWrapper>
     );
   }
 
   return (
-    <LayoutWrapper>
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
           <header className="mb-12">
@@ -171,6 +160,5 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
-    </LayoutWrapper>
   );
 }
