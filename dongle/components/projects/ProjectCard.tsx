@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Project } from "@/data/mockProjects";
 
 interface ProjectCardProps {
@@ -7,7 +8,7 @@ interface ProjectCardProps {
 
 export const ProjectCard = ({ project }: ProjectCardProps) => {
   return (
-    <div className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col">
+    <Link href={`/projects/${project.id}`} className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col cursor-pointer">
       <div className="w-full aspect-video bg-zinc-100 dark:bg-zinc-800 rounded-2xl mb-6 overflow-hidden relative shrink-0">
         <div className="absolute inset-0 flex items-center justify-center text-zinc-300 dark:text-zinc-700 font-bold text-lg">
           {project.name[0]}
@@ -33,6 +34,6 @@ export const ProjectCard = ({ project }: ProjectCardProps) => {
       <div className="text-xs text-zinc-400 dark:text-zinc-500 mt-auto">
         {project.reviews} reviews
       </div>
-    </div>
+    </Link>
   );
 };
