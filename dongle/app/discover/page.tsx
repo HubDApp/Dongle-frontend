@@ -4,17 +4,27 @@ import { useState, useMemo } from "react";
 import { mockProjects } from "@/data/mockProjects";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { Button } from "@/components/ui/Button";
-import { Search, Filter } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
+import { Search, Filter, Package } from "lucide-react";
 
 const ITEMS_PER_PAGE = 9;
 
 export default function DiscoverPage() {
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [sortBy, setSortBy] = useState<"rating" | "newest" | "popular">("rating");
   // page resets to 1 whenever filters change via the setter helpers below
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Simulate initial data loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   const categories = [
     "All",
@@ -109,7 +119,8 @@ export default function DiscoverPage() {
                   onChange={(e) =>
                     handleSortChange(e.target.value as "rating" | "newest" | "popular")
                   }
-                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  disabled={isInitialLoading}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="rating">Highest Rated</option>
                   <option value="popular">Most Popular</option>
@@ -119,12 +130,11 @@ export default function DiscoverPage() {
             </div>
           </div>
 
-          {/* Grid */}
-          {visibleProjects.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-              {visibleProjects.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
+          {/* Loading State */}
+          {isInitialLoading ? (
+            <div className="flex flex-col items-center justify-center py-24">
+              <Spinner size="lg" className="mb-4" />
+              <p className="text-zinc-500 dark:text-zinc-400">Loading projects...</p>
             </div>
           ) : (
             <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
@@ -161,11 +171,6 @@ export default function DiscoverPage() {
               </Button>
             </div>
           )}
-
-          <div className="text-center mt-6 text-sm text-zinc-500">
-            Showing {visibleProjects.length} of{" "}
-            {filteredAndSortedProjects.length} projects
-          </div>
         </div>
       </main>
   );
