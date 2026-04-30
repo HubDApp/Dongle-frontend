@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   // Strict mode catches potential issues early
   reactStrictMode: true,
 
+  // Set workspace root to silence Turbopack lockfile warning
+  turbopack: {
+    root: __dirname,
+  },
+
   // Compress responses for faster delivery
   compress: true,
 

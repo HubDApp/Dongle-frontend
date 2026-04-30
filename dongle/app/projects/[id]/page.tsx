@@ -13,7 +13,7 @@ import { Review } from "@/types/review";
 import {
   ArrowLeft,
   ExternalLink,
-  Github,
+  GitBranch,
   Globe,
   Star,
   MessageSquare,
@@ -181,7 +181,7 @@ export default function ProjectDetailPage() {
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </Button>
                   <Button variant="outline" size="sm">
-                    <Github className="w-4 h-4 mr-2" />
+                    <GitBranch className="w-4 h-4 mr-2" />
                     GitHub
                     <ExternalLink className="w-3 h-3 ml-1" />
                   </Button>
