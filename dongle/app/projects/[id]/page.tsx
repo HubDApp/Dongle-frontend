@@ -9,7 +9,10 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
+import ReviewForm from "@/components/reviews/ReviewForm";
 import { Review } from "@/types/review";
+import { reviewService } from "@/services/review/review.service";
+import { useWallet } from "@/context/wallet.context";
 import {
   ArrowLeft,
   ExternalLink,
@@ -24,55 +27,74 @@ import {
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { publicKey, connectWallet } = useWallet();
   const projectId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
-  const [project, setProject] = useState<typeof mockProjects[0] | null>(null);
+  const [project, setProject] = useState<(typeof mockProjects)[0] | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [currentUserAddress] = useState<string | null>(null);
+  const [isAddingReview, setIsAddingReview] = useState(false);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
 
   useEffect(() => {
     // Simulate data loading
     const timer = setTimeout(() => {
       const foundProject = mockProjects.find((p) => p.id === projectId);
       setProject(foundProject || null);
-      
-      // Mock reviews data
+
+      // Load reviews from shared service
       if (foundProject) {
-        setReviews([
-          {
-            id: "rev-1",
-            projectId: foundProject.id,
-            projectName: foundProject.name,
-            userAddress: "GABC...XYZ1",
-            rating: 5,
-            comment: "Excellent project! The team is very responsive and the product works flawlessly.",
-            createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-          },
-          {
-            id: "rev-2",
-            projectId: foundProject.id,
-            projectName: foundProject.name,
-            userAddress: "GDEF...XYZ2",
-            rating: 4,
-            comment: "Great concept and execution. Looking forward to future updates.",
-            createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-          },
-        ]);
+        setReviews(reviewService.getReviewsByProject(foundProject.id));
       }
-      
+
       setIsLoading(false);
     }, 600);
 
     return () => clearTimeout(timer);
   }, [projectId]);
 
+  const handleAddReview = () => {
+    if (!publicKey) {
+      connectWallet();
+      return;
+    }
+    setIsAddingReview(true);
+  };
+
   const handleEdit = (review: Review) => {
-    console.log("Edit review:", review);
+    setEditingReview(review);
+    setIsAddingReview(true);
   };
 
   const handleDelete = (id: string) => {
-    console.log("Delete review:", id);
+    if (confirm("Are you sure you want to delete this review?")) {
+      reviewService.deleteReview(id);
+      setReviews(reviewService.getReviewsByProject(projectId));
+    }
+  };
+
+  const handleSubmitReview = (data: { rating: number; comment: string }) => {
+    if (!publicKey || !project) return;
+
+    if (editingReview) {
+      reviewService.updateReview(editingReview.id, data);
+    } else {
+      reviewService.addReview({
+        projectId: project.id,
+        projectName: project.name,
+        userAddress: publicKey,
+        ...data,
+      });
+    }
+
+    setReviews(reviewService.getReviewsByProject(projectId));
+    setIsAddingReview(false);
+    setEditingReview(null);
+  };
+
+  const handleCancelReview = () => {
+    setIsAddingReview(false);
+    setEditingReview(null);
   };
 
   if (isLoading) {
@@ -82,7 +104,9 @@ export default function ProjectDetailPage() {
           <div className="container mx-auto px-4">
             <div className="flex flex-col items-center justify-center py-24">
               <Spinner size="lg" className="mb-4" />
-              <p className="text-zinc-500 dark:text-zinc-400">Loading project details...</p>
+              <p className="text-zinc-500 dark:text-zinc-400">
+                Loading project details...
+              </p>
             </div>
           </div>
         </main>
@@ -99,9 +123,13 @@ export default function ProjectDetailPage() {
               <AlertCircle className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
               <h3 className="text-2xl font-bold mb-2">Project Not Found</h3>
               <p className="text-zinc-500 dark:text-zinc-400 mb-6">
-                The project you&apos;re looking for doesn&apos;t exist or has been removed.
+                The project you&apos;re looking for doesn&apos;t exist or has
+                been removed.
               </p>
-              <Button variant="primary" onClick={() => router.push("/discover")}>
+              <Button
+                variant="primary"
+                onClick={() => router.push("/discover")}
+              >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Discover
               </Button>
@@ -147,11 +175,14 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         <span>
-                          {new Date(project.createdAt).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
+                          {new Date(project.createdAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            },
+                          )}
                         </span>
                       </div>
                     </div>
@@ -195,17 +226,31 @@ export default function ProjectDetailPage() {
                     <MessageSquare className="w-6 h-6" />
                     Reviews
                   </h2>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => router.push("/reviews")}
-                  >
-                    Write a Review
-                  </Button>
+                  {!isAddingReview && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleAddReview}
+                    >
+                      Write a Review
+                    </Button>
+                  )}
                 </div>
+                {(isAddingReview || editingReview) && project && (
+                  <div className="mb-6">
+                    <ReviewForm
+                      projectId={project.id}
+                      projectName={project.name}
+                      userAddress={publicKey || ""}
+                      initialReview={editingReview || undefined}
+                      onSubmit={handleSubmitReview}
+                      onCancel={handleCancelReview}
+                    />
+                  </div>
+                )}
                 <ReviewList
                   reviews={reviews}
-                  currentUserAddress={currentUserAddress}
+                  currentUserAddress={publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                 />
@@ -225,15 +270,21 @@ export default function ProjectDetailPage() {
                 <h3 className="text-lg font-bold mb-4">Quick Stats</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400">Rating</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Rating
+                    </span>
                     <span className="font-bold">{project.rating} / 5.0</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400">Total Reviews</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Total Reviews
+                    </span>
                     <span className="font-bold">{project.reviews}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400">Category</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Category
+                    </span>
                     <span className="font-bold">{project.category}</span>
                   </div>
                 </div>
@@ -246,7 +297,7 @@ export default function ProjectDetailPage() {
                   <Button
                     variant="primary"
                     className="w-full"
-                    onClick={() => router.push("/reviews")}
+                    onClick={handleAddReview}
                   >
                     Leave a Review
                   </Button>
