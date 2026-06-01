@@ -67,8 +67,9 @@ export default function ProjectDetailPage() {
   };
 
   const handleDelete = (id: string) => {
+    if (!publicKey) return;
     if (confirm("Are you sure you want to delete this review?")) {
-      reviewService.deleteReview(id);
+      reviewService.deleteReview(id, publicKey);
       setReviews(reviewService.getReviewsByProject(projectId));
     }
   };
@@ -77,14 +78,17 @@ export default function ProjectDetailPage() {
     if (!publicKey || !project) return;
 
     if (editingReview) {
-      reviewService.updateReview(editingReview.id, data);
+      reviewService.updateReview(editingReview.id, data, publicKey);
     } else {
-      reviewService.addReview({
-        projectId: project.id,
-        projectName: project.name,
-        userAddress: publicKey,
-        ...data,
-      });
+      reviewService.addReview(
+        {
+          projectId: project.id,
+          projectName: project.name,
+          userAddress: publicKey,
+          ...data,
+        },
+        publicKey
+      );
     }
 
     setReviews(reviewService.getReviewsByProject(projectId));
