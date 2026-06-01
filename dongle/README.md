@@ -78,18 +78,23 @@ Dongle requires the Freighter wallet extension for Stellar interactions:
 
 ## Environment Variables
 
-Currently, the application uses mock data and local storage for development. No environment variables are required for the basic functionality.
+The application requires specific environment variables for smart contract interactions. In development (`NODE_ENV=development` or `test`), safe default placeholders are provided. However, for production builds, these are **strictly required and validated** at startup.
 
-For production deployment with real blockchain integration, you may need:
+Create a `.env` or `.env.local` file in the `dongle` directory with the following variables:
 
 ```env
-# Stellar Network Configuration (future)
-NEXT_PUBLIC_STELLAR_NETWORK=testnet
-NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+# Stellar Soroban Contract IDs (Required in production)
+# Must be valid 56-character base32 encoded Stellar contract IDs starting with 'C'
+NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
-# API Endpoints (future)
-NEXT_PUBLIC_API_URL=https://api.dongle.io
+# Stellar Network Configuration (Optional, defaults to testnet)
+NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org:443
+NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
 ```
+
+If these are invalid or missing in production, the application will throw a clear validation error upon initialization.
 
 ## Project Structure
 
