@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 export const ContractIdSchema = z
-  .string({
-    required_error: "Contract ID is required in production.",
-  })
+  .string()
   .regex(/^C[A-Z2-7]{55}$/, "Invalid Stellar Contract ID format");
 
 export const getEnvSchema = (isDev: boolean) => {
@@ -29,13 +27,22 @@ export const getEnvSchema = (isDev: boolean) => {
   });
 };
 
+interface ValidationError {
+  path: string[];
+  message: string;
+}
+
+interface ZodError {
+  errors: ValidationError[];
+}
+
 export const parseEnv = (env: Record<string, string | undefined>, isDev: boolean) => {
   try {
     return getEnvSchema(isDev).parse(env);
-  } catch (error: any) {
-    if (error && typeof error === "object" && Array.isArray(error.errors)) {
+  } catch (error: unknown) {
+    if (error && typeof error === "object" && Array.isArray((error as ZodError).errors)) {
       console.error("Environment Validation Error:");
-      error.errors.forEach((err: any) => {
+      ((error as ZodError).errors).forEach((err: ValidationError) => {
         console.error(`- ${err.path.join(".")}: ${err.message}`);
       });
     }
