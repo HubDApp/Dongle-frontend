@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo, useCallback, useSyncExternalStore } from "react";
-import { projects, type Project, type ProjectCategory } from "@/data/projects";
+import { projects } from "@/data/projects";
+import { type Project, type ProjectCategory } from "@/types/project";
 
 export type SortOption = "rating" | "recency" | "reviews";
 
 export interface ProjectFiltersState {
-  category: ProjectCategory;
+  category: ProjectCategory | "All";
   sort: SortOption;
 }
 

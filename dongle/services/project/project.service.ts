@@ -1,14 +1,5 @@
 import { mockProjects } from "@/data/mockProjects";
-
-export interface Project {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  rating: number;
-  reviews: number;
-  createdAt: string;
-}
+import { Project } from "@/types/project";
 
 /**
  * Unified project service that provides a single source of truth

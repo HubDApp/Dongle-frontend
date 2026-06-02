@@ -1,12 +1,4 @@
-export interface Project {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  rating: number;
-  reviews: number;
-  createdAt: string; // ISO date string
-}
+import { Project, PROJECT_CATEGORIES } from "@/types/project";
 
 // Helper to generate deterministic but seemingly random dates
 const generateDate = (index: number) => {
@@ -18,28 +10,28 @@ const generateDate = (index: number) => {
 const baseProjects: Partial<Project>[] = [
   {
     name: "Soroban Swap",
-    category: "DeFi / DEX",
+    category: PROJECT_CATEGORIES.DEFI,
     description: "Next-generation automated market maker on Soroban.",
     rating: 4.8,
     reviews: 124,
   },
   {
     name: "Stellar Guardians",
-    category: "Gaming / NFT",
+    category: PROJECT_CATEGORIES.GAMING,
     description: "A decentralized strategy game with on-chain assets.",
     rating: 4.5,
     reviews: 89,
   },
   {
     name: "Anchor Connect",
-    category: "Infrastructure",
+    category: PROJECT_CATEGORIES.INFRASTRUCTURE,
     description: "Seamless on/off ramp protocol for Stellar anchors.",
     rating: 4.9,
     reviews: 210,
   },
   {
     name: "Lumen Lend",
-    category: "DeFi / DEX",
+    category: PROJECT_CATEGORIES.DEFI,
     description:
       "Decentralized lending and borrowing protocol for Stellar assets.",
     rating: 4.2,
@@ -47,7 +39,7 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "DAO Builder",
-    category: "DAOs / Governance",
+    category: PROJECT_CATEGORIES.DAO,
     description:
       "Create and manage your decentralized autonomous organization easily.",
     rating: 4.6,
@@ -55,28 +47,28 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "Stellar Social",
-    category: "Social / Community",
+    category: PROJECT_CATEGORIES.DAO,
     description: "A censorship-resistant social network powered by Soroban.",
     rating: 4.1,
     reviews: 32,
   },
   {
     name: "NFT Market",
-    category: "Gaming / NFT",
+    category: PROJECT_CATEGORIES.GAMING,
     description: "Buy, sell, and discover exclusive digital items and NFTs.",
     rating: 4.7,
     reviews: 305,
   },
   {
     name: "Token Forge",
-    category: "Infrastructure",
+    category: PROJECT_CATEGORIES.INFRASTRUCTURE,
     description: "No-code platform to mint and manage Stellar tokens.",
     rating: 4.4,
     reviews: 88,
   },
   {
     name: "Yield Farm",
-    category: "DeFi / DEX",
+    category: PROJECT_CATEGORIES.DEFI,
     description:
       "Maximize your returns with automated yield farming strategies.",
     rating: 4.3,

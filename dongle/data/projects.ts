@@ -1,35 +1,10 @@
-export type ProjectCategory =
-  | "All"
-  | "DeFi / DEX"
-  | "Gaming / NFT"
-  | "Infrastructure"
-  | "Payments"
-  | "DAO";
-
-export interface Project {
-  id: string;
-  name: string;
-  category: Exclude<ProjectCategory, "All">;
-  description: string;
-  rating: number;
-  reviews: number;
-  createdAt: string; // ISO date string
-}
-
-export const ALL_CATEGORIES: ProjectCategory[] = [
-  "All",
-  "DeFi / DEX",
-  "Gaming / NFT",
-  "Infrastructure",
-  "Payments",
-  "DAO",
-];
+import { Project, PROJECT_CATEGORIES } from "@/types/project";
 
 export const projects: Project[] = [
   {
     id: "soroban-swap",
     name: "Soroban Swap",
-    category: "DeFi / DEX",
+    category: PROJECT_CATEGORIES.DEFI,
     description: "Next-generation automated market maker on Soroban.",
     rating: 4.8,
     reviews: 124,
@@ -38,7 +13,7 @@ export const projects: Project[] = [
   {
     id: "stellar-guardians",
     name: "Stellar Guardians",
-    category: "Gaming / NFT",
+    category: PROJECT_CATEGORIES.GAMING,
     description: "A decentralized strategy game with on-chain assets.",
     rating: 4.5,
     reviews: 89,
@@ -47,7 +22,7 @@ export const projects: Project[] = [
   {
     id: "anchor-connect",
     name: "Anchor Connect",
-    category: "Infrastructure",
+    category: PROJECT_CATEGORIES.INFRASTRUCTURE,
     description: "Seamless on/off ramp protocol for Stellar anchors.",
     rating: 4.9,
     reviews: 210,
@@ -56,7 +31,7 @@ export const projects: Project[] = [
   {
     id: "xlm-pay",
     name: "XLM Pay",
-    category: "Payments",
+    category: PROJECT_CATEGORIES.PAYMENTS,
     description: "Instant cross-border payments powered by Stellar.",
     rating: 4.6,
     reviews: 175,
@@ -65,7 +40,7 @@ export const projects: Project[] = [
   {
     id: "stellar-dao",
     name: "Stellar DAO",
-    category: "DAO",
+    category: PROJECT_CATEGORIES.DAO,
     description: "On-chain governance and treasury management for Stellar communities.",
     rating: 4.3,
     reviews: 62,
@@ -74,7 +49,7 @@ export const projects: Project[] = [
   {
     id: "nft-forge",
     name: "NFT Forge",
-    category: "Gaming / NFT",
+    category: PROJECT_CATEGORIES.GAMING,
     description: "Mint, trade, and showcase NFTs on the Stellar network.",
     rating: 4.4,
     reviews: 98,

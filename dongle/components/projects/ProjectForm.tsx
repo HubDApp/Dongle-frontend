@@ -35,14 +35,7 @@ const projectSchema = z.object({
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
 
-const categories = [
-  { value: "defi", label: "DeFi / DEX" },
-  { value: "nfts", label: "NFTs / Collectibles" },
-  { value: "gaming", label: "Gaming" },
-  { value: "tools", label: "Tools / Infrastructure" },
-  { value: "dao", label: "DAOs / Governance" },
-  { value: "social", label: "Social / Community" },
-];
+import { CATEGORY_FORM_OPTIONS } from "@/types/project";
 
 type ProjectFormProps = {
   mode?: "create" | "edit";
@@ -131,7 +124,7 @@ export default function ProjectForm({
           />
           <SelectField
             label="Category"
-            options={categories}
+            options={CATEGORY_FORM_OPTIONS}
             {...register("category")}
             error={errors.category?.message}
           />

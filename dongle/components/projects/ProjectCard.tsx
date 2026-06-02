@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { Project } from "@/data/mockProjects";
+import { Project } from "@/types/project";
 
 interface ProjectCardProps {
   project: Project;

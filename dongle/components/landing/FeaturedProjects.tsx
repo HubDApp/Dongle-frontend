@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useProjectFilters, type SortOption } from "@/hooks/useProjectFilters";
-import { ALL_CATEGORIES, type ProjectCategory } from "@/data/projects";
+import { ALL_CATEGORIES, type ProjectCategory } from "@/types/project";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
