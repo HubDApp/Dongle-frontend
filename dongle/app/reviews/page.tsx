@@ -7,6 +7,7 @@ import { Review, Project } from "@/types/review";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import { mockProjects } from "@/data/mockProjects";
+import { toast } from "sonner";
 
 export default function ReviewsPage() {
   const { isConnected, publicKey, connectWallet } = useWallet();
@@ -41,9 +42,15 @@ export default function ReviewsPage() {
   };
 
   const handleDeleteReview = (id: string) => {
+    if (!publicKey) return;
     if (confirm("Are you sure you want to delete this review?")) {
-      reviewService.deleteReview(id);
-      setReviews(reviewService.getReviews());
+      const result = reviewService.deleteReview(id, publicKey);
+      if (result.success) {
+        setReviews(reviewService.getReviews());
+        toast.success("Review deleted");
+      } else {
+        toast.error(result.error || "Failed to delete review");
+      }
     }
   };
 
@@ -51,20 +58,36 @@ export default function ReviewsPage() {
     if (!publicKey || !selectedProject) return;
 
     if (editingReview) {
-      reviewService.updateReview(editingReview.id, data);
+      const result = reviewService.updateReview(editingReview.id, data, publicKey);
+      if (result.success) {
+        setReviews(reviewService.getReviews());
+        setIsAddingReview(false);
+        setEditingReview(null);
+        setSelectedProject(null);
+        toast.success("Review updated");
+      } else {
+        toast.error(result.errors?.[0]?.message || "Failed to update review");
+      }
     } else {
-      reviewService.addReview({
-        projectId: selectedProject.id,
-        projectName: selectedProject.name,
-        userAddress: publicKey,
-        ...data,
-      });
+      const result = reviewService.addReview(
+        {
+          projectId: selectedProject.id,
+          projectName: selectedProject.name,
+          userAddress: publicKey,
+          ...data,
+        },
+        publicKey
+      );
+      if (result.success) {
+        setReviews(reviewService.getReviews());
+        setIsAddingReview(false);
+        setEditingReview(null);
+        setSelectedProject(null);
+        toast.success("Review posted");
+      } else {
+        toast.error(result.errors?.[0]?.message || "Failed to post review");
+      }
     }
-
-    setReviews(reviewService.getReviews());
-    setIsAddingReview(false);
-    setEditingReview(null);
-    setSelectedProject(null);
   };
 
   return (
