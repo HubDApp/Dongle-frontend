@@ -135,18 +135,33 @@ export const sorobanService = {
   },
 
   /**
-   * Mock method to request verification for a project.
+   * Request verification for a project.
+   * Delegates to verification service for state management.
    */
-  async requestVerification(projectId: string) {
+  async requestVerification(projectId: string, projectName: string) {
     try {
-      console.log(
-        `[SorobanService] Requesting verification for project: ${projectId}`,
+      let userAddress: string;
+      try {
+        userAddress = await walletService.getPublicKey();
+      } catch {
+        userAddress = "unknown";
+      }
+
+      // Import here to avoid circular dependency
+      const { verificationService } = await import("./verification.service");
+
+      const requestId = await verificationService.submitVerificationRequest(
+        projectId,
+        projectName,
+        userAddress,
       );
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      console.log(
+        `[SorobanService] Verification request submitted: ${requestId}`,
+      );
+      
       return {
-        hash:
-          "mock_verification_hash_" + Math.random().toString(36).substring(7),
+        hash: requestId,
         status: "SUCCESS",
       };
     } catch (error) {
@@ -156,29 +171,21 @@ export const sorobanService = {
   },
 
   /**
-   * Mock method to get the verification status of a project.
+   * Get the verification status of a project.
+   * Queries the verification service for actual status.
    */
   async getVerificationStatus(
     projectId: string,
   ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
     try {
+      // Import here to avoid circular dependency
+      const { verificationService } = await import("./verification.service");
+
+      const status = await verificationService.getVerificationStatus(projectId);
       console.log(
-        `[SorobanService] Getting verification status for: ${projectId}`,
+        `[SorobanService] Verification status for ${projectId}: ${status}`,
       );
-      // Simulate network delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // For demonstration, we can return 'PENDING' if a certain string is passed,
-      // or randomly determine status. We'll return a random status for the mock,
-      // but biased towards 'PENDING' for newly submitted ones.
-
-      if (!projectId || projectId.length < 3) return "NONE";
-
-      // Simple hash to keep it deterministic per session
-      const mockStatus = parseInt(projectId, 36) % 3;
-      if (mockStatus === 0) return "VERIFIED";
-      if (mockStatus === 1) return "PENDING";
-      return "REJECTED";
+      return status;
     } catch (error) {
       console.error(
         "[SorobanService] Error getting verification status:",
