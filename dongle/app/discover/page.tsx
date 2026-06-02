@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { mockProjects } from "@/data/mockProjects";
+import { projectService } from "@/services/project/project.service";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -28,33 +28,20 @@ export default function DiscoverPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const categories = [
-    "All",
-    ...Array.from(new Set(mockProjects.map((p) => p.category))),
-  ];
+  const categories = projectService.getCategories();
 
   const filteredAndSortedProjects = useMemo(() => {
-    let result = mockProjects;
+    let result = projectService.getAllProjects();
+
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q),
-      );
+      result = projectService.searchProjects(searchQuery);
     }
+
     if (selectedCategory !== "All") {
       result = result.filter((p) => p.category === selectedCategory);
     }
-    result = [...result].sort((a, b) => {
-      if (sortBy === "rating") return b.rating - a.rating;
-      if (sortBy === "popular") return b.reviews - a.reviews;
-      if (sortBy === "newest")
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      return 0;
-    });
+
+    result = projectService.sortProjects(result, sortBy);
     return result;
   }, [searchQuery, selectedCategory, sortBy]);
 
