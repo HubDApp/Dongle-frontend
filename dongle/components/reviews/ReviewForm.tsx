@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Review } from "@/types/review";
+import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
 
 interface ReviewFormProps {
   projectId: string;
@@ -20,10 +20,41 @@ export default function ReviewForm({
 }: ReviewFormProps) {
   const [rating, setRating] = useState(initialReview?.rating || 5);
   const [comment, setComment] = useState(initialReview?.comment || "");
+  const [errors, setErrors] = useState<ReviewValidationError[]>([]);
+
+  const validateForm = (): boolean => {
+    const newErrors: ReviewValidationError[] = [];
+
+    if (rating < REVIEW_CONSTRAINTS.RATING_MIN || rating > REVIEW_CONSTRAINTS.RATING_MAX) {
+      newErrors.push({
+        field: "rating",
+        message: `Rating must be between ${REVIEW_CONSTRAINTS.RATING_MIN} and ${REVIEW_CONSTRAINTS.RATING_MAX}`,
+      });
+    }
+
+    if (comment.trim().length < REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH) {
+      newErrors.push({
+        field: "comment",
+        message: `Comment must be at least ${REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters`,
+      });
+    }
+
+    if (comment.length > REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH) {
+      newErrors.push({
+        field: "comment",
+        message: `Comment cannot exceed ${REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH} characters`,
+      });
+    }
+
+    setErrors(newErrors);
+    return newErrors.length === 0;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ rating, comment });
+    if (validateForm()) {
+      onSubmit({ rating, comment });
+    }
   };
 
   return (
@@ -65,10 +96,17 @@ export default function ReviewForm({
               </button>
             ))}
           </div>
+          {errors.some((e) => e.field === "rating") && (
+            <p className="text-red-500 text-sm mt-2">
+              {errors.find((e) => e.field === "rating")?.message}
+            </p>
+          )}
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Comment</label>
+          <label className="block text-sm font-medium mb-2">
+            Comment ({comment.length}/{REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH})
+          </label>
           <textarea
             required
             value={comment}
@@ -76,6 +114,18 @@ export default function ReviewForm({
             placeholder="Share your experience with this project..."
             className="w-full h-32 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
           />
+          <div className="flex justify-between items-start mt-2">
+            <div>
+              {errors.some((e) => e.field === "comment") && (
+                <p className="text-red-500 text-sm">
+                  {errors.find((e) => e.field === "comment")?.message}
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-zinc-500">
+              Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} chars
+            </p>
+          </div>
         </div>
       </div>
 

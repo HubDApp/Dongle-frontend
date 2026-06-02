@@ -1,226 +1,405 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Review } from "@/types/review";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { reviewService } from "@/services/review/review.service";
+import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
 
-// Mock review service interface
-interface ReviewService {
-  submitReview: (projectId: string, rating: number, comment: string) => Promise<Review>;
-  getProjectReviews: (projectId: string) => Promise<Review[]>;
-  deleteReview: (reviewId: string) => Promise<void>;
-  updateReview: (reviewId: string, rating: number, comment: string) => Promise<Review>;
-}
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
 
-// Create a mock implementation
-const mockReviewService: ReviewService = {
-  submitReview: vi.fn(),
-  getProjectReviews: vi.fn(),
-  deleteReview: vi.fn(),
-  updateReview: vi.fn(),
-};
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value.toString();
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+  };
+})();
 
-describe("Review Service - High Risk Flows", () => {
+Object.defineProperty(window, "localStorage", {
+  value: localStorageMock,
+});
+
+describe("Review Service", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    localStorage.clear();
   });
 
-  describe("Submit Review", () => {
-    it("submits review successfully with valid data", async () => {
-      const mockReview: Review = {
-        id: "rev-1",
-        projectId: "proj-1",
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  describe("addReview", () => {
+    it("should add a valid review", () => {
+      const review = {
+        projectId: "proj1",
         projectName: "Test Project",
-        userAddress: "GABC...XYZ",
+        userAddress: "user1",
         rating: 5,
-        comment: "Great project!",
-        createdAt: new Date().toISOString(),
+        comment: "This is a great project with excellent features",
       };
 
-      (mockReviewService.submitReview as any).mockResolvedValue(mockReview);
+      const result = reviewService.addReview(review, "user1");
 
-      const result = await mockReviewService.submitReview("proj-1", 5, "Great project!");
-      
-      expect(result).toEqual(mockReview);
-      expect(mockReviewService.submitReview).toHaveBeenCalledWith("proj-1", 5, "Great project!");
+      expect(result.success).toBe(true);
+      expect(result.data).toBeDefined();
+      expect(result.data?.id).toBeDefined();
+      expect(result.data?.createdAt).toBeDefined();
+      expect(result.data?.rating).toBe(5);
+      expect(result.data?.comment).toBe(review.comment);
     });
 
-    it("validates rating is between 1-5", async () => {
-      (mockReviewService.submitReview as any).mockImplementation(
-        (projectId: string, rating: number, comment: string) => {
-          if (rating < 1 || rating > 5) {
-            throw new Error("Rating must be between 1 and 5");
-          }
-          return Promise.resolve({ id: "rev-1" });
-        }
-      );
+    it("should reject review with invalid rating (too low)", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 0,
+        comment: "This is a great project with excellent features",
+      };
 
-      await expect(
-        mockReviewService.submitReview("proj-1", 6, "Invalid")
-      ).rejects.toThrow("Rating must be between 1 and 5");
+      const result = reviewService.addReview(review, "user1");
+
+      expect(result.success).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.[0].field).toBe("rating");
+      expect(result.errors?.[0].message).toContain("between");
     });
 
-    it("requires comment to not be empty", async () => {
-      (mockReviewService.submitReview as any).mockImplementation(
-        (projectId: string, rating: number, comment: string) => {
-          if (!comment || comment.trim().length === 0) {
-            throw new Error("Comment cannot be empty");
-          }
-          return Promise.resolve({ id: "rev-1" });
-        }
-      );
+    it("should reject review with invalid rating (too high)", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 6,
+        comment: "This is a great project with excellent features",
+      };
 
-      await expect(
-        mockReviewService.submitReview("proj-1", 5, "")
-      ).rejects.toThrow("Comment cannot be empty");
+      const result = reviewService.addReview(review, "user1");
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].field).toBe("rating");
     });
 
-    it("handles submission error gracefully", async () => {
-      (mockReviewService.submitReview as any).mockRejectedValue(
-        new Error("Failed to submit review")
-      );
+    it("should reject review with non-integer rating", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 3.5,
+        comment: "This is a great project with excellent features",
+      };
 
-      await expect(
-        mockReviewService.submitReview("proj-1", 5, "Test")
-      ).rejects.toThrow("Failed to submit review");
+      const result = reviewService.addReview(review, "user1");
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].field).toBe("rating");
+    });
+
+    it("should reject review with comment too short", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 5,
+        comment: "Too short",
+      };
+
+      const result = reviewService.addReview(review, "user1");
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].field).toBe("comment");
+      expect(result.errors?.[0].message).toContain("at least");
+    });
+
+    it("should reject review with comment too long", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 5,
+        comment: "a".repeat(REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH + 1),
+      };
+
+      const result = reviewService.addReview(review, "user1");
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].field).toBe("comment");
+      expect(result.errors?.[0].message).toContain("cannot exceed");
+    });
+
+    it("should reject duplicate review from same user for same project", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 5,
+        comment: "This is a great project with excellent features",
+      };
+
+      const result1 = reviewService.addReview(review, "user1");
+      expect(result1.success).toBe(true);
+
+      const result2 = reviewService.addReview(review, "user1");
+      expect(result2.success).toBe(false);
+      expect(result2.errors?.[0].message).toContain("already reviewed");
+    });
+
+    it("should allow different users to review same project", () => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        rating: 5,
+        comment: "This is a great project with excellent features",
+      };
+
+      const result1 = reviewService.addReview(
+        { ...review, userAddress: "user1" },
+        "user1"
+      );
+      expect(result1.success).toBe(true);
+
+      const result2 = reviewService.addReview(
+        { ...review, userAddress: "user2" },
+        "user2"
+      );
+      expect(result2.success).toBe(true);
+    });
+
+    it("should allow same user to review different projects", () => {
+      const review = {
+        userAddress: "user1",
+        rating: 5,
+        comment: "This is a great project with excellent features",
+      };
+
+      const result1 = reviewService.addReview(
+        { ...review, projectId: "proj1", projectName: "Project 1" },
+        "user1"
+      );
+      expect(result1.success).toBe(true);
+
+      const result2 = reviewService.addReview(
+        { ...review, projectId: "proj2", projectName: "Project 2" },
+        "user1"
+      );
+      expect(result2.success).toBe(true);
     });
   });
 
-  describe("Get Project Reviews", () => {
-    it("fetches all reviews for a project", async () => {
-      const mockReviews: Review[] = [
+  describe("updateReview", () => {
+    let reviewId: string;
+
+    beforeEach(() => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 5,
+        comment: "This is a great project with excellent features",
+      };
+      const result = reviewService.addReview(review, "user1");
+      reviewId = result.data?.id || "";
+    });
+
+    it("should update review by owner", () => {
+      const result = reviewService.updateReview(
+        reviewId,
+        { rating: 4, comment: "Updated comment with more details here" },
+        "user1"
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data?.rating).toBe(4);
+      expect(result.data?.comment).toBe("Updated comment with more details here");
+    });
+
+    it("should reject update by non-owner", () => {
+      const result = reviewService.updateReview(
+        reviewId,
+        { rating: 4, comment: "Updated comment with more details here" },
+        "user2"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].message).toContain("permission");
+    });
+
+    it("should reject update with invalid rating", () => {
+      const result = reviewService.updateReview(
+        reviewId,
+        { rating: 10, comment: "Updated comment with more details here" },
+        "user1"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].field).toBe("rating");
+    });
+
+    it("should reject update with invalid comment", () => {
+      const result = reviewService.updateReview(
+        reviewId,
+        { rating: 4, comment: "short" },
+        "user1"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].field).toBe("comment");
+    });
+
+    it("should reject update of non-existent review", () => {
+      const result = reviewService.updateReview(
+        "nonexistent",
+        { rating: 4, comment: "Updated comment with more details here" },
+        "user1"
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.errors?.[0].message).toContain("not found");
+    });
+
+    it("should allow partial updates", () => {
+      const result = reviewService.updateReview(
+        reviewId,
+        { rating: 3 },
+        "user1"
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data?.rating).toBe(3);
+      expect(result.data?.comment).toBe(
+        "This is a great project with excellent features"
+      );
+    });
+  });
+
+  describe("deleteReview", () => {
+    let reviewId: string;
+
+    beforeEach(() => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 5,
+        comment: "This is a great project with excellent features",
+      };
+      const result = reviewService.addReview(review, "user1");
+      reviewId = result.data?.id || "";
+    });
+
+    it("should delete review by owner", () => {
+      const result = reviewService.deleteReview(reviewId, "user1");
+
+      expect(result.success).toBe(true);
+      const reviews = reviewService.getReviews();
+      expect(reviews.find((r) => r.id === reviewId)).toBeUndefined();
+    });
+
+    it("should reject delete by non-owner", () => {
+      const result = reviewService.deleteReview(reviewId, "user2");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("permission");
+      const reviews = reviewService.getReviews();
+      expect(reviews.find((r) => r.id === reviewId)).toBeDefined();
+    });
+
+    it("should reject delete of non-existent review", () => {
+      const result = reviewService.deleteReview("nonexistent", "user1");
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("not found");
+    });
+  });
+
+  describe("getReviewsByProject", () => {
+    beforeEach(() => {
+      const reviews = [
         {
-          id: "rev-1",
-          projectId: "proj-1",
-          projectName: "Test Project",
-          userAddress: "GABC...XYZ1",
+          projectId: "proj1",
+          projectName: "Project 1",
+          userAddress: "user1",
           rating: 5,
-          comment: "Excellent!",
-          createdAt: new Date().toISOString(),
+          comment: "This is a great project with excellent features",
         },
         {
-          id: "rev-2",
-          projectId: "proj-1",
-          projectName: "Test Project",
-          userAddress: "GDEF...XYZ2",
+          projectId: "proj1",
+          projectName: "Project 1",
+          userAddress: "user2",
           rating: 4,
-          comment: "Good project",
-          createdAt: new Date().toISOString(),
+          comment: "Good project with some minor issues here",
+        },
+        {
+          projectId: "proj2",
+          projectName: "Project 2",
+          userAddress: "user1",
+          rating: 3,
+          comment: "Average project with decent functionality",
         },
       ];
 
-      (mockReviewService.getProjectReviews as any).mockResolvedValue(mockReviews);
-
-      const result = await mockReviewService.getProjectReviews("proj-1");
-      
-      expect(result).toEqual(mockReviews);
-      expect(result.length).toBe(2);
+      reviews.forEach((review, index) => {
+        reviewService.addReview(review, review.userAddress);
+      });
     });
 
-    it("returns empty array for project with no reviews", async () => {
-      (mockReviewService.getProjectReviews as any).mockResolvedValue([]);
-
-      const result = await mockReviewService.getProjectReviews("proj-no-reviews");
-      
-      expect(result).toEqual([]);
-      expect(result.length).toBe(0);
+    it("should return all reviews for a project", () => {
+      const reviews = reviewService.getReviewsByProject("proj1");
+      expect(reviews).toHaveLength(2);
+      expect(reviews.every((r) => r.projectId === "proj1")).toBe(true);
     });
 
-    it("handles fetch error gracefully", async () => {
-      (mockReviewService.getProjectReviews as any).mockRejectedValue(
-        new Error("Failed to fetch reviews")
-      );
-
-      await expect(
-        mockReviewService.getProjectReviews("proj-1")
-      ).rejects.toThrow("Failed to fetch reviews");
+    it("should return empty array for project with no reviews", () => {
+      const reviews = reviewService.getReviewsByProject("nonexistent");
+      expect(reviews).toHaveLength(0);
     });
   });
 
-  describe("Delete Review", () => {
-    it("deletes review successfully", async () => {
-      (mockReviewService.deleteReview as any).mockResolvedValue(undefined);
+  describe("getReviewsByUser", () => {
+    beforeEach(() => {
+      const reviews = [
+        {
+          projectId: "proj1",
+          projectName: "Project 1",
+          userAddress: "user1",
+          rating: 5,
+          comment: "This is a great project with excellent features",
+        },
+        {
+          projectId: "proj2",
+          projectName: "Project 2",
+          userAddress: "user1",
+          rating: 4,
+          comment: "Good project with some minor issues here",
+        },
+        {
+          projectId: "proj1",
+          projectName: "Project 1",
+          userAddress: "user2",
+          rating: 3,
+          comment: "Average project with decent functionality",
+        },
+      ];
 
-      await mockReviewService.deleteReview("rev-1");
-      
-      expect(mockReviewService.deleteReview).toHaveBeenCalledWith("rev-1");
+      reviews.forEach((review) => {
+        reviewService.addReview(review, review.userAddress);
+      });
     });
 
-    it("handles delete error for non-existent review", async () => {
-      (mockReviewService.deleteReview as any).mockRejectedValue(
-        new Error("Review not found")
-      );
-
-      await expect(
-        mockReviewService.deleteReview("rev-nonexistent")
-      ).rejects.toThrow("Review not found");
+    it("should return all reviews by a user", () => {
+      const reviews = reviewService.getReviewsByUser("user1");
+      expect(reviews).toHaveLength(2);
+      expect(reviews.every((r) => r.userAddress === "user1")).toBe(true);
     });
 
-    it("prevents unauthorized deletion", async () => {
-      (mockReviewService.deleteReview as any).mockImplementation(
-        (reviewId: string) => {
-          throw new Error("Unauthorized: Can only delete own reviews");
-        }
-      );
-
-      await expect(
-        mockReviewService.deleteReview("rev-other-user")
-      ).rejects.toThrow("Unauthorized");
-    });
-  });
-
-  describe("Update Review", () => {
-    it("updates review successfully", async () => {
-      const updatedReview: Review = {
-        id: "rev-1",
-        projectId: "proj-1",
-        projectName: "Test Project",
-        userAddress: "GABC...XYZ",
-        rating: 4,
-        comment: "Updated review",
-        createdAt: new Date().toISOString(),
-      };
-
-      (mockReviewService.updateReview as any).mockResolvedValue(updatedReview);
-
-      const result = await mockReviewService.updateReview("rev-1", 4, "Updated review");
-      
-      expect(result.rating).toBe(4);
-      expect(result.comment).toBe("Updated review");
-    });
-
-    it("handles update error for non-existent review", async () => {
-      (mockReviewService.updateReview as any).mockRejectedValue(
-        new Error("Review not found")
-      );
-
-      await expect(
-        mockReviewService.updateReview("rev-nonexistent", 5, "Comment")
-      ).rejects.toThrow("Review not found");
-    });
-  });
-
-  describe("Review Validation", () => {
-    it("prevents duplicate reviews from same user", async () => {
-      (mockReviewService.submitReview as any).mockRejectedValue(
-        new Error("User has already reviewed this project")
-      );
-
-      await expect(
-        mockReviewService.submitReview("proj-1", 5, "Review")
-      ).rejects.toThrow("User has already reviewed this project");
-    });
-
-    it("validates minimum comment length", async () => {
-      (mockReviewService.submitReview as any).mockImplementation(
-        (projectId: string, rating: number, comment: string) => {
-          if (comment.length < 10) {
-            throw new Error("Comment must be at least 10 characters");
-          }
-          return Promise.resolve({ id: "rev-1" });
-        }
-      );
-
-      await expect(
-        mockReviewService.submitReview("proj-1", 5, "Short")
-      ).rejects.toThrow("Comment must be at least 10 characters");
+    it("should return empty array for user with no reviews", () => {
+      const reviews = reviewService.getReviewsByUser("nonexistent");
+      expect(reviews).toHaveLength(0);
     });
   });
 });
