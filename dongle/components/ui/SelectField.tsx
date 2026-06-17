@@ -7,15 +7,19 @@ interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement>
 }
 
 export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(
-  ({ label, options, error, className = "", ...props }, ref) => {
+  ({ label, options, error, className = "", id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const selectId = id || generatedId;
+
     return (
       <div className="flex flex-col gap-2 w-full">
-        <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        <label htmlFor={selectId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           {label}
         </label>
         <div className="relative">
           <select
             ref={ref}
+            id={selectId}
             className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${
               error ? "border-red-500/50 focus:border-red-500" : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50"
             } rounded-2xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 ${className}`}

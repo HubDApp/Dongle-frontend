@@ -6,14 +6,18 @@ interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaEl
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", ...props }, ref) => {
+  ({ label, error, className = "", id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const textareaId = id || generatedId;
+
     return (
       <div className="flex flex-col gap-2 w-full">
-        <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        <label htmlFor={textareaId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           {label}
         </label>
         <textarea
           ref={ref}
+          id={textareaId}
           rows={4}
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${
             error ? "border-red-500/50 focus:border-red-500" : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50"

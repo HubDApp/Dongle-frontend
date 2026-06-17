@@ -7,16 +7,20 @@ interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, className = "", ...props }, ref) => {
+  ({ label, error, className = "", id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
+
     return (
       <div className="flex flex-col gap-2 w-full">
-        <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           {label}
         </label>
         <Input
           ref={ref}
           error={!!error}
           className={className}
+          id={inputId}
           {...props}
         />
         {error && (
