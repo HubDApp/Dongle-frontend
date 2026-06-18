@@ -93,7 +93,7 @@ export default function VerificationStatus({ initialProjectId }: VerificationSta
             onChange={(e) => setSearchInput(e.target.value)}
             className="flex-1"
           />
-          <Button type="submit" variant="secondary" className="mt-1" isLoading={isLoading}>
+          <Button type="submit" variant="secondary" className="mt-1" isLoading={isLoading} aria-label="Search verification status">
             <Search className="w-4 h-4" />
           </Button>
         </form>

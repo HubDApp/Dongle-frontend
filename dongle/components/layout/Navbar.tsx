@@ -84,6 +84,9 @@ export default function Navbar() {
           {/* Mobile menu button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
             className="md:hidden p-2 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
           >
             <svg
@@ -105,7 +108,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800">
+        <div id="mobile-menu" className="md:hidden bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800">
           <div className="px-4 py-4 space-y-2">
             {navLinks.map((link) => (
               <Link

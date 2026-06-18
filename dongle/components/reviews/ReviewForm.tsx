@@ -64,9 +64,10 @@ export default function ReviewForm({
           <h3 className="text-xl font-bold">{initialReview ? "Edit Review" : "Add Review"}</h3>
           <p className="text-sm text-zinc-500">{projectName}</p>
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={onCancel}
+          aria-label="Close form"
           className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,6 +85,8 @@ export default function ReviewForm({
                 key={star}
                 type="button"
                 onClick={() => setRating(star)}
+                aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                aria-pressed={rating === star}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                   rating >= star 
                     ? "bg-yellow-500 text-white shadow-lg shadow-yellow-500/20" 

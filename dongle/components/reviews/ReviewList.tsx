@@ -61,16 +61,18 @@ export default function ReviewList({ reviews, currentUserAddress, onEdit, onDele
             
             {currentUserAddress === review.userAddress && (
               <div className="flex gap-2">
-                <button 
+                <button
                   onClick={() => onEdit(review)}
+                  aria-label="Edit review"
                   className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-black dark:hover:text-white"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
                 </button>
-                <button 
+                <button
                   onClick={() => onDelete(review.id)}
+                  aria-label="Delete review"
                   className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-zinc-500 hover:text-red-500"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
