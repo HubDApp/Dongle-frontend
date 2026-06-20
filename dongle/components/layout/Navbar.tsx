@@ -34,18 +34,29 @@ export default function Navbar() {
           <Link href="/" className="text-xl font-bold tracking-tighter">
             DONGLE
           </Link>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400">
-            <Link href="/discover" className="hover:text-black dark:hover:text-white transition-colors">
-              Discover
-            </Link>
-            <Link href="/reviews" className="hover:text-black dark:hover:text-white transition-colors">
-              Reviews
-            </Link>
-            <Link href="/verify" className="hover:text-black dark:hover:text-white transition-colors">
-              Verify
-            </Link>
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`py-2 px-1 transition-all border-b-2 ${
+                  isActive(link.href)
+                    ? "text-black dark:text-white font-semibold border-black dark:border-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
             {isConnected && (
-              <Link href="/admin" className="hover:text-black dark:hover:text-white transition-colors">
+              <Link
+                href="/admin"
+                className={`py-2 px-1 transition-all border-b-2 ${
+                  isActive("/admin")
+                    ? "text-black dark:text-white font-semibold border-black dark:border-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
+                }`}
+              >
                 Admin
               </Link>
             )}
