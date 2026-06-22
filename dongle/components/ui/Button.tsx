@@ -6,12 +6,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "outline" | "ghost" | "error";
   size?: "sm" | "md" | "lg";
   isLoading?: boolean;
+  loadingText?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", isLoading, leftIcon, rightIcon, children, disabled, ...props }, ref) => {
+  ({ className, variant = "primary", size = "md", isLoading, loadingText, leftIcon, rightIcon, children, disabled, ...props }, ref) => {
     const variants = {
       primary: "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90",
       secondary: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-zinc-700",
@@ -30,6 +31,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         disabled={isLoading || disabled}
+        aria-busy={isLoading}
         className={cn(
           "inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none font-medium",
           variants[variant],
@@ -39,12 +41,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {isLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
         ) : (
           leftIcon
         )}
-        {!isLoading && children}
+        {children}
         {!isLoading && rightIcon}
+        {isLoading && (loadingText || (!children && !props["aria-label"])) && (
+          <span className="sr-only">{loadingText || "Loading..."}</span>
+        )}
       </button>
     );
   }
