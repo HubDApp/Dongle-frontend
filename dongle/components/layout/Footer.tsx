@@ -47,7 +47,7 @@ export default function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Developers</h4>
+            <h4 className="font-semibold text-sm mb-4">Resources</h4>
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
               <li>
                 <Link
@@ -59,7 +59,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/listing"
+                  href="/projects/new"
                   className="hover:text-black dark:hover:text-white"
                 >
                   Submit App
