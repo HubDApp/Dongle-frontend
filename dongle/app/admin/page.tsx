@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useWallet } from "@/context/wallet.context";
 
 interface VerificationRequest {
@@ -17,13 +17,25 @@ const MOCK_REQUESTS: VerificationRequest[] = [
   { id: "req_3", projectName: "Orbit NFT", submittedBy: "GHIJ...9012", status: "approved", timestamp: "2024-03-19T09:15:00Z" },
 ];
 
+/**
+ * Admin authorization source: NEXT_PUBLIC_ADMIN_ALLOWLIST environment variable.
+ * Provide a comma-separated list of authorized Stellar public keys.
+ * Example: NEXT_PUBLIC_ADMIN_ALLOWLIST=GABC...1234,GDEF...5678
+ */
+const ADMIN_ALLOWLIST = (process.env.NEXT_PUBLIC_ADMIN_ALLOWLIST ?? "")
+  .split(",")
+  .map((k) => k.trim())
+  .filter(Boolean);
+
 export default function AdminDashboard() {
   const { isConnected, publicKey } = useWallet();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
-
-  // Derive admin status directly — no effect needed
-  const isAdmin = isConnected && Boolean(publicKey);
+  const isAdmin = useMemo(
+    () => isConnected && Boolean(publicKey) && ADMIN_ALLOWLIST.includes(publicKey!),
+    [isConnected, publicKey],
+  );
+  const isAdminChecking = false;
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
     setRequests(prev => prev.map(req => 
@@ -34,6 +46,14 @@ export default function AdminDashboard() {
   const handleSaveFee = () => {
     alert(`Fee updated to ${fee} XLM`);
   };
+
+  if (isAdminChecking) {
+    return (
+      <div className="container mx-auto px-4 py-32 flex flex-col items-center justify-center text-center min-h-screen">
+        <p className="text-zinc-500 dark:text-zinc-400">Checking admin access…</p>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (

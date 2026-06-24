@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -103,50 +102,45 @@ export default function ProjectDetailPage() {
 
   if (isLoading) {
     return (
-      <LayoutWrapper>
-        <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col items-center justify-center py-24">
-              <Spinner size="lg" className="mb-4" />
-              <p className="text-zinc-500 dark:text-zinc-400">
-                Loading project details...
-              </p>
-            </div>
+      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center justify-center py-24">
+            <Spinner size="lg" className="mb-4" />
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Loading project details...
+            </p>
           </div>
-        </main>
-      </LayoutWrapper>
+        </div>
+      </main>
     );
   }
 
   if (!project) {
     return (
-      <LayoutWrapper>
-        <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
-          <div className="container mx-auto px-4 max-w-4xl">
-            <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
-              <AlertCircle className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold mb-2">Project Not Found</h3>
-              <p className="text-zinc-500 dark:text-zinc-400 mb-6">
-                The project you&apos;re looking for doesn&apos;t exist or has
-                been removed.
-              </p>
-              <Button
-                variant="primary"
-                onClick={() => router.push("/discover")}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Discover
-              </Button>
-            </div>
+      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+        <div className="container mx-auto px-4 max-w-4xl">
+          <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
+            <AlertCircle className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold mb-2">Project Not Found</h3>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+              The project you&apos;re looking for doesn&apos;t exist or has
+              been removed.
+            </p>
+            <Button
+              variant="primary"
+              onClick={() => router.push("/discover")}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Discover
+            </Button>
           </div>
-        </main>
-      </LayoutWrapper>
+        </div>
+      </main>
     );
   }
 
   return (
-    <LayoutWrapper>
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
           <button
@@ -318,6 +312,5 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </main>
-    </LayoutWrapper>
   );
 }

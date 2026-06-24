@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { reviewService } from "@/services/review/review.service";
-import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
+import { REVIEW_CONSTRAINTS } from "@/types/review";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -343,7 +343,7 @@ describe("Review Service", () => {
         },
       ];
 
-      reviews.forEach((review, index) => {
+      reviews.forEach((review) => {
         reviewService.addReview(review, review.userAddress);
       });
     });

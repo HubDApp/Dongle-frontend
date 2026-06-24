@@ -6,7 +6,6 @@ import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { useWallet } from "@/context/wallet.context";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
 import { reviewService } from "@/services/review/review.service";
-import { projectService } from "@/services/project/project.service";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -20,6 +19,11 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
+
+interface StellarNonNativeBalance {
+  asset_code?: string;
+  asset_issuer?: string;
+}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -174,8 +178,8 @@ export default function ProfilePage() {
                         const isNative = balance.asset_type === "native";
                         const assetCode = isNative
                           ? "Lumens (XLM)"
-                          : (balance as any).asset_code || "Unknown";
-                        const issuer = (balance as any).asset_issuer;
+                          : (balance as StellarNonNativeBalance).asset_code || "Unknown";
+                        const issuer = (balance as StellarNonNativeBalance).asset_issuer;
 
                         return (
                           <div

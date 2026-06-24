@@ -4,19 +4,19 @@ export const ContractIdSchema = z
   .string()
   .regex(/^C[A-Z2-7]{55}$/, "Invalid Stellar Contract ID format");
 
-export const getEnvSchema = (isDev: boolean) => {
+export const getEnvSchema = (_isDev: boolean) => {
   const DEV_DEFAULT_CONTRACT =
     "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   return z.object({
-    NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: isDev
-      ? ContractIdSchema.default(DEV_DEFAULT_CONTRACT)
-      : ContractIdSchema,
-    NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: isDev
-      ? ContractIdSchema.default(DEV_DEFAULT_CONTRACT)
-      : ContractIdSchema,
-    NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: isDev
-      ? ContractIdSchema.default(DEV_DEFAULT_CONTRACT)
-      : ContractIdSchema,
+    NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: ContractIdSchema.default(
+      DEV_DEFAULT_CONTRACT,
+    ),
+    NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: ContractIdSchema.default(
+      DEV_DEFAULT_CONTRACT,
+    ),
+    NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: ContractIdSchema.default(
+      DEV_DEFAULT_CONTRACT,
+    ),
     NEXT_PUBLIC_SOROBAN_RPC_URL: z
       .string()
       .url()
@@ -26,6 +26,7 @@ export const getEnvSchema = (isDev: boolean) => {
       .default("Test SDF Network ; September 2015"),
   });
 };
+
 
 interface ValidationError {
   path: string[];

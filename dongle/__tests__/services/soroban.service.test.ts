@@ -29,17 +29,17 @@ vi.mock("stellar-sdk", () => {
     constructor(id: string) {
       this.id = id;
     }
-    call(method: string, ...args: any[]) {
+    call(method: string, ...args: unknown[]) {
       return { method, args };
     }
   }
 
   class MockTransactionBuilder {
-    source: any;
-    constructor(source: any, _opts: any) {
+    source: { publicKey: string; sequence: string };
+    constructor(source: { publicKey: string; sequence: string }, _opts: Record<string, unknown>) {
       this.source = source;
     }
-    addOperation(_op: any) {
+    addOperation(_op: Record<string, unknown>) {
       return this;
     }
     setTimeout(_t: number) {
@@ -67,7 +67,7 @@ vi.mock("stellar-sdk", () => {
     TransactionBuilder: MockTransactionBuilder,
     Account: MockAccount,
     BASE_FEE: 100,
-    nativeToScVal: (v: any) => ({ v }),
+    nativeToScVal: (v: unknown) => ({ v }),
   };
 });
 
@@ -144,7 +144,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
     // advance time beyond default 60s timeout (poll interval is 2s; we advance big)
     await clock.advanceTimersByTimeAsync(65_000);
 
-    const err: any = await promise;
+    const err: unknown = await promise;
     clock.useRealTimers();
 
     expect(String(err?.message ?? err)).toContain("Timeout waiting for transaction");

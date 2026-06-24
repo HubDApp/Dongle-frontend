@@ -144,7 +144,7 @@ describe("Project Types and Categories", () => {
 
   describe("Category Consistency", () => {
     it("should have consistent mappings between form and display", () => {
-      for (const [formValue, displayCategory] of Object.entries(CATEGORY_FORM_MAP)) {
+      for (const [_formValue, displayCategory] of Object.entries(CATEGORY_FORM_MAP)) {
         if (isValidCategory(displayCategory)) {
           const reverseFormValue = CATEGORY_DISPLAY_TO_FORM[displayCategory];
           expect(reverseFormValue).toBeDefined();
