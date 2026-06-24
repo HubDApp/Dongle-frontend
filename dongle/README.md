@@ -65,6 +65,9 @@ npm start
 # Run ESLint
 npm run lint
 
+# Run TypeScript type check
+npm run typecheck
+
 # Run tests
 npm run test
 
