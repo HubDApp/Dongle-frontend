@@ -10,6 +10,7 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
   ({ label, options, error, className = "", id, ...props }, ref) => {
     const generatedId = React.useId();
     const selectId = id || generatedId;
+    const errorId = `${selectId}-error`;
 
     return (
       <div className="flex flex-col gap-2 w-full">
@@ -20,6 +21,8 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
           <select
             ref={ref}
             id={selectId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
             className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${
               error ? "border-red-500/50 focus:border-red-500" : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50"
             } rounded-2xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 ${className}`}
@@ -39,7 +42,7 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
           </div>
         </div>
         {error && (
-          <span className="text-xs font-medium text-red-500 ml-1">
+          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
             {error}
           </span>
         )}

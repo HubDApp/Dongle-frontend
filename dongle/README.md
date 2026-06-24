@@ -97,6 +97,12 @@ NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 # Stellar Network Configuration (Optional, defaults to testnet)
 NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org:443
 NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
+
+# Admin Access Control
+# Comma-separated list of Stellar public keys authorized to access the admin dashboard.
+# Any connected wallet NOT in this list will be denied access, even if it is connected.
+# Example: NEXT_PUBLIC_ADMIN_ALLOWLIST=GABC...1234,GDEF...5678
+NEXT_PUBLIC_ADMIN_ALLOWLIST=
 ```
 
 If these are invalid or missing in production, the application will throw a clear validation error upon initialization.
