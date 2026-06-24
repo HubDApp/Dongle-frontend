@@ -26,16 +26,23 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+function mockWallet(isConnected: boolean, publicKey: string | null) {
+  vi.spyOn(walletContext, "useWallet").mockReturnValue({
+    isConnected,
+    isConnecting: false,
+    publicKey,
+    walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
+    isCorrectNetwork: isConnected,
+    walletNetworkLabel: isConnected ? "Testnet" : "Unknown",
+    connectWallet: vi.fn(),
+    disconnectWallet: vi.fn(),
+  });
+}
+
 describe("Admin Dashboard - Authorization & High Risk Flows", () => {
   describe("Admin Authorization", () => {
     it("displays admin dashboard when authorized", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: ADMIN_KEY,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, ADMIN_KEY);
 
       render(<AdminPage />);
 
@@ -43,13 +50,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
     });
 
     it("denies access for non-admin users", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: "GNOTADMIN123456",
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GNOTADMIN123456");
 
       render(<AdminPage />);
 
@@ -57,13 +58,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
     });
 
     it("shows wallet connection requirement", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: false,
-        isConnecting: false,
-        publicKey: null,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(false, null);
 
       render(<AdminPage />);
 
@@ -75,13 +70,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
   describe("Verification Request Management", () => {
     beforeEach(() => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: ADMIN_KEY,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, ADMIN_KEY);
     });
 
     it("displays verification requests list", () => {
@@ -125,13 +114,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
   describe("System Settings", () => {
     beforeEach(() => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: ADMIN_KEY,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, ADMIN_KEY);
     });
 
     it("displays fee configuration section", () => {
@@ -155,13 +138,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
   describe("Dashboard Layout", () => {
     beforeEach(() => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: ADMIN_KEY,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, ADMIN_KEY);
     });
 
     it("displays navigation and sections", () => {
@@ -183,52 +160,28 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
   describe("Error Handling", () => {
     it("handles approval failure gracefully", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: ADMIN_KEY,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, ADMIN_KEY);
 
       render(<AdminPage />);
       expect(screen.getAllByRole("button", { name: /approve/i }).length).toBeGreaterThan(0);
     });
 
     it("handles rejection failure gracefully", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: ADMIN_KEY,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, ADMIN_KEY);
 
       render(<AdminPage />);
       expect(screen.getAllByRole("button", { name: /reject/i }).length).toBeGreaterThan(0);
     });
 
     it("requires wallet connection to view dashboard", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: false,
-        isConnecting: false,
-        publicKey: null,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(false, null);
 
       render(<AdminPage />);
       expect(screen.getByText("Access Restricted")).toBeInTheDocument();
     });
 
     it("verifies user is admin before showing actions", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        isConnected: true,
-        isConnecting: false,
-        publicKey: "GNOTADMIN123456",
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GNOTADMIN123456");
 
       render(<AdminPage />);
       expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();

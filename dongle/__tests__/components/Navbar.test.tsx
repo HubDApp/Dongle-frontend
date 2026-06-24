@@ -32,6 +32,9 @@ describe("Navbar active navigation", () => {
       isConnected: false,
       isConnecting: false,
       publicKey: null,
+      walletNetwork: null,
+      isCorrectNetwork: false,
+      walletNetworkLabel: "Unknown",
       connectWallet: vi.fn(),
       disconnectWallet: vi.fn(),
     });
@@ -66,6 +69,9 @@ describe("Navbar active navigation", () => {
       isConnected: true,
       isConnecting: false,
       publicKey: "GADMIN1234567890",
+      walletNetwork: "Test SDF Network ; September 2015",
+      isCorrectNetwork: true,
+      walletNetworkLabel: "Testnet",
       connectWallet: vi.fn(),
       disconnectWallet: vi.fn(),
     });
