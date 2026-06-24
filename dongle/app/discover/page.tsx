@@ -45,9 +45,10 @@ export default function DiscoverPage() {
     return result;
   }, [searchQuery, selectedCategory, sortBy]);
 
+  const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
   const visibleProjects = filteredAndSortedProjects.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredAndSortedProjects.length;
+  const hasMore = visibleCount < filteredCount;
 
   const handleLoadMore = () => {
     setIsLoadingMore(true);
@@ -101,11 +102,10 @@ export default function DiscoverPage() {
                   <button
                     key={cat}
                     onClick={() => handleCategoryChange(cat)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      selectedCategory === cat
-                        ? "bg-blue-500 text-white"
-                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                    }`}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors ${selectedCategory === cat
+                      ? "bg-blue-500 text-white"
+                      : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                      }`}
                   >
                     {cat}
                   </button>
@@ -140,7 +140,7 @@ export default function DiscoverPage() {
               Loading projects...
             </p>
           </div>
-        ) : visibleProjects.length > 0 ? (
+        ) : filteredCount > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />

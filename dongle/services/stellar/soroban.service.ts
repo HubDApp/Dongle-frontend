@@ -32,106 +32,110 @@ export interface ProjectRegistrationParams {
   docsUrl?: string;
 }
 
+const DEFAULT_POLL_INTERVAL_MS = 2_000;
+const DEFAULT_POLL_TIMEOUT_MS = 60_000;
+
+async function pollTransaction(
+  hash: string,
+  {
+    timeoutMs = DEFAULT_POLL_TIMEOUT_MS,
+    intervalMs = DEFAULT_POLL_INTERVAL_MS,
+  }: { timeoutMs?: number; intervalMs?: number } = {},
+) {
+  const startedAt = Date.now();
+
+  let last = await server.getTransaction(hash);
+  while (last.status === "NOT_FOUND") {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error(
+        `[SorobanService] Timeout waiting for transaction ${hash}. Last status: ${last.status}`,
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    last = await server.getTransaction(hash);
+  }
+
+  if (last.status !== "SUCCESS") {
+    throw new Error(
+      `[SorobanService] Transaction ${hash} failed with status: ${last.status}`,
+    );
+  }
+
+  return last;
+}
+
 export const sorobanService = {
   /**
    * Registers a new project in the Project Registry contract.
    */
   async registerProject(params: ProjectRegistrationParams) {
+    let publicKey: string;
     try {
-      let publicKey: string;
-      try {
-        publicKey = await walletService.getPublicKey();
-      } catch {
-        console.warn(
-          "[SorobanService] No wallet connected, using mock registration",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return {
-          hash: "mock_hash_" + Math.random().toString(36).substring(7),
-          status: "SUCCESS",
-        };
-      }
-
-      // 1. Fetch account sequence
-      await server.getLatestLedger(); // Just to check connection
-
-      // In a real scenario, we'd load the account from Horizon or RPC
-      // For transaction building, we need the account object
-      const source = new Account(publicKey, "0"); // Sequence will be filled by build process or manually
-
-      // 2. Initialize contract
-      const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
-
-      // 3. Prepare arguments
-      // Matching the expected contract method: register_project(name: String, category: String, description: String, url: String, logo_url: String, docs_url: String)
-      const args = [
-        nativeToScVal(params.name),
-        nativeToScVal(params.category),
-        nativeToScVal(params.description),
-        nativeToScVal(params.url),
-        nativeToScVal(params.logoUrl),
-        nativeToScVal(params.docsUrl),
-      ];
-
-      // 4. Build transaction
-      const tx = new TransactionBuilder(source, {
-        fee: BASE_FEE,
-        networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-      })
-        .addOperation(contract.call("register_project", ...args))
-        .setTimeout(30)
-        .build();
-
-      // 5. Simulate transaction (optional but recommended for Soroban)
-      // Note: In a real app, you'd use the simulation result to adjust fees/footprint
-      // const simulation = await server.simulateTransaction(tx);
-
-      // 6. Sign with Freighter
-      const xdrString = tx.toXDR();
-      const signedXdr = await walletService.signTransaction(
-        xdrString,
-        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+      publicKey = await walletService.getPublicKey();
+    } catch {
+      console.warn(
+        "[SorobanService] No wallet connected, using mock registration",
       );
-
-      // 7. Submit to RPC
-      const sendResponse = await server.sendTransaction(
-        TransactionBuilder.fromXDR(
-          signedXdr,
-          SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-        ),
-      );
-
-      if (sendResponse.status === "ERROR") {
-        throw new Error(
-          "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
-        );
-      }
-
-      // 8. Poll for status
-      let getResponse = await server.getTransaction(sendResponse.hash);
-      while (getResponse.status === "NOT_FOUND") {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        getResponse = await server.getTransaction(sendResponse.hash);
-      }
-
-      if (getResponse.status === "SUCCESS") {
-        console.log(
-          "[SorobanService] Registration successful:",
-          sendResponse.hash,
-        );
-        return {
-          hash: sendResponse.hash,
-          status: "SUCCESS",
-        };
-      } else {
-        throw new Error(
-          "Transaction failed with status: " + getResponse.status,
-        );
-      }
-    } catch (error) {
-      console.error("[SorobanService] Error registering project:", error);
-      throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return {
+        hash: "mock_hash_" + Math.random().toString(36).substring(7),
+        status: "SUCCESS",
+      };
     }
+
+    const account = await server.getAccount(publicKey);
+    const source = new Account(publicKey, account.sequence);
+
+    const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
+
+    const args = [
+      nativeToScVal(params.name),
+      nativeToScVal(params.category),
+      nativeToScVal(params.description),
+      nativeToScVal(params.url),
+      nativeToScVal(params.logoUrl),
+      nativeToScVal(params.docsUrl),
+    ];
+
+    const unsignedTx = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+    })
+      .addOperation(contract.call("register_project", ...args))
+      .setTimeout(30)
+      .build();
+
+    // Soroban-specific: simulate then prepare to ensure footprint/resources are correct.
+    const simulation = await server.simulateTransaction(unsignedTx);
+    const preparedTx = await server.prepareTransaction(unsignedTx, simulation);
+
+    const signedXdr = await walletService.signTransaction(
+      preparedTx.toXDR(),
+      SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+    );
+
+    const sendResponse = await server.sendTransaction(
+      TransactionBuilder.fromXDR(
+        signedXdr,
+        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+      ),
+    );
+
+    if (sendResponse.status === "ERROR") {
+      throw new Error(
+        "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+      );
+    }
+
+    await pollTransaction(sendResponse.hash);
+
+    console.log(
+      "[SorobanService] Registration successful:",
+      sendResponse.hash,
+    );
+
+    return { hash: sendResponse.hash, status: "SUCCESS" };
   },
 
   /**
@@ -147,7 +151,6 @@ export const sorobanService = {
         userAddress = "unknown";
       }
 
-      // Import here to avoid circular dependency
       const { verificationService } = await import("./verification.service");
 
       const requestId = await verificationService.submitVerificationRequest(
@@ -159,11 +162,8 @@ export const sorobanService = {
       console.log(
         `[SorobanService] Verification request submitted: ${requestId}`,
       );
-      
-      return {
-        hash: requestId,
-        status: "SUCCESS",
-      };
+
+      return { hash: requestId, status: "SUCCESS" };
     } catch (error) {
       console.error("[SorobanService] Error requesting verification:", error);
       throw error;
@@ -172,15 +172,12 @@ export const sorobanService = {
 
   /**
    * Get the verification status of a project.
-   * Queries the verification service for actual status.
    */
   async getVerificationStatus(
     projectId: string,
   ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
     try {
-      // Import here to avoid circular dependency
       const { verificationService } = await import("./verification.service");
-
       const status = await verificationService.getVerificationStatus(projectId);
       console.log(
         `[SorobanService] Verification status for ${projectId}: ${status}`,
@@ -201,10 +198,8 @@ export const sorobanService = {
   async getProject(projectId: string): Promise<ProjectData | null> {
     try {
       console.log(`[SorobanService] Getting project details for: ${projectId}`);
-      // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Mock data - in real implementation, this would query the contract
       const mockProjects: ProjectData[] = [
         {
           id: "soroban-swap",
@@ -214,7 +209,7 @@ export const sorobanService = {
           url: "https://soroban-swap.com",
           logoUrl: "https://example.com/logo1.png",
           docsUrl: "https://docs.soroban-swap.com",
-          owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H", // Mock owner
+          owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
           createdAt: "2024-11-10T00:00:00Z",
         },
         {
@@ -225,13 +220,12 @@ export const sorobanService = {
           url: "https://stellar-guardians.com",
           logoUrl: "https://example.com/logo2.png",
           docsUrl: "https://docs.stellar-guardians.com",
-          owner: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674CH", // Mock owner
+          owner: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674CH",
           createdAt: "2024-09-22T00:00:00Z",
         },
-        // Add more mock projects as needed
       ];
 
-      return mockProjects.find(p => p.id === projectId) || null;
+      return mockProjects.find((p) => p.id === projectId) ?? null;
     } catch (error) {
       console.error("[SorobanService] Error getting project:", error);
       return null;
@@ -242,111 +236,82 @@ export const sorobanService = {
    * Updates an existing project in the Project Registry contract.
    */
   async updateProject(projectId: string, params: ProjectRegistrationParams) {
+    let publicKey: string;
     try {
-      let publicKey: string;
-      try {
-        publicKey = await walletService.getPublicKey();
-      } catch {
-        console.warn(
-          "[SorobanService] No wallet connected, using mock update",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        return {
-          hash: "mock_update_hash_" + Math.random().toString(36).substring(7),
-          status: "SUCCESS",
-        };
-      }
-
-      // Check ownership - in real implementation, contract would enforce this
-      const project = await this.getProject(projectId);
-      if (!project) {
-        throw new Error("Project not found");
-      }
-      if (project.owner !== publicKey) {
-        throw new Error("Only project owner can update the project");
-      }
-
-      // 1. Fetch account sequence
-      await server.getLatestLedger();
-
-      const source = new Account(publicKey, "0");
-
-      // 2. Initialize contract
-      const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
-
-      // 3. Prepare arguments
-      // Assuming contract method: update_project(id: String, name: String, category: String, description: String, url: String, logo_url: String, docs_url: String)
-      const args = [
-        nativeToScVal(projectId),
-        nativeToScVal(params.name),
-        nativeToScVal(params.category),
-        nativeToScVal(params.description),
-        nativeToScVal(params.url),
-        nativeToScVal(params.logoUrl),
-        nativeToScVal(params.docsUrl),
-      ];
-
-      // 4. Build transaction
-      const tx = new TransactionBuilder(source, {
-        fee: BASE_FEE,
-        networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-      })
-        .addOperation(contract.call("update_project", ...args))
-        .setTimeout(30)
-        .build();
-
-      // 5. Sign with Freighter
-      const xdrString = tx.toXDR();
-      const signedXdr = await walletService.signTransaction(
-        xdrString,
-        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+      publicKey = await walletService.getPublicKey();
+    } catch {
+      console.warn(
+        "[SorobanService] No wallet connected, using mock update",
       );
-
-      // 6. Submit to RPC
-      const sendResponse = await server.sendTransaction(
-        TransactionBuilder.fromXDR(
-          signedXdr,
-          SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-        ),
-      );
-
-      if (sendResponse.status === "ERROR") {
-        throw new Error(
-          "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
-        );
-      }
-
-      // 7. Poll for status
-      let getResponse = await server.getTransaction(sendResponse.hash);
-      while (getResponse.status === "NOT_FOUND") {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        getResponse = await server.getTransaction(sendResponse.hash);
-      }
-
-      if (getResponse.status === "SUCCESS") {
-        console.log(
-          "[SorobanService] Update successful:",
-          sendResponse.hash,
-        );
-        return {
-          hash: sendResponse.hash,
-          status: "SUCCESS",
-        };
-      } else {
-        throw new Error(
-          "Transaction failed with status: " + getResponse.status,
-        );
-      }
-    } catch (error) {
-      console.error("[SorobanService] Error updating project:", error);
-      throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return {
+        hash: "mock_update_hash_" + Math.random().toString(36).substring(7),
+        status: "SUCCESS",
+      };
     }
+
+    const project = await this.getProject(projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.owner !== publicKey) {
+      throw new Error("Only project owner can update the project");
+    }
+
+    const account = await server.getAccount(publicKey);
+    const source = new Account(publicKey, account.sequence);
+
+    const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
+
+    const args = [
+      nativeToScVal(projectId),
+      nativeToScVal(params.name),
+      nativeToScVal(params.category),
+      nativeToScVal(params.description),
+      nativeToScVal(params.url),
+      nativeToScVal(params.logoUrl),
+      nativeToScVal(params.docsUrl),
+    ];
+
+    const unsignedTx = new TransactionBuilder(source, {
+      fee: BASE_FEE,
+      networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+    })
+      .addOperation(contract.call("update_project", ...args))
+      .setTimeout(30)
+      .build();
+
+    const simulation = await server.simulateTransaction(unsignedTx);
+    const preparedTx = await server.prepareTransaction(unsignedTx, simulation);
+
+    const signedXdr = await walletService.signTransaction(
+      preparedTx.toXDR(),
+      SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+    );
+
+    const sendResponse = await server.sendTransaction(
+      TransactionBuilder.fromXDR(
+        signedXdr,
+        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+      ),
+    );
+
+    if (sendResponse.status === "ERROR") {
+      throw new Error(
+        "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+      );
+    }
+
+    await pollTransaction(sendResponse.hash);
+
+    console.log(
+      "[SorobanService] Update successful:",
+      sendResponse.hash,
+    );
+
+    return { hash: sendResponse.hash, status: "SUCCESS" };
   },
 
-  /**
-   * Helper to get RPC server instance.
-   */
   getServer() {
     return server;
   },
 };
+
