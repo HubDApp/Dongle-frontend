@@ -73,6 +73,10 @@ export interface Project {
   rating: number;
   reviews: number;
   createdAt: string; // ISO date string
+  websiteUrl?: string;
+  githubUrl?: string;
+  logoUrl?: string;
+  docsUrl?: string;
 }
 
 /**

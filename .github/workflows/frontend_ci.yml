@@ -35,7 +35,12 @@ jobs:
         run: npx eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish
         continue-on-error: false
 
+      - name: Run Type Check
+        run: npm run typecheck
+        continue-on-error: false
+
       - name: Build Project
+        id: build
         run: npm run build
         env:
           CI: true
@@ -45,4 +50,5 @@ jobs:
         run: |
           echo "### Frontend CI Results 🚀" >> $GITHUB_STEP_SUMMARY
           echo "* **Linting:** ${{ job.status == 'success' && 'Passed ✅' || 'Failed ❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Type Check:** ${{ job.status == 'success' && 'Passed ✅' || 'Failed ❌' }}" >> $GITHUB_STEP_SUMMARY
           echo "* **Build:** ${{ steps.build.outcome == 'success' && 'Passed ✅' || 'Failed ❌' }}" >> $GITHUB_STEP_SUMMARY

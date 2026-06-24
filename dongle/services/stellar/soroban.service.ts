@@ -8,6 +8,7 @@ import {
 } from "stellar-sdk";
 import { SOROBAN_CONFIG, DONGLE_CONTRACTS } from "@/constants/contracts";
 import { walletService } from "@/services/wallet/wallet.service";
+import { generateId } from "@/lib/id-generator";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL);
 
@@ -16,7 +17,8 @@ export interface ProjectData {
   name: string;
   category: string;
   description: string;
-  url: string;
+  websiteUrl: string;
+  githubUrl?: string;
   logoUrl: string;
   docsUrl: string;
   owner: string;
@@ -27,7 +29,8 @@ export interface ProjectRegistrationParams {
   name: string;
   category: string;
   description: string;
-  url: string;
+  websiteUrl: string;
+  githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
 }
@@ -79,7 +82,7 @@ export const sorobanService = {
       );
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return {
-        hash: "mock_hash_" + Math.random().toString(36).substring(7),
+        hash: "mock_hash_" + generateId(),
         status: "SUCCESS",
       };
     }
@@ -93,7 +96,8 @@ export const sorobanService = {
       nativeToScVal(params.name),
       nativeToScVal(params.category),
       nativeToScVal(params.description),
-      nativeToScVal(params.url),
+      nativeToScVal(params.websiteUrl),
+      nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
     ];
@@ -205,7 +209,8 @@ export const sorobanService = {
           name: "Soroban Swap",
           category: "defi",
           description: "Next-generation automated market maker on Soroban.",
-          url: "https://soroban-swap.com",
+          websiteUrl: "https://soroban-swap.com",
+          githubUrl: "https://github.com/example/soroban-swap",
           logoUrl: "https://example.com/logo1.png",
           docsUrl: "https://docs.soroban-swap.com",
           owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
@@ -216,7 +221,8 @@ export const sorobanService = {
           name: "Stellar Guardians",
           category: "gaming",
           description: "A decentralized strategy game with on-chain assets.",
-          url: "https://stellar-guardians.com",
+          websiteUrl: "https://stellar-guardians.com",
+          githubUrl: "https://github.com/example/stellar-guardians",
           logoUrl: "https://example.com/logo2.png",
           docsUrl: "https://docs.stellar-guardians.com",
           owner: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674CH",
@@ -244,7 +250,7 @@ export const sorobanService = {
       );
       await new Promise((resolve) => setTimeout(resolve, 2000));
       return {
-        hash: "mock_update_hash_" + Math.random().toString(36).substring(7),
+        hash: "mock_update_hash_" + generateId(),
         status: "SUCCESS",
       };
     }
@@ -265,7 +271,8 @@ export const sorobanService = {
       nativeToScVal(params.name),
       nativeToScVal(params.category),
       nativeToScVal(params.description),
-      nativeToScVal(params.url),
+      nativeToScVal(params.websiteUrl),
+      nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
     ];

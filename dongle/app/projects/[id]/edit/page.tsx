@@ -122,7 +122,8 @@ export default function EditProjectPage() {
             name: project.name,
             category: project.category,
             description: project.description,
-            url: project.url,
+            websiteUrl: project.websiteUrl,
+            githubUrl: project.githubUrl,
             logoUrl: project.logoUrl,
             docsUrl: project.docsUrl,
           }}
