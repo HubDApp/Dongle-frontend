@@ -40,7 +40,7 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
 
   const onSubmit = async (data: VerificationFormValues) => {
     setIsSubmitting(true);
-    const promise = sorobanService.requestVerification(data.projectId);
+    const promise = sorobanService.requestVerification(data.projectId, data.projectId);
 
     toast.promise(promise, {
       loading: "Submitting verification request...",

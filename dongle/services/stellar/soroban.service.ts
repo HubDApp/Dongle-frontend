@@ -85,7 +85,7 @@ export const sorobanService = {
     }
 
     const account = await server.getAccount(publicKey);
-    const source = new Account(publicKey, account.sequence);
+    const source = new Account(publicKey, account.sequenceNumber());
 
     const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
 
@@ -106,9 +106,8 @@ export const sorobanService = {
       .setTimeout(30)
       .build();
 
-    // Soroban-specific: simulate then prepare to ensure footprint/resources are correct.
-    const simulation = await server.simulateTransaction(unsignedTx);
-    const preparedTx = await server.prepareTransaction(unsignedTx, simulation);
+    // Soroban-specific: prepare ensures footprint/resources are set correctly.
+    const preparedTx = await server.prepareTransaction(unsignedTx);
 
     const signedXdr = await walletService.signTransaction(
       preparedTx.toXDR(),
@@ -257,7 +256,7 @@ export const sorobanService = {
     }
 
     const account = await server.getAccount(publicKey);
-    const source = new Account(publicKey, account.sequence);
+    const source = new Account(publicKey, account.sequenceNumber());
 
     const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
 
@@ -279,8 +278,7 @@ export const sorobanService = {
       .setTimeout(30)
       .build();
 
-    const simulation = await server.simulateTransaction(unsignedTx);
-    const preparedTx = await server.prepareTransaction(unsignedTx, simulation);
+    const preparedTx = await server.prepareTransaction(unsignedTx);
 
     const signedXdr = await walletService.signTransaction(
       preparedTx.toXDR(),
