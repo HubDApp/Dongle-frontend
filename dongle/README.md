@@ -73,6 +73,9 @@ npm run test
 
 # Run tests in watch mode
 npm run test:watch
+
+# Run dependency security audit
+npm run audit
 ```
 
 ## Wallet Setup

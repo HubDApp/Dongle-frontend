@@ -58,6 +58,9 @@ npm run test:watch
 # Run linter
 npm run lint
 
+# Run security audit
+npm run audit
+
 # Build for production
 npm run build
 
@@ -190,6 +193,9 @@ npm test
 
 # Run linter
 npm run lint
+
+# Run security audit
+npm run audit
 
 # Build project
 npm run build

@@ -13,7 +13,8 @@
     "lint": "eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "audit": "node scripts/audit-check.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

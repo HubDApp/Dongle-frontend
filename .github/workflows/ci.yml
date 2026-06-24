@@ -78,7 +78,7 @@ jobs:
       
       - name: Audit dependencies
         working-directory: ./dongle
-        run: npm audit --production --audit-level=moderate || true
+        run: npm run audit
 
   setup-guide:
     name: Verify SETUP.md
