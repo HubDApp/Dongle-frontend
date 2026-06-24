@@ -22,8 +22,8 @@ Dongle is a decentralized project directory and review platform for the Stellar 
 
 ## Prerequisites
 
-- **Node.js**: 18.x LTS or higher (20.x LTS recommended)
-- **npm**: 9.x or higher (or use pnpm for better dependency management)
+- **Node.js**: 20.x LTS (pinned & supported version)
+- **npm**: 10.x or higher
 - [Freighter Wallet](https://freighter.app/) - Browser extension for Stellar wallet
 
 ## Getting Started
