@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { useWallet } from "@/context/wallet.context";
 import { toast } from "sonner";
+import AddressDisplay from "@/components/ui/AddressDisplay";
+import { formatDate } from "@/lib/date";
 
 interface VerificationRequest {
   id: string;
@@ -99,7 +101,12 @@ export default function AdminDashboard() {
                   >
                     <div>
                       <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
-                      <p className="text-xs text-zinc-500 font-mono">Submitted by: {req.submittedBy}</p>
+                      <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
+                        <span>Submitted by:</span>
+                        <AddressDisplay address={req.submittedBy} copyable={true} truncated={true} inline={true} />
+                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                        <span>{formatDate(req.timestamp, "short")}</span>
+                      </div>
                       <div className="mt-2">
                         <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
                           req.status === "pending" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500" :

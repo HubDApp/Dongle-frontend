@@ -85,7 +85,12 @@ export function ConfirmDialogProvider({
 export function useConfirm(): ConfirmFn {
   const fn = useContext(ConfirmContext);
   if (!fn) {
-    throw new Error("useConfirm must be used within a ConfirmDialogProvider");
+    return async (options) => {
+      if (typeof window !== "undefined") {
+        return window.confirm(`${options.title}\n\n${options.description}`);
+      }
+      return true;
+    };
   }
   return fn;
 }

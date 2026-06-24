@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
 
+import AddressDisplay from "@/components/ui/AddressDisplay";
+
 export default function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -88,11 +90,13 @@ export default function Navbar() {
               {/* Wallet address pill */}
               <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-2xl shadow-sm">
                 <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
-                  {publicKey
-                    ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}`
-                    : "Connected"}
-                </span>
+                {publicKey ? (
+                  <AddressDisplay address={publicKey} copyable={true} truncated={true} inline={true} />
+                ) : (
+                  <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
+                    Connected
+                  </span>
+                )}
                 <Button
                   onClick={disconnectWallet}
                   variant="outline"
