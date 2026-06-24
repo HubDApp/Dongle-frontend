@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { verificationService, VerificationRequest, VerificationStatus } from "@/services/stellar/verification.service";
+import { verificationService } from "@/services/stellar/verification.service";
 
 // Mock localStorage
 const mockStorage: Record<string, string> = {};

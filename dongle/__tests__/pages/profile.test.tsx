@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import ProfilePage from "@/app/profile/page";
-import { WalletProvider } from "@/context/wallet.context";
 import * as walletContext from "@/context/wallet.context";
+import { useStellarAccount } from "@/hooks/useStellarAccount";
+import { reviewService } from "@/services/review/review.service";
+import { projectService } from "@/services/project/project.service";
 
 // Mock the hooks and services
 vi.mock("@/hooks/useStellarAccount", () => ({
@@ -64,11 +66,7 @@ describe("Profile Page", () => {
 
   describe("Connected State", () => {
     beforeEach(() => {
-      const { useStellarAccount } = require("@/hooks/useStellarAccount");
-      const { reviewService } = require("@/services/review/review.service");
-      const { projectService } = require("@/services/project/project.service");
-
-      useStellarAccount.mockReturnValue({
+      vi.mocked(useStellarAccount).mockReturnValue({
         account: {
           id: "test-account",
           account_id: "GTEST123",
@@ -85,7 +83,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      reviewService.getReviewsByUser.mockReturnValue([
+      vi.mocked(reviewService.getReviewsByUser).mockReturnValue([
         {
           id: "review1",
           projectId: "proj1",
@@ -97,7 +95,7 @@ describe("Profile Page", () => {
         },
       ]);
 
-      projectService.getAllProjects.mockReturnValue([
+      vi.mocked(projectService.getAllProjects).mockReturnValue([
         {
           id: "proj1",
           name: "Test Project",
@@ -222,9 +220,7 @@ describe("Profile Page", () => {
 
   describe("Loading State", () => {
     it("should show loading spinner while fetching account data", () => {
-      const { useStellarAccount } = require("@/hooks/useStellarAccount");
-
-      useStellarAccount.mockReturnValue({
+      vi.mocked(useStellarAccount).mockReturnValue({
         account: null,
         balances: null,
         loading: true,
@@ -248,9 +244,7 @@ describe("Profile Page", () => {
 
   describe("Error State", () => {
     it("should show error message when account fetch fails", () => {
-      const { useStellarAccount } = require("@/hooks/useStellarAccount");
-
-      useStellarAccount.mockReturnValue({
+      vi.mocked(useStellarAccount).mockReturnValue({
         account: null,
         balances: null,
         loading: false,
@@ -273,10 +267,9 @@ describe("Profile Page", () => {
     });
 
     it("should show disconnect button in error state", () => {
-      const { useStellarAccount } = require("@/hooks/useStellarAccount");
       const disconnectWallet = vi.fn();
 
-      useStellarAccount.mockReturnValue({
+      vi.mocked(useStellarAccount).mockReturnValue({
         account: null,
         balances: null,
         loading: false,
@@ -303,10 +296,7 @@ describe("Profile Page", () => {
 
   describe("Empty Reviews State", () => {
     it("should show empty state when user has no reviews", () => {
-      const { useStellarAccount } = require("@/hooks/useStellarAccount");
-      const { reviewService } = require("@/services/review/review.service");
-
-      useStellarAccount.mockReturnValue({
+      vi.mocked(useStellarAccount).mockReturnValue({
         account: { id: "test" },
         balances: [],
         loading: false,
@@ -314,7 +304,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      reviewService.getReviewsByUser.mockReturnValue([]);
+      vi.mocked(reviewService.getReviewsByUser).mockReturnValue([]);
 
       vi.spyOn(walletContext, "useWallet").mockReturnValue({
         publicKey: "GTEST123456789",

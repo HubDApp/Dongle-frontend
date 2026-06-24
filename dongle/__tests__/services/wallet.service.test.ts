@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi, MockInstance } from "vitest";
 
 // Mock wallet service interface
 interface WalletService {
@@ -15,6 +15,11 @@ const mockFreighterApi = {
   getPublicKey: vi.fn(),
   signTransaction: vi.fn(),
 };
+
+// Typed helper to avoid repeated `as any` casts
+function asMock(fn: ReturnType<typeof vi.fn>): MockInstance {
+  return fn;
+}
 
 describe("Wallet Service - High Risk Flows", () => {
   let walletService: WalletService;
@@ -48,11 +53,11 @@ describe("Wallet Service - High Risk Flows", () => {
 
   describe("Connection Management", () => {
     it("connects wallet successfully", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: null,
       });
-      (mockFreighterApi.getPublicKey as any).mockResolvedValue("GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOAS5HX75Z3CC");
+      asMock(mockFreighterApi.getPublicKey).mockResolvedValue("GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOAS5HX75Z3CC");
 
       const publicKey = await walletService.connectWallet();
 
@@ -61,7 +66,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("throws error when Freighter is not installed", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: false,
         error: { message: "Freighter not installed" },
       });
@@ -70,11 +75,11 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("throws error when user rejects wallet connection", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: null,
       });
-      (mockFreighterApi.getPublicKey as any).mockRejectedValue(new Error("User rejected"));
+      asMock(mockFreighterApi.getPublicKey).mockRejectedValue(new Error("User rejected"));
 
       await expect(walletService.connectWallet()).rejects.toThrow("User rejected");
     });
@@ -82,11 +87,11 @@ describe("Wallet Service - High Risk Flows", () => {
 
   describe("Public Key Retrieval", () => {
     it("returns public key when wallet is connected", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: null,
       });
-      (mockFreighterApi.getPublicKey as any).mockResolvedValue("GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOAS5HX75Z3CC");
+      asMock(mockFreighterApi.getPublicKey).mockResolvedValue("GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOAS5HX75Z3CC");
 
       const publicKey = await walletService.getPublicKey();
 
@@ -94,17 +99,17 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("throws error when wallet not connected", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: null,
       });
-      (mockFreighterApi.getPublicKey as any).mockRejectedValue(new Error("Wallet not connected"));
+      asMock(mockFreighterApi.getPublicKey).mockRejectedValue(new Error("Wallet not connected"));
 
       await expect(walletService.getPublicKey()).rejects.toThrow("Wallet not connected");
     });
 
     it("throws error when Freighter is not installed", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: false,
         error: { message: "Not installed" },
       });
@@ -115,7 +120,7 @@ describe("Wallet Service - High Risk Flows", () => {
 
   describe("Connection Status", () => {
     it("returns true when wallet is properly connected", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: null,
       });
@@ -126,7 +131,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("returns false when Freighter is not installed", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: false,
         error: { message: "Not installed" },
       });
@@ -137,7 +142,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("returns false when wallet is not allowed", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: { message: "Not allowed" },
       });
@@ -148,7 +153,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("never throws an error", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockRejectedValue(new Error("Unexpected error"));
+      asMock(mockFreighterApi.freighterIsConnected).mockRejectedValue(new Error("Unexpected error"));
 
       const connected = await walletService.isConnected();
 
@@ -161,7 +166,7 @@ describe("Wallet Service - High Risk Flows", () => {
       const txData = "base64-encoded-tx";
       const signedTx = "signed-tx-hash";
 
-      (mockFreighterApi.signTransaction as any).mockResolvedValue(signedTx);
+      asMock(mockFreighterApi.signTransaction).mockResolvedValue(signedTx);
 
       const result = await walletService.signTransaction(txData);
 
@@ -170,7 +175,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("handles signing failure", async () => {
-      (mockFreighterApi.signTransaction as any).mockRejectedValue(
+      asMock(mockFreighterApi.signTransaction).mockRejectedValue(
         new Error("Failed to sign transaction")
       );
 
@@ -178,7 +183,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("handles user rejection of signing", async () => {
-      (mockFreighterApi.signTransaction as any).mockRejectedValue(
+      asMock(mockFreighterApi.signTransaction).mockRejectedValue(
         new Error("User rejected signing")
       );
 
@@ -186,7 +191,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("handles invalid transaction data", async () => {
-      (mockFreighterApi.signTransaction as any).mockRejectedValue(
+      asMock(mockFreighterApi.signTransaction).mockRejectedValue(
         new Error("Invalid transaction format")
       );
 
@@ -201,7 +206,7 @@ describe("Wallet Service - High Risk Flows", () => {
 
     it("clears stored connection state", async () => {
       await walletService.disconnect();
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: false,
         error: null,
       });
@@ -213,7 +218,7 @@ describe("Wallet Service - High Risk Flows", () => {
 
   describe("Error Handling", () => {
     it("handles network errors gracefully", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockRejectedValue(
+      asMock(mockFreighterApi.freighterIsConnected).mockRejectedValue(
         new Error("Network error")
       );
 
@@ -222,7 +227,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("handles timeouts gracefully", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockRejectedValue(
+      asMock(mockFreighterApi.freighterIsConnected).mockRejectedValue(
         new Error("Request timeout")
       );
 
@@ -231,7 +236,7 @@ describe("Wallet Service - High Risk Flows", () => {
     });
 
     it("provides clear error messages", async () => {
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: false,
         error: { message: "Freighter not found" },
       });
@@ -242,24 +247,24 @@ describe("Wallet Service - High Risk Flows", () => {
 
   describe("Multiple Connection Attempts", () => {
     it("succeeds after initial failure", async () => {
-      (mockFreighterApi.freighterIsConnected as any)
+      asMock(mockFreighterApi.freighterIsConnected)
         .mockRejectedValueOnce(new Error("Temporary failure"))
         .mockResolvedValueOnce({
           isConnected: true,
           error: null,
         });
-      (mockFreighterApi.getPublicKey as any).mockResolvedValue("GTEST...123");
+      asMock(mockFreighterApi.getPublicKey).mockResolvedValue("GTEST...123");
 
       // First attempt fails
       await expect(walletService.connectWallet()).rejects.toThrow();
 
       // Reset mock for second attempt
       vi.clearAllMocks();
-      (mockFreighterApi.freighterIsConnected as any).mockResolvedValue({
+      asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
         error: null,
       });
-      (mockFreighterApi.getPublicKey as any).mockResolvedValue("GTEST...123");
+      asMock(mockFreighterApi.getPublicKey).mockResolvedValue("GTEST...123");
 
       const publicKey = await walletService.connectWallet();
       expect(publicKey).toBe("GTEST...123");
