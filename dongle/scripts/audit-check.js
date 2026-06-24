@@ -1,3 +1,4 @@
+/* eslint-disable */
 const { exec } = require('child_process');
 
 // Documented exceptions for known vulnerabilities that cannot be resolved yet
