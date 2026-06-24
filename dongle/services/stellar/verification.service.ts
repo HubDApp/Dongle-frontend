@@ -19,7 +19,6 @@ export interface VerificationRequest {
 }
 
 const VERIFICATION_STORAGE_KEY = "dongle_verification_requests";
-const VERIFICATION_RESULTS_KEY = "dongle_verification_results";
 
 class VerificationService {
   /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useWallet } from "@/context/wallet.context";
 
 interface VerificationRequest {
@@ -31,15 +31,11 @@ export default function AdminDashboard() {
   const { isConnected, publicKey } = useWallet();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
-  const [isAdminChecking, setIsAdminChecking] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    setIsAdminChecking(true);
-    const authorized = isConnected && Boolean(publicKey) && ADMIN_ALLOWLIST.includes(publicKey!);
-    setIsAdmin(authorized);
-    setIsAdminChecking(false);
-  }, [isConnected, publicKey]);
+  const isAdmin = useMemo(
+    () => isConnected && Boolean(publicKey) && ADMIN_ALLOWLIST.includes(publicKey!),
+    [isConnected, publicKey],
+  );
+  const isAdminChecking = false;
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
     setRequests(prev => prev.map(req => 
