@@ -1,5 +1,7 @@
 import { Project, PROJECT_CATEGORIES } from "@/types/project";
 
+export { ALL_CATEGORIES } from "@/types/project";
+
 export const projects: Project[] = [
   {
     id: "soroban-swap",

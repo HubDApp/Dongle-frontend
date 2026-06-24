@@ -13,6 +13,8 @@ interface WalletService {
 const mockFreighterApi = {
   freighterIsConnected: vi.fn(),
   getPublicKey: vi.fn(),
+  isAllowed: vi.fn(),
+  getAddress: vi.fn(),
   signTransaction: vi.fn(),
 };
 
@@ -39,7 +41,13 @@ describe("Wallet Service - High Risk Flows", () => {
       isConnected: async () => {
         try {
           const result = await mockFreighterApi.freighterIsConnected();
-          return result.isConnected;
+          if (!result.isConnected) return false;
+
+          const allowed = await mockFreighterApi.isAllowed();
+          if (!allowed?.isAllowed) return false;
+
+          const address = await mockFreighterApi.getAddress();
+          return Boolean(address?.address);
         } catch {
           return false;
         }
@@ -124,6 +132,12 @@ describe("Wallet Service - High Risk Flows", () => {
         isConnected: true,
         error: null,
       });
+      asMock(mockFreighterApi.isAllowed).mockResolvedValue({
+        isAllowed: true,
+      });
+      asMock(mockFreighterApi.getAddress).mockResolvedValue({
+        address: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOAS5HX75Z3CC",
+      });
 
       const connected = await walletService.isConnected();
 
@@ -144,6 +158,9 @@ describe("Wallet Service - High Risk Flows", () => {
     it("returns false when wallet is not allowed", async () => {
       asMock(mockFreighterApi.freighterIsConnected).mockResolvedValue({
         isConnected: true,
+      });
+      asMock(mockFreighterApi.isAllowed).mockResolvedValue({
+        isAllowed: false,
         error: { message: "Not allowed" },
       });
 

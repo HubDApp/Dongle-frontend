@@ -4,26 +4,25 @@ export const ContractIdSchema = z
   .string()
   .regex(/^C[A-Z2-7]{55}$/, "Invalid Stellar Contract ID format");
 
-export const getEnvSchema = (_isDev: boolean) => {
+export const getEnvSchema = (isDev: boolean) => {
   const DEV_DEFAULT_CONTRACT =
     "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  const contractField = isDev
+    ? ContractIdSchema.default(DEV_DEFAULT_CONTRACT)
+    : ContractIdSchema;
+  const urlField = isDev
+    ? z.string().url().default("https://soroban-testnet.stellar.org:443")
+    : z.string().url();
+  const passphraseField = isDev
+    ? z.string().default("Test SDF Network ; September 2015")
+    : z.string().min(1);
+
   return z.object({
-    NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: ContractIdSchema.default(
-      DEV_DEFAULT_CONTRACT,
-    ),
-    NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: ContractIdSchema.default(
-      DEV_DEFAULT_CONTRACT,
-    ),
-    NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: ContractIdSchema.default(
-      DEV_DEFAULT_CONTRACT,
-    ),
-    NEXT_PUBLIC_SOROBAN_RPC_URL: z
-      .string()
-      .url()
-      .default("https://soroban-testnet.stellar.org:443"),
-    NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE: z
-      .string()
-      .default("Test SDF Network ; September 2015"),
+    NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: contractField,
+    NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: contractField,
+    NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: contractField,
+    NEXT_PUBLIC_SOROBAN_RPC_URL: urlField,
+    NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE: passphraseField,
   });
 };
 
@@ -55,6 +54,7 @@ export const parseEnv = (env: Record<string, string | undefined>, isDev: boolean
 
 const isDev =
   process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
 const parsedEnv = parseEnv(
   {
@@ -68,7 +68,7 @@ const parsedEnv = parseEnv(
     NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE:
       process.env.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE,
   },
-  isDev
+  isDev || isBuild
 );
 
 /**
