@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import ProfilePage from "@/app/profile/page";
 import * as walletContext from "@/context/wallet.context";
@@ -27,6 +27,20 @@ vi.mock("@/components/layout/LayoutWrapper", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+function mockWallet(isConnected: boolean, publicKey: string | null, overrides: Partial<ReturnType<typeof walletContext.useWallet>> = {}) {
+  vi.spyOn(walletContext, "useWallet").mockReturnValue({
+    isConnected,
+    isConnecting: false,
+    publicKey,
+    walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
+    isCorrectNetwork: isConnected,
+    walletNetworkLabel: isConnected ? "Testnet" : "Unknown",
+    connectWallet: vi.fn(),
+    disconnectWallet: vi.fn(),
+    ...overrides,
+  });
+}
+
 describe("Profile Page", () => {
   beforeEach(() => {
     vi.mocked(useStellarAccount).mockReturnValue({
@@ -40,13 +54,7 @@ describe("Profile Page", () => {
 
   describe("Disconnected State", () => {
     it("should show connect wallet prompt when not connected", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: null,
-        isConnected: false,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(false, null);
 
       render(<ProfilePage />);
 
@@ -57,13 +65,7 @@ describe("Profile Page", () => {
 
     it("should call connectWallet when button is clicked", () => {
       const connectWallet = vi.fn();
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: null,
-        isConnected: false,
-        isConnecting: false,
-        connectWallet,
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(false, null, { connectWallet });
 
       render(<ProfilePage />);
 
@@ -81,13 +83,13 @@ describe("Profile Page", () => {
           id: "test-account",
           account_id: "GTEST123",
           balances: [],
-        },
+        } as unknown as ReturnType<typeof useStellarAccount>["account"],
         balances: [
           {
             balance: "100.0000000",
             asset_type: "native",
           },
-        ],
+        ] as unknown as ReturnType<typeof useStellarAccount>["balances"],
         loading: false,
         error: null,
         refetch: vi.fn(),
@@ -109,7 +111,7 @@ describe("Profile Page", () => {
         {
           id: "proj1",
           name: "Test Project",
-          category: "DeFi",
+          category: "DeFi / DEX",
           description: "A test project",
           rating: 4.5,
           reviews: 10,
@@ -119,13 +121,7 @@ describe("Profile Page", () => {
     });
 
     it("should display wallet address when connected", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -133,13 +129,7 @@ describe("Profile Page", () => {
     });
 
     it("should display user balances", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -148,13 +138,7 @@ describe("Profile Page", () => {
     });
 
     it("should display user reviews", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -163,13 +147,7 @@ describe("Profile Page", () => {
     });
 
     it("should show review count badge", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -177,13 +155,7 @@ describe("Profile Page", () => {
     });
 
     it("should calculate average rating", () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -192,13 +164,7 @@ describe("Profile Page", () => {
 
     it("should show disconnect button", () => {
       const disconnectWallet = vi.fn();
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet,
-      });
+      mockWallet(true, "GTEST123456789", { disconnectWallet });
 
       render(<ProfilePage />);
 
@@ -209,13 +175,7 @@ describe("Profile Page", () => {
     });
 
     it("should copy address to clipboard", async () => {
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       const clipboardSpy = vi.spyOn(navigator.clipboard, "writeText");
 
@@ -238,13 +198,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -262,13 +216,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
@@ -287,13 +235,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet,
-      });
+      mockWallet(true, "GTEST123456789", { disconnectWallet });
 
       render(<ProfilePage />);
 
@@ -307,7 +249,7 @@ describe("Profile Page", () => {
   describe("Empty Reviews State", () => {
     it("should show empty state when user has no reviews", () => {
       vi.mocked(useStellarAccount).mockReturnValue({
-        account: { id: "test" },
+        account: { id: "test" } as unknown as ReturnType<typeof useStellarAccount>["account"],
         balances: [],
         loading: false,
         error: null,
@@ -316,13 +258,7 @@ describe("Profile Page", () => {
 
       vi.mocked(reviewService.getReviewsByUser).mockReturnValue([]);
 
-      vi.spyOn(walletContext, "useWallet").mockReturnValue({
-        publicKey: "GTEST123456789",
-        isConnected: true,
-        isConnecting: false,
-        connectWallet: vi.fn(),
-        disconnectWallet: vi.fn(),
-      });
+      mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 

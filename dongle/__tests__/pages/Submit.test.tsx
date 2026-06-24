@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import NewProjectPage from "@/app/projects/new/page";
@@ -21,10 +21,14 @@ vi.mock("next/link", () => ({
 }));
 
 function mockWallet(overrides: Partial<ReturnType<typeof walletContext.useWallet>> = {}) {
+  const isConnected = overrides.isConnected ?? false;
   vi.spyOn(walletContext, "useWallet").mockReturnValue({
-    isConnected: false,
+    isConnected,
     isConnecting: false,
     publicKey: null,
+    walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
+    isCorrectNetwork: isConnected,
+    walletNetworkLabel: isConnected ? "Testnet" : "Unknown",
     connectWallet: vi.fn(),
     disconnectWallet: vi.fn(),
     ...overrides,

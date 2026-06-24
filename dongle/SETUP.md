@@ -11,8 +11,8 @@ npm test
 
 ## Prerequisites
 
-- **Node.js**: 18.x LTS or higher (20.x LTS **strongly recommended**)
-- **npm**: 9.x or higher
+- **Node.js**: 20.x LTS (pinned & supported version)
+- **npm**: 10.x or higher
 - [Freighter Wallet](https://freighter.app/) - Browser extension for Stellar wallet
 
 ## Supported Platforms
@@ -57,6 +57,9 @@ npm run test:watch
 
 # Run linter
 npm run lint
+
+# Run security audit
+npm run audit
 
 # Build for production
 npm run build
@@ -121,8 +124,8 @@ Vitest uses Rolldown, which requires native bindings compiled for your platform.
    node --version
    npm --version
    ```
-   - Node.js: 18.x LTS or higher (20.x recommended)
-   - npm: 9.x or higher
+   - Node.js: 20.x LTS
+   - npm: 10.x or higher
 
 2. **Install build tools**
    
@@ -191,19 +194,18 @@ npm test
 # Run linter
 npm run lint
 
+# Run security audit
+npm run audit
+
 # Build project
 npm run build
 ```
 
 ## Node.js & npm Versions
 
-**Recommended:**
-- Node.js: 20.x LTS (latest stable)
-- npm: 10.x (bundled with Node 20)
-
-**Minimum:**
-- Node.js: 18.x LTS
-- npm: 9.x
+**Supported:**
+- Node.js: 20.x LTS (pinned)
+- npm: 10.x or higher
 
 **Installation:**
 - [Node.js Official](https://nodejs.org/) - Download LTS
@@ -213,7 +215,7 @@ npm run build
 ## CI/CD Integration
 
 For GitHub Actions or other CI systems, the project is configured to:
-- Run tests on Node 18.x and 20.x
+- Run tests on Node 20.x
 - Verify dependency lockfile is up to date
 - Run linter with zero warnings
 - Build project successfully
