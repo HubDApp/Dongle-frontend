@@ -1,8 +1,50 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import React from "react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import DiscoverPage from "@/app/discover/page";
 import { mockProjects } from "@/data/mockProjects";
 import { projectService } from "@/services/project/project.service";
+import type { SortBy } from "@/hooks/useDiscoverParams";
+
+vi.mock("@/hooks/useDiscoverParams", () => ({
+  useDiscoverParams: () => {
+    const [searchInput, setSearchInputState] = React.useState("");
+    const [searchQuery, setSearchQuery] = React.useState("");
+    const [category, setCategoryState] = React.useState("All");
+    const [sortBy, setSortByState] = React.useState<SortBy>("rating");
+    const [page, setPage] = React.useState(1);
+
+    return {
+      searchInput,
+      searchQuery,
+      category,
+      sortBy,
+      page,
+      setSearchInput: (value: string) => {
+        setSearchInputState(value);
+        setSearchQuery(value);
+        setPage(1);
+      },
+      setCategory: (value: string) => {
+        setCategoryState(value);
+        setPage(1);
+      },
+      setSortBy: (value: SortBy) => {
+        setSortByState(value);
+        setPage(1);
+      },
+      loadNextPage: () => {
+        setPage((current) => current + 1);
+      },
+      clearFilters: () => {
+        setSearchInputState("");
+        setSearchQuery("");
+        setCategoryState("All");
+        setPage(1);
+      },
+    };
+  },
+}));
 
 vi.mock("next/link", () => ({
   default: ({

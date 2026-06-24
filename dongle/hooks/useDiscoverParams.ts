@@ -63,6 +63,8 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
   // Whenever the URL changes from external navigation (back/forward), resync local state
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
+    // Browser back/forward should resync the controlled search field with the URL.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional URL-to-input sync
     setSearchInputState(q);
     setSearchQuery(q);
   }, [searchParams]);

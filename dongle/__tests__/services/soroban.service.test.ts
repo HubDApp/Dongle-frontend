@@ -12,6 +12,7 @@ const mockServer = {
 const mockWallet = {
   getPublicKey: vi.fn(),
   signTransaction: vi.fn(),
+  getNetworkPassphrase: vi.fn(),
 };
 
 vi.mock("stellar-sdk", () => {
@@ -83,6 +84,9 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
 
     mockWallet.getPublicKey.mockResolvedValue("GTEST...123");
     mockWallet.signTransaction.mockResolvedValue("SIGNED_XDR");
+    mockWallet.getNetworkPassphrase.mockResolvedValue(
+      "Test SDF Network ; September 2015",
+    );
 
     mockServer.getAccount.mockResolvedValue({
       sequence: "42",
@@ -103,7 +107,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
       name: "My Project",
       category: "cat",
       description: "desc",
-      url: "https://example.com",
+      websiteUrl: "https://example.com",
       logoUrl: "https://example.com/logo.png",
       docsUrl: "https://example.com/docs",
     });
@@ -136,7 +140,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
         name: "My Project",
         category: "cat",
         description: "desc",
-        url: "https://example.com",
+        websiteUrl: "https://example.com",
       })
       .catch((e) => e);
 

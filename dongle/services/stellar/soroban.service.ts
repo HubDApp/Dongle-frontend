@@ -8,6 +8,11 @@ import {
 } from "stellar-sdk";
 import { SOROBAN_CONFIG, DONGLE_CONTRACTS } from "@/constants/contracts";
 import { walletService } from "@/services/wallet/wallet.service";
+import {
+  EXPECTED_NETWORK_LABEL,
+  EXPECTED_NETWORK_PASSPHRASE,
+  getNetworkLabel,
+} from "@/context/wallet.context";
 import { generateId } from "@/lib/id-generator";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL);
