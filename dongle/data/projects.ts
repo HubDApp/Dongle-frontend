@@ -9,6 +9,8 @@ export const projects: Project[] = [
     rating: 4.8,
     reviews: 124,
     createdAt: "2024-11-10T00:00:00Z",
+    url: "https://soroban.stellar.org",
+    logoUrl: "https://raw.githubusercontent.com/stellar/stellar-design-system/main/packages/design-system/src/assets/logo.svg",
   },
   {
     id: "stellar-guardians",
@@ -27,6 +29,7 @@ export const projects: Project[] = [
     rating: 4.9,
     reviews: 210,
     createdAt: "2024-08-05T00:00:00Z",
+    url: "https://stellar.org",
   },
   {
     id: "xlm-pay",

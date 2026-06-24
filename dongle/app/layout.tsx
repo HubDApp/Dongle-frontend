@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/context/wallet.context";
+import { ConfirmDialogProvider } from "@/hooks/useConfirm";
 import { Toaster } from "sonner";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 
@@ -33,7 +34,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <WalletProvider>
-          <LayoutWrapper>{children}</LayoutWrapper>
+          <ConfirmDialogProvider>
+            <LayoutWrapper>{children}</LayoutWrapper>
+          </ConfirmDialogProvider>
         </WalletProvider>
         <Toaster position="top-right" richColors />
       </body>

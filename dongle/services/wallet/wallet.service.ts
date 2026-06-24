@@ -1,5 +1,6 @@
 import {
   getAddress,
+  getNetworkDetails,
   isAllowed,
   isConnected as freighterIsConnected,
   requestAccess,
@@ -70,4 +71,21 @@ export const walletService = {
 
   // Freighter has no disconnect API — context handles clearing state on its end
   disconnectWallet(): void {},
+
+  /**
+   * Returns the network passphrase of the wallet's currently selected network.
+   * Returns null when Freighter is unavailable or not yet approved.
+   */
+  async getNetworkPassphrase(): Promise<string | null> {
+    try {
+      const { isConnected } = await freighterIsConnected();
+      if (!isConnected) return null;
+      const details = await getNetworkDetails();
+      // Freighter ≥ 1.7 returns { networkPassphrase, network, networkUrl }
+      // Older versions may return { networkPassphrase } directly.
+      return (details as { networkPassphrase?: string }).networkPassphrase ?? null;
+    } catch {
+      return null;
+    }
+  },
 };

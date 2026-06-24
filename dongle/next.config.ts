@@ -15,12 +15,21 @@ const nextConfig: NextConfig = {
   // Allow images from common hosting domains
   images: {
     remotePatterns: [
+      // Decentralised storage
       { protocol: "https", hostname: "**.ipfs.io" },
       { protocol: "https", hostname: "**.ipfs.dweb.link" },
       { protocol: "https", hostname: "ipfs.io" },
       { protocol: "https", hostname: "arweave.net" },
       { protocol: "https", hostname: "**.arweave.net" },
+      // Code hosting / raw assets
       { protocol: "https", hostname: "raw.githubusercontent.com" },
+      { protocol: "https", hostname: "avatars.githubusercontent.com" },
+      // CDN / general image hosting used by projects
+      { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "**.amazonaws.com" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "pbs.twimg.com" },
+      { protocol: "https", hostname: "i.imgur.com" },
     ],
   },
 

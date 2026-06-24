@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useWallet } from "@/context/wallet.context";
+import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
 
 export default function Navbar() {
@@ -13,6 +13,8 @@ export default function Navbar() {
     isConnected,
     isConnecting,
     publicKey,
+    isCorrectNetwork,
+    walletNetworkLabel,
     connectWallet,
     disconnectWallet,
   } = useWallet();
@@ -65,21 +67,41 @@ export default function Navbar() {
 
         <div className="flex items-center gap-4">
           {isConnected ? (
-            <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-2xl shadow-sm">
-              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
-                {publicKey
-                  ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}`
-                  : "Connected"}
-              </span>
-              <Button
-                onClick={disconnectWallet}
-                variant="outline"
-                size="sm"
-                className="rounded-full text-xs py-1 px-3 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+            <div className="flex items-center gap-2">
+              {/* Network badge — always visible when connected */}
+              <span
+                title={`Expected: ${EXPECTED_NETWORK_LABEL}`}
+                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  isCorrectNetwork
+                    ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                    : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 animate-pulse"
+                }`}
               >
-                Disconnect
-              </Button>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isCorrectNetwork ? "bg-emerald-500" : "bg-red-500"
+                  }`}
+                />
+                {isCorrectNetwork ? EXPECTED_NETWORK_LABEL : walletNetworkLabel}
+              </span>
+
+              {/* Wallet address pill */}
+              <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-2xl shadow-sm">
+                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
+                  {publicKey
+                    ? `${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}`
+                    : "Connected"}
+                </span>
+                <Button
+                  onClick={disconnectWallet}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full text-xs py-1 px-3 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                >
+                  Disconnect
+                </Button>
+              </div>
             </div>
           ) : (
             <Button

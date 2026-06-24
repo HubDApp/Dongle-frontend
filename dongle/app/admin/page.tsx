@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useWallet } from "@/context/wallet.context";
+import { toast } from "sonner";
 
 interface VerificationRequest {
   id: string;
@@ -44,7 +45,8 @@ export default function AdminDashboard() {
   };
 
   const handleSaveFee = () => {
-    alert(`Fee updated to ${fee} XLM`);
+    // Persist / submit the fee here when the on-chain call is wired up.
+    toast.success(`Verification fee updated to ${fee} XLM`);
   };
 
   if (isAdminChecking) {

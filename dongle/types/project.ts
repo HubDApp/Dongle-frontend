@@ -73,6 +73,12 @@ export interface Project {
   rating: number;
   reviews: number;
   createdAt: string; // ISO date string
+  /** Optional logo/screenshot URL – rendered with next/image; falls back to letter avatar */
+  logoUrl?: string;
+  /** Project website URL */
+  url?: string;
+  /** Project documentation URL */
+  docsUrl?: string;
 }
 
 /**

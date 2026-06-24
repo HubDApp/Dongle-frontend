@@ -1,6 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Project } from "@/types/project";
+import ProjectImage from "@/components/projects/ProjectImage";
 
 interface ProjectCardProps {
   project: Project;
@@ -9,11 +10,12 @@ interface ProjectCardProps {
 export const ProjectCard = ({ project }: ProjectCardProps) => {
   return (
     <Link href={`/projects/${project.id}`} className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col cursor-pointer">
-      <div className="w-full aspect-video bg-zinc-100 dark:bg-zinc-800 rounded-2xl mb-6 overflow-hidden relative shrink-0">
-        <div className="absolute inset-0 flex items-center justify-center text-zinc-300 dark:text-zinc-700 font-bold text-lg">
-          {project.name[0]}
-        </div>
-      </div>
+      <ProjectImage
+        logoUrl={project.logoUrl}
+        name={project.name}
+        className="mb-6 shrink-0"
+        fallbackTextSize="text-lg"
+      />
       <div className="flex justify-between items-start mb-2">
         <span className="text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
           {project.category}
