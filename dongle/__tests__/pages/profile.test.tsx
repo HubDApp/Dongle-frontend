@@ -83,13 +83,13 @@ describe("Profile Page", () => {
           id: "test-account",
           account_id: "GTEST123",
           balances: [],
-        } as any,
+        } as unknown as ReturnType<typeof useStellarAccount>["account"],
         balances: [
           {
             balance: "100.0000000",
             asset_type: "native",
-          } as any,
-        ],
+          },
+        ] as unknown as ReturnType<typeof useStellarAccount>["balances"],
         loading: false,
         error: null,
         refetch: vi.fn(),
@@ -249,7 +249,7 @@ describe("Profile Page", () => {
   describe("Empty Reviews State", () => {
     it("should show empty state when user has no reviews", () => {
       vi.mocked(useStellarAccount).mockReturnValue({
-        account: { id: "test" } as any,
+        account: { id: "test" } as unknown as ReturnType<typeof useStellarAccount>["account"],
         balances: [],
         loading: false,
         error: null,
