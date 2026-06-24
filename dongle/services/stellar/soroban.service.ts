@@ -12,6 +12,36 @@ import { generateId } from "@/lib/id-generator";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL);
 
+// ─── Network mismatch error ──────────────────────────────────────────────────
+
+export class NetworkMismatchError extends Error {
+  readonly expectedNetwork: string;
+  readonly actualNetwork: string | null;
+
+  constructor(actual: string | null) {
+    const expectedLabel = EXPECTED_NETWORK_LABEL;
+    const actualLabel = getNetworkLabel(actual);
+    super(
+      `Wrong network: wallet is on ${actualLabel}, but this app requires ${expectedLabel}. ` +
+        `Please switch your Freighter wallet to ${expectedLabel} and try again.`,
+    );
+    this.name = "NetworkMismatchError";
+    this.expectedNetwork = EXPECTED_NETWORK_PASSPHRASE;
+    this.actualNetwork = actual;
+  }
+}
+
+/**
+ * Validates that the wallet is on the expected network before any transaction.
+ * Throws NetworkMismatchError if the network does not match.
+ */
+async function assertCorrectNetwork(): Promise<void> {
+  const passphrase = await walletService.getNetworkPassphrase();
+  if (passphrase !== EXPECTED_NETWORK_PASSPHRASE) {
+    throw new NetworkMismatchError(passphrase);
+  }
+}
+
 export interface ProjectData {
   id: string;
   name: string;
@@ -86,6 +116,9 @@ export const sorobanService = {
         status: "SUCCESS",
       };
     }
+
+    // Validate network before building or signing any transaction
+    await assertCorrectNetwork();
 
     const account = await server.getAccount(publicKey);
     const source = new Account(publicKey, account.sequenceNumber());
@@ -260,6 +293,9 @@ export const sorobanService = {
     if (project.owner !== publicKey) {
       throw new Error("Only project owner can update the project");
     }
+
+    // Validate network before building or signing any transaction
+    await assertCorrectNetwork();
 
     const account = await server.getAccount(publicKey);
     const source = new Account(publicKey, account.sequenceNumber());

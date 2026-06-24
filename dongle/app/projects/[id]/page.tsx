@@ -9,9 +9,11 @@ import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import ProjectImage from "@/components/projects/ProjectImage";
 import { Review } from "@/types/review";
 import { reviewService } from "@/services/review/review.service";
 import { useWallet } from "@/context/wallet.context";
+import { useConfirm } from "@/hooks/useConfirm";
 import {
   ArrowLeft,
   ExternalLink,
@@ -27,6 +29,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { publicKey, connectWallet } = useWallet();
+  const confirm = useConfirm();
   const projectId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
@@ -65,12 +68,19 @@ export default function ProjectDetailPage() {
     setIsAddingReview(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!publicKey) return;
-    if (confirm("Are you sure you want to delete this review?")) {
-      reviewService.deleteReview(id, publicKey);
-      setReviews(reviewService.getReviewsByProject(projectId));
-    }
+    const ok = await confirm({
+      title: "Delete review",
+      description:
+        "This will permanently remove your review. This action cannot be undone.",
+      confirmLabel: "Delete",
+      cancelLabel: "Keep it",
+      variant: "danger",
+    });
+    if (!ok) return;
+    reviewService.deleteReview(id, publicKey);
+    setReviews(reviewService.getReviewsByProject(projectId));
   };
 
   const handleSubmitReview = (data: { rating: number; comment: string }) => {
@@ -187,12 +197,13 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                {/* Project Image Placeholder */}
-                <div className="w-full aspect-video bg-zinc-100 dark:bg-zinc-800 rounded-2xl mb-6 overflow-hidden relative">
-                  <div className="absolute inset-0 flex items-center justify-center text-zinc-300 dark:text-zinc-700 font-bold text-4xl">
-                    {project.name[0]}
-                  </div>
-                </div>
+                {/* Project Image */}
+                <ProjectImage
+                  logoUrl={project.logoUrl}
+                  name={project.name}
+                  className="mb-6"
+                  fallbackTextSize="text-4xl"
+                />
 
                 {/* Description */}
                 <div className="mb-6">
