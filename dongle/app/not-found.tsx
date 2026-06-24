@@ -22,7 +22,7 @@ export default function NotFoundPage() {
           <Link href="/discover" passHref>
             <Button variant="secondary">Discover Projects</Button>
           </Link>
-          <Link href="/submit" passHref>
+          <Link href="/projects/new" passHref>
             <Button variant="outline">Submit a Project</Button>
           </Link>
         </div>

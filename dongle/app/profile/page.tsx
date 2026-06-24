@@ -318,7 +318,7 @@ export default function ProfilePage() {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => router.push("/submit")}
+                    onClick={() => router.push("/projects/new")}
                   >
                     Submit Project
                   </Button>
