@@ -22,7 +22,11 @@ const projectSchema = z.object({
     .string()
     .min(10, "Description must be at least 10 characters")
     .max(500),
-  url: z.string().url("Please enter a valid URL"),
+  websiteUrl: z.string().url("Please enter a valid URL"),
+  githubUrl: z
+    .string()
+    .url("Please enter a valid GitHub URL")
+    .or(z.string().length(0)),
   logoUrl: z
     .string()
     .url("Please enter a valid image URL")
@@ -63,7 +67,8 @@ export default function ProjectForm({
       name: initialData?.name || "",
       category: initialData?.category || "",
       description: initialData?.description || "",
-      url: initialData?.url || "",
+      websiteUrl: initialData?.websiteUrl || "",
+      githubUrl: initialData?.githubUrl || "",
       logoUrl: initialData?.logoUrl || "",
       docsUrl: initialData?.docsUrl || "",
     },
@@ -140,11 +145,17 @@ export default function ProjectForm({
         <FormField
           label="Project Website"
           placeholder="https://yourproject.com"
-          {...register("url")}
-          error={errors.url?.message}
+          {...register("websiteUrl")}
+          error={errors.websiteUrl?.message}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <FormField
+            label="GitHub URL (Optional)"
+            placeholder="https://github.com/..."
+            {...register("githubUrl")}
+            error={errors.githubUrl?.message}
+          />
           <FormField
             label="Logo URL (Optional)"
             placeholder="https://..."

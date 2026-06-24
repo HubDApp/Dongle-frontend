@@ -215,27 +215,31 @@ export default function ProjectDetailPage() {
 
                 {/* Links */}
                 <div className="flex flex-wrap gap-3">
-                  {project.url && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(project.url, "_blank", "noopener,noreferrer")}
+                  {project.websiteUrl && (
+                    <a
+                      href={project.websiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
                     >
-                      <Globe className="w-4 h-4 mr-2" />
-                      Website
-                      <ExternalLink className="w-3 h-3 ml-1" />
-                    </Button>
+                      <Button variant="outline" size="sm">
+                        <Globe className="w-4 h-4 mr-2" />
+                        Website
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </a>
                   )}
-                  {project.docsUrl && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(project.docsUrl, "_blank", "noopener,noreferrer")}
+                  {project.githubUrl && (
+                    <a
+                      href={project.githubUrl}
+                      target="_blank"
+                      rel="noreferrer"
                     >
-                      <GitBranch className="w-4 h-4 mr-2" />
-                      Docs
-                      <ExternalLink className="w-3 h-3 ml-1" />
-                    </Button>
+                      <Button variant="outline" size="sm">
+                        <GitBranch className="w-4 h-4 mr-2" />
+                        GitHub
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </a>
                   )}
                 </div>
               </div>

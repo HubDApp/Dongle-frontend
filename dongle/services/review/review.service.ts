@@ -1,4 +1,5 @@
 import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
+import { generateId } from "@/lib/id-generator";
 
 const STORAGE_KEY = "dongle_reviews";
 
@@ -81,7 +82,7 @@ export const reviewService = {
     const newReview: Review = {
       ...review,
       userAddress,
-      id: Math.random().toString(36).substring(2, 9),
+      id: generateId(),
       createdAt: new Date().toISOString(),
     };
     const updatedReviews = [newReview, ...reviews];

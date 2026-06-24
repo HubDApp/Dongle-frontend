@@ -9,8 +9,9 @@ export const projects: Project[] = [
     rating: 4.8,
     reviews: 124,
     createdAt: "2024-11-10T00:00:00Z",
-    url: "https://soroban.stellar.org",
-    logoUrl: "https://raw.githubusercontent.com/stellar/stellar-design-system/main/packages/design-system/src/assets/logo.svg",
+    websiteUrl: "https://soroban-swap.example.com",
+    githubUrl: "https://github.com/example/soroban-swap",
+    docsUrl: "https://docs.soroban-swap.example.com",
   },
   {
     id: "stellar-guardians",
@@ -20,6 +21,8 @@ export const projects: Project[] = [
     rating: 4.5,
     reviews: 89,
     createdAt: "2024-09-22T00:00:00Z",
+    websiteUrl: "https://stellar-guardians.example.com",
+    githubUrl: "https://github.com/example/stellar-guardians",
   },
   {
     id: "anchor-connect",
@@ -29,7 +32,9 @@ export const projects: Project[] = [
     rating: 4.9,
     reviews: 210,
     createdAt: "2024-08-05T00:00:00Z",
-    url: "https://stellar.org",
+    websiteUrl: "https://anchor-connect.example.com",
+    githubUrl: "https://github.com/example/anchor-connect",
+    docsUrl: "https://docs.anchor-connect.example.com",
   },
   {
     id: "xlm-pay",
@@ -39,6 +44,7 @@ export const projects: Project[] = [
     rating: 4.6,
     reviews: 175,
     createdAt: "2025-01-14T00:00:00Z",
+    websiteUrl: "https://xlm-pay.example.com",
   },
   {
     id: "stellar-dao",
@@ -48,6 +54,8 @@ export const projects: Project[] = [
     rating: 4.3,
     reviews: 62,
     createdAt: "2025-02-28T00:00:00Z",
+    websiteUrl: "https://stellar-dao.example.com",
+    githubUrl: "https://github.com/example/stellar-dao",
   },
   {
     id: "nft-forge",
@@ -57,5 +65,8 @@ export const projects: Project[] = [
     rating: 4.4,
     reviews: 98,
     createdAt: "2025-03-15T00:00:00Z",
+    websiteUrl: "https://nft-forge.example.com",
+    githubUrl: "https://github.com/example/nft-forge",
+    docsUrl: "https://docs.nft-forge.example.com",
   },
 ];

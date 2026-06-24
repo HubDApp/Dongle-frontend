@@ -22,10 +22,26 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
               <li>
                 <Link
-                  href="/"
+                  href="/discover"
                   className="hover:text-black dark:hover:text-white"
                 >
-                  Home
+                  Discover
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/reviews"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Reviews
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/verify"
+                  className="hover:text-black dark:hover:text-white"
+                >
+                  Verify
                 </Link>
               </li>
               <li>
@@ -33,7 +49,7 @@ export default function Footer() {
                   href="/projects/new"
                   className="hover:text-black dark:hover:text-white"
                 >
-                  Submit
+                  Submit Project
                 </Link>
               </li>
               <li>
@@ -55,14 +71,6 @@ export default function Footer() {
                   className="hover:text-black dark:hover:text-white"
                 >
                   Documentation
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/projects/new"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Submit App
                 </Link>
               </li>
               <li>
