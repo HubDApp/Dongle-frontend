@@ -28,6 +28,16 @@ vi.mock("@/components/layout/LayoutWrapper", () => ({
 }));
 
 describe("Profile Page", () => {
+  beforeEach(() => {
+    vi.mocked(useStellarAccount).mockReturnValue({
+      account: null,
+      balances: null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
   describe("Disconnected State", () => {
     it("should show connect wallet prompt when not connected", () => {
       vi.spyOn(walletContext, "useWallet").mockReturnValue({
@@ -163,7 +173,7 @@ describe("Profile Page", () => {
 
       render(<ProfilePage />);
 
-      expect(screen.getByText("1")).toBeInTheDocument(); // Review count
+      expect(screen.getByText("Your Reviews").nextElementSibling).toHaveTextContent("1");
     });
 
     it("should calculate average rating", () => {

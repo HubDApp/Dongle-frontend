@@ -1,16 +1,25 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import AdminPage from "@/app/admin/page";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@stellar/freighter-api", () => ({
-  freighterApi: {
-    freighterIsConnected: vi.fn(),
-    getPublicKey: vi.fn(),
-  },
-}));
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_ADMIN_ALLOWLIST = "GADMIN1234567890";
+});
+
+import { render, screen, fireEvent } from "@testing-library/react";
+import AdminPage from "@/app/admin/page";
+import * as walletContext from "@/context/wallet.context";
+
+const ADMIN_KEY = "GADMIN1234567890";
 
 vi.mock("next/link", () => ({
-  default: ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
+  default: ({
+    href,
+    children,
+    className,
+  }: {
+    href: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
     <a href={href} className={className}>
       {children}
     </a>
@@ -19,193 +28,210 @@ vi.mock("next/link", () => ({
 
 describe("Admin Dashboard - Authorization & High Risk Flows", () => {
   describe("Admin Authorization", () => {
-    it("displays admin dashboard when authorized", async () => {
-      render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/admin/i)).toBeInTheDocument();
+    it("displays admin dashboard when authorized", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: ADMIN_KEY,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
+
+      render(<AdminPage />);
+
+      expect(screen.getByText("ADMIN DASHBOARD")).toBeInTheDocument();
     });
 
-    it("denies access for non-admin users", async () => {
-      render(<AdminPage />);
-      
-      // Should either show unauthorized message or redirect
-      await waitFor(() => {
-        const adminText = screen.queryByText(/admin/i);
-        const unauthorizedText = screen.queryByText(/unauthorized|not authorized|access denied/i);
-        expect(adminText || unauthorizedText).toBeTruthy();
+    it("denies access for non-admin users", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: "GNOTADMIN123456",
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
+
+      render(<AdminPage />);
+
+      expect(screen.getByText("Access Restricted")).toBeInTheDocument();
     });
 
-    it("shows wallet connection requirement", async () => {
-      render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/connect|wallet/i)).toBeInTheDocument();
+    it("shows wallet connection requirement", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: false,
+        isConnecting: false,
+        publicKey: null,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
+
+      render(<AdminPage />);
+
+      expect(
+        screen.getByText(/connect an authorized admin wallet/i),
+      ).toBeInTheDocument();
     });
   });
 
   describe("Verification Request Management", () => {
-    it("displays verification requests list", async () => {
-      render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/verification/i)).toBeInTheDocument();
+    beforeEach(() => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: ADMIN_KEY,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
     });
 
-    it("shows request status correctly", async () => {
+    it("displays verification requests list", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        const statusElements = screen.queryAllByText(/pending|approved|rejected/i);
-        // Should have at least one status if requests are shown
-        expect(statusElements.length >= 0).toBe(true);
-      });
+      expect(screen.getByText(/verification requests/i)).toBeInTheDocument();
+      expect(screen.getByText("Lumina DEX")).toBeInTheDocument();
     });
 
-    it("allows admin to approve pending requests", async () => {
+    it("shows request status correctly", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        const approveButtons = screen.queryAllByRole("button", { name: /approve/i });
-        if (approveButtons.length > 0) {
-          fireEvent.click(approveButtons[0]);
-          // Should show success or update UI
-          expect(approveButtons[0]).toBeInTheDocument();
-        }
-      });
+      expect(screen.getAllByText(/pending/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/approved/i)).toBeInTheDocument();
     });
 
-    it("allows admin to reject requests", async () => {
+    it("allows admin to approve pending requests", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        const rejectButtons = screen.queryAllByRole("button", { name: /reject/i });
-        if (rejectButtons.length > 0) {
-          fireEvent.click(rejectButtons[0]);
-          expect(rejectButtons[0]).toBeInTheDocument();
-        }
-      });
+      const approveButtons = screen.getAllByRole("button", { name: /approve/i });
+      fireEvent.click(approveButtons[0]);
+      expect(screen.getAllByText(/approved/i).length).toBeGreaterThan(1);
     });
 
-    it("updates status after approval", async () => {
+    it("allows admin to reject requests", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        const statusText = screen.queryByText(/approved/i);
-        expect(statusText || screen.getByText(/admin/i)).toBeTruthy();
-      });
+      const rejectButtons = screen.getAllByRole("button", { name: /reject/i });
+      fireEvent.click(rejectButtons[0]);
+      expect(screen.getAllByText(/rejected/i).length).toBeGreaterThan(0);
     });
 
-    it("updates status after rejection", async () => {
+    it("updates status after approval", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        const statusText = screen.queryByText(/rejected/i);
-        expect(statusText || screen.getByText(/admin/i)).toBeTruthy();
-      });
+      fireEvent.click(screen.getAllByRole("button", { name: /approve/i })[0]);
+      expect(screen.getAllByText(/approved/i).length).toBeGreaterThan(1);
+    });
+
+    it("updates status after rejection", () => {
+      render(<AdminPage />);
+      fireEvent.click(screen.getAllByRole("button", { name: /reject/i })[0]);
+      expect(screen.getAllByText(/rejected/i).length).toBeGreaterThan(0);
     });
   });
 
   describe("System Settings", () => {
-    it("displays fee configuration section", async () => {
-      render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/fee|cost/i) || screen.getByText(/admin/i)).toBeTruthy();
+    beforeEach(() => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: ADMIN_KEY,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
     });
 
-    it("allows updating verification fee", async () => {
+    it("displays fee configuration section", () => {
       render(<AdminPage />);
-      
-      const feeInput = screen.queryByRole("spinbutton") || screen.queryByDisplayValue("1.5");
-      if (feeInput) {
-        fireEvent.change(feeInput, { target: { value: "2.5" } });
-        
-        const updateButton = screen.queryByRole("button", { name: /update|save/i });
-        if (updateButton) {
-          fireEvent.click(updateButton);
-          expect(updateButton).toBeInTheDocument();
-        }
-      }
+      expect(screen.getByText(/verification fee/i)).toBeInTheDocument();
     });
 
-    it("shows stats overview", async () => {
+    it("allows updating verification fee", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        const statsText = screen.queryByText(/stats|overview|active|queue/i);
-        expect(statsText || screen.getByText(/admin/i)).toBeTruthy();
-      });
+      const feeInput = screen.getByRole("spinbutton");
+      fireEvent.change(feeInput, { target: { value: "2.5" } });
+      expect((feeInput as HTMLInputElement).value).toBe("2.5");
+    });
+
+    it("shows stats overview", () => {
+      render(<AdminPage />);
+      expect(screen.getByText("Stats Overview")).toBeInTheDocument();
+      expect(screen.getByText("Queue")).toBeInTheDocument();
     });
   });
 
   describe("Dashboard Layout", () => {
-    it("displays navigation and sections", async () => {
-      render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/admin/i)).toBeInTheDocument();
+    beforeEach(() => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: ADMIN_KEY,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
     });
 
-    it("renders verification requests section", async () => {
+    it("displays navigation and sections", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/verification/i) || screen.getByText(/admin/i)).toBeTruthy();
-      });
+      expect(screen.getByText("ADMIN DASHBOARD")).toBeInTheDocument();
+      expect(screen.getByText(/system settings/i)).toBeInTheDocument();
     });
 
-    it("renders system settings section", async () => {
+    it("renders verification requests section", () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.queryByText(/settings/i) || screen.getByText(/admin/i)).toBeTruthy();
-      });
+      expect(screen.getByText(/verification requests/i)).toBeInTheDocument();
+    });
+
+    it("renders system settings section", () => {
+      render(<AdminPage />);
+      expect(screen.getByText(/system settings/i)).toBeInTheDocument();
     });
   });
 
   describe("Error Handling", () => {
-    it("handles approval failure gracefully", async () => {
-      render(<AdminPage />);
-      
-      // Should not crash on error
-      await waitFor(() => {
-        expect(screen.getByText(/admin/i)).toBeInTheDocument();
+    it("handles approval failure gracefully", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: ADMIN_KEY,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
+
+      render(<AdminPage />);
+      expect(screen.getAllByRole("button", { name: /approve/i }).length).toBeGreaterThan(0);
     });
 
-    it("handles rejection failure gracefully", async () => {
-      render(<AdminPage />);
-      
-      // Should not crash on error
-      await waitFor(() => {
-        expect(screen.getByText(/admin/i)).toBeInTheDocument();
+    it("handles rejection failure gracefully", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: ADMIN_KEY,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
-    });
-  });
 
-  describe("Access Control", () => {
-    it("requires wallet connection to view dashboard", async () => {
       render(<AdminPage />);
-      
-      await waitFor(() => {
-        expect(screen.getByText(/wallet|connect|admin/i)).toBeInTheDocument();
-      });
+      expect(screen.getAllByRole("button", { name: /reject/i }).length).toBeGreaterThan(0);
     });
 
-    it("verifies user is admin before showing actions", async () => {
-      render(<AdminPage />);
-      
-      await waitFor(() => {
-        // Should either show admin panel or unauthorized message
-        expect(screen.getByText(/admin|unauthorized|permission/i)).toBeInTheDocument();
+    it("requires wallet connection to view dashboard", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: false,
+        isConnecting: false,
+        publicKey: null,
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
       });
+
+      render(<AdminPage />);
+      expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+    });
+
+    it("verifies user is admin before showing actions", () => {
+      vi.spyOn(walletContext, "useWallet").mockReturnValue({
+        isConnected: true,
+        isConnecting: false,
+        publicKey: "GNOTADMIN123456",
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
+      });
+
+      render(<AdminPage />);
+      expect(screen.queryByRole("button", { name: /approve/i })).not.toBeInTheDocument();
     });
   });
 });

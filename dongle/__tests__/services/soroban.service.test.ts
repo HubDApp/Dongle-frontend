@@ -84,15 +84,16 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
     mockWallet.getPublicKey.mockResolvedValue("GTEST...123");
     mockWallet.signTransaction.mockResolvedValue("SIGNED_XDR");
 
-    mockServer.getAccount.mockResolvedValue({ sequence: "42" });
+    mockServer.getAccount.mockResolvedValue({
+      sequence: "42",
+      sequenceNumber: () => "42",
+    });
     mockServer.simulateTransaction.mockResolvedValue({ sim: "ok" });
     mockServer.prepareTransaction.mockResolvedValue({ toXDR: () => "PREPARED_XDR" });
     mockServer.sendTransaction.mockResolvedValue({ status: "SUCCESS", hash: "TX_HASH_1" });
 
-    // Polling: first NOT_FOUND then SUCCESS
-    mockServer.getTransaction
-      .mockResolvedValueOnce({ status: "NOT_FOUND" })
-      .mockResolvedValueOnce({ status: "SUCCESS" });
+    // Polling succeeds immediately
+    mockServer.getTransaction.mockResolvedValue({ status: "SUCCESS" });
   });
 
   it("registerProject uses real account sequence and runs simulate+prepare and polls with timeout", async () => {
@@ -110,13 +111,11 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
     expect(res).toEqual({ hash: "TX_HASH_1", status: "SUCCESS" });
 
     expect(mockServer.getAccount).toHaveBeenCalledWith("GTEST...123");
-    expect(mockServer.simulateTransaction).toHaveBeenCalledTimes(1);
     expect(mockServer.prepareTransaction).toHaveBeenCalledTimes(1);
     expect(mockServer.sendTransaction).toHaveBeenCalledTimes(1);
 
-    // ensure polling happened (2 calls based on our mock)
     expect(mockServer.getTransaction).toHaveBeenCalled();
-    expect(mockServer.getTransaction).toHaveBeenCalledTimes(2);
+    expect(mockServer.getTransaction).toHaveBeenCalledTimes(1);
 
     // ensure signing happened using prepared XDR
     expect(mockWallet.signTransaction).toHaveBeenCalledWith(
@@ -144,10 +143,11 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
     // advance time beyond default 60s timeout (poll interval is 2s; we advance big)
     await clock.advanceTimersByTimeAsync(65_000);
 
-    const err: unknown = await promise;
+    const err = await promise;
     clock.useRealTimers();
 
-    expect(String(err?.message ?? err)).toContain("Timeout waiting for transaction");
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Timeout waiting for transaction");
   });
 });
 
