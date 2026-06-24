@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { useWallet } from "@/context/wallet.context";
@@ -15,8 +15,6 @@ import {
   Star,
   MessageSquare,
   Zap,
-  Copy,
-  Check,
   AlertCircle,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
@@ -31,18 +29,9 @@ export default function ProfilePage() {
   const router = useRouter();
   const { publicKey, isConnected, connectWallet, disconnectWallet } = useWallet();
   const { balances, loading: accountLoading, error: accountError } = useStellarAccount();
-  const [copiedAddress, setCopiedAddress] = useState(false);
 
   // Get user's reviews
   const userReviews = publicKey ? reviewService.getReviewsByUser(publicKey) : [];
-
-  const handleCopyAddress = () => {
-    if (publicKey) {
-      navigator.clipboard.writeText(publicKey);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
-    }
-  };
 
   // Disconnected state
   if (!isConnected) {
