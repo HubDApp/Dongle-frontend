@@ -157,6 +157,19 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {isConnected && (
+              <Link
+                href="/admin"
+                onClick={() => setIsMenuOpen(false)}
+                className={`block py-2 text-sm font-medium transition-colors ${
+                  isActive("/admin")
+                    ? "text-black dark:text-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                }`}
+              >
+                Admin
+              </Link>
+            )}
           </div>
         </div>
       )}
