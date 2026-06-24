@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
 interface ReviewFormProps {
   projectId: string;
@@ -21,6 +22,11 @@ export default function ReviewForm({
   const [rating, setRating] = useState(initialReview?.rating || 5);
   const [comment, setComment] = useState(initialReview?.comment || "");
   const [errors, setErrors] = useState<ReviewValidationError[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isDirty = rating !== (initialReview?.rating || 5) || comment !== (initialReview?.comment || "");
+
+  useUnsavedChanges(isDirty, isSubmitting);
 
   const validateForm = (): boolean => {
     const newErrors: ReviewValidationError[] = [];
@@ -50,9 +56,15 @@ export default function ReviewForm({
     return newErrors.length === 0;
   };
 
+  const handleCancel = () => {
+    setIsSubmitting(true);
+    onCancel();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
+      setIsSubmitting(true);
       onSubmit({ rating, comment });
     }
   };
@@ -66,7 +78,7 @@ export default function ReviewForm({
         </div>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={handleCancel}
           aria-label="Close form"
           className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
         >
@@ -135,7 +147,7 @@ export default function ReviewForm({
       <div className="flex gap-3">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={handleCancel}
           className="flex-1 py-3 border border-zinc-200 dark:border-zinc-700 rounded-2xl font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
         >
           Cancel

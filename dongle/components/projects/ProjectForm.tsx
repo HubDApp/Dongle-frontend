@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
 const projectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -59,7 +60,7 @@ export default function ProjectForm({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -73,6 +74,8 @@ export default function ProjectForm({
       docsUrl: initialData?.docsUrl || "",
     },
   });
+
+  useUnsavedChanges(isDirty, isSubmitting);
 
   const onSubmit = async (data: ProjectFormValues) => {
     if (customOnSubmit) {

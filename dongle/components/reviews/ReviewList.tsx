@@ -1,6 +1,8 @@
 "use client";
 
 import { Review } from "@/types/review";
+import AddressDisplay from "@/components/ui/AddressDisplay";
+import { formatDate } from "@/lib/date";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -32,13 +34,13 @@ export default function ReviewList({ reviews, currentUserAddress, onEdit, onDele
               </div>
               <div>
                 <div className="font-bold flex items-center gap-2">
-                  {review.userAddress.substring(0, 6)}...{review.userAddress.substring(review.userAddress.length - 4)}
+                  <AddressDisplay address={review.userAddress} copyable={true} truncated={true} inline={true} />
                   {currentUserAddress === review.userAddress && (
                     <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full uppercase">You</span>
                   )}
                 </div>
                 <div className="text-xs text-zinc-500">
-                  {new Date(review.createdAt).toLocaleDateString()}
+                  {formatDate(review.createdAt, "relative")}
                 </div>
               </div>
             </div>

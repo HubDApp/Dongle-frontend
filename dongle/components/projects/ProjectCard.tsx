@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { Project } from "@/types/project";
 import ProjectImage from "@/components/projects/ProjectImage";
+import { formatDate } from "@/lib/date";
 
 interface ProjectCardProps {
   project: Project;
@@ -33,8 +34,9 @@ export const ProjectCard = ({ project }: ProjectCardProps) => {
       <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 line-clamp-2 grow">
         {project.description}
       </p>
-      <div className="text-xs text-zinc-400 dark:text-zinc-500 mt-auto">
-        {project.reviews} reviews
+      <div className="flex justify-between items-center text-xs text-zinc-400 dark:text-zinc-500 mt-auto">
+        <span>{project.reviews} reviews</span>
+        <span>Added {formatDate(project.createdAt, "short")}</span>
       </div>
     </Link>
   );

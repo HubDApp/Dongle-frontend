@@ -11,6 +11,7 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { Review } from "@/types/review";
+import { formatDate } from "@/lib/date";
 import { reviewService } from "@/services/review/review.service";
 import { useWallet } from "@/context/wallet.context";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -183,14 +184,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
                         <span>
-                          {new Date(project.createdAt).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            },
-                          )}
+                          {formatDate(project.createdAt, "long")}
                         </span>
                       </div>
                     </div>

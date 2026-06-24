@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { useWallet } from "@/context/wallet.context";
@@ -15,10 +15,10 @@ import {
   Star,
   MessageSquare,
   Zap,
-  Copy,
-  Check,
   AlertCircle,
 } from "lucide-react";
+import AddressDisplay from "@/components/ui/AddressDisplay";
+import { formatDate } from "@/lib/date";
 
 interface StellarNonNativeBalance {
   asset_code?: string;
@@ -29,18 +29,9 @@ export default function ProfilePage() {
   const router = useRouter();
   const { publicKey, isConnected, connectWallet, disconnectWallet } = useWallet();
   const { balances, loading: accountLoading, error: accountError } = useStellarAccount();
-  const [copiedAddress, setCopiedAddress] = useState(false);
 
   // Get user's reviews
   const userReviews = publicKey ? reviewService.getReviewsByUser(publicKey) : [];
-
-  const handleCopyAddress = () => {
-    if (publicKey) {
-      navigator.clipboard.writeText(publicKey);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
-    }
-  };
 
   // Disconnected state
   if (!isConnected) {
@@ -150,20 +141,13 @@ export default function ProfilePage() {
                     Wallet Address
                   </label>
                   <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl">
-                    <code className="flex-1 text-sm font-mono text-zinc-900 dark:text-zinc-100 break-all">
-                      {publicKey}
-                    </code>
-                    <button
-                      onClick={handleCopyAddress}
-                      className="flex-shrink-0 p-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                      title="Copy address"
-                    >
-                      {copiedAddress ? (
-                        <Check className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <Copy className="w-5 h-5 text-zinc-500" />
-                      )}
-                    </button>
+                    <AddressDisplay
+                      address={publicKey!}
+                      copyable={true}
+                      truncated={false}
+                      inline={true}
+                      className="flex-1 text-sm font-mono text-zinc-900 dark:text-zinc-100 break-all"
+                    />
                   </div>
                 </div>
 
@@ -193,9 +177,9 @@ export default function ProfilePage() {
                                   {assetCode}
                                 </p>
                                 {!isNative && issuer && (
-                                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                    {issuer.substring(0, 8)}...
-                                  </p>
+                                  <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
+                                    <AddressDisplay address={issuer} copyable={true} truncated={true} inline={true} />
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -234,7 +218,7 @@ export default function ProfilePage() {
                               {review.projectName}
                             </p>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                              {new Date(review.createdAt).toLocaleDateString()}
+                              {formatDate(review.createdAt, "relative")}
                             </p>
                           </div>
                           <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-lg">
