@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { useWallet } from "@/context/wallet.context";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
 import { reviewService } from "@/services/review/review.service";
+import { projectService } from "@/services/project/project.service";
+import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -16,6 +18,10 @@ import {
   MessageSquare,
   Zap,
   AlertCircle,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Package,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
@@ -29,9 +35,33 @@ export default function ProfilePage() {
   const router = useRouter();
   const { publicKey, isConnected, connectWallet, disconnectWallet } = useWallet();
   const { balances, loading: accountLoading, error: accountError } = useStellarAccount();
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
+  const [loadingVerifications, setLoadingVerifications] = useState(false);
 
   // Get user's reviews
   const userReviews = publicKey ? reviewService.getReviewsByUser(publicKey) : [];
+
+  // Load verification requests when publicKey changes
+  useEffect(() => {
+    if (!publicKey) {
+      setVerificationRequests([]);
+      return;
+    }
+
+    setLoadingVerifications(true);
+    verificationService
+      .getVerificationRequestsByUser(publicKey)
+      .then((requests) => {
+        setVerificationRequests(requests);
+      })
+      .catch((err) => {
+        console.error("Error loading verification requests:", err);
+        setVerificationRequests([]);
+      })
+      .finally(() => {
+        setLoadingVerifications(false);
+      });
+  }, [publicKey]);
 
   // Disconnected state
   if (!isConnected) {
@@ -249,6 +279,101 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+
+              {/* Verification Requests */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Package className="w-6 h-6" />
+                    Submitted Projects
+                  </h2>
+                  <Badge variant="secondary">{verificationRequests.length}</Badge>
+                </div>
+
+                {loadingVerifications ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner size="md" />
+                  </div>
+                ) : verificationRequests.length > 0 ? (
+                  <div className="space-y-4">
+                    {verificationRequests.map((request) => {
+                      const statusColors = {
+                        PENDING: {
+                          bg: "bg-yellow-50 dark:bg-yellow-900/20",
+                          text: "text-yellow-700 dark:text-yellow-500",
+                          icon: Clock,
+                        },
+                        VERIFIED: {
+                          bg: "bg-green-50 dark:bg-green-900/20",
+                          text: "text-green-700 dark:text-green-500",
+                          icon: CheckCircle,
+                        },
+                        REJECTED: {
+                          bg: "bg-red-50 dark:bg-red-900/20",
+                          text: "text-red-700 dark:text-red-500",
+                          icon: XCircle,
+                        },
+                        NONE: {
+                          bg: "bg-zinc-50 dark:bg-zinc-800",
+                          text: "text-zinc-700 dark:text-zinc-500",
+                          icon: AlertCircle,
+                        },
+                      };
+
+                      const status = statusColors[request.status];
+                      const StatusIcon = status.icon;
+
+                      return (
+                        <div
+                          key={request.id}
+                          className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                                {request.projectName}
+                              </p>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                Submitted {formatDate(request.submittedAt, "relative")}
+                              </p>
+                            </div>
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${status.bg}`}>
+                              <StatusIcon className={`w-4 h-4 ${status.text}`} />
+                              <span className={`text-sm font-medium ${status.text}`}>
+                                {request.status.charAt(0) + request.status.slice(1).toLowerCase()}
+                              </span>
+                            </div>
+                          </div>
+                          {request.rejectionReason && (
+                            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                              <p className="text-xs font-medium text-red-700 dark:text-red-500 mb-1">
+                                Rejection Reason:
+                              </p>
+                              <p className="text-sm text-red-600 dark:text-red-400">
+                                {request.rejectionReason}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                    <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No submitted projects yet.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push("/projects/new")}
+                      className="mt-4"
+                    >
+                      Submit Your First Project
+                    </Button>
+                  </div>
+                )}
+              </div>
+
             </div>
 
             {/* Sidebar */}
@@ -277,6 +402,13 @@ export default function ProfilePage() {
                           ).toFixed(1)
                         : "—"}
                     </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Submitted
+                    </span>
+                    <span className="font-bold text-lg">{verificationRequests.length}</span>
                   </div>
                 </div>
               </div>
