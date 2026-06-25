@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import WalletStatePanel from "@/components/wallet/WalletStatePanel";
+import WalletStatePanel, {
+  WalletDisconnectedBanner,
+} from "@/components/wallet/WalletStatePanel";
 import {
   getFriendbotUrl,
   getWalletStateContent,
@@ -67,5 +69,58 @@ describe("WalletStatePanel", () => {
     const link = screen.getByRole("link", { name: /Get Freighter/i });
     expect(link).toHaveAttribute("href", expect.stringContaining("freighter.app"));
     expect(link).toHaveAttribute("target", "_blank");
+  });
+});
+
+describe("WalletDisconnectedBanner", () => {
+  it("renders the 'Wallet not connected' heading", () => {
+    render(
+      <WalletDisconnectedBanner
+        pagePurpose="Connect to post reviews."
+        onConnect={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Wallet not connected")).toBeInTheDocument();
+  });
+
+  it("shows the custom page purpose text", () => {
+    render(
+      <WalletDisconnectedBanner
+        pagePurpose="Connect to post reviews."
+        onConnect={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Connect to post reviews.")).toBeInTheDocument();
+  });
+
+  it("shows default purpose text when none is provided", () => {
+    render(<WalletDisconnectedBanner onConnect={vi.fn()} />);
+    expect(
+      screen.getByText(/Connect Freighter to post reviews/i),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onConnect when the button is clicked", () => {
+    const onConnect = vi.fn();
+    render(
+      <WalletDisconnectedBanner
+        pagePurpose="Connect to continue."
+        onConnect={onConnect}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Connect Wallet/i }));
+    expect(onConnect).toHaveBeenCalledOnce();
+  });
+
+  it("shows loading state on the button while isConnecting", () => {
+    render(
+      <WalletDisconnectedBanner
+        pagePurpose="Connect to continue."
+        onConnect={vi.fn()}
+        isConnecting={true}
+      />,
+    );
+    const button = screen.getByRole("button", { name: /Connect Wallet/i });
+    expect(button).toBeDisabled();
   });
 });

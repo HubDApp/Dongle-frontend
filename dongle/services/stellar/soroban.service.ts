@@ -15,7 +15,9 @@ import {
 } from "@/context/wallet.context";
 import { generateId } from "@/lib/id-generator";
 
-const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL);
+const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
+  timeout: 15000,
+});
 
 // ─── Network mismatch error ──────────────────────────────────────────────────
 
@@ -73,14 +75,43 @@ export interface ProjectRegistrationParams {
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_POLL_TIMEOUT_MS = 60_000;
 
+function delayWithSignal(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      return reject(new Error("Transaction polling aborted"));
+    }
+
+    const timer = setTimeout(() => {
+      if (signal) {
+        signal.removeEventListener("abort", onAbort);
+      }
+      resolve();
+    }, ms);
+
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new Error("Transaction polling aborted"));
+    }
+
+    if (signal) {
+      signal.addEventListener("abort", onAbort);
+    }
+  });
+}
+
 async function pollTransaction(
   hash: string,
   {
     timeoutMs = DEFAULT_POLL_TIMEOUT_MS,
     intervalMs = DEFAULT_POLL_INTERVAL_MS,
-  }: { timeoutMs?: number; intervalMs?: number } = {},
+    signal,
+  }: { timeoutMs?: number; intervalMs?: number; signal?: AbortSignal } = {},
 ) {
   const startedAt = Date.now();
+
+  if (signal?.aborted) {
+    throw new Error("Transaction polling aborted");
+  }
 
   let last = await server.getTransaction(hash);
   while (last.status === "NOT_FOUND") {
@@ -89,8 +120,11 @@ async function pollTransaction(
         `[SorobanService] Timeout waiting for transaction ${hash}. Last status: ${last.status}`,
       );
     }
+    if (signal?.aborted) {
+      throw new Error("Transaction polling aborted");
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    await delayWithSignal(intervalMs, signal);
     last = await server.getTransaction(hash);
   }
 
@@ -107,7 +141,10 @@ export const sorobanService = {
   /**
    * Registers a new project in the Project Registry contract.
    */
-  async registerProject(params: ProjectRegistrationParams) {
+  async registerProject(
+    params: ProjectRegistrationParams,
+    options?: { signal?: AbortSignal; timeoutMs?: number; intervalMs?: number },
+  ) {
     let publicKey: string;
     try {
       publicKey = await walletService.getPublicKey();
@@ -169,7 +206,11 @@ export const sorobanService = {
       );
     }
 
-    await pollTransaction(sendResponse.hash);
+    await pollTransaction(sendResponse.hash, {
+      signal: options?.signal,
+      timeoutMs: options?.timeoutMs,
+      intervalMs: options?.intervalMs,
+    });
 
     console.log(
       "[SorobanService] Registration successful:",
@@ -278,7 +319,11 @@ export const sorobanService = {
   /**
    * Updates an existing project in the Project Registry contract.
    */
-  async updateProject(projectId: string, params: ProjectRegistrationParams) {
+  async updateProject(
+    projectId: string,
+    params: ProjectRegistrationParams,
+    options?: { signal?: AbortSignal; timeoutMs?: number; intervalMs?: number },
+  ) {
     let publicKey: string;
     try {
       publicKey = await walletService.getPublicKey();
@@ -346,7 +391,11 @@ export const sorobanService = {
       );
     }
 
-    await pollTransaction(sendResponse.hash);
+    await pollTransaction(sendResponse.hash, {
+      signal: options?.signal,
+      timeoutMs: options?.timeoutMs,
+      intervalMs: options?.intervalMs,
+    });
 
     console.log(
       "[SorobanService] Update successful:",

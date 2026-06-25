@@ -153,5 +153,60 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).toContain("Timeout waiting for transaction");
   });
+
+  it("registerProject respects custom timeout options in pollTransaction", async () => {
+    // always NOT_FOUND
+    mockServer.getTransaction.mockResolvedValue({ status: "NOT_FOUND" });
+
+    const { sorobanService } = await import("@/services/stellar/soroban.service");
+
+    const clock = vi.useFakeTimers();
+    const promise = sorobanService
+      .registerProject(
+        {
+          name: "My Project",
+          category: "cat",
+          description: "desc",
+          websiteUrl: "https://example.com",
+        },
+        { timeoutMs: 5000, intervalMs: 1000 }
+      )
+      .catch((e) => e);
+
+    // advance time beyond custom 5s timeout (poll interval is 1s; we advance 6s)
+    await clock.advanceTimersByTimeAsync(6000);
+
+    const err = await promise;
+    clock.useRealTimers();
+
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Timeout waiting for transaction");
+  });
+
+  it("registerProject aborts polling immediately when AbortSignal is aborted", async () => {
+    mockServer.getTransaction.mockResolvedValue({ status: "NOT_FOUND" });
+
+    const { sorobanService } = await import("@/services/stellar/soroban.service");
+
+    const controller = new AbortController();
+    const promise = sorobanService
+      .registerProject(
+        {
+          name: "My Project",
+          category: "cat",
+          description: "desc",
+          websiteUrl: "https://example.com",
+        },
+        { signal: controller.signal }
+      )
+      .catch((e) => e);
+
+    // Abort the signal immediately
+    controller.abort();
+
+    const err = await promise;
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Transaction polling aborted");
+  });
 });
 

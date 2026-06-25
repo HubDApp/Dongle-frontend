@@ -176,7 +176,7 @@ export default function ReviewsPage() {
           )}
         </div>
 
-        {gate.state === "disconnected" && !walletBlocked && (
+        {gate.state !== "ready" && gate.state !== "account-loading" && !walletBlocked && (
           <WalletDisconnectedBanner
             pagePurpose={REVIEWS_PURPOSE}
             onConnect={gate.connectWallet}

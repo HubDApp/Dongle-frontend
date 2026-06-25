@@ -13,8 +13,11 @@ import ProjectImage from "@/components/projects/ProjectImage";
 import { Review } from "@/types/review";
 import { formatDate } from "@/lib/date";
 import { reviewService } from "@/services/review/review.service";
-import { useWallet } from "@/context/wallet.context";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
+import WalletStatePanel, {
+  WalletDisconnectedBanner,
+} from "@/components/wallet/WalletStatePanel";
 import {
   ArrowLeft,
   ExternalLink,
@@ -26,16 +29,20 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+const PROJECT_REVIEW_PURPOSE =
+  "Connect Freighter to write or manage reviews for this project.";
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { publicKey, connectWallet } = useWallet();
+  const gate = useWalletPageGate();
   const confirm = useConfirm();
   const projectId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
   const [project, setProject] = useState<ReturnType<typeof projectService.getProjectById>>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [showWalletGate, setShowWalletGate] = useState(false);
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
 
@@ -57,11 +64,12 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const handleAddReview = () => {
-    if (!publicKey) {
-      connectWallet();
+    if (gate.state !== "ready") {
+      setShowWalletGate(true);
       return;
     }
     setIsAddingReview(true);
+    setShowWalletGate(false);
   };
 
   const handleEdit = (review: Review) => {
@@ -70,7 +78,7 @@ export default function ProjectDetailPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!publicKey) return;
+    if (!gate.publicKey) return;
     const ok = await confirm({
       title: "Delete review",
       description:
@@ -80,24 +88,24 @@ export default function ProjectDetailPage() {
       variant: "danger",
     });
     if (!ok) return;
-    reviewService.deleteReview(id, publicKey);
+    reviewService.deleteReview(id, gate.publicKey);
     setReviews(reviewService.getReviewsByProject(projectId));
   };
 
   const handleSubmitReview = (data: { rating: number; comment: string }) => {
-    if (!publicKey || !project) return;
+    if (!gate.publicKey || !project) return;
 
     if (editingReview) {
-      reviewService.updateReview(editingReview.id, data, publicKey);
+      reviewService.updateReview(editingReview.id, data, gate.publicKey);
     } else {
       reviewService.addReview(
         {
           projectId: project.id,
           projectName: project.name,
-          userAddress: publicKey,
+          userAddress: gate.publicKey,
           ...data,
         },
-        publicKey
+        gate.publicKey
       );
     }
 
@@ -255,12 +263,39 @@ export default function ProjectDetailPage() {
                     </Button>
                   )}
                 </div>
-                {(isAddingReview || editingReview) && project && (
+
+                {/* Soft gate banner for disconnected users */}
+                {gate.state === "disconnected" && !showWalletGate && (
+                  <WalletDisconnectedBanner
+                    pagePurpose={PROJECT_REVIEW_PURPOSE}
+                    onConnect={gate.connectWallet}
+                    isConnecting={gate.isConnecting}
+                  />
+                )}
+
+                {/* Compact hard gate when user clicks Write a Review while not connected */}
+                {showWalletGate &&
+                  gate.state !== "ready" &&
+                  gate.state !== "account-loading" && (
+                  <div className="mb-6">
+                    <WalletStatePanel
+                      state={gate.state}
+                      pagePurpose={PROJECT_REVIEW_PURPOSE}
+                      walletNetworkLabel={gate.walletNetworkLabel}
+                      publicKey={gate.publicKey}
+                      onConnect={gate.connectWallet}
+                      onDisconnect={gate.disconnectWallet}
+                      compact
+                    />
+                  </div>
+                )}
+
+                {(isAddingReview || editingReview) && project && gate.state === "ready" && (
                   <div className="mb-6">
                     <ReviewForm
                       projectId={project.id}
                       projectName={project.name}
-                      userAddress={publicKey || ""}
+                      userAddress={gate.publicKey || ""}
                       initialReview={editingReview || undefined}
                       onSubmit={handleSubmitReview}
                       onCancel={handleCancelReview}
@@ -269,7 +304,7 @@ export default function ProjectDetailPage() {
                 )}
                 <ReviewList
                   reviews={reviews}
-                  currentUserAddress={publicKey}
+                  currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                 />
