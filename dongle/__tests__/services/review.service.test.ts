@@ -543,7 +543,7 @@ describe("Review Service", () => {
     it("should remove unhelpful vote when voting helpful", () => {
       // Vote unhelpful
       reviewService.voteUnhelpful(reviewId, "user2");
-      let reviews = reviewService.getReviews();
+      const reviews = reviewService.getReviews();
       expect(reviews[0].unhelpfulVotes).toContain("user2");
 
       // Vote helpful

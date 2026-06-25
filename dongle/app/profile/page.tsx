@@ -40,31 +40,44 @@ export default function ProfilePage() {
   const gate = useWalletPageGate({ requireFundedAccount: true });
   const { balances } = useStellarAccount();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
-  const [loadingVerifications, setLoadingVerifications] = useState(false);
+  const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
 
   const userReviews = gate.publicKey
     ? reviewService.getReviewsByUser(gate.publicKey)
     : [];
 
+  const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
+  const loadingVerifications =
+    Boolean(gate.publicKey) && loadedVerificationKey !== gate.publicKey;
+
   useEffect(() => {
     if (!gate.publicKey) {
-      setVerificationRequests([]);
       return;
     }
 
-    setLoadingVerifications(true);
-    verificationService
-      .getVerificationRequestsByUser(gate.publicKey)
-      .then((requests) => {
-        setVerificationRequests(requests);
-      })
-      .catch((err) => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const requests = await verificationService.getVerificationRequestsByUser(
+          gate.publicKey!,
+        );
+        if (!cancelled) {
+          setVerificationRequests(requests);
+          setLoadedVerificationKey(gate.publicKey);
+        }
+      } catch (err: unknown) {
         console.error("Error loading verification requests:", err);
-        setVerificationRequests([]);
-      })
-      .finally(() => {
-        setLoadingVerifications(false);
-      });
+        if (!cancelled) {
+          setVerificationRequests([]);
+          setLoadedVerificationKey(gate.publicKey);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [gate.publicKey]);
 
   if (gate.state !== "ready") {
@@ -236,16 +249,16 @@ export default function ProfilePage() {
                     <Package className="w-6 h-6" />
                     Submitted Projects
                   </h2>
-                  <Badge variant="secondary">{verificationRequests.length}</Badge>
+                  <Badge variant="secondary">{displayedVerificationRequests.length}</Badge>
                 </div>
 
                 {loadingVerifications ? (
                   <div className="flex justify-center py-8">
                     <Spinner size="md" />
                   </div>
-                ) : verificationRequests.length > 0 ? (
+                ) : displayedVerificationRequests.length > 0 ? (
                   <div className="space-y-4">
-                    {verificationRequests.map((request) => {
+                    {displayedVerificationRequests.map((request) => {
                       const statusColors = {
                         PENDING: {
                           bg: "bg-yellow-50 dark:bg-yellow-900/20",
@@ -354,7 +367,7 @@ export default function ProfilePage() {
                       <Package className="w-4 h-4" />
                       Submitted
                     </span>
-                    <span className="font-bold text-lg">{verificationRequests.length}</span>
+                    <span className="font-bold text-lg">{displayedVerificationRequests.length}</span>
                   </div>
                 </div>
               </div>

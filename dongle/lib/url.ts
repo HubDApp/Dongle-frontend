@@ -19,7 +19,7 @@ export function normalizeUrl(urlStr: string): string {
   let parsed: URL;
   try {
     parsed = new URL(cleaned);
-  } catch (e) {
+  } catch {
     throw new Error("Invalid URL structure");
   }
 
@@ -57,7 +57,7 @@ export function extractDomain(urlStr: string): string {
     const normalized = normalizeUrl(urlStr);
     const parsed = new URL(normalized);
     return parsed.hostname.replace(/^www\./i, "");
-  } catch (e) {
+  } catch {
     return "";
   }
 }

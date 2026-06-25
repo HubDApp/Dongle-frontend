@@ -94,6 +94,24 @@ class VerificationService {
   }
 
   /**
+   * Gets all verification requests submitted by a user (for profile page).
+   */
+  async getVerificationRequestsByUser(submittedBy: string): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests
+        .filter((r) => r.submittedBy === submittedBy)
+        .sort(
+          (a, b) =>
+            new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+        );
+    } catch (error) {
+      console.error("[VerificationService] Error getting user requests:", error);
+      return [];
+    }
+  }
+
+  /**
    * Gets all pending verification requests (for admin dashboard).
    */
   async getPendingRequests(): Promise<VerificationRequest[]> {
