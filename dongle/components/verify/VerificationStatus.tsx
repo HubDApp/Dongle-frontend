@@ -20,26 +20,34 @@ export default function VerificationStatus({ initialProjectId }: VerificationSta
   const [status, setStatus] = useState<Status>("NONE");
   const [isLoading, setIsLoading] = useState(false);
 
+  const isMountedRef = React.useRef(true);
+
   const fetchStatus = async (id: string) => {
     if (!id) return;
     setIsLoading(true);
     try {
       const result = await sorobanService.getVerificationStatus(id);
+      if (!isMountedRef.current) return;
       setStatus(result);
     } catch (error) {
+      if (!isMountedRef.current) return;
       console.error(error);
       setStatus("NONE");
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
-  // Run once on mount — initialProjectId is intentionally excluded from deps
-  // because we only want to trigger the initial fetch, not re-fetch on every render
   React.useEffect(() => {
+    isMountedRef.current = true;
     if (initialProjectId) {
       void (async () => { await fetchStatus(initialProjectId); })();
     }
+    return () => {
+      isMountedRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

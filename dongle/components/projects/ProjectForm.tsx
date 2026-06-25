@@ -74,6 +74,19 @@ export default function ProjectForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
+  const isMountedRef = React.useRef(true);
+  const redirectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -110,13 +123,17 @@ export default function ProjectForm({
     toast.promise(promise, {
       loading: "Registering your project on-chain...",
       success: (res) => {
-        setIsSubmitting(false);
-        reset();
-        setTimeout(() => router.push("/"), 2000);
+        if (isMountedRef.current) {
+          setIsSubmitting(false);
+          reset();
+        }
+        redirectTimerRef.current = setTimeout(() => router.push("/"), 2000);
         return `Project registered successfully! Tx: ${res.hash.substring(0, 8)}...`;
       },
       error: (err) => {
-        setIsSubmitting(false);
+        if (isMountedRef.current) {
+          setIsSubmitting(false);
+        }
         return `Registration failed: ${err.message}`;
       },
     });

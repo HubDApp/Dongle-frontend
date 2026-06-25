@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { stellarService } from "@/services/stellar/stellar.service";
 import { useWallet } from "@/context/wallet.context";
 import type { Horizon } from "stellar-sdk";
@@ -21,21 +21,34 @@ export function useStellarAccount(): UseStellarAccountReturn {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Shared fetch logic — used both by the effect and the manual refetch
   const fetchAccountData = useCallback(async () => {
     if (!publicKey || !isConnected) {
-      setAccount(null);
-      setBalances(null);
-      setError(null);
+      if (isMountedRef.current) {
+        setAccount(null);
+        setBalances(null);
+        setError(null);
+      }
       return;
     }
     setLoading(true);
     setError(null);
     try {
       const accountData = await stellarService.getAccount(publicKey);
+      if (!isMountedRef.current) return;
       setAccount(accountData);
       setBalances(accountData.balances);
     } catch (err) {
+      if (!isMountedRef.current) return;
       const msg = err instanceof Error ? err.message : "Failed to fetch account data";
       setError(msg);
       setAccount(null);
@@ -43,7 +56,9 @@ export function useStellarAccount(): UseStellarAccountReturn {
       console.error("[useStellarAccount]", err);
       toast.error(msg);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [publicKey, isConnected]);
 

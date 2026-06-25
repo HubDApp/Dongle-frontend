@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState, Suspense } from "react";
+import { useMemo, useEffect, useState, useRef, Suspense } from "react";
 import { projectService } from "@/services/project/project.service";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { Button } from "@/components/ui/Button";
@@ -56,9 +56,19 @@ function DiscoverContent() {
   const visibleProjects = filteredAndSortedProjects.slice(0, visibleCount);
   const hasMore = visibleCount < filteredCount;
 
+  const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (loadMoreTimerRef.current) {
+        clearTimeout(loadMoreTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleLoadMore = () => {
     setIsLoadingMore(true);
-    setTimeout(() => {
+    loadMoreTimerRef.current = setTimeout(() => {
       loadNextPage();
       setIsLoadingMore(false);
     }, 600);
