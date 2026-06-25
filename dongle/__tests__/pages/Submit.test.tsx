@@ -3,6 +3,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import NewProjectPage from "@/app/projects/new/page";
 import * as walletContext from "@/context/wallet.context";
+import { useStellarAccount } from "@/hooks/useStellarAccount";
+
+vi.mock("@/hooks/useStellarAccount", () => ({
+  useStellarAccount: vi.fn(),
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -25,6 +30,7 @@ function mockWallet(overrides: Partial<ReturnType<typeof walletContext.useWallet
   vi.spyOn(walletContext, "useWallet").mockReturnValue({
     isConnected,
     isConnecting: false,
+    isFreighterAvailable: true,
     publicKey: null,
     walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
     isCorrectNetwork: isConnected,
@@ -36,6 +42,16 @@ function mockWallet(overrides: Partial<ReturnType<typeof walletContext.useWallet
 }
 
 describe("Submit Project Page - High Risk Flows", () => {
+  beforeEach(() => {
+    vi.mocked(useStellarAccount).mockReturnValue({
+      account: null,
+      balances: null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
   describe("Wallet Gating", () => {
     it("displays wallet connection message when not connected", () => {
       mockWallet();

@@ -34,6 +34,8 @@ interface WalletContextType {
   publicKey: string | null;
   isConnected: boolean;
   isConnecting: boolean;
+  /** null while checking, false when Freighter is not installed. */
+  isFreighterAvailable: boolean | null;
   /** Passphrase of the network currently active in the wallet, or null when not connected. */
   walletNetwork: string | null;
   /** True when the wallet is connected AND on the expected network. */
@@ -54,6 +56,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const [isFreighterAvailable, setIsFreighterAvailable] = useState<boolean | null>(null);
   const [walletNetwork, setWalletNetwork] = useState<string | null>(null);
 
   const isCorrectNetwork =
@@ -70,6 +73,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setWalletNetwork(null);
     localStorage.removeItem(WALLET_STORAGE_KEY);
     toast.success("Wallet disconnected");
+  }, []);
+
+  // ── detect Freighter on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    void walletService.isFreighterAvailable().then(setIsFreighterAvailable);
   }, []);
 
   // ── restore on mount ───────────────────────────────────────────────────────
@@ -183,6 +191,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         publicKey,
         isConnected,
         isConnecting,
+        isFreighterAvailable,
         walletNetwork,
         isCorrectNetwork,
         walletNetworkLabel,

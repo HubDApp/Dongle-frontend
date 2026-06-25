@@ -7,7 +7,23 @@ import {
   signTransaction,
 } from "@stellar/freighter-api";
 
+function isFreighterMissingError(message: string | undefined): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes("not installed") || lower.includes("not found");
+}
+
 export const walletService = {
+  /** Returns false when the Freighter extension is not available in the browser. */
+  async isFreighterAvailable(): Promise<boolean> {
+    try {
+      const { error } = await freighterIsConnected();
+      return !isFreighterMissingError(error?.message);
+    } catch {
+      return false;
+    }
+  },
+
   // Opens Freighter popup and returns the user's public key on approval
   async connectWallet(): Promise<string> {
     const { isConnected, error: connErr } = await freighterIsConnected();

@@ -31,6 +31,7 @@ function mockWallet(isConnected: boolean, publicKey: string | null, overrides: P
   vi.spyOn(walletContext, "useWallet").mockReturnValue({
     isConnected,
     isConnecting: false,
+    isFreighterAvailable: true,
     publicKey,
     walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
     isCorrectNetwork: isConnected,
@@ -220,8 +221,8 @@ describe("Profile Page", () => {
 
       render(<ProfilePage />);
 
-      expect(screen.getByText("Account Not Found")).toBeInTheDocument();
-      expect(screen.getByText("Account not found on testnet")).toBeInTheDocument();
+      expect(screen.getByText("Fund Your Testnet Account")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Fund with Friendbot/i })).toBeInTheDocument();
     });
 
     it("should show disconnect button in error state", () => {

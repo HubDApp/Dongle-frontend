@@ -1,17 +1,22 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useWallet } from "@/context/wallet.context";
 import { reviewService } from "@/services/review/review.service";
 import { Review, Project } from "@/types/review";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import { mockProjects } from "@/data/mockProjects";
 import { toast } from "sonner";
+import WalletStatePanel, {
+  WalletDisconnectedBanner,
+} from "@/components/wallet/WalletStatePanel";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+
+const REVIEWS_PURPOSE =
+  "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
 
 export default function ReviewsPage() {
-  const { isConnected, publicKey, connectWallet } = useWallet();
-  // Lazy initializer — reads from service once on mount, no effect needed
+  const gate = useWalletPageGate();
   const [reviews, setReviews] = useState<Review[]>(() =>
     reviewService.getReviews(),
   );
@@ -19,17 +24,23 @@ export default function ReviewsPage() {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "helpfulness">("recent");
+  const [showWalletGate, setShowWalletGate] = useState(false);
 
   const handleAddReview = (project: Project) => {
-    if (!isConnected) {
-      connectWallet();
+    if (gate.state !== "ready") {
+      setShowWalletGate(true);
       return;
     }
     setSelectedProject(project);
     setIsAddingReview(true);
+    setShowWalletGate(false);
   };
 
   const handleEditReview = (review: Review) => {
+    if (gate.state !== "ready") {
+      setShowWalletGate(true);
+      return;
+    }
     setEditingReview(review);
     const project = mockProjects.find((p) => p.id === review.projectId) || {
       id: review.projectId,
@@ -43,9 +54,12 @@ export default function ReviewsPage() {
   };
 
   const handleDeleteReview = (id: string) => {
-    if (!publicKey) return;
+    if (!gate.publicKey) {
+      setShowWalletGate(true);
+      return;
+    }
     if (confirm("Are you sure you want to delete this review?")) {
-      const result = reviewService.deleteReview(id, publicKey);
+      const result = reviewService.deleteReview(id, gate.publicKey);
       if (result.success) {
         setReviews(reviewService.getReviews());
         toast.success("Review deleted");
@@ -56,11 +70,11 @@ export default function ReviewsPage() {
   };
 
   const handleVoteHelpful = (id: string) => {
-    if (!publicKey) {
+    if (!gate.publicKey) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = reviewService.voteHelpful(id, publicKey);
+    const result = reviewService.voteHelpful(id, gate.publicKey);
     if (result.success) {
       setReviews(reviewService.getReviews());
     } else {
@@ -69,11 +83,11 @@ export default function ReviewsPage() {
   };
 
   const handleVoteUnhelpful = (id: string) => {
-    if (!publicKey) {
+    if (!gate.publicKey) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = reviewService.voteUnhelpful(id, publicKey);
+    const result = reviewService.voteUnhelpful(id, gate.publicKey);
     if (result.success) {
       setReviews(reviewService.getReviews());
     } else {
@@ -82,10 +96,10 @@ export default function ReviewsPage() {
   };
 
   const handleSubmit = (data: { rating: number; comment: string }) => {
-    if (!publicKey || !selectedProject) return;
+    if (!gate.publicKey || !selectedProject) return;
 
     if (editingReview) {
-      const result = reviewService.updateReview(editingReview.id, data, publicKey);
+      const result = reviewService.updateReview(editingReview.id, data, gate.publicKey);
       if (result.success) {
         setReviews(reviewService.getReviews());
         setIsAddingReview(false);
@@ -100,10 +114,10 @@ export default function ReviewsPage() {
         {
           projectId: selectedProject.id,
           projectName: selectedProject.name,
-          userAddress: publicKey,
+          userAddress: gate.publicKey,
           ...data,
         },
-        publicKey
+        gate.publicKey,
       );
       if (result.success) {
         setReviews(reviewService.getReviews());
@@ -132,6 +146,9 @@ export default function ReviewsPage() {
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [reviews, sortBy]);
 
+  const walletBlocked =
+    showWalletGate && gate.state !== "ready" && gate.state !== "account-loading";
+
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto">
@@ -144,7 +161,7 @@ export default function ReviewsPage() {
               Transparent feedback from the Stellar ecosystem.
             </p>
           </div>
-          {!isAddingReview && !editingReview && (
+          {!isAddingReview && !editingReview && gate.state === "ready" && (
             <div className="flex gap-2">
               {mockProjects.slice(0, 6).map((p) => (
                 <button
@@ -159,12 +176,36 @@ export default function ReviewsPage() {
           )}
         </div>
 
-        {(isAddingReview || editingReview) && selectedProject && (
+        {gate.state === "disconnected" && !walletBlocked && (
+          <WalletDisconnectedBanner
+            pagePurpose={REVIEWS_PURPOSE}
+            onConnect={gate.connectWallet}
+            isConnecting={gate.isConnecting}
+          />
+        )}
+
+        {walletBlocked &&
+          gate.state !== "ready" &&
+          gate.state !== "account-loading" && (
+          <div className="mb-12">
+            <WalletStatePanel
+              state={gate.state}
+              pagePurpose={REVIEWS_PURPOSE}
+              walletNetworkLabel={gate.walletNetworkLabel}
+              publicKey={gate.publicKey}
+              onConnect={gate.connectWallet}
+              onDisconnect={gate.disconnectWallet}
+              compact
+            />
+          </div>
+        )}
+
+        {(isAddingReview || editingReview) && selectedProject && gate.state === "ready" && (
           <div className="mb-12">
             <ReviewForm
               projectId={selectedProject.id}
               projectName={selectedProject.name}
-              userAddress={publicKey || ""}
+              userAddress={gate.publicKey || ""}
               initialReview={editingReview || undefined}
               onSubmit={handleSubmit}
               onCancel={() => {
@@ -198,7 +239,7 @@ export default function ReviewsPage() {
 
             <ReviewList
               reviews={sortedReviews}
-              currentUserAddress={publicKey}
+              currentUserAddress={gate.publicKey}
               onEdit={handleEditReview}
               onDelete={handleDeleteReview}
               onVoteHelpful={handleVoteHelpful}

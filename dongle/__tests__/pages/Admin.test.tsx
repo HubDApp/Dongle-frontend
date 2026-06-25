@@ -30,6 +30,7 @@ function mockWallet(isConnected: boolean, publicKey: string | null) {
   vi.spyOn(walletContext, "useWallet").mockReturnValue({
     isConnected,
     isConnecting: false,
+    isFreighterAvailable: true,
     publicKey,
     walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
     isCorrectNetwork: isConnected,
@@ -62,8 +63,9 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
       render(<AdminPage />);
 
+      expect(screen.getByText("Connect Your Wallet")).toBeInTheDocument();
       expect(
-        screen.getByText(/connect an authorized admin wallet/i),
+        screen.getByText(/authorized admin Freighter wallet/i),
       ).toBeInTheDocument();
     });
   });
@@ -177,7 +179,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
       mockWallet(false, null);
 
       render(<AdminPage />);
-      expect(screen.getByText("Access Restricted")).toBeInTheDocument();
+      expect(screen.getByText("Connect Your Wallet")).toBeInTheDocument();
     });
 
     it("verifies user is admin before showing actions", () => {

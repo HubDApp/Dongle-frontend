@@ -20,7 +20,7 @@ import { normalizeUrl, extractDomain } from "@/lib/url";
 const urlSchema = z.string().transform((val, ctx) => {
   try {
     return normalizeUrl(val);
-  } catch (err: any) {
+  } catch {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Please enter a valid URL",
@@ -33,7 +33,7 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
   if (val.trim().length === 0) return "";
   try {
     return normalizeUrl(val);
-  } catch (err: any) {
+  } catch {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Please enter a valid URL",
