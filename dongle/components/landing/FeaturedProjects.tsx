@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useProjectFilters, type SortOption } from "@/hooks/useProjectFilters";
 import { ALL_CATEGORIES, type ProjectCategory } from "@/types/project";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ArrowRight } from "lucide-react";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "rating", label: "Top Rated" },
@@ -31,20 +32,7 @@ export default function FeaturedProjects() {
             className="text-sm font-semibold flex items-center gap-2 hover:gap-3 transition-all underline underline-offset-4"
           >
             View all projects
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14 5l7 7m0 0l-7 7m7-7H3"
-              />
-            </svg>
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 

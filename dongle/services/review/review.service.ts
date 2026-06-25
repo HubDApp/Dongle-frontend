@@ -51,7 +51,81 @@ export const reviewService = {
   getReviews(): Review[] {
     if (typeof window === "undefined") return [];
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(stored);
+    } catch (e) {
+      return [];
+    }
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const validatedReviews: Review[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+
+      // Must have projectId and userAddress as strings
+      if (typeof item.projectId !== "string" || !item.projectId) {
+        continue;
+      }
+      if (typeof item.userAddress !== "string" || !item.userAddress) {
+        continue;
+      }
+
+      // Rating must be a number
+      const rawRating = Number(item.rating);
+      if (isNaN(rawRating)) {
+        continue;
+      }
+      const rating = Math.max(1, Math.min(5, Math.round(rawRating)));
+
+      // Comment must be a string
+      if (typeof item.comment !== "string") {
+        continue;
+      }
+
+      // Migrate / fallback fields
+      const id = typeof item.id === "string" && item.id ? item.id : generateId();
+      const projectName = typeof item.projectName === "string" && item.projectName ? item.projectName : "Unknown Project";
+      
+      let createdAt = item.createdAt;
+      if (typeof createdAt !== "string" || isNaN(Date.parse(createdAt))) {
+        createdAt = new Date().toISOString();
+      }
+
+      const review: Review = {
+        id,
+        projectId: item.projectId,
+        projectName,
+        userAddress: item.userAddress,
+        rating,
+        comment: item.comment,
+        createdAt,
+      };
+
+      // Support for helpful/unhelpful votes for task 3
+      if (Array.isArray(item.helpfulVotes)) {
+        (review as any).helpfulVotes = item.helpfulVotes.filter((v: any) => typeof v === "string");
+      } else {
+        (review as any).helpfulVotes = [];
+      }
+
+      if (Array.isArray(item.unhelpfulVotes)) {
+        (review as any).unhelpfulVotes = item.unhelpfulVotes.filter((v: any) => typeof v === "string");
+      } else {
+        (review as any).unhelpfulVotes = [];
+      }
+
+      validatedReviews.push(review);
+    }
+
+    return validatedReviews;
   },
 
   addReview(
@@ -162,5 +236,65 @@ export const reviewService = {
 
   getReviewsByUser(userAddress: string): Review[] {
     return this.getReviews().filter((r) => r.userAddress === userAddress);
+  },
+
+  voteHelpful(id: string, userAddress: string): { success: boolean; data?: Review; error?: string } {
+    const reviews = this.getReviews();
+    const index = reviews.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return { success: false, error: "Review not found" };
+    }
+
+    const review = reviews[index];
+    let helpfulVotes = review.helpfulVotes || [];
+    let unhelpfulVotes = review.unhelpfulVotes || [];
+
+    if (helpfulVotes.includes(userAddress)) {
+      helpfulVotes = helpfulVotes.filter((addr) => addr !== userAddress);
+    } else {
+      helpfulVotes = [...helpfulVotes, userAddress];
+      unhelpfulVotes = unhelpfulVotes.filter((addr) => addr !== userAddress);
+    }
+
+    const updatedReview = {
+      ...review,
+      helpfulVotes,
+      unhelpfulVotes,
+    };
+
+    reviews[index] = updatedReview;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
+    return { success: true, data: updatedReview };
+  },
+
+  voteUnhelpful(id: string, userAddress: string): { success: boolean; data?: Review; error?: string } {
+    const reviews = this.getReviews();
+    const index = reviews.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return { success: false, error: "Review not found" };
+    }
+
+    const review = reviews[index];
+    let helpfulVotes = review.helpfulVotes || [];
+    let unhelpfulVotes = review.unhelpfulVotes || [];
+
+    if (unhelpfulVotes.includes(userAddress)) {
+      unhelpfulVotes = unhelpfulVotes.filter((addr) => addr !== userAddress);
+    } else {
+      unhelpfulVotes = [...unhelpfulVotes, userAddress];
+      helpfulVotes = helpfulVotes.filter((addr) => addr !== userAddress);
+    }
+
+    const updatedReview = {
+      ...review,
+      helpfulVotes,
+      unhelpfulVotes,
+    };
+
+    reviews[index] = updatedReview;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
+    return { success: true, data: updatedReview };
   },
 };

@@ -7,6 +7,7 @@ import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
 
 import AddressDisplay from "@/components/ui/AddressDisplay";
+import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -126,19 +127,11 @@ export default function Navbar() {
             aria-controls="mobile-menu"
             className="md:hidden p-2 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
+            {isMenuOpen ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <Menu className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>

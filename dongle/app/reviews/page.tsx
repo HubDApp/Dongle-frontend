@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useWallet } from "@/context/wallet.context";
 import { reviewService } from "@/services/review/review.service";
 import { Review, Project } from "@/types/review";
@@ -18,6 +18,7 @@ export default function ReviewsPage() {
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [sortBy, setSortBy] = useState<"recent" | "helpfulness">("recent");
 
   const handleAddReview = (project: Project) => {
     if (!isConnected) {
@@ -51,6 +52,32 @@ export default function ReviewsPage() {
       } else {
         toast.error(result.error || "Failed to delete review");
       }
+    }
+  };
+
+  const handleVoteHelpful = (id: string) => {
+    if (!publicKey) {
+      toast.error("Please connect your wallet to vote");
+      return;
+    }
+    const result = reviewService.voteHelpful(id, publicKey);
+    if (result.success) {
+      setReviews(reviewService.getReviews());
+    } else {
+      toast.error(result.error || "Failed to submit vote");
+    }
+  };
+
+  const handleVoteUnhelpful = (id: string) => {
+    if (!publicKey) {
+      toast.error("Please connect your wallet to vote");
+      return;
+    }
+    const result = reviewService.voteUnhelpful(id, publicKey);
+    if (result.success) {
+      setReviews(reviewService.getReviews());
+    } else {
+      toast.error(result.error || "Failed to submit vote");
     }
   };
 
@@ -89,6 +116,21 @@ export default function ReviewsPage() {
       }
     }
   };
+
+  const sortedReviews = useMemo(() => {
+    const list = [...reviews];
+    if (sortBy === "helpfulness") {
+      return list.sort((a, b) => {
+        const votesA = a.helpfulVotes?.length || 0;
+        const votesB = b.helpfulVotes?.length || 0;
+        if (votesA !== votesB) {
+          return votesB - votesA;
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [reviews, sortBy]);
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -136,15 +178,31 @@ export default function ReviewsPage() {
 
         <div className="grid grid-cols-1 gap-12">
           <section>
-            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="w-2 h-8 bg-blue-500 rounded-full" />
-              Recent Activity
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <span className="w-2 h-8 bg-blue-500 rounded-full" />
+                {sortBy === "helpfulness" ? "Most Helpful Reviews" : "Recent Activity"}
+              </h2>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-zinc-500">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as "recent" | "helpfulness")}
+                  className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
+                >
+                  <option value="recent">Recent</option>
+                  <option value="helpfulness">Most Helpful</option>
+                </select>
+              </div>
+            </div>
+
             <ReviewList
-              reviews={reviews}
+              reviews={sortedReviews}
               currentUserAddress={publicKey}
               onEdit={handleEditReview}
               onDelete={handleDeleteReview}
+              onVoteHelpful={handleVoteHelpful}
+              onVoteUnhelpful={handleVoteUnhelpful}
             />
           </section>
         </div>

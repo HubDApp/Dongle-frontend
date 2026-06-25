@@ -402,4 +402,155 @@ describe("Review Service", () => {
       expect(reviews).toHaveLength(0);
     });
   });
+
+  describe("getReviews safe loading", () => {
+    it("should handle missing localStorage entry gracefully", () => {
+      localStorage.removeItem("dongle_reviews");
+      const reviews = reviewService.getReviews();
+      expect(reviews).toEqual([]);
+    });
+
+    it("should handle corrupt JSON gracefully by returning empty array", () => {
+      localStorage.setItem("dongle_reviews", "corrupt { json: ... }");
+      const reviews = reviewService.getReviews();
+      expect(reviews).toEqual([]);
+    });
+
+    it("should handle non-array stored data by returning empty array", () => {
+      localStorage.setItem("dongle_reviews", JSON.stringify({ notAnArray: true }));
+      const reviews = reviewService.getReviews();
+      expect(reviews).toEqual([]);
+    });
+
+    it("should filter out invalid review records and keep valid ones", () => {
+      const storedData = [
+        {
+          id: "r1",
+          projectId: "p1",
+          projectName: "Proj 1",
+          userAddress: "u1",
+          rating: 4,
+          comment: "This is a valid review comment",
+          createdAt: "2026-06-25T12:00:00.000Z",
+        },
+        {
+          // Missing userAddress
+          id: "r2",
+          projectId: "p1",
+          projectName: "Proj 1",
+          rating: 4,
+          comment: "This has no user address",
+        },
+        {
+          // Missing projectId
+          id: "r3",
+          projectName: "Proj 1",
+          userAddress: "u1",
+          rating: 3,
+          comment: "This has no project ID",
+        },
+        {
+          // Invalid rating
+          id: "r4",
+          projectId: "p1",
+          projectName: "Proj 1",
+          userAddress: "u1",
+          rating: "invalid",
+          comment: "This has an invalid rating",
+        },
+        {
+          // Missing comment
+          id: "r5",
+          projectId: "p1",
+          projectName: "Proj 1",
+          userAddress: "u1",
+          rating: 5,
+        },
+      ];
+
+      localStorage.setItem("dongle_reviews", JSON.stringify(storedData));
+      const reviews = reviewService.getReviews();
+
+      expect(reviews).toHaveLength(1);
+      expect(reviews[0].id).toBe("r1");
+    });
+
+    it("should migrate incomplete but recoverable review records", () => {
+      const storedData = [
+        {
+          // Missing id, projectName, and createdAt
+          projectId: "p1",
+          userAddress: "u1",
+          rating: 3,
+          comment: "Comment that is long enough to be valid.",
+        },
+        {
+          // Rating out of bounds (should clamp)
+          id: "r2",
+          projectId: "p1",
+          projectName: "Proj 1",
+          userAddress: "u1",
+          rating: 6,
+          comment: "Another comment that is long enough.",
+        },
+      ];
+
+      localStorage.setItem("dongle_reviews", JSON.stringify(storedData));
+      const reviews = reviewService.getReviews();
+
+      expect(reviews).toHaveLength(2);
+      
+      // Verification of migration 1
+      expect(reviews[0].id).toBeDefined();
+      expect(reviews[0].projectName).toBe("Unknown Project");
+      expect(reviews[0].createdAt).toBeDefined();
+      expect(new Date(reviews[0].createdAt).getTime()).not.toBeNaN();
+
+      // Verification of migration 2 (clamped rating)
+      expect(reviews[1].rating).toBe(5);
+    });
+  });
+
+  describe("Voting and Sorting", () => {
+    let reviewId: string;
+
+    beforeEach(() => {
+      const review = {
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "user1",
+        rating: 5,
+        comment: "This is a great project with excellent features",
+      };
+      const result = reviewService.addReview(review, "user1");
+      reviewId = result.data?.id || "";
+    });
+
+    it("should allow a user to vote helpful and prevent duplicates via toggling", () => {
+      // First vote
+      const res1 = reviewService.voteHelpful(reviewId, "user2");
+      expect(res1.success).toBe(true);
+      expect(res1.data?.helpfulVotes).toContain("user2");
+      expect(res1.data?.helpfulVotes).toHaveLength(1);
+
+      // Second vote (toggles/removes the vote, thus preventing duplicates)
+      const res2 = reviewService.voteHelpful(reviewId, "user2");
+      expect(res2.success).toBe(true);
+      expect(res2.data?.helpfulVotes).not.toContain("user2");
+      expect(res2.data?.helpfulVotes).toHaveLength(0);
+    });
+
+    it("should remove unhelpful vote when voting helpful", () => {
+      // Vote unhelpful
+      reviewService.voteUnhelpful(reviewId, "user2");
+      let reviews = reviewService.getReviews();
+      expect(reviews[0].unhelpfulVotes).toContain("user2");
+
+      // Vote helpful
+      const res = reviewService.voteHelpful(reviewId, "user2");
+      expect(res.success).toBe(true);
+      expect(res.data?.helpfulVotes).toContain("user2");
+      expect(res.data?.unhelpfulVotes).not.toContain("user2");
+    });
+  });
 });

@@ -77,6 +77,7 @@ export interface Project {
   githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
+  domain?: string;
 }
 
 /**

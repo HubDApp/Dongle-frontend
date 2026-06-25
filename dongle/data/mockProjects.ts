@@ -1,4 +1,5 @@
 import { Project, PROJECT_CATEGORIES } from "@/types/project";
+import { extractDomain } from "@/lib/url";
 
 // Helper to generate deterministic but seemingly random dates
 const generateDate = (index: number) => {
@@ -120,6 +121,7 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       githubUrl: base.githubUrl,
       logoUrl: base.logoUrl,
       docsUrl: base.docsUrl,
+      domain: base.websiteUrl ? extractDomain(base.websiteUrl) : undefined,
     };
   },
 );
