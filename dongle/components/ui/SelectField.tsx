@@ -1,4 +1,5 @@
 import React from "react";
+import { ChevronDown } from "lucide-react";
 
 interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
@@ -36,9 +37,7 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
             ))}
           </select>
           <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
+            <ChevronDown className="w-4 h-4" />
           </div>
         </div>
         {error && (

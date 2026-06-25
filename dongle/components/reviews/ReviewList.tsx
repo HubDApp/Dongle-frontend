@@ -3,15 +3,26 @@
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
+import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown } from "lucide-react";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface ReviewListProps {
   reviews: Review[];
   currentUserAddress: string | null;
   onEdit: (review: Review) => void;
   onDelete: (id: string) => void;
+  onVoteHelpful?: (id: string) => void;
+  onVoteUnhelpful?: (id: string) => void;
 }
 
-export default function ReviewList({ reviews, currentUserAddress, onEdit, onDelete }: ReviewListProps) {
+export default function ReviewList({ 
+  reviews, 
+  currentUserAddress, 
+  onEdit, 
+  onDelete,
+  onVoteHelpful,
+  onVoteUnhelpful
+}: ReviewListProps) {
   if (reviews.length === 0) {
     return (
       <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
@@ -45,9 +56,7 @@ export default function ReviewList({ reviews, currentUserAddress, onEdit, onDele
               </div>
             </div>
             <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-lg">
-              <svg className="w-4 h-4 text-yellow-500 fill-current" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
               <span className="text-sm font-bold text-yellow-700 dark:text-yellow-500">{review.rating}</span>
             </div>
           </div>
@@ -57,30 +66,58 @@ export default function ReviewList({ reviews, currentUserAddress, onEdit, onDele
           </p>
 
           <div className="flex justify-between items-center">
-            <div className="text-xs font-medium text-blue-500 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded">
-              {review.projectName}
+            <div className="flex items-center gap-3">
+              <div className="text-xs font-medium text-blue-500 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 rounded">
+                {review.projectName}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => onVoteHelpful?.(review.id)}
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border ${
+                    review.helpfulVotes?.includes(currentUserAddress || "")
+                      ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-500"
+                      : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-black dark:bg-zinc-800 dark:border-zinc-850 dark:text-zinc-400 dark:hover:bg-zinc-700/50"
+                  }`}
+                  aria-label={`Mark as helpful, current count ${review.helpfulVotes?.length || 0}`}
+                >
+                  <ThumbsUp className="w-3 h-3" />
+                  <span>{review.helpfulVotes?.length || 0}</span>
+                </button>
+
+                <button
+                  onClick={() => onVoteUnhelpful?.(review.id)}
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all border ${
+                    review.unhelpfulVotes?.includes(currentUserAddress || "")
+                      ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-500"
+                      : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 hover:text-black dark:bg-zinc-800 dark:border-zinc-850 dark:text-zinc-400 dark:hover:bg-zinc-700/50"
+                  }`}
+                  aria-label={`Mark as unhelpful, current count ${review.unhelpfulVotes?.length || 0}`}
+                >
+                  <ThumbsDown className="w-3 h-3" />
+                  <span>{review.unhelpfulVotes?.length || 0}</span>
+                </button>
+              </div>
             </div>
             
             {currentUserAddress === review.userAddress && (
               <div className="flex gap-2">
-                <button
+                <IconButton
                   onClick={() => onEdit(review)}
                   aria-label="Edit review"
-                  className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-black dark:hover:text-white"
+                  variant="default"
+                  size="sm"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button
+                  <Pencil className="w-4 h-4" />
+                </IconButton>
+                <IconButton
                   onClick={() => onDelete(review.id)}
                   aria-label="Delete review"
-                  className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-zinc-500 hover:text-red-500"
+                  variant="error"
+                  size="sm"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                  <Trash2 className="w-4 h-4" />
+                </IconButton>
               </div>
             )}
           </div>

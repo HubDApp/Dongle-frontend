@@ -6,6 +6,8 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+  helpfulVotes?: string[];
+  unhelpfulVotes?: string[];
 }
 
 export interface Project {

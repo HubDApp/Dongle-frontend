@@ -15,6 +15,32 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { normalizeUrl, extractDomain } from "@/lib/url";
+
+const urlSchema = z.string().transform((val, ctx) => {
+  try {
+    return normalizeUrl(val);
+  } catch (err: any) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please enter a valid URL",
+    });
+    return z.NEVER;
+  }
+});
+
+const optionalUrlSchema = z.string().transform((val, ctx) => {
+  if (val.trim().length === 0) return "";
+  try {
+    return normalizeUrl(val);
+  } catch (err: any) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please enter a valid URL",
+    });
+    return z.NEVER;
+  }
+});
 
 const projectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
@@ -23,19 +49,10 @@ const projectSchema = z.object({
     .string()
     .min(10, "Description must be at least 10 characters")
     .max(500),
-  websiteUrl: z.string().url("Please enter a valid URL"),
-  githubUrl: z
-    .string()
-    .url("Please enter a valid GitHub URL")
-    .or(z.string().length(0)),
-  logoUrl: z
-    .string()
-    .url("Please enter a valid image URL")
-    .or(z.string().length(0)),
-  docsUrl: z
-    .string()
-    .url("Please enter a valid documentation URL")
-    .or(z.string().length(0)),
+  websiteUrl: urlSchema,
+  githubUrl: optionalUrlSchema,
+  logoUrl: optionalUrlSchema,
+  docsUrl: optionalUrlSchema,
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -78,12 +95,17 @@ export default function ProjectForm({
   useUnsavedChanges(isDirty, isSubmitting);
 
   const onSubmit = async (data: ProjectFormValues) => {
+    const payload = {
+      ...data,
+      domain: extractDomain(data.websiteUrl),
+    };
+
     if (customOnSubmit) {
-      return customOnSubmit(data);
+      return customOnSubmit(payload);
     }
 
     setIsSubmitting(true);
-    const promise = sorobanService.registerProject(data);
+    const promise = sorobanService.registerProject(payload);
 
     toast.promise(promise, {
       loading: "Registering your project on-chain...",
