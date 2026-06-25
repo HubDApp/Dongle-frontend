@@ -31,6 +31,7 @@ describe("Navbar active navigation", () => {
     vi.spyOn(walletContext, "useWallet").mockReturnValue({
       isConnected: false,
       isConnecting: false,
+      isFreighterAvailable: true,
       publicKey: null,
       walletNetwork: null,
       isCorrectNetwork: false,
@@ -68,6 +69,7 @@ describe("Navbar active navigation", () => {
     vi.spyOn(walletContext, "useWallet").mockReturnValue({
       isConnected: true,
       isConnecting: false,
+      isFreighterAvailable: true,
       publicKey: "GADMIN1234567890",
       walletNetwork: "Test SDF Network ; September 2015",
       isCorrectNetwork: true,

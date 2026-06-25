@@ -1,18 +1,19 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
-import { useWallet } from "@/context/wallet.context";
-import { useStellarAccount } from "@/hooks/useStellarAccount";
 import { reviewService } from "@/services/review/review.service";
-import { projectService } from "@/services/project/project.service";
 import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import WalletStatePanel, {
+  WalletStateLoadingPanel,
+} from "@/components/wallet/WalletStatePanel";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+import { useStellarAccount } from "@/hooks/useStellarAccount";
 import {
-  Wallet,
   LogOut,
   Star,
   MessageSquare,
@@ -31,26 +32,29 @@ interface StellarNonNativeBalance {
   asset_issuer?: string;
 }
 
+const PROFILE_PURPOSE =
+  "Connect your Stellar wallet to view your profile, manage reviews, and track your activity on Dongle.";
+
 export default function ProfilePage() {
   const router = useRouter();
-  const { publicKey, isConnected, connectWallet, disconnectWallet } = useWallet();
-  const { balances, loading: accountLoading, error: accountError } = useStellarAccount();
+  const gate = useWalletPageGate({ requireFundedAccount: true });
+  const { balances } = useStellarAccount();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadingVerifications, setLoadingVerifications] = useState(false);
 
-  // Get user's reviews
-  const userReviews = publicKey ? reviewService.getReviewsByUser(publicKey) : [];
+  const userReviews = gate.publicKey
+    ? reviewService.getReviewsByUser(gate.publicKey)
+    : [];
 
-  // Load verification requests when publicKey changes
   useEffect(() => {
-    if (!publicKey) {
+    if (!gate.publicKey) {
       setVerificationRequests([]);
       return;
     }
 
     setLoadingVerifications(true);
     verificationService
-      .getVerificationRequestsByUser(publicKey)
+      .getVerificationRequestsByUser(gate.publicKey)
       .then((requests) => {
         setVerificationRequests(requests);
       })
@@ -61,73 +65,25 @@ export default function ProfilePage() {
       .finally(() => {
         setLoadingVerifications(false);
       });
-  }, [publicKey]);
+  }, [gate.publicKey]);
 
-  // Disconnected state
-  if (!isConnected) {
+  if (gate.state !== "ready") {
     return (
       <LayoutWrapper>
         <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
           <div className="container mx-auto px-4 max-w-2xl">
-            <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
-              <Wallet className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
-              <h1 className="text-3xl font-bold mb-2">Connect Your Wallet</h1>
-              <p className="text-zinc-500 dark:text-zinc-400 mb-8 max-w-md mx-auto">
-                Connect your Stellar wallet to view your profile, manage reviews, and track your activity on Dongle.
-              </p>
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={connectWallet}
-                className="inline-flex items-center gap-2"
-              >
-                <Wallet className="w-5 h-5" />
-                Connect Wallet
-              </Button>
-            </div>
-          </div>
-        </main>
-      </LayoutWrapper>
-    );
-  }
-
-  // Loading state
-  if (accountLoading) {
-    return (
-      <LayoutWrapper>
-        <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col items-center justify-center py-24">
-              <Spinner size="lg" className="mb-4" />
-              <p className="text-zinc-500 dark:text-zinc-400">
-                Loading your profile...
-              </p>
-            </div>
-          </div>
-        </main>
-      </LayoutWrapper>
-    );
-  }
-
-  // Error state
-  if (accountError) {
-    return (
-      <LayoutWrapper>
-        <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
-          <div className="container mx-auto px-4 max-w-2xl">
-            <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
-              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h1 className="text-2xl font-bold mb-2">Account Not Found</h1>
-              <p className="text-zinc-500 dark:text-zinc-400 mb-6">
-                {accountError}
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => disconnectWallet()}
-              >
-                Disconnect Wallet
-              </Button>
-            </div>
+            {gate.state === "account-loading" ? (
+              <WalletStateLoadingPanel message="Loading your profile..." />
+            ) : (
+              <WalletStatePanel
+                state={gate.state}
+                pagePurpose={PROFILE_PURPOSE}
+                walletNetworkLabel={gate.walletNetworkLabel}
+                publicKey={gate.publicKey}
+                onConnect={gate.connectWallet}
+                onDisconnect={gate.disconnectWallet}
+              />
+            )}
           </div>
         </main>
       </LayoutWrapper>
@@ -138,7 +94,6 @@ export default function ProfilePage() {
     <LayoutWrapper>
       <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-6xl">
-          {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
             <div>
               <h1 className="text-4xl font-black mb-2 tracking-tight">
@@ -150,7 +105,7 @@ export default function ProfilePage() {
             </div>
             <Button
               variant="outline"
-              onClick={disconnectWallet}
+              onClick={gate.disconnectWallet}
               className="inline-flex items-center gap-2"
             >
               <LogOut className="w-4 h-4" />
@@ -159,20 +114,17 @@ export default function ProfilePage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Account Summary */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <h2 className="text-2xl font-bold mb-6">Account Summary</h2>
 
-                {/* Wallet Address */}
                 <div className="mb-8">
                   <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
                     Wallet Address
                   </label>
                   <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl">
                     <AddressDisplay
-                      address={publicKey!}
+                      address={gate.publicKey!}
                       copyable={true}
                       truncated={false}
                       inline={true}
@@ -181,7 +133,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Balances */}
                 {balances && balances.length > 0 && (
                   <div>
                     <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 block">
@@ -224,7 +175,6 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* User Reviews */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -280,7 +230,6 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Verification Requests */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -373,12 +322,9 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
-
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-6">
-              {/* Stats */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <h3 className="text-lg font-bold mb-4">Activity Stats</h3>
                 <div className="space-y-4">
@@ -413,7 +359,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Quick Actions */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
                 <div className="space-y-3">

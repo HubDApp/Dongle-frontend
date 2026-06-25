@@ -25,6 +25,7 @@ function mockWallet(overrides: Partial<ReturnType<typeof walletContext.useWallet
   vi.spyOn(walletContext, "useWallet").mockReturnValue({
     isConnected,
     isConnecting: false,
+    isFreighterAvailable: true,
     publicKey: null,
     walletNetwork: isConnected ? "Test SDF Network ; September 2015" : null,
     isCorrectNetwork: isConnected,
