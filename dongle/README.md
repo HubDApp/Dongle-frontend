@@ -148,44 +148,17 @@ Dongle requires configuration for Soroban smart contract interactions and networ
 
 ### Setup Instructions
 
-1. Create a `.env.local` file in the `dongle/` directory
-2. Copy the example below and customize as needed
+1. Copy `.env.example` to `.env.local` in the `dongle/` directory:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Customize values as needed (see comments in `.env.example`)
 3. For **development**, most variables have safe defaults and are optional
 4. For **production builds**, all variables must be explicitly set
 
 ### Configuration File (`.env.local`)
 
-```env
-# ============================================
-# SOROBAN SMART CONTRACTS (Required in production)
-# ============================================
-# Stellar contract IDs for Dongle protocol smart contracts
-# Format: Must start with 'C' followed by 55 base32 characters (e.g., CAAAA...)
-# In development, defaults to placeholder contracts if not set
-
-NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-
-# ============================================
-# STELLAR NETWORK CONFIGURATION (Optional)
-# ============================================
-# RPC endpoint for Soroban interactions
-# Default (development): https://soroban-testnet.stellar.org:443
-NEXT_PUBLIC_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org:443
-
-# Network passphrase - must match Freighter's network selection
-# Default (development): "Test SDF Network ; September 2015"
-NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
-
-# ============================================
-# ADMIN ACCESS CONTROL (Optional)
-# ============================================
-# Comma-separated list of Stellar public keys (G...) authorized for admin dashboard
-# Leave empty to disable admin features
-# Example: GABC...XYZ1,GDEF...XYZ2
-NEXT_PUBLIC_ADMIN_ALLOWLIST=
-```
+The canonical template lives in [`.env.example`](./.env.example). Key variables:
 
 ### Environment Variable Reference
 
@@ -320,7 +293,8 @@ dongle/
 │   ├── services/
 │   └── components/
 │
-├── .env.local                     # Environment variables (create this)
+├── .env.example                   # Environment variable template (copy to .env.local)
+├── .env.local                     # Environment variables (create from .env.example)
 ├── package.json                   # Dependencies and scripts
 ├── tsconfig.json                  # TypeScript configuration
 ├── tailwind.config.ts             # Tailwind CSS configuration
