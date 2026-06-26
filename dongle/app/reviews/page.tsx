@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from "react";
 import { reviewService } from "@/services/review/review.service";
-import { Review, Project } from "@/types/review";
+import { projectService } from "@/services/project/project.service";
+import { Review, Project as ReviewProject } from "@/types/review";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
-import { mockProjects } from "@/data/mockProjects";
 import { toast } from "sonner";
 import WalletStatePanel, {
   WalletDisconnectedBanner,
@@ -22,11 +22,11 @@ export default function ReviewsPage() {
   );
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ReviewProject | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "helpfulness">("recent");
   const [showWalletGate, setShowWalletGate] = useState(false);
 
-  const handleAddReview = (project: Project) => {
+  const handleAddReview = (project: ReviewProject) => {
     if (gate.state !== "ready") {
       setShowWalletGate(true);
       return;
@@ -42,15 +42,25 @@ export default function ReviewsPage() {
       return;
     }
     setEditingReview(review);
-    const project = mockProjects.find((p) => p.id === review.projectId) || {
-      id: review.projectId,
-      name: review.projectName,
-      category: "",
-      description: "",
-      rating: 0,
-      reviews: 0,
-    };
-    setSelectedProject(project);
+    // Fetch project from service (will fallback to minimal project if not found)
+    const project = projectService.getProjectById(review.projectId);
+    setSelectedProject(
+      project ? {
+        id: project.id,
+        name: project.name,
+        category: project.category,
+        description: project.description,
+        rating: project.rating,
+        reviews: project.reviews,
+      } : {
+        id: review.projectId,
+        name: review.projectName,
+        category: "",
+        description: "",
+        rating: 0,
+        reviews: 0,
+      }
+    );
   };
 
   const handleDeleteReview = (id: string) => {
@@ -146,6 +156,9 @@ export default function ReviewsPage() {
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [reviews, sortBy]);
 
+  // Get top projects from service for quick review buttons
+  const topProjects = projectService.getAllProjects().slice(0, 6);
+
   const walletBlocked =
     showWalletGate && gate.state !== "ready" && gate.state !== "account-loading";
 
@@ -163,10 +176,17 @@ export default function ReviewsPage() {
           </div>
           {!isAddingReview && !editingReview && gate.state === "ready" && (
             <div className="flex gap-2">
-              {mockProjects.slice(0, 6).map((p) => (
+              {topProjects.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => handleAddReview(p)}
+                  onClick={() => handleAddReview({
+                    id: p.id,
+                    name: p.name,
+                    category: p.category,
+                    description: p.description,
+                    rating: p.rating,
+                    reviews: p.reviews,
+                  })}
                   className="text-xs font-bold px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
                 >
                   Review {p.name}
