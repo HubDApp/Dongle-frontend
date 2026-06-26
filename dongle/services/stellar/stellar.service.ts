@@ -9,9 +9,7 @@ export const STELLAR_CONFIG = {
   NETWORK_PASSPHRASE: Networks.TESTNET,
 };
 
-const server = new Horizon.Server(STELLAR_CONFIG.HORIZON_URL, {
-  timeout: 15000,
-});
+const server = new Horizon.Server(STELLAR_CONFIG.HORIZON_URL);
 
 /**
  * Service to handle communication with the Stellar network.

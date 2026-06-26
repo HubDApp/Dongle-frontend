@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -77,19 +77,6 @@ export default function ProjectForm({
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
 
-  const isMountedRef = React.useRef(true);
-  const redirectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  React.useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (redirectTimerRef.current) {
-        clearTimeout(redirectTimerRef.current);
-      }
-    };
-  }, []);
-
   const {
     register,
     handleSubmit,
@@ -110,33 +97,41 @@ export default function ProjectForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
-  const onSubmit = async (data: ProjectFormValues) => {
-    const payload = {
-      ...data,
-      domain: extractDomain(data.websiteUrl),
-    };
+  const onSubmit = useCallback(
+    async (data: ProjectFormValues) => {
+      const payload = {
+        ...data,
+        domain: extractDomain(data.websiteUrl),
+      };
 
-    if (customOnSubmit) {
-      return customOnSubmit(payload);
-    }
-
-    setIsSubmitting(true);
-    const result = await run((onPhaseChange) => {
-      if (mode === "edit" && projectId) {
-        return sorobanService.updateProject(projectId, payload, { onPhaseChange });
+      if (customOnSubmit) {
+        return customOnSubmit(payload);
       }
-      return sorobanService.registerProject(payload, { onPhaseChange });
-    });
-    if (isMountedRef.current) {
-      setIsSubmitting(false);
-    }
 
-    if (result && isMountedRef.current) {
-      reset();
-      const redirectPath =
-        mode === "edit" && projectId ? `/projects/${projectId}` : "/";
-      redirectTimerRef.current = setTimeout(() => router.push(redirectPath), 1500);
-    }
+      setIsSubmitting(true);
+      try {
+        const result = await run((onPhaseChange) => {
+          if (mode === "edit" && projectId) {
+            return sorobanService.updateProject(projectId, payload, { onPhaseChange });
+          }
+          return sorobanService.registerProject(payload, { onPhaseChange });
+        });
+
+        if (result) {
+          reset();
+          const redirectPath =
+            mode === "edit" && projectId ? `/projects/${projectId}` : "/";
+          setTimeout(() => router.push(redirectPath), 1500);
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [customOnSubmit, mode, projectId, reset, router, run],
+  );
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    void handleSubmit(onSubmit)(event);
   };
 
   return (
@@ -161,7 +156,7 @@ export default function ProjectForm({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleFormSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"

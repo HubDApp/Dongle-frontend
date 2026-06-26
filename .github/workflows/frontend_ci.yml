@@ -3,13 +3,24 @@ name: Frontend CI
 on:
   pull_request:
     branches:
-      - '**'
+      - main
     paths:
-      - 'dongle/**'
+      - "dongle/**"
+      - ".github/workflows/frontend_ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "dongle/**"
+      - ".github/workflows/frontend_ci.yml"
+
+concurrency:
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality-gate:
-    name: Lint and Build
+    name: Lint, Test, Type-check, and Build
     runs-on: ubuntu-latest
 
     defaults:
@@ -23,21 +34,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './dongle/package-lock.json'
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
 
       - name: Install Dependencies
         run: npm ci
 
       - name: Run ESLint
-        # Using 'stylish' (built-in) which works great with GitHub Action annotations
-        run: npx eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish
-        continue-on-error: false
+        run: npm run lint
 
       - name: Run Type Check
         run: npm run typecheck
-        continue-on-error: false
+
+      - name: Run Tests
+        run: npm test
 
       - name: Build Project
         id: build
@@ -48,7 +59,8 @@ jobs:
       - name: Generate Summary
         if: always()
         run: |
-          echo "### Frontend CI Results 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "* **Linting:** ${{ job.status == 'success' && 'Passed ✅' || 'Failed ❌' }}" >> $GITHUB_STEP_SUMMARY
-          echo "* **Type Check:** ${{ job.status == 'success' && 'Passed ✅' || 'Failed ❌' }}" >> $GITHUB_STEP_SUMMARY
-          echo "* **Build:** ${{ steps.build.outcome == 'success' && 'Passed ✅' || 'Failed ❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "* **Lint:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Type Check:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Tests:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Build:** ${{ steps.build.outcome == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
