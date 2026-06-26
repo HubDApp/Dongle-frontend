@@ -112,7 +112,8 @@ describe("Profile Page", () => {
         {
           id: "proj1",
           name: "Test Project",
-          category: "DeFi / DEX",
+          primaryCategory: "DeFi / DEX",
+          tags: [],
           description: "A test project",
           rating: 4.5,
           reviews: 10,

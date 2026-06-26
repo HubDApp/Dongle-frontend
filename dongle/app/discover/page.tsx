@@ -56,7 +56,7 @@ function DiscoverContent() {
 
     result = projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, category, sortBy]);
+  }, [searchQuery, category, tags, sortBy]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;

@@ -51,7 +51,7 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
 const projectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
   primaryCategory: z.string().min(1, "Please select a category"),
-  tags: z.array(z.string()).default([]),
+  tags: z.array(z.string()),
   description: z
     .string()
     .min(10, "Description must be at least 10 characters")
@@ -81,7 +81,7 @@ export default function ProjectForm({
   const [duplicateWarning, setDuplicateWarning] = useState<{
     isOpen: boolean;
     matches: Project[];
-    payload: any;
+    payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], payload: null });
 
   const router = useRouter();
@@ -110,7 +110,7 @@ export default function ProjectForm({
   useUnsavedChanges(isDirty, isSubmitting);
 
   const executeSubmit = useCallback(
-    async (payload: any) => {
+    async (payload: ProjectFormValues & { domain?: string }) => {
       if (customOnSubmit) {
         return customOnSubmit(payload);
       }
@@ -215,6 +215,7 @@ export default function ProjectForm({
           <FormField
             label="Project Name"
             placeholder="e.g. Soroban Swap"
+            maxLength={50}
             {...register("name")}
             error={errors.name?.message}
           />

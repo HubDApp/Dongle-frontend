@@ -48,17 +48,21 @@ export default function ReviewsPage() {
       project ? {
         id: project.id,
         name: project.name,
-        category: project.category,
+        primaryCategory: project.primaryCategory,
+        tags: project.tags,
         description: project.description,
         rating: project.rating,
         reviews: project.reviews,
+        createdAt: project.createdAt,
       } : {
         id: review.projectId,
         name: review.projectName,
-        category: "",
+        primaryCategory: "DeFi / DEX", // Fallback
+        tags: [],
         description: "",
         rating: 0,
         reviews: 0,
+        createdAt: new Date().toISOString(),
       }
     );
   };
@@ -182,10 +186,12 @@ export default function ReviewsPage() {
                   onClick={() => handleAddReview({
                     id: p.id,
                     name: p.name,
-                    category: p.category,
+                    primaryCategory: p.primaryCategory,
+                    tags: p.tags,
                     description: p.description,
                     rating: p.rating,
                     reviews: p.reviews,
+                    createdAt: p.createdAt,
                   })}
                   className="text-xs font-bold px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
                 >

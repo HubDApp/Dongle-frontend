@@ -52,11 +52,7 @@ describe("Category System Consistency", () => {
       const allProjects = projectService.getAllProjects();
 
       for (const project of allProjects) {
-        // Each project category should be one of the canonical categories
-        expect(isValidCategory(project.category)).toBe(
-          true,
-          `Project ${project.id} has invalid category: ${project.category}`
-        );
+        expect(isValidCategory(project.primaryCategory), `Project ${project.id} has invalid category: ${project.primaryCategory}`).toBe(true);
       }
     });
 
@@ -66,7 +62,7 @@ describe("Category System Consistency", () => {
 
       for (const project of allProjects) {
         // Projects should never have form values like "defi", always display like "DeFi / DEX"
-        expect(formValues).not.toContain(project.category);
+        expect(formValues).not.toContain(project.primaryCategory);
       }
     });
   });
@@ -77,7 +73,7 @@ describe("Category System Consistency", () => {
         const filtered = projectService.getProjectsByCategory(displayCategory);
 
         expect(filtered.length).toBeGreaterThan(0);
-        expect(filtered.every((p) => p.category === displayCategory)).toBe(true);
+        expect(filtered.every((p) => p.primaryCategory === displayCategory)).toBe(true);
       }
     });
 
@@ -95,7 +91,7 @@ describe("Category System Consistency", () => {
 
       for (const project of defProjects.slice(0, 3)) {
         const detail = projectService.getProjectById(project.id);
-        expect(detail?.category).toBe(PROJECT_CATEGORIES.DEFI);
+        expect(detail?.primaryCategory).toBe(PROJECT_CATEGORIES.DEFI);
       }
     });
   });
@@ -175,7 +171,7 @@ describe("Category System Consistency", () => {
 
     it("should handle all form values in reverse map", () => {
       const primaryFormValues = Object.keys(CATEGORY_DISPLAY_TO_FORM).map(
-        (k) => CATEGORY_DISPLAY_TO_FORM[k as any]
+        (k) => CATEGORY_DISPLAY_TO_FORM[k as keyof typeof CATEGORY_DISPLAY_TO_FORM]
       );
 
       for (const formValue of primaryFormValues) {
@@ -193,7 +189,7 @@ describe("Category System Consistency", () => {
       );
       const sorted = projectService.sortProjects(defiProjects, "rating");
 
-      expect(sorted.every((p) => p.category === PROJECT_CATEGORIES.DEFI)).toBe(
+      expect(sorted.every((p) => p.primaryCategory === PROJECT_CATEGORIES.DEFI)).toBe(
         true
       );
 
@@ -213,7 +209,7 @@ describe("Category System Consistency", () => {
 
       for (const result of searchResults) {
         // Search results should have valid categories
-        expect(isValidCategory(result.category)).toBe(true);
+        expect(isValidCategory(result.primaryCategory)).toBe(true);
       }
     });
   });

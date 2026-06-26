@@ -1,5 +1,5 @@
 import { mockProjects } from "@/data/mockProjects";
-import { Project, ProjectCategory } from "@/types/project";
+import { Project } from "@/types/project";
 
 /**
  * Migrate a project ensuring primaryCategory and tags are present
