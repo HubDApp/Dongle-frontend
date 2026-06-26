@@ -1,5 +1,19 @@
 import { mockProjects } from "@/data/mockProjects";
-import { Project } from "@/types/project";
+import { Project, ProjectCategory } from "@/types/project";
+
+/**
+ * Migrate a project ensuring primaryCategory and tags are present
+ */
+const migrateProject = (p: Project): Project => {
+  const migrated = { ...p };
+  if (migrated.category && !migrated.primaryCategory) {
+    migrated.primaryCategory = migrated.category;
+  }
+  if (!migrated.tags) {
+    migrated.tags = migrated.category ? [migrated.category] : [];
+  }
+  return migrated;
+};
 
 /**
  * Unified project service that provides a single source of truth
@@ -10,7 +24,7 @@ export const projectService = {
    * Get all projects
    */
   getAllProjects(): Project[] {
-    return mockProjects;
+    return mockProjects.map(migrateProject);
   },
 
   /**
@@ -18,17 +32,29 @@ export const projectService = {
    * Returns null if project not found
    */
   getProjectById(id: string): Project | null {
-    return mockProjects.find((p) => p.id === id) || null;
+    const project = mockProjects.find((p) => p.id === id);
+    return project ? migrateProject(project) : null;
   },
 
   /**
    * Get projects by category
    */
   getProjectsByCategory(category: string): Project[] {
+    const all = this.getAllProjects();
     if (category === "All") {
-      return mockProjects;
+      return all;
     }
-    return mockProjects.filter((p) => p.category === category);
+    return all.filter((p) => p.primaryCategory === category);
+  },
+  
+  /**
+   * Get projects by tags
+   */
+  getProjectsByTags(tags: string[]): Project[] {
+    if (!tags || tags.length === 0) return this.getAllProjects();
+    return this.getAllProjects().filter((p) => 
+      p.tags?.some((t) => tags.includes(t))
+    );
   },
 
   /**
@@ -36,10 +62,11 @@ export const projectService = {
    */
   searchProjects(query: string): Project[] {
     const q = query.toLowerCase();
-    return mockProjects.filter(
+    return this.getAllProjects().filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        p.description.toLowerCase().includes(q) ||
+        p.tags?.some(tag => tag.toLowerCase().includes(q))
     );
   },
 
@@ -47,7 +74,7 @@ export const projectService = {
    * Get unique categories from all projects
    */
   getCategories(): string[] {
-    const categories = new Set(mockProjects.map((p) => p.category));
+    const categories = new Set(this.getAllProjects().map((p) => p.primaryCategory).filter(Boolean));
     return ["All", ...Array.from(categories)];
   },
 
