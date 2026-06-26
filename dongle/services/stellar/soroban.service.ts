@@ -14,10 +14,23 @@ import {
   getNetworkLabel,
 } from "@/context/wallet.context";
 import { generateId } from "@/lib/id-generator";
+import type { TransactionPhase } from "@/lib/transaction-progress";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,
 });
+
+export type TransactionPhaseHandler = (
+  phase: TransactionPhase,
+  meta?: { txHash?: string; error?: Error },
+) => void;
+
+export interface SorobanTransactionOptions {
+  onPhaseChange?: TransactionPhaseHandler;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  intervalMs?: number;
+}
 
 // ─── Network mismatch error ──────────────────────────────────────────────────
 
@@ -104,10 +117,17 @@ async function pollTransaction(
   {
     timeoutMs = DEFAULT_POLL_TIMEOUT_MS,
     intervalMs = DEFAULT_POLL_INTERVAL_MS,
+    onPhaseChange,
     signal,
-  }: { timeoutMs?: number; intervalMs?: number; signal?: AbortSignal } = {},
+  }: {
+    timeoutMs?: number;
+    intervalMs?: number;
+    onPhaseChange?: TransactionPhaseHandler;
+    signal?: AbortSignal;
+  } = {},
 ) {
   const startedAt = Date.now();
+  onPhaseChange?.("confirming", { txHash: hash });
 
   if (signal?.aborted) {
     throw new Error("Transaction polling aborted");
@@ -134,7 +154,59 @@ async function pollTransaction(
     );
   }
 
+  onPhaseChange?.("success", { txHash: hash });
   return last;
+}
+
+async function executeContractTransaction(
+  publicKey: string,
+  buildOperation: (contract: Contract) => ReturnType<Contract["call"]>,
+  options: SorobanTransactionOptions = {},
+) {
+  const { onPhaseChange, signal, timeoutMs, intervalMs } = options;
+
+  onPhaseChange?.("preparing");
+  await assertCorrectNetwork();
+
+  const account = await server.getAccount(publicKey);
+  const source = new Account(publicKey, account.sequenceNumber());
+  const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
+
+  const unsignedTx = new TransactionBuilder(source, {
+    fee: BASE_FEE,
+    networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+  })
+    .addOperation(buildOperation(contract))
+    .setTimeout(30)
+    .build();
+
+  const preparedTx = await server.prepareTransaction(unsignedTx);
+
+  onPhaseChange?.("signing");
+  const signedXdr = await walletService.signTransaction(
+    preparedTx.toXDR(),
+    SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+  );
+
+  onPhaseChange?.("submitting");
+  const sendResponse = await server.sendTransaction(
+    TransactionBuilder.fromXDR(signedXdr, SOROBAN_CONFIG.NETWORK_PASSPHRASE),
+  );
+
+  if (sendResponse.status === "ERROR") {
+    throw new Error(
+      "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+    );
+  }
+
+  await pollTransaction(sendResponse.hash, {
+    onPhaseChange,
+    signal,
+    timeoutMs,
+    intervalMs,
+  });
+
+  return { hash: sendResponse.hash, status: "SUCCESS" as const };
 }
 
 export const sorobanService = {
@@ -143,7 +215,7 @@ export const sorobanService = {
    */
   async registerProject(
     params: ProjectRegistrationParams,
-    options?: { signal?: AbortSignal; timeoutMs?: number; intervalMs?: number },
+    options: SorobanTransactionOptions = {},
   ) {
     let publicKey: string;
     try {
@@ -152,20 +224,21 @@ export const sorobanService = {
       console.warn(
         "[SorobanService] No wallet connected, using mock registration",
       );
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      options.onPhaseChange?.("preparing");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      options.onPhaseChange?.("signing");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      options.onPhaseChange?.("submitting");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const hash = "mock_hash_" + generateId();
+      options.onPhaseChange?.("confirming", { txHash: hash });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      options.onPhaseChange?.("success", { txHash: hash });
       return {
-        hash: "mock_hash_" + generateId(),
+        hash,
         status: "SUCCESS",
       };
     }
-
-    // Validate network before building or signing any transaction
-    await assertCorrectNetwork();
-
-    const account = await server.getAccount(publicKey);
-    const source = new Account(publicKey, account.sequenceNumber());
-
-    const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
 
     const args = [
       nativeToScVal(params.name),
@@ -177,47 +250,14 @@ export const sorobanService = {
       nativeToScVal(params.docsUrl),
     ];
 
-    const unsignedTx = new TransactionBuilder(source, {
-      fee: BASE_FEE,
-      networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-    })
-      .addOperation(contract.call("register_project", ...args))
-      .setTimeout(30)
-      .build();
-
-    // Soroban-specific: prepare ensures footprint/resources are set correctly.
-    const preparedTx = await server.prepareTransaction(unsignedTx);
-
-    const signedXdr = await walletService.signTransaction(
-      preparedTx.toXDR(),
-      SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+    const result = await executeContractTransaction(
+      publicKey,
+      (contract) => contract.call("register_project", ...args),
+      options,
     );
 
-    const sendResponse = await server.sendTransaction(
-      TransactionBuilder.fromXDR(
-        signedXdr,
-        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-      ),
-    );
-
-    if (sendResponse.status === "ERROR") {
-      throw new Error(
-        "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
-      );
-    }
-
-    await pollTransaction(sendResponse.hash, {
-      signal: options?.signal,
-      timeoutMs: options?.timeoutMs,
-      intervalMs: options?.intervalMs,
-    });
-
-    console.log(
-      "[SorobanService] Registration successful:",
-      sendResponse.hash,
-    );
-
-    return { hash: sendResponse.hash, status: "SUCCESS" };
+    console.log("[SorobanService] Registration successful:", result.hash);
+    return result;
   },
 
   /**
@@ -322,7 +362,7 @@ export const sorobanService = {
   async updateProject(
     projectId: string,
     params: ProjectRegistrationParams,
-    options?: { signal?: AbortSignal; timeoutMs?: number; intervalMs?: number },
+    options: SorobanTransactionOptions = {},
   ) {
     let publicKey: string;
     try {
@@ -331,9 +371,12 @@ export const sorobanService = {
       console.warn(
         "[SorobanService] No wallet connected, using mock update",
       );
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      options.onPhaseChange?.("preparing");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const hash = "mock_update_hash_" + generateId();
+      options.onPhaseChange?.("success", { txHash: hash });
       return {
-        hash: "mock_update_hash_" + generateId(),
+        hash,
         status: "SUCCESS",
       };
     }
@@ -343,14 +386,6 @@ export const sorobanService = {
     if (project.owner !== publicKey) {
       throw new Error("Only project owner can update the project");
     }
-
-    // Validate network before building or signing any transaction
-    await assertCorrectNetwork();
-
-    const account = await server.getAccount(publicKey);
-    const source = new Account(publicKey, account.sequenceNumber());
-
-    const contract = new Contract(DONGLE_CONTRACTS.PROJECT_REGISTRY);
 
     const args = [
       nativeToScVal(projectId),
@@ -363,46 +398,14 @@ export const sorobanService = {
       nativeToScVal(params.docsUrl),
     ];
 
-    const unsignedTx = new TransactionBuilder(source, {
-      fee: BASE_FEE,
-      networkPassphrase: SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-    })
-      .addOperation(contract.call("update_project", ...args))
-      .setTimeout(30)
-      .build();
-
-    const preparedTx = await server.prepareTransaction(unsignedTx);
-
-    const signedXdr = await walletService.signTransaction(
-      preparedTx.toXDR(),
-      SOROBAN_CONFIG.NETWORK_PASSPHRASE,
+    const result = await executeContractTransaction(
+      publicKey,
+      (contract) => contract.call("update_project", ...args),
+      options,
     );
 
-    const sendResponse = await server.sendTransaction(
-      TransactionBuilder.fromXDR(
-        signedXdr,
-        SOROBAN_CONFIG.NETWORK_PASSPHRASE,
-      ),
-    );
-
-    if (sendResponse.status === "ERROR") {
-      throw new Error(
-        "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
-      );
-    }
-
-    await pollTransaction(sendResponse.hash, {
-      signal: options?.signal,
-      timeoutMs: options?.timeoutMs,
-      intervalMs: options?.intervalMs,
-    });
-
-    console.log(
-      "[SorobanService] Update successful:",
-      sendResponse.hash,
-    );
-
-    return { hash: sendResponse.hash, status: "SUCCESS" };
+    console.log("[SorobanService] Update successful:", result.hash);
+    return result;
   },
 
   getServer() {
