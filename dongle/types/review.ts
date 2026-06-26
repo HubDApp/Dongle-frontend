@@ -1,3 +1,5 @@
+import { Project } from "@/types/project";
+
 export interface Review {
   id: string;
   projectId: string;
@@ -8,15 +10,6 @@ export interface Review {
   createdAt: string;
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  rating: number;
-  reviews: number;
 }
 
 // Validation constraints
@@ -31,3 +24,7 @@ export interface ReviewValidationError {
   field: "rating" | "comment";
   message: string;
 }
+
+// Re-export Project for backward compatibility in components
+export type { Project };
+
