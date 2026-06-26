@@ -1,20 +1,19 @@
-\"use client\";
+"use client";
 
-import React, { useState, useEffect } from \"react\";
-import { useParams, useRouter } from \"next/navigation\";
-import ProjectForm from \"@/components/projects/ProjectForm\";
-import { sorobanService, ProjectData } from \"@/services/stellar/soroban.service\";
-import { toast } from \"sonner\";
-import { AlertTriangle, ArrowLeft } from \"lucide-react\";
-import { Button } from \"@/components/ui/Button\";
-import { Card } from \"@/components/ui/Card\";
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import ProjectForm from "@/components/projects/ProjectForm";
+import { sorobanService, ProjectData } from "@/services/stellar/soroban.service";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import WalletStatePanel, {
   WalletStateLoadingPanel,
-} from \"@/components/wallet/WalletStatePanel\";
-import { useWalletPageGate } from \"@/hooks/useWalletPageGate\";
+} from "@/components/wallet/WalletStatePanel";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 
 const EDIT_PURPOSE =
-  \"Connect Freighter to edit and update your project on-chain.\";
+  "Connect Freighter to edit and update your project on-chain.";
 
 export default function EditProjectPage() {
   const params = useParams();
@@ -59,30 +58,16 @@ export default function EditProjectPage() {
     };
   }, [projectId, gate.state]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleUpdate = async (data: any) => {
-    if (!project) return;
-    const promise = sorobanService.updateProject(projectId, data);
-    toast.promise(promise, {
-      loading: \"Updating your project on-chain...\",
-      success: (res) => {
-        setTimeout(() => router.push(`/projects/${projectId}`), 2000);
-        return `Project updated successfully! Tx: ${res.hash.substring(0, 8)}...`;
-      },
-      error: (err) => `Update failed: ${err.message}`,
-    });
-  };
-
-  const pageClass = \"min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950\";
+  const pageClass = "min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950";
 
   // Wallet gate — show before attempting any project fetch
-  if (gate.state !== \"ready\") {
+  if (gate.state !== "ready") {
     return (
       <main className={pageClass}>
-        <div className=\"container mx-auto px-4\">
-          <div className=\"max-w-xl mx-auto animate-fade-in\">
-            {gate.state === \"account-loading\" ? (
-              <WalletStateLoadingPanel message=\"Verifying your wallet...\" />
+        <div className="container mx-auto px-4">
+          <div className="max-w-xl mx-auto animate-fade-in">
+            {gate.state === "account-loading" ? (
+              <WalletStateLoadingPanel message="Verifying your wallet..." />
             ) : (
               <WalletStatePanel
                 state={gate.state}
@@ -102,13 +87,13 @@ export default function EditProjectPage() {
   if (loading) {
     return (
       <main className={pageClass}>
-        <div className=\"container mx-auto px-4\">
-          <div className=\"max-w-2xl mx-auto animate-pulse space-y-4\">
-            <div className=\"h-8 bg-zinc-200 dark:bg-zinc-800 rounded\" />
-            <div className=\"h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3\" />
-            <div className=\"h-12 bg-zinc-200 dark:bg-zinc-800 rounded\" />
-            <div className=\"h-12 bg-zinc-200 dark:bg-zinc-800 rounded\" />
-            <div className=\"h-24 bg-zinc-200 dark:bg-zinc-800 rounded\" />
+        <div className="container mx-auto px-4">
+          <div className="max-w-2xl mx-auto animate-pulse space-y-4">
+            <div className="h-8 bg-zinc-200 dark:bg-zinc-800 rounded" />
+            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3" />
+            <div className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded" />
+            <div className="h-12 bg-zinc-200 dark:bg-zinc-800 rounded" />
+            <div className="h-24 bg-zinc-200 dark:bg-zinc-800 rounded" />
           </div>
         </div>
       </main>
@@ -118,15 +103,15 @@ export default function EditProjectPage() {
   if (error || !project) {
     return (
       <main className={pageClass}>
-        <div className=\"container mx-auto px-4\">
-          <Card className=\"max-w-2xl mx-auto p-8 text-center\">
-            <AlertTriangle className=\"w-12 h-12 text-red-500 mx-auto mb-4\" />
-            <h2 className=\"text-2xl font-bold mb-2\">{error ? \"Error\" : \"Project Not Found\"}</h2>
-            <p className=\"text-zinc-600 dark:text-zinc-400 mb-6\">
-              {error ?? \"The project you're trying to edit doesn't exist.\"}
+        <div className="container mx-auto px-4">
+          <Card className="max-w-2xl mx-auto p-8 text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">{error ? "Error" : "Project Not Found"}</h2>
+            <p className="text-zinc-600 dark:text-zinc-400 mb-6">
+              {error ?? "The project you're trying to edit doesn't exist."}
             </p>
             <Button onClick={() => router.back()}>
-              <ArrowLeft className=\"w-4 h-4 mr-2\" />
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Go Back
             </Button>
           </Card>
@@ -138,15 +123,15 @@ export default function EditProjectPage() {
   if (gate.publicKey && project.owner !== gate.publicKey) {
     return (
       <main className={pageClass}>
-        <div className=\"container mx-auto px-4\">
-          <Card className=\"max-w-2xl mx-auto p-8 text-center\">
-            <AlertTriangle className=\"w-12 h-12 text-red-500 mx-auto mb-4\" />
-            <h2 className=\"text-2xl font-bold mb-2\">Access Denied</h2>
-            <p className=\"text-zinc-600 dark:text-zinc-400 mb-6\">
+        <div className="container mx-auto px-4">
+          <Card className="max-w-2xl mx-auto p-8 text-center">
+            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+            <p className="text-zinc-600 dark:text-zinc-400 mb-6">
               Only the project owner can edit this project.
             </p>
             <Button onClick={() => router.back()}>
-              <ArrowLeft className=\"w-4 h-4 mr-2\" />
+              <ArrowLeft className="w-4 h-4 mr-2" />
               Go Back
             </Button>
           </Card>
@@ -157,9 +142,10 @@ export default function EditProjectPage() {
 
   return (
     <main className={pageClass}>
-      <div className=\"container mx-auto px-4\">
+      <div className="container mx-auto px-4">
         <ProjectForm
-          mode=\"edit\"
+          mode="edit"
+          projectId={projectId}
           initialData={{
             name: project.name,
             category: project.category,
@@ -169,8 +155,6 @@ export default function EditProjectPage() {
             logoUrl: project.logoUrl,
             docsUrl: project.docsUrl,
           }}
-          projectId={projectId}
-          onSubmit={handleUpdate}
         />
       </div>
     </main>

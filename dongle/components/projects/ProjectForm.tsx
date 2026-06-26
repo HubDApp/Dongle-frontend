@@ -8,9 +8,10 @@ import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { sorobanService } from "@/services/stellar/soroban.service";
-import { toast } from "sonner";
 import { Rocket, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
+import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -69,10 +70,12 @@ type ProjectFormProps = {
 export default function ProjectForm({
   mode = "create",
   initialData,
+  projectId,
   onSubmit: customOnSubmit,
-}: Omit<ProjectFormProps, "projectId"> & { projectId?: string } = {}) {
+}: ProjectFormProps = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const { progress, run, retry, isInProgress } = useOnChainTransaction();
 
   const isMountedRef = React.useRef(true);
   const redirectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,25 +121,22 @@ export default function ProjectForm({
     }
 
     setIsSubmitting(true);
-    const promise = sorobanService.registerProject(payload);
-
-    toast.promise(promise, {
-      loading: "Registering your project on-chain...",
-      success: (res) => {
-        if (isMountedRef.current) {
-          setIsSubmitting(false);
-          reset();
-        }
-        redirectTimerRef.current = setTimeout(() => router.push("/"), 2000);
-        return `Project registered successfully! Tx: ${res.hash.substring(0, 8)}...`;
-      },
-      error: (err) => {
-        if (isMountedRef.current) {
-          setIsSubmitting(false);
-        }
-        return `Registration failed: ${err.message}`;
-      },
+    const result = await run((onPhaseChange) => {
+      if (mode === "edit" && projectId) {
+        return sorobanService.updateProject(projectId, payload, { onPhaseChange });
+      }
+      return sorobanService.registerProject(payload, { onPhaseChange });
     });
+    if (isMountedRef.current) {
+      setIsSubmitting(false);
+    }
+
+    if (result && isMountedRef.current) {
+      reset();
+      const redirectPath =
+        mode === "edit" && projectId ? `/projects/${projectId}` : "/";
+      redirectTimerRef.current = setTimeout(() => router.push(redirectPath), 1500);
+    }
   };
 
   return (
@@ -214,17 +214,27 @@ export default function ProjectForm({
 
         <Button
           type="submit"
-          isLoading={isSubmitting}
+          isLoading={isSubmitting || isInProgress}
           className="w-full"
           size="lg"
           rightIcon={<CheckCircle2 className="w-5 h-5" />}
         >
-          {isSubmitting
+          {isSubmitting || isInProgress
             ? "Processing Transaction..."
             : mode === "edit"
             ? "Update Project"
             : "Submit Registration"}
         </Button>
+
+        {progress.phase !== "idle" && (
+          <TransactionProgressPanel
+            progress={progress}
+            onRetry={() => {
+              setIsSubmitting(true);
+              void retry().finally(() => setIsSubmitting(false));
+            }}
+          />
+        )}
 
         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 px-8">
           {mode === "edit"
