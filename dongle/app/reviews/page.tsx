@@ -24,6 +24,7 @@ export default function ReviewsPage() {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [selectedProject, setSelectedProject] = useState<ReviewProject | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "helpfulness">("recent");
+  const [projectFilter, setProjectFilter] = useState<string>("all");
   const [showWalletGate, setShowWalletGate] = useState(false);
 
   const handleAddReview = (project: ReviewProject) => {
@@ -52,13 +53,15 @@ export default function ReviewsPage() {
         description: project.description,
         rating: project.rating,
         reviews: project.reviews,
+        createdAt: project.createdAt,
       } : {
         id: review.projectId,
         name: review.projectName,
-        category: "",
+        category: "DeFi / DEX",
         description: "",
         rating: 0,
         reviews: 0,
+        createdAt: new Date().toISOString(),
       }
     );
   };
@@ -142,7 +145,10 @@ export default function ReviewsPage() {
   };
 
   const sortedReviews = useMemo(() => {
-    const list = [...reviews];
+    let list = [...reviews];
+    if (projectFilter !== "all") {
+      list = list.filter((r) => r.projectId === projectFilter);
+    }
     if (sortBy === "helpfulness") {
       return list.sort((a, b) => {
         const votesA = a.helpfulVotes?.length || 0;
@@ -154,10 +160,11 @@ export default function ReviewsPage() {
       });
     }
     return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [reviews, sortBy]);
+  }, [reviews, sortBy, projectFilter]);
 
   // Get top projects from service for quick review buttons
-  const topProjects = projectService.getAllProjects().slice(0, 6);
+  const allProjects = projectService.getAllProjects();
+  const topProjects = allProjects.slice(0, 6);
 
   const walletBlocked =
     showWalletGate && gate.state !== "ready" && gate.state !== "account-loading";
@@ -186,6 +193,7 @@ export default function ReviewsPage() {
                     description: p.description,
                     rating: p.rating,
                     reviews: p.reviews,
+                    createdAt: p.createdAt,
                   })}
                   className="text-xs font-bold px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
                 >
@@ -244,16 +252,33 @@ export default function ReviewsPage() {
                 <span className="w-2 h-8 bg-blue-500 rounded-full" />
                 {sortBy === "helpfulness" ? "Most Helpful Reviews" : "Recent Activity"}
               </h2>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-zinc-500">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as "recent" | "helpfulness")}
-                  className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
-                >
-                  <option value="recent">Recent</option>
-                  <option value="helpfulness">Most Helpful</option>
-                </select>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-500 whitespace-nowrap">Filter by:</span>
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => setProjectFilter(e.target.value)}
+                    className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold max-w-[150px] truncate"
+                  >
+                    <option value="all">All Projects</option>
+                    {allProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-zinc-500 whitespace-nowrap">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as "recent" | "helpfulness")}
+                    className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
+                  >
+                    <option value="recent">Recent</option>
+                    <option value="helpfulness">Most Helpful</option>
+                  </select>
+                </div>
               </div>
             </div>
 

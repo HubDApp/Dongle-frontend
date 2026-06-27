@@ -27,7 +27,10 @@ import {
   MessageSquare,
   Calendar,
   AlertCircle,
+  Info,
 } from "lucide-react";
+import { toast } from "sonner";
+import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -45,6 +48,8 @@ export default function ProjectDetailPage() {
   const [showWalletGate, setShowWalletGate] = useState(false);
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
 
   useEffect(() => {
     // Simulate data loading
@@ -63,14 +68,50 @@ export default function ProjectDetailPage() {
     return () => clearTimeout(timer);
   }, [projectId]);
 
+  const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
+
   const handleAddReview = () => {
     if (gate.state !== "ready") {
       setShowWalletGate(true);
       return;
     }
+    if (isOwner) {
+      toast.error("You cannot review your own project.");
+      return;
+    }
     setIsAddingReview(true);
     setShowWalletGate(false);
   };
+
+  const handleReportSubmit = (data: { reason: string; explanation: string }) => {
+    console.log("Reported:", project?.id, data);
+    setIsReporting(false);
+    toast.success("Project reported successfully");
+  };
+
+  const ratingDistribution = React.useMemo(() => {
+    const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    reviews.forEach((r) => {
+      if (r.rating >= 1 && r.rating <= 5) {
+        dist[r.rating as keyof typeof dist]++;
+      }
+    });
+    return dist;
+  }, [reviews]);
+
+  const sortedReviews = React.useMemo(() => {
+    let list = [...reviews];
+    if (reviewSort === "mine") {
+      list = list.filter((r) => r.userAddress === gate.publicKey);
+    } else if (reviewSort === "highest") {
+      list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (reviewSort === "lowest") {
+      list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return list;
+  }, [reviews, reviewSort, gate.publicKey]);
 
   const handleEdit = (review: Review) => {
     setEditingReview(review);
@@ -248,21 +289,72 @@ export default function ProjectDetailPage() {
 
               {/* Reviews Section */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <MessageSquare className="w-6 h-6" />
                     Reviews
                   </h2>
-                  {!isAddingReview && (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={handleAddReview}
+                  <div className="flex gap-2">
+                    <select
+                      value={reviewSort}
+                      onChange={(e) => setReviewSort(e.target.value as any)}
+                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
-                      Write a Review
-                    </Button>
-                  )}
+                      <option value="newest">Newest First</option>
+                      <option value="highest">Highest Rating</option>
+                      <option value="lowest">Lowest Rating</option>
+                      {gate.publicKey && <option value="mine">My Reviews</option>}
+                    </select>
+                    {!isAddingReview && !isOwner && (
+                      <Button
+                        variant="primary"
+                        onClick={handleAddReview}
+                      >
+                        Write a Review
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                {reviews.length > 0 && (
+                  <div className="mb-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row gap-8 items-center">
+                    <div className="text-center md:text-left">
+                      <div className="text-5xl font-black mb-1">{project?.rating}</div>
+                      <div className="flex items-center justify-center md:justify-start gap-1 mb-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} className={`w-4 h-4 ${star <= (project?.rating || 0) ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-300 dark:text-zinc-700'}`} />
+                        ))}
+                      </div>
+                      <div className="text-sm text-zinc-500 dark:text-zinc-400">{reviews.length} total reviews</div>
+                    </div>
+                    <div className="flex-1 w-full max-w-sm space-y-2">
+                      {[5, 4, 3, 2, 1].map((star) => {
+                        const count = ratingDistribution[star as keyof typeof ratingDistribution];
+                        const percentage = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
+                        return (
+                          <div key={star} className="flex items-center gap-3 text-sm">
+                            <div className="w-12 text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
+                              {star} <Star className="w-3 h-3" />
+                            </div>
+                            <div className="flex-1 h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                              <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${percentage}%` }} />
+                            </div>
+                            <div className="w-10 text-right text-zinc-500 dark:text-zinc-400">
+                              {percentage}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {isOwner && (
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 text-sm flex items-start gap-3">
+                    <Info className="w-5 h-5 shrink-0 mt-0.5" />
+                    <p>As the creator of this project, you cannot submit public reviews or ratings for it. We encourage you to reply to user feedback in the community.</p>
+                  </div>
+                )}
 
                 {/* Soft gate banner for disconnected users */}
                 {gate.state === "disconnected" && !showWalletGate && (
@@ -303,7 +395,7 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
                 <ReviewList
-                  reviews={reviews}
+                  reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
@@ -362,11 +454,25 @@ export default function ProjectDetailPage() {
                   >
                     Request Verification
                   </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
+                    onClick={() => setIsReporting(true)}
+                  >
+                    Report Project
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        <ReportProjectModal
+          isOpen={isReporting}
+          projectName={project?.name || ""}
+          onClose={() => setIsReporting(false)}
+          onSubmit={handleReportSubmit}
+        />
       </main>
   );
 }
