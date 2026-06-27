@@ -148,7 +148,10 @@ describe("Discover-to-Detail Navigation Data Contract", () => {
       for (const project of searchResults.slice(0, 3)) {
         const detailProject = projectService.getProjectById(project.id);
         expect(detailProject).toBeDefined();
-        expect(detailProject?.name.toLowerCase()).toContain(searchTerm.toLowerCase());
+        const matchesName = detailProject?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesDesc = detailProject?.description.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesTags = detailProject?.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+        expect(matchesName || matchesDesc || matchesTags).toBe(true);
       }
     });
   });

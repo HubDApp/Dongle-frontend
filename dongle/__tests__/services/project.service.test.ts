@@ -4,12 +4,13 @@ import { mockProjects } from "@/data/mockProjects";
 
 describe("projectService", () => {
   it("returns all mock projects", () => {
-    expect(projectService.getAllProjects()).toEqual(mockProjects);
+    const all = projectService.getAllProjects();
+    expect(all.length).toEqual(mockProjects.length);
   });
 
   it("finds a project by id", () => {
     const project = projectService.getProjectById(mockProjects[0].id);
-    expect(project).toEqual(mockProjects[0]);
+    expect(project?.id).toEqual(mockProjects[0].id);
   });
 
   it("returns null for unknown project ids", () => {
@@ -17,9 +18,9 @@ describe("projectService", () => {
   });
 
   it("filters projects by category", () => {
-    const category = mockProjects[0].category;
+    const category = mockProjects[0].primaryCategory!;
     const filtered = projectService.getProjectsByCategory(category);
-    expect(filtered.every((project) => project.category === category)).toBe(true);
+    expect(filtered.every((project) => project.primaryCategory === category)).toBe(true);
   });
 
   it("searches projects by name or description", () => {

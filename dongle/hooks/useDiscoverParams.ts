@@ -11,6 +11,7 @@ export interface DiscoverParams {
   /** The debounced value used for filtering — lags searchInput by DEBOUNCE_MS */
   searchQuery: string;
   category: string;
+  tags: string[];
   sortBy: SortBy;
   page: number;
 }
@@ -18,6 +19,7 @@ export interface DiscoverParams {
 export interface DiscoverParamsActions {
   setSearchInput: (value: string) => void;
   setCategory: (value: string) => void;
+  setTags: (tags: string[]) => void;
   setSortBy: (value: SortBy) => void;
   loadNextPage: () => void;
   clearFilters: () => void;
@@ -33,6 +35,11 @@ function parseSort(raw: string | null): SortBy {
 function parsePage(raw: string | null): number {
   const n = parseInt(raw ?? "1", 10);
   return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function parseTags(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw.split(",").filter(Boolean);
 }
 
 /**
@@ -52,6 +59,7 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
   // Read initial values from URL once
   const urlQuery = searchParams.get("q") ?? "";
   const urlCategory = searchParams.get("category") ?? "All";
+  const urlTags = parseTags(searchParams.get("tags"));
   const urlSort = parseSort(searchParams.get("sort"));
   const urlPage = parsePage(searchParams.get("page"));
 
@@ -73,7 +81,7 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
 
   /** Push a new URL with the supplied params merged on top of the current ones */
   const pushParams = useCallback(
-    (updates: Partial<Record<"q" | "category" | "sort" | "page", string>>) => {
+    (updates: Partial<Record<"q" | "category" | "tags" | "sort" | "page", string>>) => {
       const params = new URLSearchParams(searchParams.toString());
 
       for (const [key, value] of Object.entries(updates)) {
@@ -82,6 +90,7 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
           if (
             (key === "q" && value === "") ||
             (key === "category" && value === "All") ||
+            (key === "tags" && value === "") ||
             (key === "sort" && value === "rating") ||
             (key === "page" && value === "1")
           ) {
@@ -122,6 +131,13 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
     [pushParams],
   );
 
+  const setTags = useCallback(
+    (tags: string[]) => {
+      pushParams({ tags: tags.join(","), page: "1" });
+    },
+    [pushParams],
+  );
+
   const setSortBy = useCallback(
     (value: SortBy) => {
       pushParams({ sort: value, page: "1" });
@@ -151,10 +167,12 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
     searchInput,
     searchQuery,
     category: urlCategory,
+    tags: urlTags,
     sortBy: urlSort,
     page: urlPage,
     setSearchInput,
     setCategory,
+    setTags,
     setSortBy,
     loadNextPage,
     clearFilters,

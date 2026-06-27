@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Search, Filter } from "lucide-react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
+import { TagInput } from "@/components/ui/TagInput";
 
 const ITEMS_PER_PAGE = 9;
 
@@ -21,10 +22,12 @@ function DiscoverContent() {
     searchInput,
     searchQuery,
     category,
+    tags,
     sortBy,
     page,
     setSearchInput,
     setCategory,
+    setTags,
     setSortBy,
     loadNextPage,
     clearFilters,
@@ -44,12 +47,16 @@ function DiscoverContent() {
       : projectService.getAllProjects();
 
     if (category !== "All") {
-      result = result.filter((p) => p.category === category);
+      result = result.filter((p) => p.primaryCategory === category);
+    }
+    
+    if (tags && tags.length > 0) {
+      result = result.filter((p) => tags.every((t) => p.tags?.includes(t)));
     }
 
     result = projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, category, sortBy]);
+  }, [searchQuery, category, tags, sortBy]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -132,6 +139,16 @@ function DiscoverContent() {
                 <option value="newest">Newest</option>
               </select>
             </div>
+          </div>
+          
+          {/* Tags filtering */}
+          <div className="mt-4 max-w-xl">
+             <TagInput
+               label="Filter by Tags"
+               tags={tags}
+               onChange={setTags}
+               placeholder="Add tags to filter..."
+             />
           </div>
         </div>
 

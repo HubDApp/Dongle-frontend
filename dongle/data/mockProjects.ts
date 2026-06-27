@@ -12,6 +12,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Soroban Swap",
     category: PROJECT_CATEGORIES.DEFI,
+    primaryCategory: PROJECT_CATEGORIES.DEFI,
+    tags: ["DEX", "AMM"],
     description: "Next-generation automated market maker on Soroban.",
     rating: 4.8,
     reviews: 124,
@@ -22,6 +24,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Stellar Guardians",
     category: PROJECT_CATEGORIES.GAMING,
+    primaryCategory: PROJECT_CATEGORIES.GAMING,
+    tags: ["Strategy", "P2E"],
     description: "A decentralized strategy game with on-chain assets.",
     rating: 4.5,
     reviews: 89,
@@ -31,6 +35,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Anchor Connect",
     category: PROJECT_CATEGORIES.INFRASTRUCTURE,
+    primaryCategory: PROJECT_CATEGORIES.INFRASTRUCTURE,
+    tags: ["On-ramp", "SDK"],
     description: "Seamless on/off ramp protocol for Stellar anchors.",
     rating: 4.9,
     reviews: 210,
@@ -39,17 +45,20 @@ const baseProjects: Partial<Project>[] = [
     docsUrl: "https://docs.anchor-connect.example.com",
   },
   {
-    name: "Lumen Lend",
-    category: PROJECT_CATEGORIES.DEFI,
-    description: "Decentralized lending and borrowing protocol for Stellar assets.",
-    rating: 4.2,
-    reviews: 45,
-    websiteUrl: "https://lumen-lend.example.com",
-    githubUrl: "https://github.com/example/lumen-lend",
+    name: "XLM Pay",
+    category: PROJECT_CATEGORIES.PAYMENTS,
+    primaryCategory: PROJECT_CATEGORIES.PAYMENTS,
+    tags: ["Payments", "Cross-border"],
+    description: "Instant cross-border payments powered by Stellar.",
+    rating: 4.6,
+    reviews: 175,
+    websiteUrl: "https://xlm-pay.example.com",
   },
   {
     name: "DAO Builder",
     category: PROJECT_CATEGORIES.DAO,
+    primaryCategory: PROJECT_CATEGORIES.DAO,
+    tags: ["Governance", "No-code"],
     description: "Create and manage your decentralized autonomous organization easily.",
     rating: 4.6,
     reviews: 156,
@@ -60,6 +69,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Stellar Social",
     category: PROJECT_CATEGORIES.DAO,
+    primaryCategory: PROJECT_CATEGORIES.DAO,
+    tags: ["Social", "Web3"],
     description: "A censorship-resistant social network powered by Soroban.",
     rating: 4.1,
     reviews: 32,
@@ -68,6 +79,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "NFT Market",
     category: PROJECT_CATEGORIES.GAMING,
+    primaryCategory: PROJECT_CATEGORIES.GAMING,
+    tags: ["NFT", "Marketplace"],
     description: "Buy, sell, and discover exclusive digital items and NFTs.",
     rating: 4.7,
     reviews: 305,
@@ -77,6 +90,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Token Forge",
     category: PROJECT_CATEGORIES.INFRASTRUCTURE,
+    primaryCategory: PROJECT_CATEGORIES.INFRASTRUCTURE,
+    tags: ["Tokens", "Minting"],
     description: "No-code platform to mint and manage Stellar tokens.",
     rating: 4.4,
     reviews: 88,
@@ -87,6 +102,8 @@ const baseProjects: Partial<Project>[] = [
   {
     name: "Yield Farm",
     category: PROJECT_CATEGORIES.DEFI,
+    primaryCategory: PROJECT_CATEGORIES.DEFI,
+    tags: ["Yield", "Auto-compounding"],
     description: "Maximize your returns with automated yield farming strategies.",
     rating: 4.3,
     reviews: 112,
@@ -104,11 +121,13 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
     return {
       id: `proj-${i}`,
       name: iteration === 0 ? base.name! : `${base.name} V${iteration + 1}`,
-      category: base.category!,
+      category: base.category,
+      primaryCategory: base.primaryCategory!,
+      tags: base.tags || [],
       description: base.description!,
       // Add some variance to ratings and reviews for sorting testing
       rating: Number(
-        Math.max(1, base.rating! - iteration * 0.1 + Math.sin(i) * 0.5).toFixed(
+        Math.min(5, Math.max(1, base.rating! - iteration * 0.1 + Math.sin(i) * 0.5)).toFixed(
           1,
         ),
       ),

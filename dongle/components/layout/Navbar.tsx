@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
 
@@ -22,6 +22,9 @@ export default function Navbar() {
     disconnectWallet,
   } = useWallet();
 
+  const menuRef = useRef<HTMLDivElement>(null);
+  const toggleBtnRef = useRef<HTMLButtonElement>(null);
+
   const navLinks = [
     { href: "/discover", label: "Discover" },
     { href: "/reviews", label: "Reviews" },
@@ -31,6 +34,59 @@ export default function Navbar() {
   ];
 
   const isActive = (href: string) => pathname === href;
+
+  // Close menu on route changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional on route change
+    setIsMenuOpen(false);
+  }, [pathname]);
+
+  // Focus trap and escape key handler
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsMenuOpen(false);
+        // Return focus to toggle button when closed via Escape
+        toggleBtnRef.current?.focus();
+        return;
+      }
+
+      if (e.key === "Tab" && menuRef.current) {
+        const focusable = menuRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        // Include toggle button in focus loop for mobile
+        const elements = [toggleBtnRef.current, ...Array.from(focusable)].filter(Boolean) as HTMLElement[];
+        
+        if (elements.length === 0) return;
+
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last?.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first?.focus();
+          }
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
@@ -121,11 +177,12 @@ export default function Navbar() {
 
           {/* Mobile menu button */}
           <button
+            ref={toggleBtnRef}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMenuOpen}
             aria-controls="mobile-menu"
-            className="md:hidden p-2 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+            className="md:hidden p-2 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           >
             {isMenuOpen ? (
               <X className="w-5 h-5" />
@@ -138,13 +195,17 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div id="mobile-menu" className="md:hidden bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800">
+        <div 
+          id="mobile-menu" 
+          ref={menuRef}
+          aria-hidden={!isMenuOpen}
+          className="md:hidden bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800"
+        >
           <div className="px-4 py-4 space-y-2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                onClick={() => setIsMenuOpen(false)}
                 className={`block py-2 text-sm font-medium transition-colors ${
                   isActive(link.href)
                     ? "text-black dark:text-white"
@@ -157,7 +218,6 @@ export default function Navbar() {
             {isConnected && (
               <Link
                 href="/admin"
-                onClick={() => setIsMenuOpen(false)}
                 className={`block py-2 text-sm font-medium transition-colors ${
                   isActive("/admin")
                     ? "text-black dark:text-white"
