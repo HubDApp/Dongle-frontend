@@ -49,7 +49,8 @@ export default function ReviewsPage() {
       project ? {
         id: project.id,
         name: project.name,
-        category: project.category,
+        primaryCategory: project.primaryCategory,
+        tags: project.tags,
         description: project.description,
         rating: project.rating,
         reviews: project.reviews,
@@ -58,6 +59,8 @@ export default function ReviewsPage() {
         id: review.projectId,
         name: review.projectName,
         category: "DeFi / DEX",
+        primaryCategory: "DeFi / DEX", // Fallback
+        tags: [],
         description: "",
         rating: 0,
         reviews: 0,
@@ -189,7 +192,8 @@ export default function ReviewsPage() {
                   onClick={() => handleAddReview({
                     id: p.id,
                     name: p.name,
-                    category: p.category,
+                    primaryCategory: p.primaryCategory,
+                    tags: p.tags,
                     description: p.description,
                     rating: p.rating,
                     reviews: p.reviews,

@@ -68,7 +68,9 @@ export const CATEGORY_FORM_OPTIONS = [
 export interface Project {
   id: string;
   name: string;
-  category: ProjectCategory;
+  primaryCategory: ProjectCategory;
+  category?: ProjectCategory; // For backward compatibility/migration
+  tags?: string[];
   description: string;
   rating: number;
   reviews: number;

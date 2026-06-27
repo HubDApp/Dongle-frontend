@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
+import { TagInput } from "@/components/ui/TagInput";
 import { sorobanService } from "@/services/stellar/soroban.service";
+import { projectService } from "@/services/project/project.service";
 import { Rocket, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
@@ -15,8 +17,11 @@ import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
+import { CATEGORY_FORM_OPTIONS } from "@/types/project";
+import type { Project } from "@/types/project";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -45,11 +50,12 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
 
 const projectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
-  category: z.string().min(1, "Please select a category"),
+  primaryCategory: z.string().min(1, "Please select a category"),
+  tags: z.array(z.string()),
   description: z
     .string()
     .min(10, "Description must be at least 10 characters")
-    .max(500),
+    .max(500, "Description cannot exceed 500 characters"),
   websiteUrl: urlSchema,
   githubUrl: optionalUrlSchema,
   logoUrl: optionalUrlSchema,
@@ -58,11 +64,9 @@ const projectSchema = z.object({
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
 
-import { CATEGORY_FORM_OPTIONS } from "@/types/project";
-
 type ProjectFormProps = {
   mode?: "create" | "edit";
-  initialData?: Partial<ProjectFormValues>;
+  initialData?: Partial<ProjectFormValues> & { category?: string };
   projectId?: string;
   onSubmit?: (data: ProjectFormValues) => Promise<void>;
 };
@@ -74,19 +78,27 @@ export default function ProjectForm({
   onSubmit: customOnSubmit,
 }: ProjectFormProps = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    isOpen: boolean;
+    matches: Project[];
+    payload: ProjectFormValues & { domain?: string } | null;
+  }>({ isOpen: false, matches: [], payload: null });
+
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
 
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty },
     reset,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
       name: initialData?.name || "",
-      category: initialData?.category || "",
+      primaryCategory: initialData?.primaryCategory || initialData?.category || "",
+      tags: initialData?.tags || [],
       description: initialData?.description || "",
       websiteUrl: initialData?.websiteUrl || "",
       githubUrl: initialData?.githubUrl || "",
@@ -97,13 +109,8 @@ export default function ProjectForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
-  const onSubmit = useCallback(
-    async (data: ProjectFormValues) => {
-      const payload = {
-        ...data,
-        domain: extractDomain(data.websiteUrl),
-      };
-
+  const executeSubmit = useCallback(
+    async (payload: ProjectFormValues & { domain?: string }) => {
       if (customOnSubmit) {
         return customOnSubmit(payload);
       }
@@ -111,10 +118,15 @@ export default function ProjectForm({
       setIsSubmitting(true);
       try {
         const result = await run((onPhaseChange) => {
+          // Pass primaryCategory as category to the Soroban service to maintain contract compatibility
+          const contractPayload = {
+            ...payload,
+            category: payload.primaryCategory,
+          };
           if (mode === "edit" && projectId) {
-            return sorobanService.updateProject(projectId, payload, { onPhaseChange });
+            return sorobanService.updateProject(projectId, contractPayload, { onPhaseChange });
           }
-          return sorobanService.registerProject(payload, { onPhaseChange });
+          return sorobanService.registerProject(contractPayload, { onPhaseChange });
         });
 
         if (result) {
@@ -130,8 +142,50 @@ export default function ProjectForm({
     [customOnSubmit, mode, projectId, reset, router, run],
   );
 
+  const onPreSubmit = useCallback(
+    (data: ProjectFormValues) => {
+      const payload = {
+        ...data,
+        domain: extractDomain(data.websiteUrl),
+      };
+
+      const existingProjects = projectService.getAllProjects();
+      const normName = (str: string) => str.toLowerCase().trim();
+      const normUrl = (str: string) =>
+        str.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+      const duplicates = existingProjects.filter((existing) => {
+        if (mode === "edit" && existing.id === projectId) return false;
+
+        if (normName(existing.name) === normName(payload.name)) return true;
+        if (
+          existing.domain &&
+          payload.domain &&
+          normUrl(existing.domain) === normUrl(payload.domain)
+        )
+          return true;
+        if (
+          existing.githubUrl &&
+          payload.githubUrl &&
+          normUrl(existing.githubUrl) === normUrl(payload.githubUrl)
+        )
+          return true;
+
+        return false;
+      });
+
+      if (duplicates.length > 0) {
+        setDuplicateWarning({ isOpen: true, matches: duplicates, payload });
+        return;
+      }
+
+      void executeSubmit(payload);
+    },
+    [executeSubmit, mode, projectId],
+  );
+
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    void handleSubmit(onSubmit)(event);
+    void handleSubmit(onPreSubmit)(event);
   };
 
   return (
@@ -161,20 +215,36 @@ export default function ProjectForm({
           <FormField
             label="Project Name"
             placeholder="e.g. Soroban Swap"
+            maxLength={50}
             {...register("name")}
             error={errors.name?.message}
           />
           <SelectField
             label="Category"
             options={CATEGORY_FORM_OPTIONS}
-            {...register("category")}
-            error={errors.category?.message}
+            {...register("primaryCategory")}
+            error={errors.primaryCategory?.message}
           />
         </div>
+
+        <Controller
+          name="tags"
+          control={control}
+          render={({ field }) => (
+            <TagInput
+              label="Tags"
+              tags={field.value}
+              onChange={field.onChange}
+              error={errors.tags?.message}
+              placeholder="Add tags (press enter)"
+            />
+          )}
+        />
 
         <TextAreaField
           label="Description"
           placeholder="What does your project do? Keep it concise and engaging."
+          maxLength={500}
           {...register("description")}
           error={errors.description?.message}
         />
@@ -237,6 +307,26 @@ export default function ProjectForm({
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
         </p>
       </form>
+
+      <ConfirmDialog
+        isOpen={duplicateWarning.isOpen}
+        title="Possible Duplicate Detected"
+        description={`We found existing projects that look very similar to yours:\n\n${duplicateWarning.matches
+          .map((m) => `- ${m.name}`)
+          .join("\n")}\n\nAre you sure you want to continue with this submission?`}
+        confirmLabel="Continue Anyway"
+        cancelLabel="Cancel"
+        variant="warning"
+        onConfirm={() => {
+          setDuplicateWarning({ isOpen: false, matches: [], payload: null });
+          if (duplicateWarning.payload) {
+            void executeSubmit(duplicateWarning.payload);
+          }
+        }}
+        onCancel={() => {
+          setDuplicateWarning({ isOpen: false, matches: [], payload: null });
+        }}
+      />
     </Card>
   );
 }

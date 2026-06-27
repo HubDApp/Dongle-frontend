@@ -18,8 +18,10 @@ vi.mock("@/hooks/useDiscoverParams", () => ({
       searchInput,
       searchQuery,
       category,
+      tags: [],
       sortBy,
       page,
+      setTags: vi.fn(),
       setSearchInput: (value: string) => {
         setSearchInputState(value);
         setSearchQuery(value);
@@ -108,7 +110,7 @@ describe("Discover Page - High Risk Flows", () => {
 
       const project = mockProjects[0];
       expect(screen.getByText(project.name)).toBeInTheDocument();
-      expect(screen.getAllByText(project.category).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(project.primaryCategory!).length).toBeGreaterThan(0);
     });
 
     it("shows correct number of projects initially (pagination)", async () => {
@@ -192,7 +194,7 @@ describe("Discover Page - High Risk Flows", () => {
       expect(defiButton).toBeTruthy();
       fireEvent.click(defiButton!);
 
-      const defiProjects = mockProjects.filter((p) => p.category.includes("DeFi"));
+      const defiProjects = mockProjects.filter((p) => p.primaryCategory?.includes("DeFi"));
       expect(screen.getByText(defiProjects[0].name)).toBeInTheDocument();
     });
 

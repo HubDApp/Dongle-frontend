@@ -5,6 +5,7 @@ import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/revie
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { TextAreaField } from "@/components/ui/TextAreaField";
 
 interface ReviewFormProps {
   projectId: string;
@@ -118,24 +119,17 @@ export default function ReviewForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">
-            Comment ({comment.length}/{REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH})
-          </label>
-          <textarea
+          <TextAreaField
+            label="Comment"
             required
             value={comment}
+            maxLength={REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Share your experience with this project..."
-            className="w-full h-32 px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+            error={errors.find((e) => e.field === "comment")?.message}
+            className="h-32"
           />
-          <div className="flex justify-between items-start mt-2">
-            <div>
-              {errors.some((e) => e.field === "comment") && (
-                <p className="text-red-500 text-sm">
-                  {errors.find((e) => e.field === "comment")?.message}
-                </p>
-              )}
-            </div>
+          <div className="flex justify-end items-start mt-2">
             <p className="text-xs text-zinc-500">
               Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} chars
             </p>
