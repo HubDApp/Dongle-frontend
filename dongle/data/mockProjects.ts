@@ -141,7 +141,6 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       logoUrl: base.logoUrl,
       docsUrl: base.docsUrl,
       domain: base.websiteUrl ? extractDomain(base.websiteUrl) : undefined,
-      ownerAddress: base.ownerAddress || `GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890${i.toString().padStart(4, '0')}ABCDEFGHIJKLMNOPQR`,
     };
   },
 );
