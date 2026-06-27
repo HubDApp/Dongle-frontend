@@ -80,6 +80,7 @@ export interface Project {
   logoUrl?: string;
   docsUrl?: string;
   domain?: string;
+  ownerAddress?: string;
 }
 
 /**
