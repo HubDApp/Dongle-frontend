@@ -13,6 +13,8 @@ import ProjectImage from "@/components/projects/ProjectImage";
 import { Review } from "@/types/review";
 import { formatDate } from "@/lib/date";
 import { reviewService } from "@/services/review/review.service";
+import { sorobanService } from "@/services/stellar/soroban.service";
+import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import WalletStatePanel, {
@@ -50,6 +52,7 @@ export default function ProjectDetailPage() {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [isReporting, setIsReporting] = useState(false);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
+  const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
 
   useEffect(() => {
     // Simulate data loading
@@ -60,6 +63,16 @@ export default function ProjectDetailPage() {
       // Load reviews from shared service
       if (foundProject) {
         setReviews(reviewService.getReviewsByProject(foundProject.id));
+        // Fetch verification status
+        void (async () => {
+          try {
+            const status = await sorobanService.getVerificationStatus(projectId);
+            setVerificationStatus(status);
+          } catch (error) {
+            console.error("Failed to fetch verification status:", error);
+            setVerificationStatus("NONE");
+          }
+        })();
       }
 
       setIsLoading(false);
@@ -160,6 +173,34 @@ export default function ProjectDetailPage() {
     setEditingReview(null);
   };
 
+  const handleExternalLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+    e.preventDefault();
+    
+    // Check if the domain is verified and can bypass the warning
+    // Verified project domains can bypass the warning if approved (i.e. verificationStatus is VERIFIED).
+    const targetDomain = extractDomain(url);
+    const isVerifiedDomain = verificationStatus === "VERIFIED";
+
+    if (isVerifiedDomain) {
+      // Bypass the warning and open link safely
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Otherwise, show confirmation interstitial/modal
+    const ok = await confirm({
+      title: "External Link Safety Warning",
+      description: `You are about to visit the following external domain: ${targetDomain}.\nFull URL: ${url}\n\nMake sure you trust this site before proceeding.`,
+      confirmLabel: "Proceed to Site",
+      cancelLabel: "Stay Here",
+      variant: "warning",
+    });
+
+    if (ok) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
   if (isLoading) {
     return (
       <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
@@ -210,6 +251,31 @@ export default function ProjectDetailPage() {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
+
+          {/* Warning Banner */}
+          {verificationStatus === "REJECTED" && (
+            <div className="mb-6 p-5 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 rounded-3xl border border-red-200 dark:border-red-900/50 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+              <AlertCircle className="w-6 h-6 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
+              <div>
+                <h4 className="font-bold text-base mb-1">High Risk Warning: Rejected Project</h4>
+                <p className="text-sm opacity-90 leading-relaxed">
+                  This project was rejected by the community verification process. Please be extremely cautious: do not connect your wallet, share private keys, or interact with external links unless you are absolutely sure of its safety.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {(verificationStatus === "NONE" || verificationStatus === "PENDING") && (
+            <div className="mb-6 p-5 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 rounded-3xl border border-amber-200 dark:border-amber-900/50 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+              <Info className="w-6 h-6 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <h4 className="font-bold text-base mb-1">Unverified Project Context</h4>
+                <p className="text-sm opacity-90 leading-relaxed">
+                  This project has not completed the community verification process. It is currently unverified. Please exercise due diligence when interacting with the project and checking external resources.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -262,7 +328,8 @@ export default function ProjectDetailPage() {
                     <a
                       href={project.websiteUrl}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
+                      onClick={(e) => handleExternalLinkClick(e, project.websiteUrl!)}
                     >
                       <Button variant="outline" size="sm">
                         <Globe className="w-4 h-4 mr-2" />
@@ -275,7 +342,8 @@ export default function ProjectDetailPage() {
                     <a
                       href={project.githubUrl}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
+                      onClick={(e) => handleExternalLinkClick(e, project.githubUrl!)}
                     >
                       <Button variant="outline" size="sm">
                         <GitBranch className="w-4 h-4 mr-2" />
