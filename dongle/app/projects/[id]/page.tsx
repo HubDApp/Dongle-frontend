@@ -10,6 +10,7 @@ import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
+import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
 import { Review } from "@/types/review";
 import { formatDate } from "@/lib/date";
 import { reviewService } from "@/services/review/review.service";
@@ -613,6 +614,11 @@ export default function ProjectDetailPage() {
                 <h3 className="text-lg font-bold mb-4">Verification Status</h3>
                 <VerificationStatus initialProjectId={project.id} />
               </div>
+
+              {/* Repository Metadata */}
+              {project.githubUrl && (
+                <RepositoryMetadata githubUrl={project.githubUrl} />
+              )}
 
               {/* Quick Stats */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">

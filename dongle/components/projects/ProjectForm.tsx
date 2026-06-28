@@ -22,6 +22,7 @@ import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
+import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import { CATEGORY_FORM_OPTIONS } from "@/types/project";
 import type { Project } from "@/types/project";
 
@@ -50,6 +51,22 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
   }
 });
 
+const repositoryUrlSchema = z.string().transform((val, ctx) => {
+  if (val.trim().length === 0) return "";
+  
+  const validation = validateRepositoryUrl(val);
+  
+  if (!validation.isValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: validation.error || "Invalid repository URL",
+    });
+    return z.NEVER;
+  }
+  
+  return normalizeRepositoryUrl(val);
+});
+
 const projectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
   primaryCategory: z.string().min(1, "Please select a category"),
@@ -59,7 +76,7 @@ const projectSchema = z.object({
     .min(10, "Description must be at least 10 characters")
     .max(500, "Description cannot exceed 500 characters"),
   websiteUrl: urlSchema,
-  githubUrl: optionalUrlSchema,
+  githubUrl: repositoryUrlSchema,
   logoUrl: optionalUrlSchema,
   docsUrl: optionalUrlSchema,
 });
@@ -317,9 +334,10 @@ export default function ProjectForm({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             label="GitHub URL (Optional)"
-            placeholder="https://github.com/..."
+            placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
+            helperText="Supported: GitHub, GitLab, Bitbucket"
           />
           <FormField
             label="Logo URL (Optional)"
