@@ -30,9 +30,14 @@ import {
   Calendar,
   AlertCircle,
   Info,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { updateService } from "@/services/update/update.service";
+import { ProjectUpdate, UpdateType } from "@/types/update";
+import UpdateList from "@/components/updates/UpdateList";
+import UpdateForm from "@/components/updates/UpdateForm";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -53,6 +58,10 @@ export default function ProjectDetailPage() {
   const [isReporting, setIsReporting] = useState(false);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
+  const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
+  const [isAddingUpdate, setIsAddingUpdate] = useState(false);
+  const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
+  const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
 
   useEffect(() => {
     // Simulate data loading
@@ -63,6 +72,7 @@ export default function ProjectDetailPage() {
       // Load reviews from shared service
       if (foundProject) {
         setReviews(reviewService.getReviewsByProject(foundProject.id));
+        setUpdates(updateService.getUpdatesByProject(foundProject.id));
         // Fetch verification status
         void (async () => {
           try {
@@ -171,6 +181,68 @@ export default function ProjectDetailPage() {
   const handleCancelReview = () => {
     setIsAddingReview(false);
     setEditingReview(null);
+  };
+
+  const handleAddUpdate = () => {
+    setIsAddingUpdate(true);
+  };
+
+  const handleSubmitUpdate = (data: {
+    type: UpdateType;
+    title: string;
+    content: string;
+    version?: string;
+  }) => {
+    if (!gate.publicKey || !project) return;
+
+    if (editingUpdate) {
+      updateService.updateUpdate(editingUpdate.id, data, gate.publicKey);
+      toast.success("Update edited successfully");
+    } else {
+      updateService.addUpdate(
+        {
+          projectId: project.id,
+          ...data,
+        },
+        gate.publicKey
+      );
+      toast.success("Update published successfully");
+    }
+
+    setUpdates(updateService.getUpdatesByProject(projectId));
+    setIsAddingUpdate(false);
+    setEditingUpdate(null);
+  };
+
+  const handleCancelUpdate = () => {
+    setIsAddingUpdate(false);
+    setEditingUpdate(null);
+  };
+
+  const handleEditUpdate = (update: ProjectUpdate) => {
+    setEditingUpdate(update);
+    setIsAddingUpdate(true);
+  };
+
+  const handleDeleteUpdate = async (id: string) => {
+    if (!gate.publicKey) return;
+    const ok = await confirm({
+      title: "Delete update",
+      description:
+        "This will permanently remove this update. This action cannot be undone.",
+      confirmLabel: "Delete",
+      cancelLabel: "Cancel",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    try {
+      updateService.deleteUpdate(id, gate.publicKey);
+      setUpdates(updateService.getUpdatesByProject(projectId));
+      toast.success("Update deleted successfully");
+    } catch (error) {
+      toast.error("Failed to delete update");
+    }
   };
 
   const handleExternalLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
@@ -316,10 +388,73 @@ export default function ProjectDetailPage() {
 
                 {/* Description */}
                 <div className="mb-6">
-                  <h2 className="text-xl font-bold mb-3">About</h2>
-                  <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    {project.description}
-                  </p>
+                  <div className="flex items-center gap-4 mb-4 border-b border-zinc-200 dark:border-zinc-800">
+                    <button
+                      onClick={() => setActiveTab("about")}
+                      className={`pb-3 px-1 font-medium transition-colors relative ${
+                        activeTab === "about"
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      About
+                      {activeTab === "about" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("updates")}
+                      className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+                        activeTab === "updates"
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <Megaphone className="w-4 h-4" />
+                      Updates
+                      {updates.length > 0 && (
+                        <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                          {updates.length}
+                        </span>
+                      )}
+                      {activeTab === "updates" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+                      )}
+                    </button>
+                  </div>
+
+                  {activeTab === "about" && (
+                    <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      {project.description}
+                    </p>
+                  )}
+
+                  {activeTab === "updates" && (
+                    <div className="space-y-4">
+                      {isOwner && !isAddingUpdate && (
+                        <Button variant="primary" onClick={handleAddUpdate}>
+                          <Megaphone className="w-4 h-4 mr-2" />
+                          Post Update
+                        </Button>
+                      )}
+
+                      {isAddingUpdate && project && (
+                        <UpdateForm
+                          projectId={project.id}
+                          initialUpdate={editingUpdate || undefined}
+                          onSubmit={handleSubmitUpdate}
+                          onCancel={handleCancelUpdate}
+                        />
+                      )}
+
+                      <UpdateList
+                        updates={updates}
+                        canManage={isOwner}
+                        onEdit={handleEditUpdate}
+                        onDelete={handleDeleteUpdate}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Links */}
