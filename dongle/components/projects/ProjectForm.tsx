@@ -60,6 +60,8 @@ const projectSchema = z.object({
   githubUrl: optionalUrlSchema,
   logoUrl: optionalUrlSchema,
   docsUrl: optionalUrlSchema,
+  auditReportUrl: optionalUrlSchema,
+  bugBountyUrl: optionalUrlSchema,
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -104,6 +106,8 @@ export default function ProjectForm({
       githubUrl: initialData?.githubUrl || "",
       logoUrl: initialData?.logoUrl || "",
       docsUrl: initialData?.docsUrl || "",
+      auditReportUrl: initialData?.auditReportUrl || "",
+      bugBountyUrl: initialData?.bugBountyUrl || "",
     },
   });
 
@@ -274,6 +278,21 @@ export default function ProjectForm({
             placeholder="https://docs..."
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField
+            label="Audit Report URL (Optional)"
+            placeholder="https://..."
+            {...register("auditReportUrl")}
+            error={errors.auditReportUrl?.message}
+          />
+          <FormField
+            label="Bug Bounty URL (Optional)"
+            placeholder="https://..."
+            {...register("bugBountyUrl")}
+            error={errors.bugBountyUrl?.message}
           />
         </div>
 
