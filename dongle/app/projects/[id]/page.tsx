@@ -30,7 +30,8 @@ import {
   Calendar,
   AlertCircle,
   Info,
-  Megaphone,
+  Shield,
+  Bug,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
@@ -483,6 +484,34 @@ export default function ProjectDetailPage() {
                       <Button variant="outline" size="sm">
                         <GitBranch className="w-4 h-4 mr-2" />
                         GitHub
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </a>
+                  )}
+                  {project.auditReportUrl && (
+                    <a
+                      href={project.auditReportUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => handleExternalLinkClick(e, project.auditReportUrl!)}
+                    >
+                      <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50 dark:hover:bg-green-900/20">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Audit Report
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </a>
+                  )}
+                  {project.bugBountyUrl && (
+                    <a
+                      href={project.bugBountyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => handleExternalLinkClick(e, project.bugBountyUrl!)}
+                    >
+                      <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                        <Bug className="w-4 h-4 mr-2" />
+                        Bug Bounty
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Button>
                     </a>
