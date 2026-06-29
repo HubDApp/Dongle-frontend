@@ -4,14 +4,16 @@ import { Input } from "./Input";
 interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
+  helperText?: string;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, className = "", id, ...props }, ref) => {
+  ({ label, error, helperText, className = "", id, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
     const counterId = `${inputId}-counter`;
+    const helperId = `${inputId}-helper`;
 
     const [charCount, setCharCount] = React.useState(0);
 
@@ -65,7 +67,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           id={inputId}
           onChange={handleChange}
           aria-invalid={error || isAtLimit ? true : undefined}
-          aria-describedby={[error ? errorId : "", props.maxLength ? counterId : ""].filter(Boolean).join(" ") || undefined}
+          aria-describedby={[error ? errorId : "", props.maxLength ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
           {...props}
           className={`${className} ${
             error || isAtLimit ? "border-red-500/50 focus:border-red-500" : ""
@@ -74,6 +76,11 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         {error && (
           <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
             {error}
+          </span>
+        )}
+        {!error && helperText && (
+          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+            {helperText}
           </span>
         )}
       </div>
