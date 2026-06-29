@@ -79,6 +79,8 @@ export interface Project {
   githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
+  auditReportUrl?: string;
+  bugBountyUrl?: string;
   domain?: string;
   ownerAddress?: string;
 }
