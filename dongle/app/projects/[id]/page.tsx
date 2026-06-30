@@ -40,6 +40,7 @@ import { updateService } from "@/services/update/update.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
+import { VerificationBadge } from "@/components/projects/VerificationBadge";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -358,9 +359,14 @@ export default function ProjectDetailPage() {
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex-1">
-                    <Badge variant="primary" className="mb-3">
-                      {project.category}
-                    </Badge>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="primary">
+                        {project.category}
+                      </Badge>
+                      {verificationStatus && (
+                        <VerificationBadge status={verificationStatus} />
+                      )}
+                    </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>
                     <div className="flex items-center gap-6 text-sm text-zinc-500 dark:text-zinc-400">
                       <div className="flex items-center gap-2">

@@ -9,6 +9,8 @@ import { Search, Filter } from "lucide-react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
+import { sorobanService } from "@/services/stellar/soroban.service";
+import type { VerificationStatus } from "@/components/projects/VerificationBadge";
 
 const ITEMS_PER_PAGE = 9;
 
@@ -17,6 +19,8 @@ const ITEMS_PER_PAGE = 9;
 function DiscoverContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
+  const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
 
   const {
     searchInput,
@@ -33,10 +37,29 @@ function DiscoverContent() {
     clearFilters,
   } = useDiscoverParams();
 
-  // Simulate initial data fetch
+  // Fetch verification statuses for all projects
   useEffect(() => {
-    const timer = setTimeout(() => setIsInitialLoading(false), 800);
-    return () => clearTimeout(timer);
+    const fetchVerificationStatuses = async () => {
+      const projects = projectService.getAllProjects();
+      const statuses: Record<string, VerificationStatus> = {};
+      
+      await Promise.all(
+        projects.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id);
+            statuses[project.id] = status;
+          } catch (error) {
+            console.error(`Failed to fetch verification status for ${project.id}:`, error);
+            statuses[project.id] = "NONE";
+          }
+        })
+      );
+      
+      setVerificationStatuses(statuses);
+      setIsInitialLoading(false);
+    };
+
+    void fetchVerificationStatuses();
   }, []);
 
   const categories = projectService.getCategories();
@@ -54,9 +77,13 @@ function DiscoverContent() {
       result = result.filter((p) => tags.every((t) => p.tags?.includes(t)));
     }
 
+    if (verificationFilter !== "ALL") {
+      result = result.filter((p) => verificationStatuses[p.id] === verificationFilter);
+    }
+
     result = projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, category, tags, sortBy]);
+  }, [searchQuery, category, tags, sortBy, verificationFilter, verificationStatuses]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -127,6 +154,20 @@ function DiscoverContent() {
 
               <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-800 hidden lg:block mx-2" />
 
+              {/* Verification Filter */}
+              <select
+                value={verificationFilter}
+                onChange={(e) => setVerificationFilter(e.target.value as VerificationStatus | "ALL")}
+                disabled={isInitialLoading}
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">All Status</option>
+                <option value="VERIFIED">Verified</option>
+                <option value="PENDING">Pending</option>
+                <option value="NONE">Unverified</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+
               {/* Sort */}
               <select
                 value={sortBy}
@@ -163,7 +204,11 @@ function DiscoverContent() {
         ) : filteredCount > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard 
+                key={project.id} 
+                project={project}
+                verificationStatus={verificationStatuses[project.id]}
+              />
             ))}
           </div>
         ) : (
