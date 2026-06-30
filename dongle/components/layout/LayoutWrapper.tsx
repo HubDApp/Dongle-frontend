@@ -1,6 +1,9 @@
+"use client";
+
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import NetworkMismatchBanner from "./NetworkMismatchBanner";
+import { ComparisonFloatingButton } from "@/components/compare/ComparisonFloatingButton";
 
 interface LayoutWrapperProps {
   children: React.ReactNode;
@@ -15,6 +18,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         {children}
       </main>
       <Footer />
+      <ComparisonFloatingButton />
     </div>
   );
 }

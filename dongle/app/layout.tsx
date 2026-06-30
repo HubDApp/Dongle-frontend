@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "@/context/wallet.context";
 import { ConfirmDialogProvider } from "@/hooks/useConfirm";
+import { ComparisonProvider } from "@/context/comparison.context";
 import { Toaster } from "sonner";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 
@@ -35,7 +36,9 @@ export default function RootLayout({
       >
         <WalletProvider>
           <ConfirmDialogProvider>
-            <LayoutWrapper>{children}</LayoutWrapper>
+            <ComparisonProvider>
+              <LayoutWrapper>{children}</LayoutWrapper>
+            </ComparisonProvider>
           </ConfirmDialogProvider>
         </WalletProvider>
         <Toaster position="top-right" richColors />
