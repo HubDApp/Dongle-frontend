@@ -11,6 +11,9 @@ import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { useRecentViews } from "@/hooks/useRecentViews";
+import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 
 const ITEMS_PER_PAGE = 9;
 
@@ -21,6 +24,8 @@ function DiscoverContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
+  const gate = useWalletPageGate();
+  const { recentProjects, hasHistory } = useRecentViews(gate.publicKey || undefined);
 
   const {
     searchInput,
@@ -192,6 +197,16 @@ function DiscoverContent() {
              />
           </div>
         </div>
+
+        {/* Recently Viewed - Show above main content */}
+        {!isInitialLoading && hasHistory && (
+          <div className="mb-8">
+            <RecentlyViewedProjects
+              projects={recentProjects.slice(0, 5)}
+              compact
+            />
+          </div>
+        )}
 
         {/* Initial loading */}
         {isInitialLoading ? (

@@ -33,6 +33,7 @@ import {
   Info,
   Shield,
   Bug,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
@@ -41,6 +42,7 @@ import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import { recentViewsService } from "@/services/recent-views/recent-views.service";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -76,6 +78,10 @@ export default function ProjectDetailPage() {
       if (foundProject) {
         setReviews(reviewService.getReviewsByProject(foundProject.id));
         setUpdates(updateService.getUpdatesByProject(foundProject.id));
+        
+        // Track this project view
+        recentViewsService.addView(foundProject.id, gate.publicKey || undefined);
+        
         // Fetch verification status
         void (async () => {
           try {
@@ -92,7 +98,7 @@ export default function ProjectDetailPage() {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [projectId]);
+  }, [projectId, gate.publicKey]);
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
 

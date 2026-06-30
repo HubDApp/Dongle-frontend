@@ -26,6 +26,9 @@ import {
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
+import { useRecentViews } from "@/hooks/useRecentViews";
+import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
+import { useConfirm } from "@/hooks/useConfirm";
 
 interface StellarNonNativeBalance {
   asset_code?: string;
@@ -39,6 +42,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const gate = useWalletPageGate({ requireFundedAccount: true });
   const { balances } = useStellarAccount();
+  const confirm = useConfirm();
+  const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
 
@@ -49,6 +54,20 @@ export default function ProfilePage() {
   const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
   const loadingVerifications =
     Boolean(gate.publicKey) && loadedVerificationKey !== gate.publicKey;
+
+  const handleClearHistory = async () => {
+    const ok = await confirm({
+      title: "Clear viewing history",
+      description: "This will permanently remove your recently viewed projects. This action cannot be undone.",
+      confirmLabel: "Clear History",
+      cancelLabel: "Cancel",
+      variant: "danger",
+    });
+    
+    if (ok) {
+      clearHistory();
+    }
+  };
 
   useEffect(() => {
     if (!gate.publicKey) {
@@ -242,6 +261,14 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+
+              {/* Recently Viewed Projects */}
+              {hasHistory && (
+                <RecentlyViewedProjects
+                  projects={recentProjects}
+                  onClear={handleClearHistory}
+                />
+              )}
 
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-6">
