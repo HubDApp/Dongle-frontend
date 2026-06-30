@@ -16,6 +16,7 @@ import TransactionProgressPanel from "@/components/transactions/TransactionProgr
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 import { useDraft } from "@/hooks/useDraft";
 import { DraftIndicator } from "@/components/projects/DraftIndicator";
+import { SubmissionChecklist } from "@/components/projects/SubmissionChecklist";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -144,6 +145,9 @@ export default function ProjectForm({
   }, [draft.loadedDraft]);
 
   useUnsavedChanges(isDirty, isSubmitting);
+
+  // Watch form values for checklist
+  const watchedValues = watch();
 
   // Auto-save draft when form changes
   useEffect(() => {
@@ -288,6 +292,20 @@ export default function ProjectForm({
           hasDraft={draft.hasDraft}
           lastSaved={draft.lastSaved}
           onDiscard={handleDiscardDraft}
+        />
+
+        {/* Quality Checklist */}
+        <SubmissionChecklist
+          formData={{
+            name: watchedValues.name,
+            websiteUrl: watchedValues.websiteUrl,
+            githubUrl: watchedValues.githubUrl,
+            logoUrl: watchedValues.logoUrl,
+            docsUrl: watchedValues.docsUrl,
+            auditReportUrl: watchedValues.auditReportUrl,
+            bugBountyUrl: watchedValues.bugBountyUrl,
+            description: watchedValues.description,
+          }}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
