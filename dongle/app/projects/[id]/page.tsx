@@ -31,6 +31,12 @@ import {
   Calendar,
   AlertCircle,
   Info,
+  Bookmark,
+  BookmarkCheck,
+} from "lucide-react";
+import { toast } from "sonner";
+import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { useSavedProjects } from "@/hooks/useSavedProjects";
   Shield,
   Bug,
 } from "lucide-react";
@@ -50,6 +56,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const gate = useWalletPageGate();
   const confirm = useConfirm();
+  const { isProjectSaved, toggleSavedProject, canManageSavedProjects } = useSavedProjects();
   const projectId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +102,18 @@ export default function ProjectDetailPage() {
   }, [projectId]);
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
+  const isSaved = project ? isProjectSaved(project.id) : false;
+
+  const handleToggleSaved = () => {
+    if (!project) return;
+    if (!canManageSavedProjects) {
+      setShowWalletGate(true);
+      return;
+    }
+
+    const nextSaved = toggleSavedProject(project.id);
+    toast.success(nextSaved ? "Saved project" : "Removed from saved projects");
+  };
 
   const handleAddReview = () => {
     if (gate.state !== "ready") {
@@ -357,7 +376,7 @@ export default function ProjectDetailPage() {
             <div className="lg:col-span-2 space-y-8">
               {/* Project Header */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-start justify-between mb-6">
+                <div className="flex items-start justify-between mb-6 gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-3">
                       <Badge variant="primary">
@@ -384,6 +403,15 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   </div>
+                  <Button
+                    variant={isSaved ? "secondary" : "outline"}
+                    onClick={handleToggleSaved}
+                    disabled={!project}
+                    leftIcon={isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                    className="shrink-0"
+                  >
+                    {isSaved ? "Saved" : "Save"}
+                  </Button>
                 </div>
 
                 {/* Project Image */}
