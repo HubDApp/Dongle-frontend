@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -14,12 +14,15 @@ import { Rocket, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
+import { useDraft } from "@/hooks/useDraft";
+import { DraftIndicator } from "@/components/projects/DraftIndicator";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
+import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import { CATEGORY_FORM_OPTIONS } from "@/types/project";
 import type { Project } from "@/types/project";
 
@@ -48,6 +51,22 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
   }
 });
 
+const repositoryUrlSchema = z.string().transform((val, ctx) => {
+  if (val.trim().length === 0) return "";
+  
+  const validation = validateRepositoryUrl(val);
+  
+  if (!validation.isValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: validation.error || "Invalid repository URL",
+    });
+    return z.NEVER;
+  }
+  
+  return normalizeRepositoryUrl(val);
+});
+
 const projectSchema = z.object({
   name: z.string().min(3, "Project name must be at least 3 characters"),
   primaryCategory: z.string().min(1, "Please select a category"),
@@ -57,9 +76,11 @@ const projectSchema = z.object({
     .min(10, "Description must be at least 10 characters")
     .max(500, "Description cannot exceed 500 characters"),
   websiteUrl: urlSchema,
-  githubUrl: optionalUrlSchema,
+  githubUrl: repositoryUrlSchema,
   logoUrl: optionalUrlSchema,
   docsUrl: optionalUrlSchema,
+  auditReportUrl: optionalUrlSchema,
+  bugBountyUrl: optionalUrlSchema,
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -83,9 +104,14 @@ export default function ProjectForm({
     matches: Project[];
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], payload: null });
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
+  
+  // Draft management
+  const draft = useDraft({ mode, projectId, autoSave: true });
+  const [draftRestored, setDraftRestored] = React.useState(false);
 
   const {
     register,
@@ -93,6 +119,7 @@ export default function ProjectForm({
     control,
     formState: { errors, isDirty },
     reset,
+    watch,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -104,10 +131,27 @@ export default function ProjectForm({
       githubUrl: initialData?.githubUrl || "",
       logoUrl: initialData?.logoUrl || "",
       docsUrl: initialData?.docsUrl || "",
+      auditReportUrl: initialData?.auditReportUrl || "",
+      bugBountyUrl: initialData?.bugBountyUrl || "",
     },
   });
 
+  // Show notification when draft is restored
+  useEffect(() => {
+    if (draft.loadedDraft) {
+      setDraftRestored(true);
+    }
+  }, [draft.loadedDraft]);
+
   useUnsavedChanges(isDirty, isSubmitting);
+
+  // Auto-save draft when form changes
+  useEffect(() => {
+    const subscription = watch((formData) => {
+      draft.saveDraft(formData as ProjectFormValues);
+    });
+    return () => subscription.unsubscribe();
+  }, [watch, draft]);
 
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
@@ -130,6 +174,8 @@ export default function ProjectForm({
         });
 
         if (result) {
+          // Clear draft after successful submission
+          draft.clearDraft();
           reset();
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
@@ -139,7 +185,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run],
+    [customOnSubmit, mode, projectId, reset, router, run, draft],
   );
 
   const onPreSubmit = useCallback(
@@ -188,6 +234,26 @@ export default function ProjectForm({
     void handleSubmit(onPreSubmit)(event);
   };
 
+  const handleDiscardDraft = () => {
+    setDiscardDialogOpen(true);
+  };
+
+  const confirmDiscardDraft = () => {
+    draft.deleteDraft();
+    setDraftRestored(false);
+    reset({
+      name: initialData?.name || "",
+      primaryCategory: initialData?.primaryCategory || initialData?.category || "",
+      tags: initialData?.tags || [],
+      description: initialData?.description || "",
+      websiteUrl: initialData?.websiteUrl || "",
+      githubUrl: initialData?.githubUrl || "",
+      logoUrl: initialData?.logoUrl || "",
+      docsUrl: initialData?.docsUrl || "",
+    });
+    setDiscardDialogOpen(false);
+  };
+
   return (
     <Card
       variant="glass"
@@ -211,6 +277,19 @@ export default function ProjectForm({
       </div>
 
       <form onSubmit={handleFormSubmit} className="space-y-6">
+        {draftRestored && (
+          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Your previous draft has been restored</span>
+          </div>
+        )}
+
+        <DraftIndicator
+          hasDraft={draft.hasDraft}
+          lastSaved={draft.lastSaved}
+          onDiscard={handleDiscardDraft}
+        />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"
@@ -259,9 +338,10 @@ export default function ProjectForm({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             label="GitHub URL (Optional)"
-            placeholder="https://github.com/..."
+            placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
+            helperText="Supported: GitHub, GitLab, Bitbucket"
           />
           <FormField
             label="Logo URL (Optional)"
@@ -274,6 +354,21 @@ export default function ProjectForm({
             placeholder="https://docs..."
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField
+            label="Audit Report URL (Optional)"
+            placeholder="https://..."
+            {...register("auditReportUrl")}
+            error={errors.auditReportUrl?.message}
+          />
+          <FormField
+            label="Bug Bounty URL (Optional)"
+            placeholder="https://..."
+            {...register("bugBountyUrl")}
+            error={errors.bugBountyUrl?.message}
           />
         </div>
 
@@ -326,6 +421,17 @@ export default function ProjectForm({
         onCancel={() => {
           setDuplicateWarning({ isOpen: false, matches: [], payload: null });
         }}
+      />
+
+      <ConfirmDialog
+        isOpen={discardDialogOpen}
+        title="Discard Draft"
+        description="Are you sure you want to discard this draft? All unsaved changes will be lost."
+        confirmLabel="Discard Draft"
+        cancelLabel="Keep Draft"
+        variant="danger"
+        onConfirm={confirmDiscardDraft}
+        onCancel={() => setDiscardDialogOpen(false)}
       />
     </Card>
   );

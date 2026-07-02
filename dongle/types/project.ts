@@ -3,6 +3,8 @@
  * This is the single source of truth for project data structure and categories
  */
 
+import { RepositoryMetadata } from "./repository";
+
 export const PROJECT_CATEGORIES = {
   DEFI: "DeFi / DEX",
   GAMING: "Gaming / NFT",
@@ -79,8 +81,11 @@ export interface Project {
   githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
+  auditReportUrl?: string;
+  bugBountyUrl?: string;
   domain?: string;
   ownerAddress?: string;
+  repositoryMetadata?: RepositoryMetadata; // Cached repository metadata
 }
 
 /**
