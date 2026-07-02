@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
+import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
 import { Button } from "@/components/ui/Button";
@@ -23,12 +24,15 @@ import {
   Clock,
   XCircle,
   Package,
+  Bookmark,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useConfirm } from "@/hooks/useConfirm";
+import { ProjectCard } from "@/components/projects/ProjectCard";
+import { useSavedProjects } from "@/hooks/useSavedProjects";
 
 interface StellarNonNativeBalance {
   asset_code?: string;
@@ -44,6 +48,7 @@ export default function ProfilePage() {
   const { balances } = useStellarAccount();
   const confirm = useConfirm();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
+  const { savedProjectIds } = useSavedProjects();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
 
@@ -54,6 +59,9 @@ export default function ProfilePage() {
   const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
   const loadingVerifications =
     Boolean(gate.publicKey) && loadedVerificationKey !== gate.publicKey;
+  const savedProjects = savedProjectIds
+    .map((projectId) => projectService.getProjectById(projectId))
+    .filter((project): project is NonNullable<typeof project> => Boolean(project));
 
   const handleClearHistory = async () => {
     const ok = await confirm({
@@ -269,6 +277,37 @@ export default function ProfilePage() {
                   onClear={handleClearHistory}
                 />
               )}
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Bookmark className="w-6 h-6" />
+                    Saved Projects
+                  </h2>
+                  <Badge variant="secondary">{savedProjects.length}</Badge>
+                </div>
+
+                {savedProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {savedProjects.map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                    <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No saved projects yet. Bookmark projects to revisit them later.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push("/discover")}
+                      className="mt-4"
+                    >
+                      Browse Projects
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <div className="flex items-center justify-between mb-6">
