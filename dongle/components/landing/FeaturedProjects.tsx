@@ -5,6 +5,9 @@ import { useProjectFilters, type SortOption } from "@/hooks/useProjectFilters";
 import { ALL_CATEGORIES, type ProjectCategory } from "@/types/project";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import { ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { sorobanService } from "@/services/stellar/soroban.service";
+import type { VerificationStatus } from "@/components/projects/VerificationBadge";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "rating", label: "Top Rated" },
@@ -15,6 +18,31 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 export default function FeaturedProjects() {
   const { filters, filtered, setCategory, setSort, hydrated } =
     useProjectFilters(6);
+  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
+
+  // Fetch verification statuses for displayed projects
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      if (filtered.length === 0) return;
+      
+      const statuses: Record<string, VerificationStatus> = {};
+      await Promise.all(
+        filtered.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id);
+            statuses[project.id] = status;
+          } catch (error) {
+            console.error(`Failed to fetch verification status for ${project.id}:`, error);
+            statuses[project.id] = "NONE";
+          }
+        })
+      );
+      
+      setVerificationStatuses(statuses);
+    };
+
+    void fetchStatuses();
+  }, [filtered]);
 
   return (
     <section className="py-24 bg-zinc-50 dark:bg-zinc-950">
@@ -98,7 +126,11 @@ export default function FeaturedProjects() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {filtered.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard 
+                key={project.id} 
+                project={project}
+                verificationStatus={verificationStatuses[project.id]}
+              />
             ))}
           </div>
         )}

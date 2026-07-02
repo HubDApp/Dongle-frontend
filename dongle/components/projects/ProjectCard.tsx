@@ -5,13 +5,37 @@ import Link from "next/link";
 import { Project } from "@/types/project";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { formatDate } from "@/lib/date";
+import { Star } from "lucide-react";
+import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
 import { Bookmark, BookmarkCheck, Star } from "lucide-react";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 
 interface ProjectCardProps {
   project: Project;
+  verificationStatus?: VerificationStatus;
 }
 
+export const ProjectCard = ({ project, verificationStatus }: ProjectCardProps) => {
+  return (
+    <Link href={`/projects/${project.id}`} className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col cursor-pointer">
+      <ProjectImage
+        logoUrl={project.logoUrl}
+        name={project.name}
+        className="mb-6 shrink-0"
+        fallbackTextSize="text-lg"
+      />
+      <div className="flex justify-between items-start mb-2 gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+            {project.category}
+          </span>
+          {verificationStatus && (
+            <VerificationBadge status={verificationStatus} showIcon={false} />
+          )}
+        </div>
+        <div className="flex items-center gap-1 text-sm font-bold shrink-0">
+          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+          {project.rating}
 export const ProjectCard = ({ project }: ProjectCardProps) => {
   const { isProjectSaved, toggleSavedProject, canManageSavedProjects } = useSavedProjects();
   const isSaved = isProjectSaved(project.id);
