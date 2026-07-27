@@ -65,13 +65,14 @@ export const CATEGORY_FORM_OPTIONS = [
 ];
 
 /**
- * Canonical Project interface
+ * Canonical Project interface.
+ * Use `primaryCategory` everywhere — it holds the display-label form of the
+ * category (e.g. "DeFi / DEX"). Never store raw form values ("defi") here.
  */
 export interface Project {
   id: string;
   name: string;
   primaryCategory: ProjectCategory;
-  category?: ProjectCategory; // For backward compatibility/migration
   tags?: string[];
   description: string;
   rating: number;

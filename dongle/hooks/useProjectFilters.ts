@@ -77,7 +77,7 @@ export function useProjectFilters(limit?: number) {
     const result =
       filters.category === "All"
         ? [...projects]
-        : projects.filter((p) => p.category === filters.category);
+        : projects.filter((p) => p.primaryCategory === filters.category);
 
     switch (filters.sort) {
       case "rating":

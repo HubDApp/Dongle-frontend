@@ -11,7 +11,6 @@ const generateDate = (index: number) => {
 const baseProjects: Partial<Project>[] = [
   {
     name: "Soroban Swap",
-    category: PROJECT_CATEGORIES.DEFI,
     primaryCategory: PROJECT_CATEGORIES.DEFI,
     tags: ["DEX", "AMM"],
     description: "Next-generation automated market maker on Soroban.",
@@ -23,7 +22,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "Stellar Guardians",
-    category: PROJECT_CATEGORIES.GAMING,
     primaryCategory: PROJECT_CATEGORIES.GAMING,
     tags: ["Strategy", "P2E"],
     description: "A decentralized strategy game with on-chain assets.",
@@ -34,7 +32,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "Anchor Connect",
-    category: PROJECT_CATEGORIES.INFRASTRUCTURE,
     primaryCategory: PROJECT_CATEGORIES.INFRASTRUCTURE,
     tags: ["On-ramp", "SDK"],
     description: "Seamless on/off ramp protocol for Stellar anchors.",
@@ -46,7 +43,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "XLM Pay",
-    category: PROJECT_CATEGORIES.PAYMENTS,
     primaryCategory: PROJECT_CATEGORIES.PAYMENTS,
     tags: ["Payments", "Cross-border"],
     description: "Instant cross-border payments powered by Stellar.",
@@ -56,7 +52,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "DAO Builder",
-    category: PROJECT_CATEGORIES.DAO,
     primaryCategory: PROJECT_CATEGORIES.DAO,
     tags: ["Governance", "No-code"],
     description: "Create and manage your decentralized autonomous organization easily.",
@@ -68,7 +63,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "Stellar Social",
-    category: PROJECT_CATEGORIES.DAO,
     primaryCategory: PROJECT_CATEGORIES.DAO,
     tags: ["Social", "Web3"],
     description: "A censorship-resistant social network powered by Soroban.",
@@ -78,7 +72,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "NFT Market",
-    category: PROJECT_CATEGORIES.GAMING,
     primaryCategory: PROJECT_CATEGORIES.GAMING,
     tags: ["NFT", "Marketplace"],
     description: "Buy, sell, and discover exclusive digital items and NFTs.",
@@ -89,7 +82,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "Token Forge",
-    category: PROJECT_CATEGORIES.INFRASTRUCTURE,
     primaryCategory: PROJECT_CATEGORIES.INFRASTRUCTURE,
     tags: ["Tokens", "Minting"],
     description: "No-code platform to mint and manage Stellar tokens.",
@@ -101,7 +93,6 @@ const baseProjects: Partial<Project>[] = [
   },
   {
     name: "Yield Farm",
-    category: PROJECT_CATEGORIES.DEFI,
     primaryCategory: PROJECT_CATEGORIES.DEFI,
     tags: ["Yield", "Auto-compounding"],
     description: "Maximize your returns with automated yield farming strategies.",
@@ -121,7 +112,6 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
     return {
       id: `proj-${i}`,
       name: iteration === 0 ? base.name! : `${base.name} V${iteration + 1}`,
-      category: base.category,
       primaryCategory: base.primaryCategory!,
       tags: base.tags || [],
       description: base.description!,

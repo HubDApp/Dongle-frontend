@@ -2,20 +2,6 @@ import { mockProjects } from "@/data/mockProjects";
 import { Project } from "@/types/project";
 
 /**
- * Migrate a project ensuring primaryCategory and tags are present
- */
-const migrateProject = (p: Project): Project => {
-  const migrated = { ...p };
-  if (migrated.category && !migrated.primaryCategory) {
-    migrated.primaryCategory = migrated.category;
-  }
-  if (!migrated.tags) {
-    migrated.tags = migrated.category ? [migrated.category] : [];
-  }
-  return migrated;
-};
-
-/**
  * Unified project service that provides a single source of truth
  * for project data across the application
  */
@@ -24,7 +10,7 @@ export const projectService = {
    * Get all projects
    */
   getAllProjects(): Project[] {
-    return mockProjects.map(migrateProject);
+    return mockProjects;
   },
 
   /**
@@ -32,8 +18,7 @@ export const projectService = {
    * Returns null if project not found
    */
   getProjectById(id: string): Project | null {
-    const project = mockProjects.find((p) => p.id === id);
-    return project ? migrateProject(project) : null;
+    return mockProjects.find((p) => p.id === id) ?? null;
   },
 
   /**

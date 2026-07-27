@@ -13,7 +13,7 @@ import {
   EXPECTED_NETWORK_PASSPHRASE,
   getNetworkLabel,
 } from "@/context/wallet.context";
-import { generateId } from "@/lib/id-generator";
+import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
@@ -51,6 +51,21 @@ export class NetworkMismatchError extends Error {
   }
 }
 
+// ─── Wallet not connected error ──────────────────────────────────────────────
+
+/**
+ * Thrown when a transaction is attempted without a connected wallet.
+ * Always surfaces as a real error — never silently falls back to mock data.
+ */
+export class WalletNotConnectedError extends Error {
+  constructor() {
+    super(
+      "No wallet connected. Please connect your Freighter wallet and try again.",
+    );
+    this.name = "WalletNotConnectedError";
+  }
+}
+
 /**
  * Validates that the wallet is on the expected network before any transaction.
  * Throws NetworkMismatchError if the network does not match.
@@ -65,7 +80,7 @@ async function assertCorrectNetwork(): Promise<void> {
 export interface ProjectData {
   id: string;
   name: string;
-  category: string;
+  category: ProjectCategory;
   description: string;
   websiteUrl: string;
   githubUrl?: string;
@@ -77,7 +92,7 @@ export interface ProjectData {
 
 export interface ProjectRegistrationParams {
   name: string;
-  category: string;
+  category: ProjectCategory;
   description: string;
   websiteUrl: string;
   githubUrl?: string;
@@ -221,23 +236,7 @@ export const sorobanService = {
     try {
       publicKey = await walletService.getPublicKey();
     } catch {
-      console.warn(
-        "[SorobanService] No wallet connected, using mock registration",
-      );
-      options.onPhaseChange?.("preparing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      options.onPhaseChange?.("signing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      options.onPhaseChange?.("submitting");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const hash = "mock_hash_" + generateId();
-      options.onPhaseChange?.("confirming", { txHash: hash });
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      options.onPhaseChange?.("success", { txHash: hash });
-      return {
-        hash,
-        status: "SUCCESS",
-      };
+      throw new WalletNotConnectedError();
     }
 
     const args = [
@@ -326,7 +325,7 @@ export const sorobanService = {
         {
           id: "soroban-swap",
           name: "Soroban Swap",
-          category: "defi",
+          category: PROJECT_CATEGORIES.DEFI,
           description: "Next-generation automated market maker on Soroban.",
           websiteUrl: "https://soroban-swap.com",
           githubUrl: "https://github.com/example/soroban-swap",
@@ -338,7 +337,7 @@ export const sorobanService = {
         {
           id: "stellar-guardians",
           name: "Stellar Guardians",
-          category: "gaming",
+          category: PROJECT_CATEGORIES.GAMING,
           description: "A decentralized strategy game with on-chain assets.",
           websiteUrl: "https://stellar-guardians.com",
           githubUrl: "https://github.com/example/stellar-guardians",
@@ -368,17 +367,7 @@ export const sorobanService = {
     try {
       publicKey = await walletService.getPublicKey();
     } catch {
-      console.warn(
-        "[SorobanService] No wallet connected, using mock update",
-      );
-      options.onPhaseChange?.("preparing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const hash = "mock_update_hash_" + generateId();
-      options.onPhaseChange?.("success", { txHash: hash });
-      return {
-        hash,
-        status: "SUCCESS",
-      };
+      throw new WalletNotConnectedError();
     }
 
     const project = await this.getProject(projectId);
