@@ -78,6 +78,96 @@ vi.mock("@/services/wallet/wallet.service", () => {
   };
 });
 
+describe("sorobanService - no-wallet error path", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Simulate Freighter unavailable / not approved
+    mockWallet.getPublicKey.mockRejectedValue(new Error("Wallet not connected"));
+  });
+
+  it("registerProject throws WalletNotConnectedError when wallet is unavailable", async () => {
+    const { sorobanService, WalletNotConnectedError } = await import(
+      "@/services/stellar/soroban.service"
+    );
+
+    await expect(
+      sorobanService.registerProject({
+        name: "My Project",
+        category: "cat",
+        description: "desc",
+        websiteUrl: "https://example.com",
+      }),
+    ).rejects.toThrow(WalletNotConnectedError);
+  });
+
+  it("registerProject error message is actionable", async () => {
+    const { sorobanService } = await import("@/services/stellar/soroban.service");
+
+    const err = await sorobanService
+      .registerProject({
+        name: "My Project",
+        category: "cat",
+        description: "desc",
+        websiteUrl: "https://example.com",
+      })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain("Freighter");
+  });
+
+  it("registerProject never returns a mock success hash when wallet is unavailable", async () => {
+    const { sorobanService } = await import("@/services/stellar/soroban.service");
+
+    const result = await sorobanService
+      .registerProject({
+        name: "My Project",
+        category: "cat",
+        description: "desc",
+        websiteUrl: "https://example.com",
+      })
+      .catch(() => null);
+
+    // Must reject, never resolve with a fake hash
+    expect(result).toBeNull();
+    // RPC must never be touched
+    expect(mockServer.prepareTransaction).not.toHaveBeenCalled();
+    expect(mockServer.sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it("updateProject throws WalletNotConnectedError when wallet is unavailable", async () => {
+    const { sorobanService, WalletNotConnectedError } = await import(
+      "@/services/stellar/soroban.service"
+    );
+
+    await expect(
+      sorobanService.updateProject("proj-123", {
+        name: "Updated Name",
+        category: "defi",
+        description: "desc",
+        websiteUrl: "https://example.com",
+      }),
+    ).rejects.toThrow(WalletNotConnectedError);
+  });
+
+  it("updateProject never returns a mock success hash when wallet is unavailable", async () => {
+    const { sorobanService } = await import("@/services/stellar/soroban.service");
+
+    const result = await sorobanService
+      .updateProject("proj-123", {
+        name: "Updated Name",
+        category: "defi",
+        description: "desc",
+        websiteUrl: "https://example.com",
+      })
+      .catch(() => null);
+
+    expect(result).toBeNull();
+    expect(mockServer.prepareTransaction).not.toHaveBeenCalled();
+    expect(mockServer.sendTransaction).not.toHaveBeenCalled();
+  });
+});
+
 describe("sorobanService - sequence + simulate/prepare + polling", () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -386,7 +386,7 @@ export default function ProjectDetailPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-3">
                       <Badge variant="primary">
-                        {project.category}
+                        {project.primaryCategory}
                       </Badge>
                       {verificationStatus && (
                         <VerificationBadge status={verificationStatus} />
@@ -709,7 +709,7 @@ export default function ProjectDetailPage() {
                     <span className="text-zinc-500 dark:text-zinc-400">
                       Category
                     </span>
-                    <span className="font-bold">{project.category}</span>
+                    <span className="font-bold">{project.primaryCategory}</span>
                   </div>
                 </div>
               </div>

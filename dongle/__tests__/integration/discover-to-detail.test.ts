@@ -24,7 +24,7 @@ describe("Discover-to-Detail Navigation Data Contract", () => {
       for (const project of allProjects.slice(0, 10)) {
         expect(project.id).toBeTruthy();
         expect(project.name).toBeTruthy();
-        expect(project.category).toBeTruthy();
+        expect(project.primaryCategory).toBeTruthy();
         expect(project.description).toBeTruthy();
         expect(project.rating).toBeGreaterThanOrEqual(0);
         expect(project.rating).toBeLessThanOrEqual(5);
@@ -41,7 +41,7 @@ describe("Discover-to-Detail Navigation Data Contract", () => {
 
         expect(detailProject?.rating).toEqual(discoverProject.rating);
         expect(detailProject?.reviews).toEqual(discoverProject.reviews);
-        expect(detailProject?.category).toEqual(discoverProject.category);
+        expect(detailProject?.primaryCategory).toEqual(discoverProject.primaryCategory);
       }
     });
 
@@ -87,8 +87,7 @@ describe("Discover-to-Detail Navigation Data Contract", () => {
       const allProjects = projectService.getAllProjects();
 
       for (const project of allProjects) {
-        // Each project's category should be in the available categories
-        expect(categories).toContain(project.category);
+        expect(categories).toContain(project.primaryCategory);
       }
     });
 
@@ -100,7 +99,7 @@ describe("Discover-to-Detail Navigation Data Contract", () => {
 
         for (const project of projectsInCategory.slice(0, 3)) {
           const detailProject = projectService.getProjectById(project.id);
-          expect(detailProject?.category).toEqual(category);
+          expect(detailProject?.primaryCategory).toEqual(category);
         }
       }
     });

@@ -24,7 +24,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
-import { CATEGORY_FORM_OPTIONS } from "@/types/project";
+import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
 import type { Project } from "@/types/project";
 
 const urlSchema = z.string().transform((val, ctx) => {
@@ -166,10 +166,12 @@ export default function ProjectForm({
       setIsSubmitting(true);
       try {
         const result = await run((onPhaseChange) => {
-          // Pass primaryCategory as category to the Soroban service to maintain contract compatibility
+          // Normalize the form value (e.g. "defi") to its canonical display label
+          // (e.g. "DeFi / DEX") before submitting to the contract.
+          const canonicalCategory = CATEGORY_FORM_MAP[payload.primaryCategory] ?? payload.primaryCategory;
           const contractPayload = {
             ...payload,
-            category: payload.primaryCategory,
+            category: canonicalCategory,
           };
           if (mode === "edit" && projectId) {
             return sorobanService.updateProject(projectId, contractPayload, { onPhaseChange });

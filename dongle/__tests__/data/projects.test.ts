@@ -10,7 +10,7 @@ describe("projects data", () => {
     for (const p of projects) {
       expect(p.id).toBeTruthy();
       expect(p.name).toBeTruthy();
-      expect(p.category).toBeTruthy();
+      expect(p.primaryCategory).toBeTruthy();
       expect(p.description).toBeTruthy();
       expect(typeof p.rating).toBe("number");
       expect(typeof p.reviews).toBe("number");
@@ -42,7 +42,7 @@ describe("projects data", () => {
 
   it("every project category exists in ALL_CATEGORIES", () => {
     for (const p of projects) {
-      expect(ALL_CATEGORIES).toContain(p.category);
+      expect(ALL_CATEGORIES).toContain(p.primaryCategory);
     }
   });
 });
