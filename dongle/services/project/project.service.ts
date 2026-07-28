@@ -1,5 +1,50 @@
 import { mockProjects } from "@/data/mockProjects";
 import { Project } from "@/types/project";
+import { extractDomain } from "@/lib/url";
+
+/**
+ * Normalize a string for case-insensitive comparison
+ */
+function norm(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+/**
+ * Normalize a URL for comparison: removes protocol and trailing slash, lowercases
+ */
+function normalizeUrlForComparison(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+}
+
+/**
+ * Duplicate detection options
+ */
+export interface DuplicateDetectionOptions {
+  /** Name from the submission form */
+  name: string;
+  /** Website URL from the submission form */
+  websiteUrl?: string;
+  /** Repository URL from the submission form */
+  githubUrl?: string;
+  /** Project ID to exclude (when editing an existing project) */
+  excludeProjectId?: string;
+}
+
+/**
+ * Result of a duplicate detection check
+ */
+export interface DuplicateDetectionResult {
+  /** Whether likely duplicates were found */
+  hasDuplicates: boolean;
+  /** The matching projects */
+  matches: Project[];
+  /** Human-readable explanation of what matched */
+  reasons: string[];
+}
 
 /**
  * Unified project service that provides a single source of truth
@@ -82,5 +127,64 @@ export const projectService = {
       );
     }
     return sorted;
+  },
+
+  /**
+   * Detect possible duplicate projects based on name, domain, and repository URL.
+   * All checks are case-insensitive and domain-normalized.
+   *
+   * @returns Object with hasDuplicates flag, matching projects, and human-readable reasons
+   */
+  detectDuplicates(options: DuplicateDetectionOptions): DuplicateDetectionResult {
+    const { name, websiteUrl, githubUrl, excludeProjectId } = options;
+    const matches: Project[] = [];
+    const reasons: string[] = [];
+    const seenIds = new Set<string>();
+
+    const existingProjects = this.getAllProjects();
+    const submittedDomain = websiteUrl ? extractDomain(websiteUrl) : "";
+
+    for (const existing of existingProjects) {
+      // Skip the project being edited
+      if (excludeProjectId && existing.id === excludeProjectId) continue;
+      if (seenIds.has(existing.id)) continue;
+
+      const matchReasons: string[] = [];
+
+      // Check by normalized name (case-insensitive, trimmed)
+      if (norm(existing.name) === norm(name)) {
+        matchReasons.push("identical name");
+      }
+
+      // Check by website domain (case-insensitive, domain-normalized)
+      if (
+        existing.domain &&
+        submittedDomain &&
+        normalizeUrlForComparison(existing.domain) === normalizeUrlForComparison(submittedDomain)
+      ) {
+        matchReasons.push("same website domain");
+      }
+
+      // Check by repository URL (case-insensitive, domain-normalized)
+      if (
+        existing.githubUrl &&
+        githubUrl &&
+        normalizeUrlForComparison(existing.githubUrl) === normalizeUrlForComparison(githubUrl)
+      ) {
+        matchReasons.push("same repository URL");
+      }
+
+      if (matchReasons.length > 0) {
+        seenIds.add(existing.id);
+        matches.push(existing);
+        reasons.push(`“${existing.name}” — ${matchReasons.join(", ")}`);
+      }
+    }
+
+    return {
+      hasDuplicates: matches.length > 0,
+      matches,
+      reasons,
+    };
   },
 };

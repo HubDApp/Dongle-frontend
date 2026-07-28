@@ -12,6 +12,32 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Mock the comparison context used by ProjectCard
+vi.mock("@/context/comparison.context", () => ({
+  useComparison: () => ({
+    selectedProjects: [],
+    addProject: vi.fn(),
+    removeProject: vi.fn(),
+    clearComparison: vi.fn(),
+    isSelected: () => false,
+    canAddMore: true,
+    maxSelections: 4,
+  }),
+}));
+
+// Mock the saved projects hook used by ProjectCard (which depends on useWallet)
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    walletAddress: null,
+    isConnected: false,
+    savedProjectIds: [],
+    isProjectSaved: () => false,
+    toggleSavedProject: vi.fn(),
+    clearSavedProjects: vi.fn(),
+    canManageSavedProjects: false,
+  }),
+}));
+
 beforeEach(() => {
   sessionStorage.clear();
 });
@@ -79,7 +105,7 @@ describe("FeaturedProjects component", () => {
 
     // Find a category with zero projects (if any)
     const emptyCategory = ALL_CATEGORIES.find(
-      (cat) => cat !== "All" && !projects.some((p) => p.category === cat)
+      (cat) => cat !== "All" && !projects.some((p) => p.primaryCategory === cat)
     );
 
     if (emptyCategory) {

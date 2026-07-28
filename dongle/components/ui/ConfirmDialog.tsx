@@ -148,12 +148,12 @@ export function ConfirmDialog({
         >
           {title}
         </h2>
-        <p
+        <div
           id="confirm-dialog-description"
-          className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8"
+          className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8 whitespace-pre-line"
         >
           {description}
-        </p>
+        </div>
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">
