@@ -103,8 +103,9 @@ export default function ProjectForm({
   const [duplicateWarning, setDuplicateWarning] = useState<{
     isOpen: boolean;
     matches: Project[];
+    reasons: string[];
     payload: ProjectFormValues & { domain?: string } | null;
-  }>({ isOpen: false, matches: [], payload: null });
+  }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
   const router = useRouter();
@@ -201,33 +202,15 @@ export default function ProjectForm({
         domain: extractDomain(data.websiteUrl),
       };
 
-      const existingProjects = projectService.getAllProjects();
-      const normName = (str: string) => str.toLowerCase().trim();
-      const normUrl = (str: string) =>
-        str.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
-
-      const duplicates = existingProjects.filter((existing) => {
-        if (mode === "edit" && existing.id === projectId) return false;
-
-        if (normName(existing.name) === normName(payload.name)) return true;
-        if (
-          existing.domain &&
-          payload.domain &&
-          normUrl(existing.domain) === normUrl(payload.domain)
-        )
-          return true;
-        if (
-          existing.githubUrl &&
-          payload.githubUrl &&
-          normUrl(existing.githubUrl) === normUrl(payload.githubUrl)
-        )
-          return true;
-
-        return false;
+      const result = projectService.detectDuplicates({
+        name: payload.name,
+        websiteUrl: payload.websiteUrl,
+        githubUrl: payload.githubUrl,
+        excludeProjectId: mode === "edit" ? projectId : undefined,
       });
 
-      if (duplicates.length > 0) {
-        setDuplicateWarning({ isOpen: true, matches: duplicates, payload });
+      if (result.hasDuplicates) {
+        setDuplicateWarning({ isOpen: true, matches: result.matches, payload, reasons: result.reasons });
         return;
       }
 
@@ -426,20 +409,19 @@ export default function ProjectForm({
       <ConfirmDialog
         isOpen={duplicateWarning.isOpen}
         title="Possible Duplicate Detected"
-        description={`We found existing projects that look very similar to yours:\n\n${duplicateWarning.matches
-          .map((m) => `- ${m.name}`)
-          .join("\n")}\n\nAre you sure you want to continue with this submission?`}
+        description={`We found existing projects that look very similar to yours:\n\n${duplicateWarning.reasons.join("\n")}\n\nAre you sure you want to continue with this submission?`}
         confirmLabel="Continue Anyway"
         cancelLabel="Cancel"
         variant="warning"
         onConfirm={() => {
-          setDuplicateWarning({ isOpen: false, matches: [], payload: null });
-          if (duplicateWarning.payload) {
-            void executeSubmit(duplicateWarning.payload);
+          const payload = duplicateWarning.payload;
+          setDuplicateWarning({ isOpen: false, matches: [], reasons: [], payload: null });
+          if (payload) {
+            void executeSubmit(payload);
           }
         }}
         onCancel={() => {
-          setDuplicateWarning({ isOpen: false, matches: [], payload: null });
+          setDuplicateWarning({ isOpen: false, matches: [], reasons: [], payload: null });
         }}
       />
 
