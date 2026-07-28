@@ -9,9 +9,7 @@ import { verificationService, type VerificationRequest } from "@/services/stella
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
+import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
 import {
@@ -112,18 +110,11 @@ export default function ProfilePage() {
       <LayoutWrapper>
         <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
           <div className="container mx-auto px-4 max-w-2xl">
-            {gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel message="Loading your profile..." />
-            ) : (
-              <WalletStatePanel
-                state={gate.state}
-                pagePurpose={PROFILE_PURPOSE}
-                walletNetworkLabel={gate.walletNetworkLabel}
-                publicKey={gate.publicKey}
-                onConnect={gate.connectWallet}
-                onDisconnect={gate.disconnectWallet}
-              />
-            )}
+            <WalletGate
+              gate={gate}
+              pagePurpose={PROFILE_PURPOSE}
+              loadingMessage="Loading your profile..."
+            />
           </div>
         </main>
       </LayoutWrapper>
