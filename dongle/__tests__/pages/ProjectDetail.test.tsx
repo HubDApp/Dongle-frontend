@@ -44,6 +44,18 @@ vi.mock("@/hooks/useWalletPageGate", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    isProjectSaved: vi.fn(() => false),
+    toggleSavedProject: vi.fn(),
+    canManageSavedProjects: true,
+    savedProjectIds: [],
+    walletAddress: "G_OWNER_123",
+    isConnected: true,
+    clearSavedProjects: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/useConfirm", () => ({
   useConfirm: vi.fn(),
 }));

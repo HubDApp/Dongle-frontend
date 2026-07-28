@@ -104,7 +104,7 @@ export default function ProjectDetailPage() {
     return () => clearTimeout(timer);
   }, [projectId, gate.publicKey]);
 
-  const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
+  const isOwner = Boolean(project && gate.publicKey && project.ownerAddress === gate.publicKey);
   const isSaved = project ? isProjectSaved(project.id) : false;
 
   const handleToggleSaved = () => {

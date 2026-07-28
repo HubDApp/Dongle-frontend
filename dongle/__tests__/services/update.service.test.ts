@@ -85,22 +85,24 @@ describe("UpdateService", () => {
         mockAuthorAddress
       );
 
-      // Simulate time passing
-      setTimeout(() => {
-        const second = updateService.addUpdate(
-          {
-            projectId: mockProjectId,
-            type: UPDATE_TYPES.ANNOUNCEMENT,
-            title: "Second",
-            content: "Content",
-          },
-          mockAuthorAddress
-        );
+      const second = updateService.addUpdate(
+        {
+          projectId: mockProjectId,
+          type: UPDATE_TYPES.ANNOUNCEMENT,
+          title: "Second",
+          content: "Content",
+        },
+        mockAuthorAddress
+      );
 
-        const updates = updateService.getUpdatesByProject(mockProjectId);
-        expect(updates[0].id).toBe(second.id);
-        expect(updates[1].id).toBe(first.id);
-      }, 10);
+      // Manually set different publishedAt so ordering is deterministic
+      (updateService as unknown as { updates: { publishedAt: string; id: string }[] })
+        .updates.find(u => u.id === second.id)!.publishedAt =
+        new Date(Date.now() + 1000).toISOString();
+
+      const updates = updateService.getUpdatesByProject(mockProjectId);
+      expect(updates[0].id).toBe(second.id);
+      expect(updates[1].id).toBe(first.id);
     });
   });
 

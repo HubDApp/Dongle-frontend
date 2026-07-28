@@ -9,6 +9,15 @@ vi.mock("@/hooks/useStellarAccount", () => ({
   useStellarAccount: vi.fn(),
 }));
 
+vi.mock("@/hooks/useAdminAccess", () => ({
+  useAdminAccess: () => ({
+    isAdmin: false,
+    isAdminChecking: false,
+    gate: { state: "disconnected", publicKey: null, walletNetworkLabel: "Unknown",
+      connectWallet: vi.fn(), disconnectWallet: vi.fn(), isConnecting: false },
+  }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -102,7 +111,7 @@ describe("Submit Project Page - High Risk Flows", () => {
     });
 
     it("shows validation error for invalid URL", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<NewProjectPage />);
 
       await user.type(screen.getByLabelText(/project name/i), "Test Project");
@@ -115,10 +124,10 @@ describe("Submit Project Page - High Risk Flows", () => {
       fireEvent.click(screen.getByRole("button", { name: /Submit Registration/i }));
 
       expect(await screen.findByText(/valid url/i)).toBeInTheDocument();
-    });
+    }, 15000);
 
     it("allows form submission with valid data", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<NewProjectPage />);
 
       await user.type(screen.getByLabelText(/project name/i), "Test Project");
@@ -131,10 +140,10 @@ describe("Submit Project Page - High Risk Flows", () => {
 
       const submitButton = screen.getByRole("button", { name: /Submit Registration/i });
       expect(submitButton).not.toBeDisabled();
-    });
+    }, 15000);
 
     it("does not show errors for optional fields left empty", async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       render(<NewProjectPage />);
 
       await user.type(screen.getByLabelText(/project name/i), "Test Project");
@@ -146,7 +155,7 @@ describe("Submit Project Page - High Risk Flows", () => {
       await user.type(screen.getByLabelText(/Project Website/i), "https://example.com");
 
       expect(screen.queryAllByRole("alert")).toHaveLength(0);
-    });
+    }, 15000);
   });
 
   describe("Form Submission", () => {

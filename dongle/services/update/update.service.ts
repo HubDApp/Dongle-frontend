@@ -21,7 +21,7 @@ class UpdateService {
    * Add a new update
    */
   addUpdate(
-    update: Omit<ProjectUpdate, "id" | "publishedAt">,
+    update: Omit<ProjectUpdate, "id" | "publishedAt" | "authorAddress">,
     authorAddress: string
   ): ProjectUpdate {
     const newUpdate: ProjectUpdate = {
