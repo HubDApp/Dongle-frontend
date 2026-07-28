@@ -240,9 +240,10 @@ describe("parseEnv — production mode", () => {
   });
 
   it("does NOT apply dev defaults during a production build (isBuild scenario)", () => {
-    // Simulate the environment a CI server would have during `next build`
-    // when the operator forgot to set contract IDs — this should hard-fail,
-    // not silently fall back to placeholder values.
+    // The build phase (NEXT_PHASE=phase-production-build) is treated as
+    // permissive so CI can compile without contract IDs being pre-set.
+    // Contract IDs are supplied by the hosting platform at deploy time.
+    // isDev=false (strict) → missing vars still throw in non-build contexts.
     expect(() => parseEnv({}, false)).toThrow();
   });
 });
