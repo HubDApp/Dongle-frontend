@@ -300,6 +300,7 @@ export default function ProjectForm({
         <SubmissionChecklist
           formData={{
             name: watchedValues.name,
+            primaryCategory: watchedValues.primaryCategory,
             websiteUrl: watchedValues.websiteUrl,
             githubUrl: watchedValues.githubUrl,
             logoUrl: watchedValues.logoUrl,
