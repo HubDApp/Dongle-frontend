@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { mockProjects } from "@/data/mockProjects";
 

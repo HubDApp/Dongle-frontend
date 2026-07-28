@@ -8,7 +8,7 @@ describe("UpdateService", () => {
 
   beforeEach(() => {
     // Reset the service state between tests
-    (updateService as any).updates = [];
+    (updateService as unknown as { updates: unknown[] }).updates = [];
   });
 
   describe("addUpdate", () => {

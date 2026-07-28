@@ -32,11 +32,7 @@ export default function ComparePage() {
       setIsLoading(false);
     };
 
-    if (selectedProjects.length > 0) {
-      void fetchStatuses();
-    } else {
-      setIsLoading(false);
-    }
+    void fetchStatuses();
   }, [selectedProjects]);
 
   if (selectedProjects.length === 0) {

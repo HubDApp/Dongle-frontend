@@ -5,6 +5,7 @@ import ProjectDetailPage from "@/app/projects/[id]/page";
 import { projectService } from "@/services/project/project.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { useConfirm } from "@/hooks/useConfirm";
+import { PROJECT_CATEGORIES } from "@/types/project";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "test-project-id" }),
@@ -57,8 +58,8 @@ describe("Project Detail Page - Verification and Safety Warnings", () => {
   const mockProject = {
     id: "test-project-id",
     name: "Test Secure Project",
-    category: "DeFi / DEX" as any,
-    primaryCategory: "DeFi / DEX" as any,
+    category: PROJECT_CATEGORIES.DEFI,
+    primaryCategory: PROJECT_CATEGORIES.DEFI,
     description: "A test project description.",
     rating: 4.8,
     reviews: 5,
