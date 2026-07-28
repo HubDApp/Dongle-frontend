@@ -5,6 +5,7 @@ const STORAGE_KEY = "dongle_reviews";
 
 /**
  * Validates review data before persistence
+ * Enforces rating constraints (1-5) and comment length limits (10-1000 chars)
  */
 function validateReview(
   rating: number,
