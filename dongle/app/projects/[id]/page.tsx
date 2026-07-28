@@ -33,16 +33,13 @@ import {
   Info,
   Bookmark,
   BookmarkCheck,
-} from "lucide-react";
-import { toast } from "sonner";
-import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { useSavedProjects } from "@/hooks/useSavedProjects";
   Shield,
   Bug,
   Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";

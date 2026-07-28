@@ -201,15 +201,15 @@ export default function Navbar() {
           aria-hidden={!isMenuOpen}
           className="md:hidden bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800"
         >
-          <div className="px-4 py-4 space-y-2">
+          <div className="px-4 py-4 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`block py-2 text-sm font-medium transition-colors ${
+                className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
                   isActive(link.href)
-                    ? "text-black dark:text-white"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                    ? "text-black dark:text-white font-semibold border-black dark:border-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"
                 }`}
               >
                 {link.label}
@@ -218,10 +218,10 @@ export default function Navbar() {
             {isConnected && (
               <Link
                 href="/admin"
-                className={`block py-2 text-sm font-medium transition-colors ${
+                className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
                   isActive("/admin")
-                    ? "text-black dark:text-white"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                    ? "text-black dark:text-white font-semibold border-black dark:border-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"
                 }`}
               >
                 Admin

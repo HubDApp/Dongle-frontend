@@ -47,6 +47,30 @@ vi.mock("@/hooks/useConfirm", () => ({
   useConfirm: vi.fn(),
 }));
 
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    isProjectSaved: () => false,
+    toggleSavedProject: vi.fn(),
+    canManageSavedProjects: true,
+    savedProjectIds: [],
+  }),
+}));
+
+vi.mock("@/services/update/update.service", () => ({
+  updateService: {
+    getUpdatesByProject: vi.fn(() => []),
+    addUpdate: vi.fn(),
+    updateUpdate: vi.fn(),
+    deleteUpdate: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/recent-views/recent-views.service", () => ({
+  recentViewsService: {
+    addView: vi.fn(),
+  },
+}));
+
 async function finishInitialLoad() {
   await act(async () => {
     vi.advanceTimersByTime(800);
@@ -158,5 +182,79 @@ describe("Project Detail Page - Verification and Safety Warnings", () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
 
     windowOpenSpy.mockRestore();
+  });
+});
+
+describe("Project Detail Page - layout shell", () => {
+  const mockProject = {
+    id: "test-project-id",
+    name: "Test Secure Project",
+    category: "DeFi / DEX" as any,
+    primaryCategory: "DeFi / DEX" as any,
+    description: "A test project description.",
+    rating: 4.8,
+    reviews: 5,
+    createdAt: "2026-01-01T00:00:00Z",
+    websiteUrl: "https://secure-test.xyz",
+    githubUrl: "https://github.com/secure-test/repo",
+    ownerAddress: "G_OWNER_123",
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    vi.mocked(useConfirm).mockReturnValue(vi.fn());
+    vi.mocked(sorobanService.getVerificationStatus).mockResolvedValue("NONE");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not import or render a nested LayoutWrapper", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("fs") as typeof import("fs");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require("path") as typeof import("path");
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "app/projects/[id]/page.tsx"),
+      "utf8",
+    );
+    expect(source).not.toMatch(/LayoutWrapper/);
+  });
+
+  it("uses the shared page shell spacing while loading", () => {
+    vi.mocked(projectService.getProjectById).mockReturnValue(mockProject);
+    const { container } = render(<ProjectDetailPage />);
+
+    const shell = container.querySelector("main");
+    expect(shell?.className).toMatch(/min-h-screen/);
+    expect(shell?.className).toMatch(/pt-32/);
+    expect(shell?.className).toMatch(/pb-24/);
+    expect(screen.getByText(/Loading project details/i)).toBeInTheDocument();
+  });
+
+  it("uses the shared page shell spacing for not-found state", async () => {
+    vi.mocked(projectService.getProjectById).mockReturnValue(null);
+    render(<ProjectDetailPage />);
+    await finishInitialLoad();
+
+    expect(screen.getByText(/Project Not Found/i)).toBeInTheDocument();
+    const shell = screen.getByText(/Project Not Found/i).closest("main");
+    expect(shell?.className).toMatch(/min-h-screen/);
+    expect(shell?.className).toMatch(/pt-32/);
+    expect(shell?.className).toMatch(/pb-24/);
+  });
+
+  it("uses the shared page shell spacing for the success state", async () => {
+    vi.mocked(projectService.getProjectById).mockReturnValue(mockProject);
+    render(<ProjectDetailPage />);
+    await finishInitialLoad();
+
+    expect(screen.getByRole("heading", { name: mockProject.name })).toBeInTheDocument();
+    const shell = screen.getByRole("heading", { name: mockProject.name }).closest("main");
+    expect(shell?.className).toMatch(/min-h-screen/);
+    expect(shell?.className).toMatch(/pt-32/);
+    expect(shell?.className).toMatch(/pb-24/);
   });
 });

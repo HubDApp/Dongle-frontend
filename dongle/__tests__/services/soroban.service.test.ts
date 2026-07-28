@@ -166,6 +166,29 @@ describe("sorobanService - no-wallet error path", () => {
     expect(mockServer.prepareTransaction).not.toHaveBeenCalled();
     expect(mockServer.sendTransaction).not.toHaveBeenCalled();
   });
+
+  it("registerProject throws NetworkMismatchError when wallet is on the wrong network", async () => {
+    mockWallet.getPublicKey.mockResolvedValue("GTEST...123");
+    mockWallet.getNetworkPassphrase.mockResolvedValue(
+      "Public Global Stellar Network ; September 2015",
+    );
+
+    const { sorobanService, NetworkMismatchError } = await import(
+      "@/services/stellar/soroban.service"
+    );
+
+    await expect(
+      sorobanService.registerProject({
+        name: "My Project",
+        category: "cat",
+        description: "desc",
+        websiteUrl: "https://example.com",
+      }),
+    ).rejects.toThrow(NetworkMismatchError);
+
+    expect(mockWallet.signTransaction).not.toHaveBeenCalled();
+    expect(mockServer.sendTransaction).not.toHaveBeenCalled();
+  });
 });
 
 describe("sorobanService - sequence + simulate/prepare + polling", () => {
