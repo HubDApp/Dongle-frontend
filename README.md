@@ -84,6 +84,10 @@ pnpm start
 
 Copy `.env.example` to `.env.local` in the project root and fill these in:
 
+```bash
+cp .env.example .env.local
+```
+
 | Variable                                     | Required   | Description                                                                                                                                 |
 | -------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT`      | Production | Soroban contract ID (56 chars, starts with `C`) for the Project Registry.                                                                   |
@@ -94,6 +98,8 @@ Copy `.env.example` to `.env.local` in the project root and fill these in:
 | `NEXT_PUBLIC_ADMIN_ALLOWLIST`                | Optional   | Comma-separated list of Stellar public keys (`G...`) allowed to access the admin dashboard. Leave empty to disable admin routes.            |
 
 **Development builds use placeholder defaults for the contract IDs when they're unset** — see [Known Limitations](#known-limitations). To point the app at real deployed contracts (testnet or mainnet), set all three contract ID variables explicitly and make sure `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` matches the network those contracts are deployed on.
+
+`.env.local` is gitignored — never commit real values.
 
 ## Wallet & Network Setup
 
