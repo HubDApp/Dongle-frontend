@@ -5,10 +5,18 @@ vi.hoisted(() => {
 });
 
 import { render, screen, fireEvent } from "@testing-library/react";
+import { toast } from "sonner";
 import AdminPage from "@/app/admin/page";
 import * as walletContext from "@/context/wallet.context";
 
 const ADMIN_KEY = "GADMIN1234567890";
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 vi.mock("next/link", () => ({
   default: ({
@@ -129,6 +137,19 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
       const feeInput = screen.getByRole("spinbutton");
       fireEvent.change(feeInput, { target: { value: "2.5" } });
       expect((feeInput as HTMLInputElement).value).toBe("2.5");
+    });
+
+    it("uses in-app toast feedback instead of alert() when saving fee", () => {
+      const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+      render(<AdminPage />);
+
+      fireEvent.click(screen.getByRole("button", { name: /update fee/i }));
+
+      expect(toast.success).toHaveBeenCalledWith(
+        expect.stringMatching(/verification fee updated/i),
+      );
+      expect(alertSpy).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
     });
 
     it("shows stats overview", () => {

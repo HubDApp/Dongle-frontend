@@ -2,12 +2,12 @@
 
 import { RouteErrorFallback } from "@/components/ui/RouteErrorFallback";
 
-export default function GlobalError({
+export default function ProfileError({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return <RouteErrorFallback error={error} reset={reset} />;
+  return <RouteErrorFallback error={error} reset={reset} section="profile" />;
 }

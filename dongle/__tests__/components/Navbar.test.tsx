@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import Navbar from "@/components/layout/Navbar";
 import * as walletContext from "@/context/wallet.context";
 
@@ -91,5 +91,18 @@ describe("Navbar active navigation", () => {
     const reviewsLink = screen.getByRole("link", { name: "Reviews" });
     expect(reviewsLink.className).toContain("border-transparent");
     expect(reviewsLink.className).toContain("text-zinc-600");
+  });
+
+  it("exposes accessible name and expanded state for the mobile menu button", () => {
+    render(<Navbar />);
+
+    const menuButton = screen.getByRole("button", { name: /open menu/i });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(menuButton).toHaveAttribute("aria-controls", "mobile-menu");
+
+    fireEvent.click(menuButton);
+
+    const closeButton = screen.getByRole("button", { name: /close menu/i });
+    expect(closeButton).toHaveAttribute("aria-expanded", "true");
   });
 });

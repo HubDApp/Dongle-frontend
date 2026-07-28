@@ -50,6 +50,9 @@ jobs:
       - name: Run Tests
         run: npm test
 
+      - name: Dependency Audit
+        run: npm run audit
+
       - name: Build Project
         id: build
         run: npm run build
@@ -63,4 +66,5 @@ jobs:
           echo "* **Lint:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "* **Type Check:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "* **Tests:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Audit:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "* **Build:** ${{ steps.build.outcome == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY

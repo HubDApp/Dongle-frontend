@@ -73,10 +73,12 @@ export default function UpdateForm({
           {initialUpdate ? "Edit Update" : "New Update"}
         </h3>
         <button
+          type="button"
           onClick={onCancel}
           className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+          aria-label="Close update form"
         >
-          <X className="w-5 h-5" />
+          <X className="w-5 h-5" aria-hidden="true" />
         </button>
       </div>
 
