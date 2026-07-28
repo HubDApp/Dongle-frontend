@@ -3,9 +3,7 @@
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
+import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { formatDate } from "@/lib/date";
 import { AlertCircle } from "lucide-react";
@@ -58,18 +56,11 @@ export default function AdminDashboard() {
   if (gate.state !== "ready") {
     return (
       <div className="container mx-auto px-4 py-32 min-h-screen max-w-2xl">
-        {gate.state === "account-loading" ? (
-          <WalletStateLoadingPanel message="Verifying wallet access..." />
-        ) : (
-          <WalletStatePanel
-            state={gate.state}
-            pagePurpose={ADMIN_PURPOSE}
-            walletNetworkLabel={gate.walletNetworkLabel}
-            publicKey={gate.publicKey}
-            onConnect={gate.connectWallet}
-            onDisconnect={gate.disconnectWallet}
-          />
-        )}
+        <WalletGate
+          gate={gate}
+          pagePurpose={ADMIN_PURPOSE}
+          loadingMessage="Verifying wallet access..."
+        />
       </div>
     );
   }

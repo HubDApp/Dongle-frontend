@@ -8,9 +8,7 @@ import { CATEGORY_DISPLAY_TO_FORM } from "@/types/project";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
+import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 
 const EDIT_PURPOSE =
@@ -67,18 +65,11 @@ export default function EditProjectPage() {
       <main className={pageClass}>
         <div className="container mx-auto px-4">
           <div className="max-w-xl mx-auto animate-fade-in">
-            {gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel message="Verifying your wallet..." />
-            ) : (
-              <WalletStatePanel
-                state={gate.state}
-                pagePurpose={EDIT_PURPOSE}
-                walletNetworkLabel={gate.walletNetworkLabel}
-                publicKey={gate.publicKey}
-                onConnect={gate.connectWallet}
-                onDisconnect={gate.disconnectWallet}
-              />
-            )}
+            <WalletGate
+              gate={gate}
+              pagePurpose={EDIT_PURPOSE}
+              loadingMessage="Verifying your wallet..."
+            />
           </div>
         </div>
       </main>
