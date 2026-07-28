@@ -31,7 +31,7 @@ Object.defineProperty(window, "localStorage", {
 describe("useDraft hook", () => {
   beforeEach(() => {
     localStorageMock.clear();
-    jest.clearAllTimers();
+    vi.clearAllTimers();
   });
 
   describe("Acceptance Criteria: Autosave runs only after fields change", () => {
@@ -57,6 +57,8 @@ describe("useDraft hook", () => {
     });
 
     it("should save draft when user types in fields", () => {
+      vi.useFakeTimers();
+      
       const { result } = renderHook(() =>
         useDraft({ mode: "create", autoSave: true })
       );
@@ -76,16 +78,18 @@ describe("useDraft hook", () => {
 
       // Wait for debounce
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
 
       expect(result.current.hasDraft).toBe(true);
       expect(result.current.lastSaved).toBeTruthy();
+      
+      vi.useRealTimers();
     });
 
     it("should debounce autosave to prevent excessive saves", () => {
-      jest.useFakeTimers();
-      const saveSpy = jest.spyOn(draftService, "saveDraft");
+      vi.useFakeTimers();
+      const saveSpy = vi.spyOn(draftService, "saveDraft");
 
       const { result } = renderHook(() =>
         useDraft({ mode: "create", autoSave: true })
@@ -136,13 +140,13 @@ describe("useDraft hook", () => {
 
       // Fast-forward time
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
 
       // Should only save once after debounce
       expect(saveSpy).toHaveBeenCalledTimes(1);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
       saveSpy.mockRestore();
     });
   });
