@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
-import { reviewService } from "@/services/review/review.service";
+import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
+import { Review } from "@/types/review";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -51,10 +52,7 @@ export default function ProfilePage() {
   const { savedProjectIds } = useSavedProjects();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
-
-  const userReviews = gate.publicKey
-    ? reviewService.getReviewsByUser(gate.publicKey)
-    : [];
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
 
   const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
   const loadingVerifications =
@@ -99,6 +97,26 @@ export default function ProfilePage() {
           setVerificationRequests([]);
           setLoadedVerificationKey(gate.publicKey);
         }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gate.publicKey]);
+
+  useEffect(() => {
+    if (!gate.publicKey) {
+      setUserReviews([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const reviews = await reviewService.getReviewsByUser(gate.publicKey!);
+      if (!cancelled) {
+        setUserReviews(reviews);
       }
     })();
 
@@ -220,6 +238,11 @@ export default function ProfilePage() {
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <MessageSquare className="w-6 h-6" />
                     Your Reviews
+                    {getReviewPersistenceLabel() !== "API" && (
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full">
+                        DEV-ONLY
+                      </span>
+                    )}
                   </h2>
                   <Badge variant="secondary">{userReviews.length}</Badge>
                 </div>

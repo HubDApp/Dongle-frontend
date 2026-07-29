@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ProfilePage from "@/app/profile/page";
 import * as walletContext from "@/context/wallet.context";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
@@ -14,7 +14,16 @@ vi.mock("@/hooks/useStellarAccount", () => ({
 vi.mock("@/services/review/review.service", () => ({
   reviewService: {
     getReviewsByUser: vi.fn(),
+    getReviews: vi.fn(),
+    addReview: vi.fn(),
+    updateReview: vi.fn(),
+    deleteReview: vi.fn(),
+    getReviewsByProject: vi.fn(),
+    voteHelpful: vi.fn(),
+    voteUnhelpful: vi.fn(),
   },
+  isReviewPersistenceApi: vi.fn(() => false),
+  getReviewPersistenceLabel: vi.fn(() => "localStorage (DEV-ONLY)"),
 }));
 
 vi.mock("@/services/project/project.service", () => ({
@@ -96,7 +105,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(reviewService.getReviewsByUser).mockReturnValue([
+      vi.mocked(reviewService.getReviewsByUser).mockResolvedValue([
         {
           id: "review1",
           projectId: "proj1",
@@ -139,29 +148,35 @@ describe("Profile Page", () => {
       expect(screen.getByText("100.00")).toBeInTheDocument();
     });
 
-    it("should display user reviews", () => {
+    it("should display user reviews", async () => {
       mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
-      expect(screen.getByText("Test Project")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText("Test Project")).toBeInTheDocument();
+      });
       expect(screen.getByText(/Great project with excellent features/)).toBeInTheDocument();
     });
 
-    it("should show review count badge", () => {
+    it("should show review count badge", async () => {
       mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
-      expect(screen.getByText("Your Reviews").nextElementSibling).toHaveTextContent("1");
+      await waitFor(() => {
+        expect(screen.getByText("Your Reviews").nextElementSibling).toHaveTextContent("1");
+      });
     });
 
-    it("should calculate average rating", () => {
+    it("should calculate average rating", async () => {
       mockWallet(true, "GTEST123456789");
 
       render(<ProfilePage />);
 
-      expect(screen.getByText("5.0")).toBeInTheDocument(); // Average rating
+      await waitFor(() => {
+        expect(screen.getByText("5.0")).toBeInTheDocument();
+      });
     });
 
     it("should show disconnect button", () => {
@@ -258,7 +273,7 @@ describe("Profile Page", () => {
         refetch: vi.fn(),
       });
 
-      vi.mocked(reviewService.getReviewsByUser).mockReturnValue([]);
+      vi.mocked(reviewService.getReviewsByUser).mockResolvedValue([]);
 
       mockWallet(true, "GTEST123456789");
 
