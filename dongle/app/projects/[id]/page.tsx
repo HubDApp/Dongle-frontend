@@ -33,16 +33,13 @@ import {
   Info,
   Bookmark,
   BookmarkCheck,
-} from "lucide-react";
-import { toast } from "sonner";
-import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { useSavedProjects } from "@/hooks/useSavedProjects";
   Shield,
   Bug,
   Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
@@ -107,7 +104,7 @@ export default function ProjectDetailPage() {
     return () => clearTimeout(timer);
   }, [projectId, gate.publicKey]);
 
-  const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
+  const isOwner = !!(project && gate.publicKey && project.ownerAddress === gate.publicKey);
   const isSaved = project ? isProjectSaved(project.id) : false;
 
   const handleToggleSaved = () => {
@@ -231,6 +228,7 @@ export default function ProjectDetailPage() {
         {
           projectId: project.id,
           ...data,
+          authorAddress: gate.publicKey,
         },
         gate.publicKey
       );

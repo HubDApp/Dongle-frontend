@@ -58,7 +58,6 @@ export default function ReviewsPage() {
       } : {
         id: review.projectId,
         name: review.projectName,
-        category: "DeFi / DEX",
         primaryCategory: "DeFi / DEX", // Fallback
         tags: [],
         description: "",
