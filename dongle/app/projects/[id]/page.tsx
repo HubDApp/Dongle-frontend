@@ -612,12 +612,22 @@ export default function ProjectDetailPage() {
 
                   {activeTab === "updates" && (
                     <div className="space-y-4">
-                      {isOwner && !isAddingUpdate && (
-                        <Button variant="primary" onClick={handleAddUpdate}>
-                          <Megaphone className="w-4 h-4 mr-2" />
-                          Post Update
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {isOwner && !isAddingUpdate && (
+                          <Button variant="primary" onClick={handleAddUpdate}>
+                            <Megaphone className="w-4 h-4 mr-2" />
+                            Post Update
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/projects/${projectId}/updates`)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View full feed
                         </Button>
-                      )}
+                      </div>
 
                       {isAddingUpdate && project && (
                         <UpdateForm
