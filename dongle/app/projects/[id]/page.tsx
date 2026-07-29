@@ -33,16 +33,13 @@ import {
   Info,
   Bookmark,
   BookmarkCheck,
-} from "lucide-react";
-import { toast } from "sonner";
-import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { useSavedProjects } from "@/hooks/useSavedProjects";
   Shield,
   Bug,
   Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
@@ -107,7 +104,7 @@ export default function ProjectDetailPage() {
     return () => clearTimeout(timer);
   }, [projectId, gate.publicKey]);
 
-  const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
+  const isOwner = Boolean(project && gate.publicKey && project.ownerAddress === gate.publicKey);
   const isSaved = project ? isProjectSaved(project.id) : false;
 
   const handleToggleSaved = () => {
@@ -268,7 +265,7 @@ export default function ProjectDetailPage() {
       updateService.deleteUpdate(id, gate.publicKey);
       setUpdates(updateService.getUpdatesByProject(projectId));
       toast.success("Update deleted successfully");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to delete update");
     }
   };
@@ -570,7 +567,7 @@ export default function ProjectDetailPage() {
                   <div className="flex gap-2">
                     <select
                       value={reviewSort}
-                      onChange={(e) => setReviewSort(e.target.value as any)}
+                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine")}
                       className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
                       <option value="newest">Newest First</option>

@@ -146,16 +146,21 @@ export default function ProjectForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
-  // Watch form values for checklist
+  // Watch form values for checklist and auto-save.
+  // react-hook-form's watch() is intentionally used here for live value access.
+  // The React Compiler flags it as non-memoizable, but this component does not
+  // rely on memoization of watchedValues — it's read-only for the checklist
+  // and the draft autosave effect below.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
 
-  // Auto-save draft when form changes
+  // Auto-save draft when form changes — derive from watchedValues instead of
+  // a watch() subscription to avoid the react-hooks/incompatible-library warning
+  // that fires when RHF's watch callback is passed into a memoized hook.
   useEffect(() => {
-    const subscription = watch((formData) => {
-      draft.saveDraft(formData as ProjectFormValues);
-    });
-    return () => subscription.unsubscribe();
-  }, [watch, draft]);
+    draft.saveDraft(watchedValues as ProjectFormValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(watchedValues)]);
 
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
