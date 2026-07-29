@@ -17,7 +17,6 @@ import { projectReportService } from "@/services/project/project-report.service"
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { reviewReportService } from "@/services/review/review-report.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
@@ -36,13 +35,9 @@ import {
   GitBranch,
   Globe,
   Info,
-  Bookmark,
-  BookmarkCheck,
   Shield,
-  Bug,
   Megaphone,
   MessageSquare,
-  Shield,
   Star,
   UserPlus,
 } from "lucide-react";
