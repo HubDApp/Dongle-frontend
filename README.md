@@ -12,6 +12,7 @@ Dongle lets users browse and rate dApps, lets project owners list and verify the
 - [Environment Variables](#environment-variables)
 - [Wallet & Network Setup](#wallet--network-setup)
 - [Available Scripts](#available-scripts)
+- [Production Deployment](#production-deployment)
 - [Known Limitations](#known-limitations)
 
 ## What Dongle Does
@@ -111,16 +112,18 @@ cp .env.example .env.local
 
 ## Available Scripts
 
-| Command           | Description                                                       |
-| ----------------- | ----------------------------------------------------------------- |
-| `pnpm dev`        | Start the Next.js dev server.                                     |
-| `pnpm build`      | Build the production bundle.                                      |
-| `pnpm start`      | Serve the production build.                                       |
-| `pnpm lint`       | Run ESLint (`--max-warnings 0`, so any warning fails the check).  |
-| `pnpm typecheck`  | Run `tsc --noEmit` to check types without emitting output.        |
-| `pnpm test`       | Run the Vitest suite once.                                        |
-| `pnpm test:watch` | Run Vitest in watch mode.                                         |
-| `pnpm audit`      | Run the project's custom audit script (`scripts/audit-check.js`). |
+| Command              | Description                                                       |
+| -------------------- | ----------------------------------------------------------------- |
+| `pnpm dev`           | Start the Next.js dev server.                                     |
+| `pnpm build`         | Build the production bundle.                                      |
+| `pnpm start`         | Serve the production build.                                       |
+| `pnpm lint`          | Run ESLint (`--max-warnings 0`, so any warning fails the check).  |
+| `pnpm typecheck`     | Run `tsc --noEmit` to check types without emitting output.        |
+| `pnpm test`          | Run the Vitest suite once.                                        |
+| `pnpm test:watch`    | Run Vitest in watch mode.                                         |
+| `pnpm audit`         | Run the project's custom audit script (`scripts/audit-check.js`). |
+| `pnpm validate:env`  | Fail if production env vars are missing, invalid, or placeholders.|
+| `pnpm preview:smoke` | HTTP smoke-test main routes against `PREVIEW_URL`.                |
 
 Before pushing or opening a PR, it's worth running lint, typecheck, and test together:
 
@@ -128,9 +131,21 @@ Before pushing or opening a PR, it's worth running lint, typecheck, and test tog
 pnpm lint && pnpm typecheck && pnpm test
 ```
 
+## Production Deployment
+
+For Vercel (or similar) deploys — environment setup, wallet/network assumptions, preview route validation, and smoke tests — see **[`dongle/DEPLOYMENT.md`](./dongle/DEPLOYMENT.md)**.
+
+Quick checks before promoting a preview:
+
+```bash
+cd dongle
+npm run validate:env
+PREVIEW_URL=https://your-preview.vercel.app npm run preview:smoke
+```
+
 ## Known Limitations
 
-- **Placeholder contract IDs in development.** If the three `NEXT_PUBLIC_*_CONTRACT` variables are left unset, the app falls back to placeholder contract addresses rather than real deployed contracts. On-chain reads/writes against these placeholders will not reflect real data — set real testnet or mainnet contract IDs to exercise actual contract behavior.
+- **Placeholder contract IDs in development.** If the three `NEXT_PUBLIC_*_CONTRACT` variables are left unset, the app falls back to placeholder contract addresses rather than real deployed contracts. On-chain reads/writes against these placeholders will not reflect real data — set real testnet or mainnet contract IDs to exercise actual contract behavior. Production builds reject the placeholder and surface a config banner if it was somehow inlined.
 - **Testnet-first.** Defaults (RPC URL, network passphrase) point at Stellar testnet. Mainnet use requires explicitly overriding all network-related env vars, and has not been the primary target during development.
 - **Off-chain evidence storage.** Written reviews and verification evidence are stored on IPFS and referenced on-chain by CID — the frontend depends on that off-chain content being pinned/available; it is not itself persisted on-chain.
 - **Admin access is allowlist-based.** Admin routes are gated purely by the `NEXT_PUBLIC_ADMIN_ALLOWLIST` public keys; leaving it empty disables the admin dashboard entirely rather than restricting it.

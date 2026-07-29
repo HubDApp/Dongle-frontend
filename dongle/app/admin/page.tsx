@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
@@ -36,24 +36,25 @@ export default function AdminDashboard() {
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<"verification" | "reports">("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
 
-  const isAdmin = useMemo(
-    () =>
-      gate.state === "ready" &&
-      Boolean(gate.publicKey) &&
-      ADMIN_ALLOWLIST.includes(gate.publicKey!),
-    [gate.state, gate.publicKey],
-  );
-
-  // Load reports and moderation log
+  // Load reports, reviews, and moderation log
   useEffect(() => {
-    if (isAdmin) {
-      setReports(reviewReportService.getReports());
-      setModerationLog(reviewReportService.getModerationLog());
-    }
+    if (!isAdmin) return;
+
+    let cancelled = false;
+    setReports(reviewReportService.getReports());
+    setModerationLog(reviewReportService.getModerationLog());
+    void reviewService.getReviews().then((loaded) => {
+      if (!cancelled) setReviews(loaded);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
@@ -97,7 +98,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviewService.getReviews().find((r) => r.id === reviewId);
+    return reviews.find((r) => r.id === reviewId);
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {
@@ -146,16 +147,6 @@ export default function AdminDashboard() {
   }
 
   // ── 3. Authorized — render dashboard ────────────────────────────────────────
-  const handleAction = (id: string, status: "approved" | "rejected") => {
-    setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status } : req)),
-    );
-  };
-
-  const handleSaveFee = () => {
-    toast.success(`Verification fee updated to ${fee} XLM`);
-  };
-
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
