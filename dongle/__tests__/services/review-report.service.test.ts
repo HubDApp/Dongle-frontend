@@ -26,7 +26,7 @@ Object.defineProperty(window, "localStorage", {
 });
 
 describe("Review Report Service", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
     setIdGenerator(() => "test-id-123");
   });
@@ -37,9 +37,9 @@ describe("Review Report Service", () => {
   });
 
   describe("createReport", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       // Seed a review to report
-      reviewService.addReview(
+      await reviewService.addReview(
         {
           projectId: "proj1",
           projectName: "Test Project",
@@ -51,11 +51,11 @@ describe("Review Report Service", () => {
       );
     });
 
-    it("should create a report successfully", () => {
-      const reviews = reviewService.getReviews();
+    it("should create a report successfully", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result = reviewReportService.createReport(
+      const result = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "spam",
@@ -72,11 +72,11 @@ describe("Review Report Service", () => {
       expect(result.data?.reviewId).toBe(review.id);
     });
 
-    it("should reject report with invalid reason", () => {
-      const reviews = reviewService.getReviews();
+    it("should reject report with invalid reason", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result = reviewReportService.createReport(
+      const result = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "invalid-reason",
@@ -90,11 +90,11 @@ describe("Review Report Service", () => {
       expect(result.errors?.[0].field).toBe("reason");
     });
 
-    it("should reject report with explanation exceeding max length", () => {
-      const reviews = reviewService.getReviews();
+    it("should reject report with explanation exceeding max length", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result = reviewReportService.createReport(
+      const result = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "abusive",
@@ -107,11 +107,11 @@ describe("Review Report Service", () => {
       expect(result.errors?.[0].field).toBe("explanation");
     });
 
-    it("should reject self-reporting (review author cannot report own review)", () => {
-      const reviews = reviewService.getReviews();
+    it("should reject self-reporting (review author cannot report own review)", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result = reviewReportService.createReport(
+      const result = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "spam",
@@ -124,12 +124,12 @@ describe("Review Report Service", () => {
       expect(result.errors?.[0].message).toContain("cannot report your own review");
     });
 
-    it("should reject duplicate report from same user on same review", () => {
-      const reviews = reviewService.getReviews();
+    it("should reject duplicate report from same user on same review", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
       // First report
-      const result1 = reviewReportService.createReport(
+      const result1 = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "spam",
@@ -140,7 +140,7 @@ describe("Review Report Service", () => {
       expect(result1.success).toBe(true);
 
       // Second report (duplicate)
-      const result2 = reviewReportService.createReport(
+      const result2 = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "abusive",
@@ -152,11 +152,11 @@ describe("Review Report Service", () => {
       expect(result2.errors?.[0].message).toContain("already reported");
     });
 
-    it("should allow different users to report the same review", () => {
-      const reviews = reviewService.getReviews();
+    it("should allow different users to report the same review", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result1 = reviewReportService.createReport(
+      const result1 = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "spam",
@@ -166,7 +166,7 @@ describe("Review Report Service", () => {
       );
       expect(result1.success).toBe(true);
 
-      const result2 = reviewReportService.createReport(
+      const result2 = await reviewReportService.createReport(
         {
           reviewId: review.id,
           reason: "abusive",
@@ -177,8 +177,8 @@ describe("Review Report Service", () => {
       expect(result2.success).toBe(true);
     });
 
-    it("should reject report for non-existent review", () => {
-      const result = reviewReportService.createReport(
+    it("should reject report for non-existent review", async () => {
+      const result = await reviewReportService.createReport(
         {
           reviewId: "nonexistent-review-id",
           reason: "spam",
@@ -193,8 +193,8 @@ describe("Review Report Service", () => {
   });
 
   describe("getReports", () => {
-    beforeEach(() => {
-      reviewService.addReview(
+    beforeEach(async () => {
+      await reviewService.addReview(
         {
           projectId: "proj1",
           projectName: "Test Project",
@@ -206,20 +206,20 @@ describe("Review Report Service", () => {
       );
     });
 
-    it("should return empty array when no reports exist", () => {
+    it("should return empty array when no reports exist", async () => {
       const reports = reviewReportService.getReports();
       expect(reports).toEqual([]);
     });
 
-    it("should return all reports", () => {
-      const reviews = reviewService.getReviews();
+    it("should return all reports", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      reviewReportService.createReport(
+      await reviewReportService.createReport(
         { reviewId: review.id, reason: "spam", explanation: "Spam" },
         "GUSER5678"
       );
-      reviewReportService.createReport(
+      await reviewReportService.createReport(
         { reviewId: review.id, reason: "abusive", explanation: "Abusive" },
         "GANOTHER99"
       );
@@ -228,13 +228,13 @@ describe("Review Report Service", () => {
       expect(reports).toHaveLength(2);
     });
 
-    it("should handle corrupt JSON gracefully", () => {
+    it("should handle corrupt JSON gracefully", async () => {
       localStorage.setItem("dongle_review_reports", "corrupt json");
       const reports = reviewReportService.getReports();
       expect(reports).toEqual([]);
     });
 
-    it("should handle non-array stored data", () => {
+    it("should handle non-array stored data", async () => {
       localStorage.setItem("dongle_review_reports", JSON.stringify({ notAnArray: true }));
       const reports = reviewReportService.getReports();
       expect(reports).toEqual([]);
@@ -242,8 +242,8 @@ describe("Review Report Service", () => {
   });
 
   describe("getPendingReports", () => {
-    beforeEach(() => {
-      reviewService.addReview(
+    beforeEach(async () => {
+      await reviewService.addReview(
         {
           projectId: "proj1",
           projectName: "Test Project",
@@ -255,11 +255,11 @@ describe("Review Report Service", () => {
       );
     });
 
-    it("should return only pending reports", () => {
-      const reviews = reviewService.getReviews();
+    it("should return only pending reports", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      reviewReportService.createReport(
+      await reviewReportService.createReport(
         { reviewId: review.id, reason: "spam", explanation: "Spam" },
         "GUSER5678"
       );
@@ -267,7 +267,7 @@ describe("Review Report Service", () => {
       const reports = reviewReportService.getReports();
       reviewReportService.resolveReport(reports[0].id, "GADMIN000", "Resolved");
 
-      reviewReportService.createReport(
+      await reviewReportService.createReport(
         { reviewId: review.id, reason: "abusive", explanation: "Abusive" },
         "GANOTHER99"
       );
@@ -279,8 +279,8 @@ describe("Review Report Service", () => {
   });
 
   describe("hasUserReportedReview", () => {
-    beforeEach(() => {
-      reviewService.addReview(
+    beforeEach(async () => {
+      await reviewService.addReview(
         {
           projectId: "proj1",
           projectName: "Test Project",
@@ -292,11 +292,11 @@ describe("Review Report Service", () => {
       );
     });
 
-    it("should return true if user has reported the review", () => {
-      const reviews = reviewService.getReviews();
+    it("should return true if user has reported the review", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      reviewReportService.createReport(
+      await reviewReportService.createReport(
         { reviewId: review.id, reason: "spam", explanation: "Spam" },
         "GUSER5678"
       );
@@ -304,8 +304,8 @@ describe("Review Report Service", () => {
       expect(reviewReportService.hasUserReportedReview(review.id, "GUSER5678")).toBe(true);
     });
 
-    it("should return false if user has not reported the review", () => {
-      const reviews = reviewService.getReviews();
+    it("should return false if user has not reported the review", async () => {
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
       expect(reviewReportService.hasUserReportedReview(review.id, "GUSER5678")).toBe(false);
@@ -315,8 +315,8 @@ describe("Review Report Service", () => {
   describe("Moderation Actions", () => {
     let reportId: string;
 
-    beforeEach(() => {
-      reviewService.addReview(
+    beforeEach(async () => {
+      await reviewService.addReview(
         {
           projectId: "proj1",
           projectName: "Test Project",
@@ -327,10 +327,10 @@ describe("Review Report Service", () => {
         "GABC1234"
       );
 
-      const reviews = reviewService.getReviews();
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result = reviewReportService.createReport(
+      const result = await reviewReportService.createReport(
         { reviewId: review.id, reason: "spam", explanation: "Spam content" },
         "GUSER5678"
       );
@@ -338,7 +338,7 @@ describe("Review Report Service", () => {
     });
 
     describe("resolveReport", () => {
-      it("should resolve a pending report", () => {
+      it("should resolve a pending report", async () => {
         const result = reviewReportService.resolveReport(
           reportId,
           "GADMIN000",
@@ -351,7 +351,7 @@ describe("Review Report Service", () => {
         expect(report?.status).toBe("resolved");
       });
 
-      it("should record audit trail on resolve", () => {
+      it("should record audit trail on resolve", async () => {
         reviewReportService.resolveReport(reportId, "GADMIN000", "Resolved - no violation");
 
         const log = reviewReportService.getModerationLogByReport(reportId);
@@ -362,7 +362,7 @@ describe("Review Report Service", () => {
         expect(log[0].timestamp).toBeDefined();
       });
 
-      it("should reject resolving an already resolved report", () => {
+      it("should reject resolving an already resolved report", async () => {
         reviewReportService.resolveReport(reportId, "GADMIN000", "Resolved");
 
         const result = reviewReportService.resolveReport(
@@ -375,7 +375,7 @@ describe("Review Report Service", () => {
         expect(result.error).toContain("already been moderated");
       });
 
-      it("should reject resolving a non-existent report", () => {
+      it("should reject resolving a non-existent report", async () => {
         const result = reviewReportService.resolveReport(
           "nonexistent",
           "GADMIN000",
@@ -388,7 +388,7 @@ describe("Review Report Service", () => {
     });
 
     describe("dismissReport", () => {
-      it("should dismiss a pending report", () => {
+      it("should dismiss a pending report", async () => {
         const result = reviewReportService.dismissReport(
           reportId,
           "GADMIN000",
@@ -401,7 +401,7 @@ describe("Review Report Service", () => {
         expect(report?.status).toBe("dismissed");
       });
 
-      it("should record audit trail on dismiss", () => {
+      it("should record audit trail on dismiss", async () => {
         reviewReportService.dismissReport(reportId, "GADMIN000", "No violation found");
 
         const log = reviewReportService.getModerationLogByReport(reportId);
@@ -411,7 +411,7 @@ describe("Review Report Service", () => {
         expect(log[0].reason).toBe("No violation found");
       });
 
-      it("should reject dismissing an already dismissed report", () => {
+      it("should reject dismissing an already dismissed report", async () => {
         reviewReportService.dismissReport(reportId, "GADMIN000", "Dismissed");
 
         const result = reviewReportService.dismissReport(
@@ -427,13 +427,13 @@ describe("Review Report Service", () => {
   });
 
   describe("Audit Trail", () => {
-    it("should return empty moderation log when no actions taken", () => {
+    it("should return empty moderation log when no actions taken", async () => {
       const log = reviewReportService.getModerationLog();
       expect(log).toEqual([]);
     });
 
-    it("should return all moderation actions", () => {
-      reviewService.addReview(
+    it("should return all moderation actions", async () => {
+      await reviewService.addReview(
         {
           projectId: "proj1",
           projectName: "Test Project",
@@ -444,10 +444,10 @@ describe("Review Report Service", () => {
         "GABC1234"
       );
 
-      const reviews = reviewService.getReviews();
+      const reviews = await reviewService.getReviews();
       const review = reviews[0];
 
-      const result = reviewReportService.createReport(
+      const result = await reviewReportService.createReport(
         { reviewId: review.id, reason: "spam", explanation: "Spam" },
         "GUSER5678"
       );
@@ -462,7 +462,7 @@ describe("Review Report Service", () => {
       expect(log[0].action).toBe("resolved");
     });
 
-    it("should handle corrupt moderation log JSON gracefully", () => {
+    it("should handle corrupt moderation log JSON gracefully", async () => {
       localStorage.setItem("dongle_review_moderation_log", "corrupt json");
       const log = reviewReportService.getModerationLog();
       expect(log).toEqual([]);

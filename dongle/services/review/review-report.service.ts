@@ -119,18 +119,18 @@ export const reviewReportService = {
     );
   },
 
-  createReport(
+  async createReport(
     data: {
       reviewId: string;
       reason: string;
       explanation: string;
     },
     reporterAddress: string
-  ): {
+  ): Promise<{
     success: boolean;
     data?: ReviewReport;
     errors?: ReviewReportValidationError[];
-  } {
+  }> {
     // Validate input
     const validationErrors = validateReport(data.reason, data.explanation);
     if (validationErrors.length > 0) {
@@ -138,7 +138,7 @@ export const reviewReportService = {
     }
 
     // Verify the review exists
-    const reviews = reviewService.getReviews();
+    const reviews = await reviewService.getReviews();
     const review = reviews.find((r) => r.id === data.reviewId);
     if (!review) {
       return {

@@ -11,6 +11,10 @@ import React, {
 import { walletService } from "@/services/wallet/wallet.service";
 import { SOROBAN_CONFIG } from "@/constants/contracts";
 import { toast } from "sonner";
+import {
+  trackWalletConnect,
+  trackWalletDisconnect,
+} from "@/lib/analytics";
 
 // ─── Network helpers ────────────────────────────────────────────────────────
 
@@ -72,6 +76,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setIsConnected(false);
     setWalletNetwork(null);
     localStorage.removeItem(WALLET_STORAGE_KEY);
+    trackWalletDisconnect();
     toast.success("Wallet disconnected");
   }, []);
 
@@ -169,6 +174,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const onExpectedNetwork =
         networkPassphrase === EXPECTED_NETWORK_PASSPHRASE;
 
+      trackWalletConnect({
+        success: true,
+        networkLabel: getNetworkLabel(networkPassphrase),
+        walletAddress: address,
+      });
+
       toast.success(
         onExpectedNetwork
           ? "Wallet connected successfully"
@@ -179,6 +190,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const msg =
         error instanceof Error ? error.message : "Wallet connection failed";
       console.error("Wallet connection failed:", error);
+      trackWalletConnect({
+        success: false,
+        errorCode: error instanceof Error ? error.name || "Error" : "unknown",
+      });
       toast.error(msg, { id: toastId });
     } finally {
       setIsConnecting(false);

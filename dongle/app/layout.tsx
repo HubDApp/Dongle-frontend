@@ -6,6 +6,7 @@ import { ConfirmDialogProvider } from "@/hooks/useConfirm";
 import { ComparisonProvider } from "@/context/comparison.context";
 import { Toaster } from "sonner";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
+import AnalyticsRoot from "@/components/analytics/AnalyticsRoot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,7 +38,9 @@ export default function RootLayout({
         <WalletProvider>
           <ConfirmDialogProvider>
             <ComparisonProvider>
-              <LayoutWrapper>{children}</LayoutWrapper>
+              <AnalyticsRoot>
+                <LayoutWrapper>{children}</LayoutWrapper>
+              </AnalyticsRoot>
             </ComparisonProvider>
           </ConfirmDialogProvider>
         </WalletProvider>
