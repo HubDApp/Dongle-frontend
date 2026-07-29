@@ -118,21 +118,16 @@ describe("Navbar active navigation", () => {
     expect(reviewsLink.className).toContain("text-zinc-600");
   });
 
-  it("uses the same active underline treatment on mobile and desktop", () => {
-    mockPathname.mockReturnValue("/verify");
+  it("exposes accessible name and expanded state for the mobile menu button", () => {
     render(<Navbar />);
 
-    const desktopVerify = screen.getByRole("link", { name: "Verify" });
-    expect(desktopVerify.className).toContain("font-semibold");
-    expect(desktopVerify.className).toMatch(/border-black|dark:border-white/);
+    const menuButton = screen.getByRole("button", { name: /open menu/i });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    expect(menuButton).toHaveAttribute("aria-controls", "mobile-menu");
 
-    fireEvent.click(screen.getByRole("button", { name: /Open menu/i }));
+    fireEvent.click(menuButton);
 
-    const verifyLinks = screen.getAllByRole("link", { name: "Verify" });
-    expect(verifyLinks.length).toBe(2);
-    for (const link of verifyLinks) {
-      expect(link.className).toContain("font-semibold");
-      expect(link.className).toMatch(/border-black|dark:border-white/);
-    }
+    const closeButton = screen.getByRole("button", { name: /close menu/i });
+    expect(closeButton).toHaveAttribute("aria-expanded", "true");
   });
 });

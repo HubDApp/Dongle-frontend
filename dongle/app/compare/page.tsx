@@ -112,10 +112,12 @@ export default function ComparePage() {
                   {selectedProjects.map((project) => (
                     <th key={project.id} className="p-6 min-w-[250px] relative">
                       <button
+                        type="button"
                         onClick={() => removeProject(project.id)}
                         className="absolute top-4 right-4 text-zinc-400 hover:text-red-500 transition-colors"
+                        aria-label={`Remove ${project.name} from comparison`}
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <div className="flex flex-col items-center gap-3">
                         <ProjectImage
@@ -342,10 +344,12 @@ export default function ComparePage() {
                   <h3 className="font-bold text-lg">{project.name}</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => removeProject(project.id)}
                   className="text-zinc-400 hover:text-red-500 transition-colors"
+                  aria-label={`Remove ${project.name} from comparison`}
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
 
