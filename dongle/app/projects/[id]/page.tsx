@@ -325,6 +325,7 @@ export default function ProjectDetailPage() {
         {
           projectId: project.id,
           ...data,
+          authorAddress: gate.publicKey,
         },
         gate.publicKey
       );
