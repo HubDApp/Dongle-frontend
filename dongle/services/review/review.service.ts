@@ -47,88 +47,97 @@ function hasExistingReview(userAddress: string, projectId: string, reviews: Revi
   );
 }
 
+/**
+ * Safely loads and validates review data from localStorage.
+ * Handles corrupt JSON, non-array data, invalid records, and migrates
+ * recoverable fields to prevent runtime crashes.
+ */
+function safeLoadReviews(stored: string): Review[] {
+  if (!stored) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const validatedReviews: Review[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+
+    // Must have projectId and userAddress as strings
+    if (typeof record.projectId !== "string" || !record.projectId) {
+      continue;
+    }
+    if (typeof record.userAddress !== "string" || !record.userAddress) {
+      continue;
+    }
+
+    // Rating must be a number
+    const rawRating = Number(record.rating);
+    if (isNaN(rawRating)) {
+      continue;
+    }
+    const rating = Math.max(1, Math.min(5, Math.round(rawRating)));
+
+    // Comment must be a string
+    if (typeof record.comment !== "string") {
+      continue;
+    }
+
+    // Migrate / fallback fields
+    const id = typeof record.id === "string" && record.id ? record.id : generateId();
+    const projectName = typeof record.projectName === "string" && record.projectName ? record.projectName : "Unknown Project";
+
+    let createdAt: string;
+    if (typeof record.createdAt === "string" && !isNaN(Date.parse(record.createdAt))) {
+      createdAt = record.createdAt;
+    } else {
+      createdAt = new Date().toISOString();
+    }
+
+    const review: Review = {
+      id,
+      projectId: record.projectId,
+      projectName,
+      userAddress: record.userAddress,
+      rating,
+      comment: record.comment,
+      createdAt,
+    };
+
+    if (Array.isArray(record.helpfulVotes)) {
+      review.helpfulVotes = record.helpfulVotes.filter((v): v is string => typeof v === "string");
+    } else {
+      review.helpfulVotes = [];
+    }
+
+    if (Array.isArray(record.unhelpfulVotes)) {
+      review.unhelpfulVotes = record.unhelpfulVotes.filter((v): v is string => typeof v === "string");
+    } else {
+      review.unhelpfulVotes = [];
+    }
+
+    validatedReviews.push(review);
+  }
+
+  return validatedReviews;
+}
+
 export const reviewService = {
   getReviews(): Review[] {
     if (typeof window === "undefined") return [];
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(stored);
-    } catch {
-      return [];
-    }
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    const validatedReviews: Review[] = [];
-    for (const item of parsed) {
-      if (!item || typeof item !== "object") {
-        continue;
-      }
-
-      const record = item as Record<string, unknown>;
-
-      // Must have projectId and userAddress as strings
-      if (typeof record.projectId !== "string" || !record.projectId) {
-        continue;
-      }
-      if (typeof record.userAddress !== "string" || !record.userAddress) {
-        continue;
-      }
-
-      // Rating must be a number
-      const rawRating = Number(record.rating);
-      if (isNaN(rawRating)) {
-        continue;
-      }
-      const rating = Math.max(1, Math.min(5, Math.round(rawRating)));
-
-      // Comment must be a string
-      if (typeof record.comment !== "string") {
-        continue;
-      }
-
-      // Migrate / fallback fields
-      const id = typeof record.id === "string" && record.id ? record.id : generateId();
-      const projectName = typeof record.projectName === "string" && record.projectName ? record.projectName : "Unknown Project";
-      
-      let createdAt: string;
-      if (typeof record.createdAt === "string" && !isNaN(Date.parse(record.createdAt))) {
-        createdAt = record.createdAt;
-      } else {
-        createdAt = new Date().toISOString();
-      }
-
-      const review: Review = {
-        id,
-        projectId: record.projectId,
-        projectName,
-        userAddress: record.userAddress,
-        rating,
-        comment: record.comment,
-        createdAt,
-      };
-
-      if (Array.isArray(record.helpfulVotes)) {
-        review.helpfulVotes = record.helpfulVotes.filter((v): v is string => typeof v === "string");
-      } else {
-        review.helpfulVotes = [];
-      }
-
-      if (Array.isArray(record.unhelpfulVotes)) {
-        review.unhelpfulVotes = record.unhelpfulVotes.filter((v): v is string => typeof v === "string");
-      } else {
-        review.unhelpfulVotes = [];
-      }
-
-      validatedReviews.push(review);
-    }
-
-    return validatedReviews;
+    return safeLoadReviews(stored ?? "");
   },
 
   addReview(
