@@ -8,6 +8,7 @@ import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Button } from "@/components/ui/Button";
 
 import AddressDisplay from "@/components/ui/AddressDisplay";
+import { IconButton } from "@/components/ui/IconButton";
 import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
@@ -27,6 +28,7 @@ export default function Navbar() {
 
   const menuRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
+  const firstMenuItemRef = useRef<HTMLAnchorElement>(null);
 
   const navLinks = [
     { href: "/discover", label: "Discover" },
@@ -37,6 +39,22 @@ export default function Navbar() {
   ];
 
   const isActive = (href: string) => pathname === href;
+
+  const closeMenu = (options?: { returnFocus?: boolean }) => {
+    setIsMenuOpen(false);
+    if (options?.returnFocus) {
+      requestAnimationFrame(() => {
+        toggleBtnRef.current?.focus();
+      });
+    }
+  };
+
+  const openMenu = () => {
+    setIsMenuOpen(true);
+    requestAnimationFrame(() => {
+      firstMenuItemRef.current?.focus();
+    });
+  };
 
   // Close menu on route changes
   useEffect(() => {
@@ -52,9 +70,7 @@ export default function Navbar() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setIsMenuOpen(false);
-        // Return focus to toggle button when closed via Escape
-        toggleBtnRef.current?.focus();
+        closeMenu({ returnFocus: true });
         return;
       }
 
@@ -62,10 +78,9 @@ export default function Navbar() {
         const focusable = menuRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
-        
-        // Include toggle button in focus loop for mobile
-        const elements = [toggleBtnRef.current, ...Array.from(focusable)].filter(Boolean) as HTMLElement[];
-        
+
+        const elements = Array.from(focusable).filter(Boolean) as HTMLElement[];
+
         if (elements.length === 0) return;
 
         const first = elements[0];
@@ -179,20 +194,24 @@ export default function Navbar() {
           )}
 
           {/* Mobile menu button */}
-          <button
+          <IconButton
             ref={toggleBtnRef}
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onClick={() => {
+              if (isMenuOpen) {
+                closeMenu({ returnFocus: true });
+              } else {
+                openMenu();
+              }
+            }}
             aria-label={isMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMenuOpen}
             aria-controls="mobile-menu"
-            className="md:hidden p-2 rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            size="md"
+            variant="ghost"
+            className="md:hidden rounded-md text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           >
-            {isMenuOpen ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <Menu className="w-5 h-5" />
-            )}
-          </button>
+            {isMenuOpen ? <X /> : <Menu />}
+          </IconButton>
         </div>
       </div>
 
@@ -209,6 +228,8 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                ref={link.href === "/discover" ? firstMenuItemRef : undefined}
+                onClick={() => closeMenu({ returnFocus: true })}
                 className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
                   isActive(link.href)
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
@@ -221,6 +242,7 @@ export default function Navbar() {
             {isAdmin && (
               <Link
                 href="/admin"
+                onClick={() => closeMenu({ returnFocus: true })}
                 className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
                   isActive("/admin")
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"

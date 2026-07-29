@@ -1,5 +1,6 @@
 import { mockProjects } from "@/data/mockProjects";
 import { Project } from "@/types/project";
+import { projectOwnerService } from "./project-owner.service";
 
 /**
  * Unified project service that provides a single source of truth
@@ -18,7 +19,15 @@ export const projectService = {
    * Returns null if project not found
    */
   getProjectById(id: string): Project | null {
-    return mockProjects.find((p) => p.id === id) ?? null;
+    const project = mockProjects.find((p) => p.id === id) ?? null;
+    if (!project) return null;
+
+    const overrideOwner = projectOwnerService.getProjectOwnerOverride(project.id);
+    if (overrideOwner) {
+      return { ...project, ownerAddress: overrideOwner };
+    }
+
+    return project;
   },
 
   /**

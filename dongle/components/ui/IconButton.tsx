@@ -22,6 +22,23 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       lg: "p-3 rounded-2xl",
     };
 
+    const iconSizes = {
+      sm: "w-4 h-4",
+      md: "w-5 h-5",
+      lg: "w-6 h-6",
+    };
+
+    const content = React.isValidElement(children)
+      ? React.cloneElement(children as React.ReactElement<{ className?: string; strokeWidth?: number }>, {
+          className: cn(
+            (children as React.ReactElement<{ className?: string }>).props.className,
+            iconSizes[size],
+            "shrink-0"
+          ),
+          strokeWidth: (children as React.ReactElement<{ strokeWidth?: number }>).props.strokeWidth ?? 2,
+        })
+      : children;
+
     return (
       <button
         ref={ref}
@@ -33,7 +50,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         )}
         {...props}
       >
-        {children}
+        {content}
       </button>
     );
   }
