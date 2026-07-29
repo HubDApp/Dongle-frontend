@@ -11,12 +11,14 @@ import WalletStatePanel, {
   WalletDisconnectedBanner,
 } from "@/components/wallet/WalletStatePanel";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
 
 export default function ReviewsPage() {
   const gate = useWalletPageGate();
+  const confirm = useConfirm();
   const [reviews, setReviews] = useState<Review[]>(() =>
     reviewService.getReviews(),
   );
@@ -58,8 +60,7 @@ export default function ReviewsPage() {
       } : {
         id: review.projectId,
         name: review.projectName,
-        category: "DeFi / DEX",
-        primaryCategory: "DeFi / DEX", // Fallback
+        primaryCategory: "DeFi / DEX" as const,
         tags: [],
         description: "",
         rating: 0,
@@ -69,19 +70,29 @@ export default function ReviewsPage() {
     );
   };
 
-  const handleDeleteReview = (id: string) => {
+  const handleDeleteReview = async (id: string) => {
     if (!gate.publicKey) {
       setShowWalletGate(true);
       return;
     }
-    if (confirm("Are you sure you want to delete this review?")) {
-      const result = reviewService.deleteReview(id, gate.publicKey);
-      if (result.success) {
-        setReviews(reviewService.getReviews());
-        toast.success("Review deleted");
-      } else {
-        toast.error(result.error || "Failed to delete review");
-      }
+
+    const ok = await confirm({
+      title: "Delete review",
+      description:
+        "Are you sure you want to delete this review? This action cannot be undone.",
+      confirmLabel: "Delete",
+      cancelLabel: "Keep review",
+      variant: "danger",
+    });
+
+    if (!ok) return;
+
+    const result = reviewService.deleteReview(id, gate.publicKey);
+    if (result.success) {
+      setReviews(reviewService.getReviews());
+      toast.success("Review deleted");
+    } else {
+      toast.error(result.error || "Failed to delete review");
     }
   };
 

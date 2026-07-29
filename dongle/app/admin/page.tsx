@@ -6,7 +6,7 @@ import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
   WalletStateLoadingPanel,
 } from "@/components/wallet/WalletStatePanel";
-import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { formatDate } from "@/lib/date";
 import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
@@ -27,16 +27,11 @@ const MOCK_REQUESTS: VerificationRequest[] = [
   { id: "req_3", projectName: "Orbit NFT", submittedBy: "GHIJ...9012", status: "approved", timestamp: "2024-03-19T09:15:00Z" },
 ];
 
-const ADMIN_ALLOWLIST = (process.env.NEXT_PUBLIC_ADMIN_ALLOWLIST ?? "")
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
 const ADMIN_PURPOSE =
   "Connect an authorized admin Freighter wallet to manage verification requests, review reports, and system settings.";
 
 export default function AdminDashboard() {
-  const gate = useWalletPageGate();
+  const { isAdmin, isAdminChecking, gate } = useAdminAccess();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<"verification" | "reports">("verification");
@@ -115,8 +110,8 @@ export default function AdminDashboard() {
   if (gate.state !== "ready") {
     return (
       <div className="container mx-auto px-4 py-32 min-h-screen max-w-2xl">
-        {gate.state === "account-loading" ? (
-          <WalletStateLoadingPanel message="Verifying wallet access..." />
+        {isAdminChecking || gate.state === "account-loading" ? (
+          <WalletStateLoadingPanel message="Verifying admin access..." />
         ) : (
           <WalletStatePanel
             state={gate.state}
@@ -131,6 +126,7 @@ export default function AdminDashboard() {
     );
   }
 
+  // ── 2. Wallet ready but not in the admin allowlist ───────────────────────────
   if (!isAdmin) {
     return (
       <div className="container mx-auto px-4 py-32 flex flex-col items-center justify-center text-center min-h-screen">
@@ -139,11 +135,26 @@ export default function AdminDashboard() {
         </div>
         <h1 className="text-3xl font-bold mb-4">Access Restricted</h1>
         <p className="text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-          Please connect an authorized admin wallet to access this dashboard.
+          Your wallet is not on the admin allowlist. Please connect an authorized
+          admin wallet to access this dashboard.
+        </p>
+        <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-600 font-mono break-all max-w-sm">
+          {gate.publicKey}
         </p>
       </div>
     );
   }
+
+  // ── 3. Authorized — render dashboard ────────────────────────────────────────
+  const handleAction = (id: string, status: "approved" | "rejected") => {
+    setRequests((prev) =>
+      prev.map((req) => (req.id === id ? { ...req, status } : req)),
+    );
+  };
+
+  const handleSaveFee = () => {
+    toast.success(`Verification fee updated to ${fee} XLM`);
+  };
 
   return (
     <div className="container mx-auto px-4 py-12">

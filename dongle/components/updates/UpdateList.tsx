@@ -4,7 +4,6 @@ import React from "react";
 import { ProjectUpdate } from "@/types/update";
 import { formatDate } from "@/lib/date";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Megaphone, Shield, Target, Bell, Edit2, Trash2 } from "lucide-react";
 
 interface UpdateListProps {
@@ -82,18 +81,22 @@ export default function UpdateList({
               {canManage && onEdit && onDelete && (
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => onEdit(update)}
                     className="p-2 text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                     title="Edit update"
+                    aria-label="Edit update"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <Edit2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => onDelete(update.id)}
                     className="p-2 text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                     title="Delete update"
+                    aria-label="Delete update"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               )}

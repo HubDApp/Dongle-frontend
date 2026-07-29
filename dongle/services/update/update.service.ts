@@ -1,4 +1,4 @@
-import { ProjectUpdate, UpdateType } from "@/types/update";
+import { ProjectUpdate } from "@/types/update";
 import { mockUpdates } from "@/data/mockUpdates";
 
 /**
@@ -21,7 +21,7 @@ class UpdateService {
    * Add a new update
    */
   addUpdate(
-    update: Omit<ProjectUpdate, "id" | "publishedAt">,
+    update: Omit<ProjectUpdate, "id" | "publishedAt" | "authorAddress">,
     authorAddress: string
   ): ProjectUpdate {
     const newUpdate: ProjectUpdate = {

@@ -94,6 +94,9 @@ npm run test:watch
 npm run audit
 ```
 
+See [DEPENDENCY_POLICY.md](./DEPENDENCY_POLICY.md) for the update cadence, wallet/Stellar SDK compatibility checks, and documented audit exceptions.
+
+
 ### Build & Production
 
 ```bash

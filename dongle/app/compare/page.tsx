@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useComparison } from "@/context/comparison.context";
 import { useRouter } from "next/navigation";
-import { Star, ExternalLink, Github, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
+import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { Button } from "@/components/ui/Button";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
@@ -32,11 +32,7 @@ export default function ComparePage() {
       setIsLoading(false);
     };
 
-    if (selectedProjects.length > 0) {
-      void fetchStatuses();
-    } else {
-      setIsLoading(false);
-    }
+    void fetchStatuses();
   }, [selectedProjects]);
 
   if (selectedProjects.length === 0) {
@@ -116,10 +112,12 @@ export default function ComparePage() {
                   {selectedProjects.map((project) => (
                     <th key={project.id} className="p-6 min-w-[250px] relative">
                       <button
+                        type="button"
                         onClick={() => removeProject(project.id)}
                         className="absolute top-4 right-4 text-zinc-400 hover:text-red-500 transition-colors"
+                        aria-label={`Remove ${project.name} from comparison`}
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <div className="flex flex-col items-center gap-3">
                         <ProjectImage
@@ -238,7 +236,7 @@ export default function ComparePage() {
 
                 <ComparisonRow
                   label="GitHub"
-                  icon={<Github className="w-4 h-4" />}
+                  icon={<GitBranch className="w-4 h-4" />}
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.githubUrl ? (
@@ -249,7 +247,7 @@ export default function ComparePage() {
                           className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1 justify-center"
                         >
                           View Repo
-                          <Github className="w-3 h-3" />
+                          <GitBranch className="w-3 h-3" />
                         </a>
                       ) : (
                         <span className="text-zinc-400 text-sm">N/A</span>
@@ -346,10 +344,12 @@ export default function ComparePage() {
                   <h3 className="font-bold text-lg">{project.name}</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => removeProject(project.id)}
                   className="text-zinc-400 hover:text-red-500 transition-colors"
+                  aria-label={`Remove ${project.name} from comparison`}
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
 
@@ -431,7 +431,7 @@ export default function ComparePage() {
                         className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1"
                       >
                         View Repo
-                        <Github className="w-3 h-3" />
+                        <GitBranch className="w-3 h-3" />
                       </a>
                     ) : (
                       <span className="text-zinc-400">N/A</span>

@@ -10,7 +10,7 @@ interface ReviewListProps {
   reviews: Review[];
   currentUserAddress: string | null;
   onEdit: (review: Review) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onVoteHelpful?: (id: string) => void;
   onVoteUnhelpful?: (id: string) => void;
   onReport?: (review: Review) => void;

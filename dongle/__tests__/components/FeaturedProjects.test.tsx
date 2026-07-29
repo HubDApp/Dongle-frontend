@@ -12,6 +12,29 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("@/context/comparison.context", () => ({
+  useComparison: () => ({
+    selectedProjects: [],
+    addProject: vi.fn(),
+    removeProject: vi.fn(),
+    isSelected: vi.fn(() => false),
+    canAddMore: true,
+    clearComparison: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    isProjectSaved: vi.fn(() => false),
+    toggleSavedProject: vi.fn(),
+    canManageSavedProjects: false,
+    savedProjectIds: [],
+    walletAddress: null,
+    isConnected: false,
+    clearSavedProjects: vi.fn(),
+  }),
+}));
+
 beforeEach(() => {
   sessionStorage.clear();
 });
@@ -63,7 +86,7 @@ describe("FeaturedProjects component", () => {
       expect(defiBtn).toHaveAttribute("aria-pressed", "true");
     });
 
-    const defiProjects = projects.filter((p) => p.category === "DeFi / DEX");
+    const defiProjects = projects.filter((p) => p.primaryCategory === "DeFi / DEX");
     for (const p of defiProjects) {
       expect(screen.getByText(p.name)).toBeInTheDocument();
     }
@@ -79,7 +102,7 @@ describe("FeaturedProjects component", () => {
 
     // Find a category with zero projects (if any)
     const emptyCategory = ALL_CATEGORIES.find(
-      (cat) => cat !== "All" && !projects.some((p) => p.category === cat)
+      (cat) => cat !== "All" && !projects.some((p) => p.primaryCategory === cat)
     );
 
     if (emptyCategory) {
