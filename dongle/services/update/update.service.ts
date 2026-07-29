@@ -1,4 +1,4 @@
-import { ProjectUpdate, UpdateType } from "@/types/update";
+import { ProjectUpdate } from "@/types/update";
 import { mockUpdates } from "@/data/mockUpdates";
 import { generateId } from "@/lib/id-generator";
 

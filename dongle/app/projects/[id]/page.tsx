@@ -11,9 +11,9 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
-import { Review } from "@/types/review";
+import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
 import { formatDate } from "@/lib/date";
-import { reviewService } from "@/services/review/review.service";
+import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
@@ -32,6 +32,10 @@ import {
   GitBranch,
   Globe,
   Info,
+  Bookmark,
+  BookmarkCheck,
+  Shield,
+  Bug,
   Megaphone,
   MessageSquare,
   Shield,
@@ -40,7 +44,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { TransferOwnershipModal } from "@/components/projects/TransferOwnershipModal";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
@@ -68,6 +71,8 @@ export default function ProjectDetailPage() {
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [isReporting, setIsReporting] = useState(false);
+  const [isReportingReview, setIsReportingReview] = useState(false);
+  const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
@@ -90,7 +95,10 @@ export default function ProjectDetailPage() {
 
       // Load reviews from shared service
       if (foundProject) {
-        setReviews(reviewService.getReviewsByProject(foundProject.id));
+        void (async () => {
+          const loaded = await reviewService.getReviewsByProject(foundProject.id);
+          setReviews(loaded);
+        })();
         setUpdates(updateService.getUpdatesByProject(foundProject.id));
         
         // Track this project view
@@ -125,6 +133,14 @@ export default function ProjectDetailPage() {
     };
   }, [projectId, gate.publicKey]);
 
+  const actualRating = React.useMemo(() => {
+    if (reviews.length === 0) return project?.rating || 0;
+    const sum = reviews.reduce((acc, r) => acc + r.rating, 0);
+    return Math.round((sum / reviews.length) * 10) / 10;
+  }, [reviews, project?.rating]);
+
+  const actualReviewCount = reviews.length || project?.reviews || 0;
+
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isSaved = project ? isProjectSaved(project.id) : false;
 
@@ -158,22 +174,36 @@ export default function ProjectDetailPage() {
     toast.success("Project reported successfully");
   };
 
-  const handleTransferOwnership = async (newOwnerAddress: string) => {
-    if (!project || !gate.publicKey) return;
-
-    setIsTransferringOwnership(true);
-    try {
-      await sorobanService.transferOwnership(project.id, newOwnerAddress, {});
-      toast.success("Ownership transfer initiated");
-      setShowTransferModal(false);
-      // Update local state to reflect the new owner
-      setProject({ ...project, ownerAddress: newOwnerAddress });
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Transfer failed";
-      toast.error(msg);
-    } finally {
-      setIsTransferringOwnership(false);
+  const handleReportReview = (review: Review) => {
+    if (gate.state !== "ready") {
+      setShowWalletGate(true);
+      return;
     }
+    setReportingReview(review);
+    setIsReportingReview(true);
+  };
+
+  const handleReportReviewSubmit = (data: { reason: string; explanation: string }) => {
+    if (!gate.publicKey || !reportingReview) return;
+
+    const result = reviewReportService.createReport(
+      {
+        reviewId: reportingReview.id,
+        reason: data.reason as ReviewReportReason,
+        explanation: data.explanation,
+      },
+      gate.publicKey
+    );
+
+    if (result.success) {
+      toast.success("Review reported successfully");
+    } else {
+      const errorMsg = result.errors?.[0]?.message || "Failed to report review";
+      toast.error(errorMsg);
+    }
+
+    setIsReportingReview(false);
+    setReportingReview(null);
   };
 
   const ratingDistribution = React.useMemo(() => {
@@ -216,17 +246,17 @@ export default function ProjectDetailPage() {
       variant: "danger",
     });
     if (!ok) return;
-    reviewService.deleteReview(id, gate.publicKey);
-    setReviews(reviewService.getReviewsByProject(projectId));
+    await reviewService.deleteReview(id, gate.publicKey);
+    setReviews(await reviewService.getReviewsByProject(projectId));
   };
 
-  const handleSubmitReview = (data: { rating: number; comment: string }) => {
+  const handleSubmitReview = async (data: { rating: number; comment: string }) => {
     if (!gate.publicKey || !project) return;
 
     if (editingReview) {
-      reviewService.updateReview(editingReview.id, data, gate.publicKey);
+      await reviewService.updateReview(editingReview.id, data, gate.publicKey);
     } else {
-      reviewService.addReview(
+      await reviewService.addReview(
         {
           projectId: project.id,
           projectName: project.name,
@@ -237,7 +267,7 @@ export default function ProjectDetailPage() {
       );
     }
 
-    setReviews(reviewService.getReviewsByProject(projectId));
+    setReviews(await reviewService.getReviewsByProject(projectId));
     setIsAddingReview(false);
     setEditingReview(null);
   };
@@ -304,7 +334,7 @@ export default function ProjectDetailPage() {
       updateService.deleteUpdate(id, gate.publicKey);
       setUpdates(updateService.getUpdatesByProject(projectId));
       toast.success("Update deleted successfully");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to delete update");
     }
   };
@@ -433,9 +463,9 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2">
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                         <span className="font-bold text-zinc-900 dark:text-zinc-100">
-                          {project.rating}
+                          {actualRating}
                         </span>
-                        <span>({project.reviews} reviews)</span>
+                        <span>({actualReviewCount} reviews)</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -602,11 +632,16 @@ export default function ProjectDetailPage() {
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <MessageSquare className="w-6 h-6" />
                     Reviews
+                    {getReviewPersistenceLabel() !== "API" && (
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full ml-2">
+                        DEV-ONLY
+                      </span>
+                    )}
                   </h2>
                   <div className="flex gap-2">
                     <select
                       value={reviewSort}
-                      onChange={(e) => setReviewSort(e.target.value as any)}
+                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine")}
                       className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
                       <option value="newest">Newest First</option>
@@ -628,10 +663,10 @@ export default function ProjectDetailPage() {
                 {reviews.length > 0 && (
                   <div className="mb-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row gap-8 items-center">
                     <div className="text-center md:text-left">
-                      <div className="text-5xl font-black mb-1">{project?.rating}</div>
+                      <div className="text-5xl font-black mb-1">{actualRating}</div>
                       <div className="flex items-center justify-center md:justify-start gap-1 mb-2">
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} className={`w-4 h-4 ${star <= (project?.rating || 0) ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-300 dark:text-zinc-700'}`} />
+                          <Star key={star} className={`w-4 h-4 ${star <= actualRating ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-300 dark:text-zinc-700'}`} />
                         ))}
                       </div>
                       <div className="text-sm text-zinc-500 dark:text-zinc-400">{reviews.length} total reviews</div>
@@ -708,6 +743,7 @@ export default function ProjectDetailPage() {
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onReport={handleReportReview}
                 />
               </div>
             </div>
@@ -733,13 +769,13 @@ export default function ProjectDetailPage() {
                     <span className="text-zinc-500 dark:text-zinc-400">
                       Rating
                     </span>
-                    <span className="font-bold">{project.rating} / 5.0</span>
+                      <span className="font-bold">{actualRating} / 5.0</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400">
                       Total Reviews
                     </span>
-                    <span className="font-bold">{project.reviews}</span>
+                      <span className="font-bold">{actualReviewCount}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400">
@@ -808,17 +844,15 @@ export default function ProjectDetailPage() {
           onClose={() => setIsReporting(false)}
           onSubmit={handleReportSubmit}
         />
-
-        {project && (
-          <TransferOwnershipModal
-            isOpen={showTransferModal}
-            projectName={project.name}
-            currentOwnerAddress={project.ownerAddress || ""}
-            onClose={() => setShowTransferModal(false)}
-            onTransfer={handleTransferOwnership}
-            isTransferring={isTransferringOwnership}
-          />
-        )}
+        <ReportReviewModal
+          isOpen={isReportingReview}
+          review={reportingReview!}
+          onClose={() => {
+            setIsReportingReview(false);
+            setReportingReview(null);
+          }}
+          onSubmit={handleReportReviewSubmit}
+        />
       </main>
   );
 }

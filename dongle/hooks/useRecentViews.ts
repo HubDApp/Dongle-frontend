@@ -11,10 +11,13 @@ export function useRecentViews(walletAddress?: string) {
 
   // Load recent projects
   useEffect(() => {
-    setIsLoading(true);
-    const projects = recentViewsService.getRecentProjects(walletAddress);
-    setRecentProjects(projects);
-    setIsLoading(false);
+    const id = setTimeout(() => {
+      setIsLoading(true);
+      const projects = recentViewsService.getRecentProjects(walletAddress);
+      setRecentProjects(projects);
+      setIsLoading(false);
+    }, 0);
+    return () => clearTimeout(id);
   }, [walletAddress]);
 
   // Track a new project view

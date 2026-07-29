@@ -2,6 +2,7 @@
  * Tests for useDraft hook
  */
 
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useDraft } from "@/hooks/useDraft";
 import { draftService } from "@/services/draft/draft.service";
@@ -31,7 +32,11 @@ Object.defineProperty(window, "localStorage", {
 describe("useDraft hook", () => {
   beforeEach(() => {
     localStorageMock.clear();
-    jest.clearAllTimers();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("Acceptance Criteria: Autosave runs only after fields change", () => {
@@ -56,7 +61,7 @@ describe("useDraft hook", () => {
       expect(result.current.hasDraft).toBe(false);
     });
 
-    it("should save draft when user types in fields", () => {
+    it("should save draft when user types in fields", async () => {
       const { result } = renderHook(() =>
         useDraft({ mode: "create", autoSave: true })
       );
@@ -74,9 +79,9 @@ describe("useDraft hook", () => {
         });
       });
 
-      // Wait for debounce
-      act(() => {
-        jest.advanceTimersByTime(1000);
+      // Flush autosave debounce
+      await act(async () => {
+        vi.runAllTimers();
       });
 
       expect(result.current.hasDraft).toBe(true);
@@ -84,8 +89,8 @@ describe("useDraft hook", () => {
     });
 
     it("should debounce autosave to prevent excessive saves", () => {
-      jest.useFakeTimers();
-      const saveSpy = jest.spyOn(draftService, "saveDraft");
+      vi.useFakeTimers();
+      const saveSpy = vi.spyOn(draftService, "saveDraft");
 
       const { result } = renderHook(() =>
         useDraft({ mode: "create", autoSave: true })
@@ -136,19 +141,19 @@ describe("useDraft hook", () => {
 
       // Fast-forward time
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
 
       // Should only save once after debounce
       expect(saveSpy).toHaveBeenCalledTimes(1);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
       saveSpy.mockRestore();
     });
   });
 
   describe("Acceptance Criteria: Restored drafts are clearly indicated", () => {
-    it("should load existing draft on mount", () => {
+    it("should load existing draft on mount", async () => {
       // Pre-populate a draft
       const draftData = {
         name: "Existing Project",
@@ -171,12 +176,17 @@ describe("useDraft hook", () => {
         useDraft({ mode: "create", autoSave: true })
       );
 
+      // Flush the deferred state update
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
       expect(result.current.hasDraft).toBe(true);
       expect(result.current.loadedDraft).toEqual(draftData);
       expect(result.current.lastSaved).toBeTruthy();
     });
 
-    it("should provide lastSaved timestamp for UI display", () => {
+    it("should provide lastSaved timestamp for UI display", async () => {
       const draftData = {
         name: "Test Project",
         primaryCategory: "defi",
@@ -198,6 +208,10 @@ describe("useDraft hook", () => {
         useDraft({ mode: "create", autoSave: true })
       );
 
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
       expect(result.current.lastSaved).toBeTruthy();
       expect(typeof result.current.lastSaved).toBe("string");
       // Verify it's a valid ISO timestamp
@@ -208,7 +222,7 @@ describe("useDraft hook", () => {
   });
 
   describe("Acceptance Criteria: Users can clear saved drafts", () => {
-    it("should delete draft when clearDraft is called", () => {
+    it("should delete draft when clearDraft is called", async () => {
       const draftData = {
         name: "To Be Deleted",
         primaryCategory: "defi",
@@ -229,6 +243,11 @@ describe("useDraft hook", () => {
       const { result } = renderHook(() =>
         useDraft({ mode: "create", autoSave: true })
       );
+
+      // Flush deferred mount state
+      await act(async () => {
+        vi.runAllTimers();
+      });
 
       expect(result.current.hasDraft).toBe(true);
 
@@ -241,7 +260,7 @@ describe("useDraft hook", () => {
       expect(result.current.lastSaved).toBeNull();
     });
 
-    it("should delete draft when deleteDraft is called", () => {
+    it("should delete draft when deleteDraft is called", async () => {
       const draftData = {
         name: "To Be Deleted",
         primaryCategory: "defi",
@@ -262,6 +281,10 @@ describe("useDraft hook", () => {
       const { result } = renderHook(() =>
         useDraft({ mode: "create", autoSave: true })
       );
+
+      await act(async () => {
+        vi.runAllTimers();
+      });
 
       act(() => {
         result.current.deleteDraft();
@@ -284,7 +307,7 @@ describe("useDraft hook", () => {
       expect(editResult.current.draftId).toBe("edit-project-project-123");
     });
 
-    it("should load project-specific draft for edit mode", () => {
+    it("should load project-specific draft for edit mode", async () => {
       const draftData = {
         name: "Edit Mode Project",
         primaryCategory: "defi",
@@ -306,6 +329,10 @@ describe("useDraft hook", () => {
       const { result } = renderHook(() =>
         useDraft({ mode: "edit", projectId: "project-456", autoSave: true })
       );
+
+      await act(async () => {
+        vi.runAllTimers();
+      });
 
       expect(result.current.hasDraft).toBe(true);
       expect(result.current.loadedDraft?.name).toBe("Edit Mode Project");
