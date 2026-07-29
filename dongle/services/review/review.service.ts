@@ -4,8 +4,8 @@ import { generateId } from "@/lib/id-generator";
 const STORAGE_KEY = "dongle_reviews";
 
 /**
- * Validates review data using Zod schema
- * Converts Zod errors to ReviewValidationError format for backward compatibility
+ * Validates review data before persistence
+ * Enforces rating constraints (1-5) and comment length limits (10-1000 chars)
  */
 function validateReview(
   rating: number,
