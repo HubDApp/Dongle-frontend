@@ -1,40 +1,82 @@
 /**
+ * UTC-aware date utilities
+ * 
+ * This module ensures consistent, timezone-independent date handling:
+ * - Display formatting uses UTC to avoid timezone shifts
+ * - Timestamps are created consistently in ISO 8601 UTC format
+ * - Tests are stable regardless of machine timezone
+ */
+
+// ─── Timestamp Creation ─────────────────────────────────────────────────────
+
+/**
+ * Get current timestamp as ISO 8601 UTC string
+ * Use for storing timestamps in databases or on-chain
+ */
+export function nowUTC(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * Convert any date input to UTC ISO string
+ */
+export function toUTCString(date: Date | string | number): string {
+  const dateObj = date instanceof Date ? date : new Date(date);
+  return dateObj.toISOString();
+}
+
+// ─── Date Validation ────────────────────────────────────────────────────────
+
+/**
+ * Check if date input is valid
+ */
+export function isValidDate(date: Date | string | number | null | undefined): boolean {
+  if (date === null || date === undefined) return false;
+  const dateObj = date instanceof Date ? date : new Date(date);
+  return !isNaN(dateObj.getTime());
+}
+
+// ─── Display Formatting ─────────────────────────────────────────────────────
+
+/**
  * Formats a date string, number, or Date object into short, long, or relative formats.
+ * Uses UTC-based formatting to ensure consistent display across timezones.
  * Falls back gracefully to "N/A" if the date is invalid.
  */
 export function formatDate(
   dateInput: string | number | Date | null | undefined,
   format: "short" | "long" | "relative" = "short"
 ): string {
-  if (dateInput === null || dateInput === undefined) return "N/A";
+  if (!isValidDate(dateInput)) return "N/A";
 
-  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
-
-  if (isNaN(date.getTime())) {
-    return "N/A";
-  }
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput!);
 
   if (format === "short") {
+    // Use UTC to avoid timezone shifts in display
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "numeric",
       day: "numeric",
+      timeZone: "UTC",
     });
   }
 
   if (format === "long") {
+    // Use UTC to avoid timezone shifts in display
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
+      timeZone: "UTC",
     });
   }
 
   if (format === "relative") {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    // Relative times use actual elapsed time, not affected by timezone
+    const now = Date.now();
+    const diffMs = now - date.getTime();
     
-    // Fall back to short if date is in the future
+    // Fall back to "just now" if date is in the future
     if (diffMs < 0) {
       return "just now";
     }
