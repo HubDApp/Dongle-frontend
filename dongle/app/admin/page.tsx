@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
@@ -8,10 +8,12 @@ import WalletStatePanel, {
 } from "@/components/wallet/WalletStatePanel";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { formatDate } from "@/lib/date";
-import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare } from "lucide-react";
+import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare, ScrollText } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { reviewService } from "@/services/review/review.service";
+import { auditLogService } from "@/services/audit/audit-log.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
+import AuditLogViewer from "@/components/admin/AuditLogViewer";
 
 interface VerificationRequest {
   id: string;
@@ -34,19 +36,11 @@ export default function AdminDashboard() {
   const { isAdmin, isAdminChecking, gate } = useAdminAccess();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
-  const [activeTab, setActiveTab] = useState<"verification" | "reports">("verification");
+  const [activeTab, setActiveTab] = useState<"verification" | "reports" | "audit-log">("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
-
-  const isAdmin = useMemo(
-    () =>
-      gate.state === "ready" &&
-      Boolean(gate.publicKey) &&
-      ADMIN_ALLOWLIST.includes(gate.publicKey!),
-    [gate.state, gate.publicKey],
-  );
 
   // Load reports and moderation log
   useEffect(() => {
@@ -57,12 +51,30 @@ export default function AdminDashboard() {
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
+    const req = requests.find((r) => r.id === id);
     setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status } : req)),
+      prev.map((r) => (r.id === id ? { ...r, status } : r)),
     );
+    if (req && gate.publicKey) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: status === "approved" ? "verification_approved" : "verification_rejected",
+        targetId: req.id,
+        targetLabel: req.projectName,
+      });
+    }
   };
 
   const handleSaveFee = () => {
+    if (gate.publicKey) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "fee_updated",
+        targetId: "verification_fee",
+        targetLabel: "Verification Fee",
+        metadata: { newValue: fee },
+      });
+    }
     toast.success(`Verification fee updated to ${fee} XLM`);
   };
 
@@ -72,6 +84,13 @@ export default function AdminDashboard() {
 
     const result = reviewReportService.resolveReport(reportId, gate.publicKey, reason);
     if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_resolved",
+        targetId: reportId,
+        targetLabel: `Report ${reportId}`,
+        reason,
+      });
       toast.success("Report resolved successfully");
       setReports(reviewReportService.getReports());
       setModerationLog(reviewReportService.getModerationLog());
@@ -87,6 +106,13 @@ export default function AdminDashboard() {
 
     const result = reviewReportService.dismissReport(reportId, gate.publicKey, reason);
     if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_dismissed",
+        targetId: reportId,
+        targetLabel: `Report ${reportId}`,
+        reason,
+      });
       toast.success("Report dismissed");
       setReports(reviewReportService.getReports());
       setModerationLog(reviewReportService.getModerationLog());
@@ -146,15 +172,6 @@ export default function AdminDashboard() {
   }
 
   // ── 3. Authorized — render dashboard ────────────────────────────────────────
-  const handleAction = (id: string, status: "approved" | "rejected") => {
-    setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status } : req)),
-    );
-  };
-
-  const handleSaveFee = () => {
-    toast.success(`Verification fee updated to ${fee} XLM`);
-  };
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -197,6 +214,20 @@ export default function AdminDashboard() {
               </span>
             )}
             {activeTab === "reports" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("audit-log")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "audit-log"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <ScrollText className="w-4 h-4" />
+            Audit Log
+            {activeTab === "audit-log" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -556,6 +587,9 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        )}
+        {activeTab === "audit-log" && (
+          <AuditLogViewer entries={auditLogService.list()} />
         )}
       </div>
     </div>
