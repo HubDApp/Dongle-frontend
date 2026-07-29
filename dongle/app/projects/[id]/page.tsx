@@ -22,28 +22,28 @@ import WalletStatePanel, {
   WalletDisconnectedBanner,
 } from "@/components/wallet/WalletStatePanel";
 import {
+  AlertCircle,
   ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
+  Bug,
+  Calendar,
   ExternalLink,
   GitBranch,
   Globe,
-  Star,
-  MessageSquare,
-  Calendar,
-  AlertCircle,
   Info,
-  Bookmark,
-  BookmarkCheck,
-} from "lucide-react";
-import { toast } from "sonner";
-import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { useSavedProjects } from "@/hooks/useSavedProjects";
-  Shield,
-  Bug,
   Megaphone,
+  MessageSquare,
+  Shield,
+  Star,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { TransferOwnershipModal } from "@/components/projects/TransferOwnershipModal";
+import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
+import { abbreviateStellarAddress } from "@/lib/stellar-address";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -74,10 +74,17 @@ export default function ProjectDetailPage() {
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
   const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
+  const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   useEffect(() => {
+    const abortController = new AbortController();
+    let cancelled = false;
+
     // Simulate data loading
     const timer = setTimeout(() => {
+      if (cancelled || abortController.signal.aborted) return;
+
       const foundProject = projectService.getProjectById(projectId);
       setProject(foundProject);
 
@@ -89,22 +96,33 @@ export default function ProjectDetailPage() {
         // Track this project view
         recentViewsService.addView(foundProject.id, gate.publicKey || undefined);
         
-        // Fetch verification status
-        void (async () => {
+        // Fetch verification status with cancellation support
+        const fetchVerification = async () => {
           try {
-            const status = await sorobanService.getVerificationStatus(projectId);
-            setVerificationStatus(status);
+            const status = await sorobanService.getVerificationStatus(projectId, abortController.signal);
+            if (!cancelled) {
+              setVerificationStatus(status);
+            }
           } catch (error) {
-            console.error("Failed to fetch verification status:", error);
-            setVerificationStatus("NONE");
+            if (!cancelled) {
+              console.error("Failed to fetch verification status:", error);
+              setVerificationStatus("NONE");
+            }
           }
-        })();
+        };
+        fetchVerification();
       }
 
-      setIsLoading(false);
+      if (!cancelled) {
+        setIsLoading(false);
+      }
     }, 600);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      abortController.abort();
+    };
   }, [projectId, gate.publicKey]);
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
@@ -138,6 +156,24 @@ export default function ProjectDetailPage() {
     console.log("Reported:", project?.id, data);
     setIsReporting(false);
     toast.success("Project reported successfully");
+  };
+
+  const handleTransferOwnership = async (newOwnerAddress: string) => {
+    if (!project || !gate.publicKey) return;
+
+    setIsTransferringOwnership(true);
+    try {
+      await sorobanService.transferOwnership(project.id, newOwnerAddress, {});
+      toast.success("Ownership transfer initiated");
+      setShowTransferModal(false);
+      // Update local state to reflect the new owner
+      setProject({ ...project, ownerAddress: newOwnerAddress });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Transfer failed";
+      toast.error(msg);
+    } finally {
+      setIsTransferringOwnership(false);
+    }
   };
 
   const ratingDistribution = React.useMemo(() => {
@@ -739,8 +775,29 @@ export default function ProjectDetailPage() {
                   >
                     Report Project
                   </Button>
+
+                  {isOwner && (
+                    <Button
+                      variant="outline"
+                      className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 border-amber-200 dark:border-amber-900"
+                      onClick={() => setShowTransferModal(true)}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Transfer Ownership
+                    </Button>
+                  )}
                 </div>
               </div>
+
+              {/* Owner Address Display */}
+              {project.ownerAddress && (
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+                  <h3 className="text-lg font-bold mb-4">Owner</h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono break-all">
+                    {abbreviateStellarAddress(project.ownerAddress)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -751,6 +808,17 @@ export default function ProjectDetailPage() {
           onClose={() => setIsReporting(false)}
           onSubmit={handleReportSubmit}
         />
+
+        {project && (
+          <TransferOwnershipModal
+            isOpen={showTransferModal}
+            projectName={project.name}
+            currentOwnerAddress={project.ownerAddress || ""}
+            onClose={() => setShowTransferModal(false)}
+            onTransfer={handleTransferOwnership}
+            isTransferring={isTransferringOwnership}
+          />
+        )}
       </main>
   );
 }

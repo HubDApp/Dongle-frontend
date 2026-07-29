@@ -37,12 +37,14 @@ export function ReportProjectModal({
 
   // Reset state when opened
   useEffect(() => {
-    if (isOpen) {
-      setReason("");
-      setExplanation("");
-      setError("");
-      setTimeout(() => initialFocusRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    
+    setReason("");
+    setExplanation("");
+    setError("");
+    
+    const focusTimer = setTimeout(() => initialFocusRef.current?.focus(), 50);
+    return () => clearTimeout(focusTimer);
   }, [isOpen]);
 
   // Handle escape key

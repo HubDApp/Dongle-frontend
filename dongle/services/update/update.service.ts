@@ -1,5 +1,6 @@
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import { mockUpdates } from "@/data/mockUpdates";
+import { generateId } from "@/lib/id-generator";
 
 /**
  * Update service for managing project updates
@@ -21,12 +22,12 @@ class UpdateService {
    * Add a new update
    */
   addUpdate(
-    update: Omit<ProjectUpdate, "id" | "publishedAt">,
+    update: Omit<ProjectUpdate, "id" | "publishedAt" | "authorAddress">,
     authorAddress: string
   ): ProjectUpdate {
     const newUpdate: ProjectUpdate = {
       ...update,
-      id: `update-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: generateId(),
       publishedAt: new Date().toISOString(),
       authorAddress,
     };
