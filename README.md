@@ -134,3 +134,9 @@ pnpm lint && pnpm typecheck && pnpm test
 - **Testnet-first.** Defaults (RPC URL, network passphrase) point at Stellar testnet. Mainnet use requires explicitly overriding all network-related env vars, and has not been the primary target during development.
 - **Off-chain evidence storage.** Written reviews and verification evidence are stored on IPFS and referenced on-chain by CID — the frontend depends on that off-chain content being pinned/available; it is not itself persisted on-chain.
 - **Admin access is allowlist-based.** Admin routes are gated purely by the `NEXT_PUBLIC_ADMIN_ALLOWLIST` public keys; leaving it empty disables the admin dashboard entirely rather than restricting it.
+
+## Prerequisites
+
+- Node.js >= 20.0.0
+- npm >= 10.0.0
+
