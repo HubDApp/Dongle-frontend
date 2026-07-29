@@ -39,12 +39,6 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
       ? "text-amber-500"
       : "text-zinc-500";
 
-    const baseBorder = error || isAtLimit
-      ? "border-red-500/50 focus:border-red-500"
-      : isNearLimit
-      ? "border-amber-500/50 focus:border-amber-500"
-      : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
-
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
@@ -62,16 +56,14 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           )}
         </div>
         <Input
+          {...props}
           ref={ref}
-          error={!!error}
           id={inputId}
+          error={!!error}
           onChange={handleChange}
           aria-invalid={error || isAtLimit ? true : undefined}
           aria-describedby={[error ? errorId : "", props.maxLength ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
-          {...props}
-          className={`${className} ${
-            error || isAtLimit ? "border-red-500/50 focus:border-red-500" : ""
-          }`}
+          className={`${className} ${baseBorder}`}
         />
         {error && (
           <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
