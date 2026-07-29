@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Check } from "lucide-react";
 
 export default function Hero() {
   return (
@@ -64,7 +65,7 @@ export default function Hero() {
               <div className="absolute -top-6 -right-6 p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl hidden sm:block animate-bounce [animation-duration:3s]">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                    <Check className="w-6 h-6 text-green-500" />
                   </div>
                   <div>
                     <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Status</div>

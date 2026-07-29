@@ -1,11 +1,29 @@
 import {
   getAddress,
+  getNetworkDetails,
   isAllowed,
   isConnected as freighterIsConnected,
   requestAccess,
+  signTransaction,
 } from "@stellar/freighter-api";
 
+function isFreighterMissingError(message: string | undefined): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes("not installed") || lower.includes("not found");
+}
+
 export const walletService = {
+  /** Returns false when the Freighter extension is not available in the browser. */
+  async isFreighterAvailable(): Promise<boolean> {
+    try {
+      const { error } = await freighterIsConnected();
+      return !isFreighterMissingError(error?.message);
+    } catch {
+      return false;
+    }
+  },
+
   // Opens Freighter popup and returns the user's public key on approval
   async connectWallet(): Promise<string> {
     const { isConnected, error: connErr } = await freighterIsConnected();
@@ -58,6 +76,32 @@ export const walletService = {
     }
   },
 
+  // Signs a transaction XDR with Freighter
+  async signTransaction(xdr: string, networkPassphrase: string): Promise<string> {
+    const { signedTxXdr, error } = await signTransaction(xdr, { networkPassphrase });
+    if (error || !signedTxXdr) {
+      throw new Error(error ?? "Transaction signing failed");
+    }
+    return signedTxXdr;
+  },
+
   // Freighter has no disconnect API — context handles clearing state on its end
   disconnectWallet(): void {},
+
+  /**
+   * Returns the network passphrase of the wallet's currently selected network.
+   * Returns null when Freighter is unavailable or not yet approved.
+   */
+  async getNetworkPassphrase(): Promise<string | null> {
+    try {
+      const { isConnected } = await freighterIsConnected();
+      if (!isConnected) return null;
+      const details = await getNetworkDetails();
+      // Freighter ≥ 1.7 returns { networkPassphrase, network, networkUrl }
+      // Older versions may return { networkPassphrase } directly.
+      return (details as { networkPassphrase?: string }).networkPassphrase ?? null;
+    } catch {
+      return null;
+    }
+  },
 };

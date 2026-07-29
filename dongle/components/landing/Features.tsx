@@ -1,30 +1,20 @@
+import { ShieldCheck, MessageSquare, Code } from "lucide-react";
+
 const features = [
   {
     title: "On-Chain Verification",
     description: "Every app listing and review is stored directly on the Stellar blockchain, ensuring data integrity and censorship resistance.",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    ),
+    icon: <ShieldCheck className="w-6 h-6" />,
   },
   {
     title: "Community Reviews",
     description: "Real users provide verified feedback. Reviewers earn reputation based on the accuracy and depth of their contributions.",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-      </svg>
-    ),
+    icon: <MessageSquare className="w-6 h-6" />,
   },
   {
     title: "Developer Focused",
     description: "Simple integration for developers to list their Stellar dApps and reach a community that values trust and transparency.",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    ),
+    icon: <Code className="w-6 h-6" />,
   },
 ];
 

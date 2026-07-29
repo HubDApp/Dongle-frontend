@@ -1,48 +1,52 @@
-import React, { useId, forwardRef } from 'react';
+import React from "react";
+import { ChevronDown } from "lucide-react";
 
 export interface SelectOption {
-  label: string;
   value: string;
-}
-
-export interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
-  error?: string;
-  id?: string;
-  options: SelectOption[];
 }
 
-export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
-  ({ label, error, id: customId, options, className = '', ...props }, ref) => {
-    const generatedId = useId();
-    const id = customId || generatedId;
-    const errorId = `${id}-error`;
+interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label: string;
+  options: SelectOption[];
+  error?: string;
+}
+
+export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(
+  ({ label, options, error, className = "", id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const selectId = id || generatedId;
+    const errorId = `${selectId}-error`;
 
     return (
-      <div className="flex flex-col gap-1.5 w-full">
-        <label htmlFor={id} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+      <div className="flex flex-col gap-2 w-full">
+        <label htmlFor={selectId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           {label}
         </label>
-        <select
-          id={id}
-          ref={ref}
-          aria-invalid={!!error}
-          aria-describedby={error ? errorId : undefined}
-          className={`rounded-md border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white ${
-            error
-              ? 'border-red-500 focus:ring-red-500'
-              : 'border-zinc-300 dark:border-zinc-700'
-          } ${className}`}
-          {...props}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="dark:bg-zinc-800">
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            {...props}
+            ref={ref}
+            id={selectId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${
+              error ? "border-red-500/50 focus:border-red-500" : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50"
+            } rounded-2xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 ${className}`}
+          >
+            <option value="" disabled>Select a category</option>
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+            <ChevronDown className="w-4 h-4" />
+          </div>
+        </div>
         {error && (
-          <span id={errorId} className="text-xs text-red-500 font-medium">
+          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
             {error}
           </span>
         )}
@@ -51,4 +55,4 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
   }
 );
 
-SelectField.displayName = 'SelectField';
+SelectField.displayName = "SelectField";

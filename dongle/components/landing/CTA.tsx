@@ -14,7 +14,7 @@ export default function CTA() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link 
-                href="/listing" 
+                href="/projects/new" 
                 className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-black text-black dark:text-white font-bold rounded-full hover:scale-105 transition-transform"
               >
                 Submit Project

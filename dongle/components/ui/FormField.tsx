@@ -1,37 +1,84 @@
-import React, { useId, forwardRef } from 'react';
+import React from "react";
+import { Input } from "./Input";
 
-export interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
-  id?: string;
+  helperText?: string;
 }
 
-export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, id: customId, className = '', ...props }, ref) => {
-    const generatedId = useId();
-    const id = customId || generatedId;
-    const errorId = `${id}-error`;
+export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
+  ({ label, error, helperText, className = "", id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
+    const errorId = `${inputId}-error`;
+    const counterId = `${inputId}-counter`;
+    const helperId = `${inputId}-helper`;
+
+    const [charCount, setCharCount] = React.useState(0);
+
+    React.useEffect(() => {
+      if (typeof props.value === "string") {
+        setCharCount(props.value.length);
+      } else if (typeof props.defaultValue === "string") {
+        setCharCount(props.defaultValue.length);
+      }
+    }, [props.value, props.defaultValue]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setCharCount(e.target.value.length);
+      props.onChange?.(e);
+    };
+
+    const isNearLimit = props.maxLength && charCount >= props.maxLength * 0.9;
+    const isAtLimit = props.maxLength && charCount >= props.maxLength;
+
+    const counterClass = isAtLimit
+      ? "text-red-500"
+      : isNearLimit
+      ? "text-amber-500"
+      : "text-zinc-500";
+
+    const baseBorder = error || isAtLimit
+      ? "border-red-500/50 focus:border-red-500"
+      : isNearLimit
+      ? "border-amber-500/50 focus:border-amber-500"
+      : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
 
     return (
-      <div className="flex flex-col gap-1.5 w-full">
-        <label htmlFor={id} className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          {label}
-        </label>
-        <input
-          id={id}
-          ref={ref}
-          aria-invalid={!!error}
-          aria-describedby={error ? errorId : undefined}
-          className={`rounded-md border bg-transparent px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white ${
-            error
-              ? 'border-red-500 focus:ring-red-500'
-              : 'border-zinc-300 dark:border-zinc-700'
-          } ${className}`}
+      <div className="flex flex-col gap-2 w-full">
+        <div className="flex justify-between items-end">
+          <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            {label}
+          </label>
+          {props.maxLength && (
+            <span
+              id={counterId}
+              className={`text-xs font-medium ${counterClass} transition-colors`}
+              aria-live="polite"
+            >
+              {charCount} / {props.maxLength}
+            </span>
+          )}
+        </div>
+        <Input
           {...props}
+          ref={ref}
+          id={inputId}
+          error={!!error}
+          onChange={handleChange}
+          aria-invalid={error || isAtLimit ? true : undefined}
+          aria-describedby={[error ? errorId : "", props.maxLength ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
+          className={`${className} ${baseBorder}`}
         />
         {error && (
-          <span id={errorId} className="text-xs text-red-500 font-medium">
+          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
             {error}
+          </span>
+        )}
+        {!error && helperText && (
+          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+            {helperText}
           </span>
         )}
       </div>
@@ -39,4 +86,4 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
   }
 );
 
-FormField.displayName = 'FormField';
+FormField.displayName = "FormField";
