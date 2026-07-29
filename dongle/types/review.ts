@@ -26,22 +26,56 @@ export interface ReviewValidationError {
   message: string;
 }
 
-// Zod schema for review validation
-export const reviewSchema = z.object({
-  rating: z
-    .number()
-    .int("Rating must be an integer")
-    .min(REVIEW_CONSTRAINTS.RATING_MIN, `Rating must be at least ${REVIEW_CONSTRAINTS.RATING_MIN}`)
-    .max(REVIEW_CONSTRAINTS.RATING_MAX, `Rating must be at most ${REVIEW_CONSTRAINTS.RATING_MAX}`),
-  comment: z
-    .string()
-    .min(REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH, `Comment must be at least ${REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters`)
-    .max(REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH, `Comment cannot exceed ${REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH} characters`)
-    .trim()
-    .refine(val => val.length >= REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH, `Comment must be at least ${REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters after trimming`),
-});
+// ─── Review Reporting Types ─────────────────────────────────────────────────
 
-export type ReviewInput = z.infer<typeof reviewSchema>;
+export type ReviewReportReason =
+  | "spam"
+  | "abusive"
+  | "inappropriate"
+  | "misleading"
+  | "harassment"
+  | "other";
+
+export type ReviewReportStatus = "pending" | "resolved" | "dismissed";
+
+export type ModerationActionType = "resolved" | "dismissed";
+
+export const REVIEW_REPORT_REASONS: { value: ReviewReportReason; label: string }[] = [
+  { value: "spam", label: "Spam" },
+  { value: "abusive", label: "Abusive or Hateful" },
+  { value: "inappropriate", label: "Inappropriate Content" },
+  { value: "misleading", label: "Misleading or False" },
+  { value: "harassment", label: "Harassment" },
+  { value: "other", label: "Other" },
+];
+
+export const REVIEW_REPORT_CONSTRAINTS = {
+  EXPLANATION_MAX_LENGTH: 2000,
+} as const;
+
+export interface ReviewReport {
+  id: string;
+  reviewId: string;
+  reporterAddress: string;
+  reason: ReviewReportReason;
+  explanation: string;
+  status: ReviewReportStatus;
+  createdAt: string;
+}
+
+export interface ModerationAction {
+  id: string;
+  reportId: string;
+  moderatorAddress: string;
+  action: ModerationActionType;
+  reason: string;
+  timestamp: string;
+}
+
+export interface ReviewReportValidationError {
+  field: "reason" | "explanation";
+  message: string;
+}
 
 // Re-export Project for backward compatibility in components
 export type { Project };

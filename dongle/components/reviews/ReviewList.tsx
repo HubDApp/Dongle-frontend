@@ -3,7 +3,7 @@
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
-import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 
 interface ReviewListProps {
@@ -13,6 +13,7 @@ interface ReviewListProps {
   onDelete: (id: string) => void | Promise<void>;
   onVoteHelpful?: (id: string) => void;
   onVoteUnhelpful?: (id: string) => void;
+  onReport?: (review: Review) => void;
 }
 
 export default function ReviewList({ 
@@ -21,7 +22,8 @@ export default function ReviewList({
   onEdit, 
   onDelete,
   onVoteHelpful,
-  onVoteUnhelpful
+  onVoteUnhelpful,
+  onReport
 }: ReviewListProps) {
   if (reviews.length === 0) {
     return (
@@ -100,26 +102,39 @@ export default function ReviewList({
               </div>
             </div>
             
-            {currentUserAddress === review.userAddress && (
-              <div className="flex gap-2">
-                <IconButton
-                  onClick={() => onEdit(review)}
-                  aria-label="Edit review"
-                  variant="default"
-                  size="sm"
-                >
-                  <Pencil className="w-4 h-4" />
-                </IconButton>
-                <IconButton
-                  onClick={() => onDelete(review.id)}
-                  aria-label="Delete review"
-                  variant="error"
-                  size="sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </IconButton>
-              </div>
-            )}
+            <div className="flex gap-2">
+              {currentUserAddress === review.userAddress ? (
+                <>
+                  <IconButton
+                    onClick={() => onEdit(review)}
+                    aria-label="Edit review"
+                    variant="default"
+                    size="sm"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => onDelete(review.id)}
+                    aria-label="Delete review"
+                    variant="error"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </IconButton>
+                </>
+              ) : (
+                currentUserAddress && onReport && (
+                  <IconButton
+                    onClick={() => onReport(review)}
+                    aria-label="Report review"
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <Flag className="w-4 h-4 text-zinc-400 hover:text-red-500" />
+                  </IconButton>
+                )
+              )}
+            </div>
           </div>
         </div>
       ))}
