@@ -15,6 +15,7 @@ import {
 } from "@/context/wallet.context";
 import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
+import { validateStellarAddress } from "@/lib/stellar-address";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,
@@ -296,6 +297,7 @@ export const sorobanService = {
    */
   async getVerificationStatus(
     projectId: string,
+    signal?: AbortSignal,
   ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
     try {
       const { verificationService } = await import("./verification.service");
@@ -394,6 +396,55 @@ export const sorobanService = {
     );
 
     console.log("[SorobanService] Update successful:", result.hash);
+    return result;
+  },
+
+  /**
+   * Transfer ownership of a project to a new Stellar address.
+   * Only the current owner can initiate this transfer.
+   * The new owner address is validated before submission.
+   *
+   * Note: This operation requires underlying contract support (`transfer_ownership`).
+   */
+  async transferOwnership(
+    projectId: string,
+    newOwnerAddress: string,
+    options: SorobanTransactionOptions = {},
+  ) {
+    let publicKey: string;
+    try {
+      publicKey = await walletService.getPublicKey();
+    } catch {
+      throw new WalletNotConnectedError();
+    }
+
+    const project = await this.getProject(projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.owner !== publicKey) {
+      throw new Error("Only the current project owner can transfer ownership");
+    }
+
+    // Validate new owner address
+    const validation = validateStellarAddress(newOwnerAddress);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    const args = [
+      nativeToScVal(projectId),
+      nativeToScVal(newOwnerAddress),
+    ];
+
+    const result = await executeContractTransaction(
+      publicKey,
+      (contract) => contract.call("transfer_ownership", ...args),
+      options,
+    );
+
+    console.log(
+      "[SorobanService] Ownership transfer successful:",
+      result.hash,
+    );
     return result;
   },
 
