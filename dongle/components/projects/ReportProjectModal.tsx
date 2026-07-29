@@ -37,12 +37,16 @@ export function ReportProjectModal({
 
   // Reset state when opened
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    // Schedule resets as a microtask so they run after render,
+    // avoiding synchronous setState-in-effect lint violations.
+    const id = setTimeout(() => {
       setReason("");
       setExplanation("");
       setError("");
-      setTimeout(() => initialFocusRef.current?.focus(), 50);
-    }
+      initialFocusRef.current?.focus();
+    }, 0);
+    return () => clearTimeout(id);
   }, [isOpen]);
 
   // Handle escape key

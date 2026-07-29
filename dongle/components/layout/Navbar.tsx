@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Button } from "@/components/ui/Button";
 
 import AddressDisplay from "@/components/ui/AddressDisplay";
@@ -21,6 +22,8 @@ export default function Navbar() {
     connectWallet,
     disconnectWallet,
   } = useWallet();
+
+  const { isAdmin } = useAdminAccess();
 
   const menuRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
@@ -109,7 +112,7 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {isConnected && (
+            {isAdmin && (
               <Link
                 href="/admin"
                 className={`py-2 px-1 transition-all border-b-2 ${
@@ -201,27 +204,27 @@ export default function Navbar() {
           aria-hidden={!isMenuOpen}
           className="md:hidden bg-white dark:bg-black border-t border-zinc-200 dark:border-zinc-800"
         >
-          <div className="px-4 py-4 space-y-2">
+          <div className="px-4 py-4 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`block py-2 text-sm font-medium transition-colors ${
+                className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
                   isActive(link.href)
-                    ? "text-black dark:text-white"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                    ? "text-black dark:text-white font-semibold border-black dark:border-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"
                 }`}
               >
                 {link.label}
               </Link>
             ))}
-            {isConnected && (
+            {isAdmin && (
               <Link
                 href="/admin"
-                className={`block py-2 text-sm font-medium transition-colors ${
+                className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
                   isActive("/admin")
-                    ? "text-black dark:text-white"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                    ? "text-black dark:text-white font-semibold border-black dark:border-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"
                 }`}
               >
                 Admin

@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "default" | "ghost" | "error";
   size?: "sm" | "md" | "lg";
+  /** Required accessible name for icon-only controls */
+  "aria-label": string;
 }
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(

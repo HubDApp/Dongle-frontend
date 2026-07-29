@@ -68,8 +68,17 @@ export const ProjectCard = ({
       {/* Compare toggle — rendered below the save button on the left */}
       {showCompareCheckbox && (
         <button
+          type="button"
           onClick={handleCompareToggle}
           disabled={!selected && !canAddMore}
+          aria-pressed={selected}
+          aria-label={
+            selected
+              ? `Remove ${project.name} from comparison`
+              : !canAddMore
+              ? `Cannot add ${project.name}: maximum 4 projects`
+              : `Add ${project.name} to comparison`
+          }
           className={`absolute left-4 top-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
             selected
               ? "bg-blue-500 text-white"
