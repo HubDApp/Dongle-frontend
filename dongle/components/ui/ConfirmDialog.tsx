@@ -111,20 +111,20 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    // Backdrop
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
-      onClick={onCancel}
-      aria-hidden="true"
-    >
-      {/* Dialog panel — stop click propagation so backdrop click doesn't fire inside */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop is decorative; dialog is a sibling so it stays accessible */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+
       <div
         ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
-        onClick={(e) => e.stopPropagation()}
         className={cn(
           "relative w-full max-w-md bg-white dark:bg-zinc-900",
           "border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl",

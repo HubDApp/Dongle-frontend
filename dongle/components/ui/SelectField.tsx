@@ -1,9 +1,14 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
 
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
 interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
-  options: { value: string; label: string }[];
+  options: SelectOption[];
   error?: string;
 }
 
@@ -20,6 +25,7 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
         </label>
         <div className="relative">
           <select
+            {...props}
             ref={ref}
             id={selectId}
             aria-invalid={error ? true : undefined}
@@ -27,7 +33,6 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
             className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${
               error ? "border-red-500/50 focus:border-red-500" : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50"
             } rounded-2xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 ${className}`}
-            {...props}
           >
             <option value="" disabled>Select a category</option>
             {options.map((option) => (

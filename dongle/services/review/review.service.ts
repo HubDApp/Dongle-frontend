@@ -1,4 +1,4 @@
-import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
+import { Review, REVIEW_CONSTRAINTS, ReviewValidationError, reviewSchema } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { reviewApiService } from "./review-api.service";
 

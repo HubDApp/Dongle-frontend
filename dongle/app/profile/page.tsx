@@ -15,6 +15,7 @@ import WalletStatePanel, {
 } from "@/components/wallet/WalletStatePanel";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
+import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import {
   LogOut,
   Star,
@@ -188,6 +189,29 @@ export default function ProfilePage() {
                       inline={true}
                       className="flex-1 text-sm font-mono text-zinc-900 dark:text-zinc-100 break-all"
                     />
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
+                    Network
+                  </label>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl space-y-2">
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">
+                      Connected to{" "}
+                      <span className="font-semibold font-mono">
+                        {gate.walletNetworkLabel}
+                      </span>
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Dongle requires Stellar{" "}
+                      <span className="font-semibold font-mono">
+                        {EXPECTED_NETWORK_LABEL}
+                      </span>{" "}
+                      (Soroban testnet). Before signing, confirm Freighter is on
+                      this network via Settings → Network. Wrong-network
+                      transactions are blocked automatically.
+                    </p>
                   </div>
                 </div>
 

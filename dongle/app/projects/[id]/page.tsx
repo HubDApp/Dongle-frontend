@@ -11,7 +11,7 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
-import { Review } from "@/types/review";
+import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
@@ -65,6 +65,8 @@ export default function ProjectDetailPage() {
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [isReporting, setIsReporting] = useState(false);
+  const [isReportingReview, setIsReportingReview] = useState(false);
+  const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
@@ -146,6 +148,38 @@ export default function ProjectDetailPage() {
     console.log("Reported:", project?.id, data);
     setIsReporting(false);
     toast.success("Project reported successfully");
+  };
+
+  const handleReportReview = (review: Review) => {
+    if (gate.state !== "ready") {
+      setShowWalletGate(true);
+      return;
+    }
+    setReportingReview(review);
+    setIsReportingReview(true);
+  };
+
+  const handleReportReviewSubmit = (data: { reason: string; explanation: string }) => {
+    if (!gate.publicKey || !reportingReview) return;
+
+    const result = reviewReportService.createReport(
+      {
+        reviewId: reportingReview.id,
+        reason: data.reason as ReviewReportReason,
+        explanation: data.explanation,
+      },
+      gate.publicKey
+    );
+
+    if (result.success) {
+      toast.success("Review reported successfully");
+    } else {
+      const errorMsg = result.errors?.[0]?.message || "Failed to report review";
+      toast.error(errorMsg);
+    }
+
+    setIsReportingReview(false);
+    setReportingReview(null);
   };
 
   const ratingDistribution = React.useMemo(() => {
@@ -276,7 +310,7 @@ export default function ProjectDetailPage() {
       updateService.deleteUpdate(id, gate.publicKey);
       setUpdates(updateService.getUpdatesByProject(projectId));
       toast.success("Update deleted successfully");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to delete update");
     }
   };
@@ -583,7 +617,7 @@ export default function ProjectDetailPage() {
                   <div className="flex gap-2">
                     <select
                       value={reviewSort}
-                      onChange={(e) => setReviewSort(e.target.value as any)}
+                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine")}
                       className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
                       <option value="newest">Newest First</option>
@@ -685,6 +719,7 @@ export default function ProjectDetailPage() {
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onReport={handleReportReview}
                 />
               </div>
             </div>
@@ -763,6 +798,15 @@ export default function ProjectDetailPage() {
           projectName={project?.name || ""}
           onClose={() => setIsReporting(false)}
           onSubmit={handleReportSubmit}
+        />
+        <ReportReviewModal
+          isOpen={isReportingReview}
+          review={reportingReview!}
+          onClose={() => {
+            setIsReportingReview(false);
+            setReportingReview(null);
+          }}
+          onSubmit={handleReportReviewSubmit}
         />
       </main>
   );

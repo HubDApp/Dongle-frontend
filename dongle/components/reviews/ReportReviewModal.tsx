@@ -6,28 +6,21 @@ import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { cn } from "@/lib/utils";
+import { Review, REVIEW_REPORT_REASONS, REVIEW_REPORT_CONSTRAINTS } from "@/types/review";
 
-interface ReportProjectModalProps {
+interface ReportReviewModalProps {
   isOpen: boolean;
-  projectName: string;
+  review: Review;
   onClose: () => void;
   onSubmit: (data: { reason: string; explanation: string }) => void;
 }
 
-const REPORT_REASONS = [
-  { value: "phishing", label: "Phishing or Scam" },
-  { value: "impersonation", label: "Impersonation" },
-  { value: "broken_links", label: "Broken Links" },
-  { value: "fraud", label: "Fraud" },
-  { value: "inappropriate", label: "Inappropriate Content" },
-];
-
-export function ReportProjectModal({
+export function ReportReviewModal({
   isOpen,
-  projectName,
+  review,
   onClose,
   onSubmit,
-}: ReportProjectModalProps) {
+}: ReportReviewModalProps) {
   const [reason, setReason] = useState("");
   const [explanation, setExplanation] = useState("");
   const [error, setError] = useState("");
@@ -37,16 +30,12 @@ export function ReportProjectModal({
 
   // Reset state when opened
   useEffect(() => {
-    if (!isOpen) return;
-    // Schedule resets as a microtask so they run after render,
-    // avoiding synchronous setState-in-effect lint violations.
-    const id = setTimeout(() => {
+    if (isOpen) {
       setReason("");
       setExplanation("");
       setError("");
-      initialFocusRef.current?.focus();
-    }, 0);
-    return () => clearTimeout(id);
+      setTimeout(() => initialFocusRef.current?.focus(), 50);
+    }
   }, [isOpen]);
 
   // Handle escape key
@@ -80,7 +69,7 @@ export function ReportProjectModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="report-dialog-title"
+        aria-labelledby="report-review-dialog-title"
         onClick={(e) => e.stopPropagation()}
         className={cn(
           "relative w-full max-w-md bg-white dark:bg-zinc-900",
@@ -92,12 +81,27 @@ export function ReportProjectModal({
           <Flag className="w-6 h-6 text-red-500" aria-hidden="true" />
         </div>
 
-        <h2 id="report-dialog-title" className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-          Report {projectName}
+        <h2 id="report-review-dialog-title" className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
+          Report Review
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-6">
-          Please provide details about why you are reporting this project. Your report will be reviewed by our team.
+          Report this review by{" "}
+          <span className="font-mono text-zinc-700 dark:text-zinc-300">
+            {review.userAddress.substring(0, 6)}...
+          </span>
+          . Your report will be reviewed by our moderation team.
         </p>
+
+        <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-yellow-500 font-bold">{review.rating}/5</span>
+            <span className="text-xs text-zinc-500">•</span>
+            <span className="text-xs text-zinc-500">{review.projectName}</span>
+          </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3">
+            {review.comment}
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <SelectField
@@ -108,7 +112,7 @@ export function ReportProjectModal({
               setReason(e.target.value);
               if (error) setError("");
             }}
-            options={REPORT_REASONS}
+            options={REVIEW_REPORT_REASONS}
             error={error}
           />
 
@@ -116,7 +120,8 @@ export function ReportProjectModal({
             label="Additional explanation (optional)"
             value={explanation}
             onChange={(e) => setExplanation(e.target.value)}
-            placeholder="Provide any additional context or links..."
+            placeholder="Provide any additional context..."
+            maxLength={REVIEW_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH}
           />
 
           <div className="flex gap-3 justify-end pt-4">

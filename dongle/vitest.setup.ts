@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 
+// Test setup for Vitest - mocks Next.js navigation and browser APIs
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),

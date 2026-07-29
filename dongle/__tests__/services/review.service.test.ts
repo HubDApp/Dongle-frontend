@@ -50,7 +50,7 @@ describe("Review Service", () => {
       expect(result.success).toBe(false);
       expect(result.errors).toBeDefined();
       expect(result.errors?.[0].field).toBe("rating");
-      expect(result.errors?.[0].message).toContain("between");
+      expect(result.errors?.[0].message).toContain("at least");
     });
 
     it("should reject review with invalid rating (too high)", async () => {
