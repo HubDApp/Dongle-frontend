@@ -181,7 +181,7 @@ describe("sorobanService - no-wallet error path", () => {
     await expect(
       sorobanService.registerProject({
         name: "My Project",
-        category: "cat",
+        category: "DeFi / DEX",
         description: "desc",
         websiteUrl: "https://example.com",
       }),

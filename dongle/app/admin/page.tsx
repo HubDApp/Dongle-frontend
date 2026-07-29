@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
@@ -39,32 +39,24 @@ export default function AdminDashboard() {
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
 
-  const isAdmin = useMemo(
-    () =>
-      gate.state === "ready" &&
-      Boolean(gate.publicKey) &&
-      ADMIN_ALLOWLIST.includes(gate.publicKey!),
-    [gate.state, gate.publicKey],
-  );
-
-  // Load reports and moderation log
+  // Load reports, moderation log, and reviews for report context
   useEffect(() => {
-    if (isAdmin) {
+    if (!isAdmin) return;
+    const id = setTimeout(() => {
       setReports(reviewReportService.getReports());
       setModerationLog(reviewReportService.getModerationLog());
-    }
+      void reviewService.getReviews().then((reviews) => {
+        const map: Record<string, Review> = {};
+        for (const review of reviews) {
+          map[review.id] = review;
+        }
+        setReviewsById(map);
+      });
+    }, 0);
+    return () => clearTimeout(id);
   }, [isAdmin]);
-
-  const handleAction = (id: string, status: "approved" | "rejected") => {
-    setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status } : req)),
-    );
-  };
-
-  const handleSaveFee = () => {
-    toast.success(`Verification fee updated to ${fee} XLM`);
-  };
 
   const handleResolveReport = (reportId: string) => {
     const reason = moderationReason[reportId]?.trim() || "Review content complies with guidelines";
@@ -97,7 +89,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviewService.getReviews().find((r) => r.id === reviewId);
+    return reviewsById[reviewId];
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {

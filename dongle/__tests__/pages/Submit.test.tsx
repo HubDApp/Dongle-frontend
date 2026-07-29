@@ -34,6 +34,21 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("@/hooks/useDraft", () => ({
+  useDraft: () => ({
+    loadedDraft: null,
+    lastSavedAt: null,
+    isSaving: false,
+    saveDraft: vi.fn(),
+    clearDraft: vi.fn(),
+    deleteDraft: vi.fn(),
+  }),
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  trackProjectSubmit: vi.fn(),
+}));
+
 function mockWallet(overrides: Partial<ReturnType<typeof walletContext.useWallet>> = {}) {
   const isConnected = overrides.isConnected ?? false;
   vi.spyOn(walletContext, "useWallet").mockReturnValue({
@@ -130,13 +145,18 @@ describe("Submit Project Page - High Risk Flows", () => {
       const user = userEvent.setup({ delay: null });
       render(<NewProjectPage />);
 
-      await user.type(screen.getByLabelText(/project name/i), "Test Project");
-      await user.type(
-        screen.getByLabelText(/description/i),
-        "This is a valid description with more than twenty characters",
-      );
+      fireEvent.change(screen.getByLabelText(/project name/i), {
+        target: { value: "Test Project" },
+      });
+      fireEvent.change(screen.getByLabelText(/description/i), {
+        target: {
+          value: "This is a valid description with more than twenty characters",
+        },
+      });
       await user.selectOptions(screen.getByLabelText(/category/i), "defi");
-      await user.type(screen.getByLabelText(/Project Website/i), "https://example.com");
+      fireEvent.change(screen.getByLabelText(/Project Website/i), {
+        target: { value: "https://example.com" },
+      });
 
       const submitButton = screen.getByRole("button", { name: /Submit Registration/i });
       expect(submitButton).not.toBeDisabled();

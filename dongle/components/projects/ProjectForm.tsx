@@ -26,6 +26,7 @@ import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
 import type { Project } from "@/types/project";
+import { trackProjectSubmit } from "@/lib/analytics";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -185,13 +186,31 @@ export default function ProjectForm({
         });
 
         if (result) {
+          trackProjectSubmit({
+            success: true,
+            mode,
+            category: CATEGORY_FORM_MAP[payload.primaryCategory] ?? payload.primaryCategory,
+            projectId: mode === "edit" ? projectId : undefined,
+          });
           // Clear draft after successful submission
           draft.clearDraft();
           reset();
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
           setTimeout(() => router.push(redirectPath), 1500);
+        } else {
+          trackProjectSubmit({
+            success: false,
+            mode,
+            errorCode: "transaction_incomplete",
+          });
         }
+      } catch (error) {
+        trackProjectSubmit({
+          success: false,
+          mode,
+          errorCode: error instanceof Error ? error.name || "Error" : "unknown",
+        });
       } finally {
         setIsSubmitting(false);
       }
