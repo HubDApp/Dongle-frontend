@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
@@ -10,8 +10,12 @@ import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { formatDate } from "@/lib/date";
 import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
+import { projectReportService } from "@/services/project/project-report.service";
+import { projectClaimService } from "@/services/project/project-claim.service";
+import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
+import { ProjectClaimRequest, ProjectReport, ProjectModerationAction } from "@/types/project";
 
 interface VerificationRequest {
   id: string;
@@ -36,23 +40,21 @@ export default function AdminDashboard() {
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<"verification" | "reports">("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
+  const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
+  const [claimRequests, setClaimRequests] = useState<ProjectClaimRequest[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
+  const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
-
-  const isAdmin = useMemo(
-    () =>
-      gate.state === "ready" &&
-      Boolean(gate.publicKey) &&
-      ADMIN_ALLOWLIST.includes(gate.publicKey!),
-    [gate.state, gate.publicKey],
-  );
 
   // Load reports and moderation log
   useEffect(() => {
     if (isAdmin) {
       setReports(reviewReportService.getReports());
+      setProjectReports(projectReportService.getReports());
+      setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
+      setProjectModerationLog(projectReportService.getModerationLog());
     }
   }, [isAdmin]);
 
@@ -96,6 +98,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleApproveClaim = (requestId: string) => {
+    if (!gate.publicKey) return;
+
+    const result = projectClaimService.approveRequest(requestId, gate.publicKey, "Approved by admin");
+    if (result.success) {
+      toast.success("Claim approved");
+      setClaimRequests(projectClaimService.getRequests());
+    } else {
+      toast.error(result.error || "Failed to approve claim");
+    }
+  };
+
+  const handleRejectClaim = (requestId: string) => {
+    if (!gate.publicKey) return;
+
+    const result = projectClaimService.rejectRequest(requestId, gate.publicKey, "Rejected by admin");
+    if (result.success) {
+      toast.success("Claim rejected");
+      setClaimRequests(projectClaimService.getRequests());
+    } else {
+      toast.error(result.error || "Failed to reject claim");
+    }
+  };
+
   const getReviewForReport = (reviewId: string): Review | undefined => {
     return reviewService.getReviews().find((r) => r.id === reviewId);
   };
@@ -106,6 +132,9 @@ export default function AdminDashboard() {
 
   const pendingReports = reports.filter((r) => r.status === "pending");
   const resolvedReports = reports.filter((r) => r.status !== "pending");
+  const pendingProjectReports = projectReports.filter((report) => report.status === "pending");
+  const pendingClaimRequests = claimRequests.filter((request) => request.status === "pending");
+  const resolvedProjectReports = projectReports.filter((report) => report.status !== "pending");
 
   if (gate.state !== "ready") {
     return (
@@ -146,16 +175,6 @@ export default function AdminDashboard() {
   }
 
   // ── 3. Authorized — render dashboard ────────────────────────────────────────
-  const handleAction = (id: string, status: "approved" | "rejected") => {
-    setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status } : req)),
-    );
-  };
-
-  const handleSaveFee = () => {
-    toast.success(`Verification fee updated to ${fee} XLM`);
-  };
-
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
@@ -191,9 +210,9 @@ export default function AdminDashboard() {
           >
             <Flag className="w-4 h-4" />
             Review Reports
-            {pendingReports.length > 0 && (
+            {(pendingReports.length + pendingProjectReports.length) > 0 && (
               <span className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold px-2 py-0.5 rounded-full">
-                {pendingReports.length}
+                {pendingReports.length + pendingProjectReports.length}
               </span>
             )}
             {activeTab === "reports" && (
@@ -315,14 +334,79 @@ export default function AdminDashboard() {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <span className="w-2 h-8 bg-red-500 rounded-full" />
                 Pending Reports
-                {pendingReports.length > 0 && (
+                {(pendingReports.length + pendingProjectReports.length) > 0 && (
                   <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                    ({pendingReports.length} pending)
+                    ({pendingReports.length + pendingProjectReports.length} pending)
                   </span>
                 )}
               </h2>
 
-              {pendingReports.length === 0 ? (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-blue-500" />
+                    Ownership Claims
+                  </h3>
+                  {pendingClaimRequests.length > 0 && (
+                    <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                      {pendingClaimRequests.length} pending
+                    </span>
+                  )}
+                </div>
+
+                {pendingClaimRequests.length === 0 ? (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    No pending ownership claims at the moment.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingClaimRequests.map((request) => {
+                      const project = projectService.getProjectById(request.projectId);
+                      return (
+                        <div key={request.id} className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="font-semibold text-sm">
+                                {project?.name || "Unknown project"}
+                              </div>
+                              <div className="text-xs text-zinc-500 mt-1">
+                                Requested by <AddressDisplay address={request.requestedBy} copyable={true} truncated={true} inline={true} /> • {formatDate(request.createdAt, "relative")}
+                              </div>
+                              <div className="mt-2 text-xs uppercase font-bold text-blue-600 dark:text-blue-400">
+                                {request.proofType}
+                              </div>
+                              <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                                {request.proofValue}
+                              </div>
+                              {request.explanation && (
+                                <div className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap">
+                                  {request.explanation}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                onClick={() => handleApproveClaim(request.id)}
+                                className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleRejectClaim(request.id)}
+                                className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {pendingReports.length === 0 && pendingProjectReports.length === 0 ? (
                 <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
                   <Shield className="w-12 h-12 text-green-500 mx-auto mb-4" />
                   <p className="text-zinc-500 dark:text-zinc-400 font-medium">
@@ -419,8 +503,93 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+                  {pendingProjectReports.map((report) => {
+                    const project = projectService.getProjectById(report.projectId);
+                    return (
+                      <div
+                        key={report.id}
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:shadow-lg"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                              <Flag className="w-5 h-5 text-red-500" />
+                            </div>
+                            <div>
+                              <div className="font-bold flex items-center gap-2">
+                                <span>Reported Project</span>
+                                <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 px-1.5 py-0.5 rounded-full uppercase">
+                                  {report.reason}
+                                </span>
+                              </div>
+                              <div className="text-xs text-zinc-500">
+                                Reported by <AddressDisplay address={report.reporterAddress} copyable={true} truncated={true} inline={true} /> • {formatDate(report.createdAt, "relative")}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {project && (
+                          <div className="mb-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Shield className="w-4 h-4 text-zinc-400" />
+                              <span className="text-sm font-medium">Project: {project.name}</span>
+                            </div>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                              {project.description}
+                            </p>
+                          </div>
+                        )}
+
+                        {report.explanation && (
+                          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
+                            <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const result = projectReportService.resolveReport(report.id, gate.publicKey!, "Project complies with guidelines");
+                              if (result.success) {
+                                setProjectReports(projectReportService.getReports());
+                                setProjectModerationLog(projectReportService.getModerationLog());
+                                toast.success("Project report resolved");
+                              } else {
+                                toast.error(result.error || "Failed to resolve project report");
+                              }
+                            }}
+                            className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Resolve
+                          </button>
+                          <button
+                            onClick={() => {
+                              const result = projectReportService.dismissReport(report.id, gate.publicKey!, "Project does not violate guidelines");
+                              if (result.success) {
+                                setProjectReports(projectReportService.getReports());
+                                setProjectModerationLog(projectReportService.getModerationLog());
+                                toast.success("Project report dismissed");
+                              } else {
+                                toast.error(result.error || "Failed to dismiss project report");
+                              }
+                            }}
+                            className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Resolved Reports */}
-              {resolvedReports.length > 0 && (
+              {(resolvedReports.length > 0 || resolvedProjectReports.length > 0) && (
                 <div className="mt-10">
                   <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
                     <span className="w-2 h-6 bg-zinc-400 rounded-full" />
@@ -489,6 +658,68 @@ export default function AdminDashboard() {
                         </div>
                       );
                     })}
+                    {resolvedProjectReports.map((report) => {
+                      const actions = projectModerationLog.filter((action) => action.reportId === report.id);
+                      const lastAction = actions[actions.length - 1];
+                      return (
+                        <div
+                          key={report.id}
+                          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {report.status === "resolved" ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-zinc-400" />
+                              )}
+                              <span className="text-sm font-medium">
+                                Project report {report.status}
+                              </span>
+                              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                                {report.reason}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() =>
+                                setExpandedReport(
+                                  expandedReport === report.id ? null : report.id
+                                )
+                              }
+                              className="text-xs text-blue-500 hover:text-blue-600 font-medium"
+                            >
+                              {expandedReport === report.id ? "Hide" : "Details"}
+                            </button>
+                          </div>
+
+                          {expandedReport === report.id && (
+                            <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+                              <div className="text-xs text-zinc-500">
+                                Reported by: <AddressDisplay address={report.reporterAddress} copyable={true} truncated={true} inline={true} />
+                              </div>
+                              <div className="text-xs text-zinc-500">
+                                Reported: {formatDate(report.createdAt, "short")}
+                              </div>
+                              {lastAction && (
+                                <>
+                                  <div className="text-xs text-zinc-500">
+                                    Moderator: <AddressDisplay address={lastAction.moderatorAddress} copyable={true} truncated={true} inline={true} />
+                                  </div>
+                                  <div className="text-xs text-zinc-500">
+                                    Action: {lastAction.action} • {formatDate(lastAction.timestamp, "short")}
+                                  </div>
+                                  {lastAction.reason && (
+                                    <div className="text-xs text-zinc-500">
+                                      Reason: {lastAction.reason}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -503,22 +734,22 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400">Total Reports</span>
-                    <span className="font-bold">{reports.length}</span>
+                    <span className="font-bold">{reports.length + projectReports.length}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400">Pending</span>
-                    <span className="font-bold text-yellow-500">{pendingReports.length}</span>
+                    <span className="font-bold text-yellow-500">{pendingReports.length + pendingProjectReports.length}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400">Resolved</span>
                     <span className="font-bold text-green-500">
-                      {reports.filter((r) => r.status === "resolved").length}
+                      {reports.filter((r) => r.status === "resolved").length + projectReports.filter((r) => r.status === "resolved").length}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400">Dismissed</span>
                     <span className="font-bold text-zinc-500">
-                      {reports.filter((r) => r.status === "dismissed").length}
+                      {reports.filter((r) => r.status === "dismissed").length + projectReports.filter((r) => r.status === "dismissed").length}
                     </span>
                   </div>
                 </div>

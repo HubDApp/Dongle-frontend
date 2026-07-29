@@ -7,6 +7,7 @@ import ProjectImage from "@/components/projects/ProjectImage";
 import { formatDate } from "@/lib/date";
 import { Star, Plus, Check, Bookmark, BookmarkCheck } from "lucide-react";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
+import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 
@@ -46,7 +47,7 @@ export const ProjectCard = ({
   return (
     <div className="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col">
       {/* Save button */}
-      <button
+      <IconButton
         type="button"
         onClick={handleToggleSaved}
         disabled={!canManageSavedProjects}
@@ -56,18 +57,15 @@ export const ProjectCard = ({
             ? `Remove ${project.name} from saved projects`
             : `Save ${project.name}`
         }
-        className="absolute right-4 top-4 z-10 inline-flex items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-2 text-zinc-500 shadow-sm transition-colors hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+        size="md"
+        className="absolute right-4 top-4 z-10 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-2 text-zinc-500 shadow-sm transition-colors hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {isSaved ? (
-          <BookmarkCheck className="w-4 h-4" />
-        ) : (
-          <Bookmark className="w-4 h-4" />
-        )}
-      </button>
+        {isSaved ? <BookmarkCheck /> : <Bookmark />}
+      </IconButton>
 
       {/* Compare toggle — rendered below the save button on the left */}
       {showCompareCheckbox && (
-        <button
+        <IconButton
           type="button"
           onClick={handleCompareToggle}
           disabled={!selected && !canAddMore}
@@ -79,9 +77,10 @@ export const ProjectCard = ({
               ? `Cannot add ${project.name}: maximum 4 projects`
               : `Add ${project.name} to comparison`
           }
-          className={`absolute left-4 top-4 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+          size="md"
+          className={`absolute left-4 top-4 z-10 rounded-full ${
             selected
-              ? "bg-blue-500 text-white"
+              ? "bg-blue-500 text-white hover:bg-blue-600 hover:text-white"
               : !canAddMore
               ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-400 cursor-not-allowed"
               : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-500"
@@ -94,12 +93,8 @@ export const ProjectCard = ({
               : "Add to comparison"
           }
         >
-          {selected ? (
-            <Check className="w-4 h-4" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-        </button>
+          {selected ? <Check /> : <Plus />}
+        </IconButton>
       )}
 
       <Link href={`/projects/${project.id}`} className="flex h-full flex-col">

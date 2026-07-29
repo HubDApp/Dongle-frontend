@@ -12,6 +12,9 @@ import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
 import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
+import { reviewReportService } from "@/services/review/review-report.service";
+import { projectReportService } from "@/services/project/project-report.service";
+import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
@@ -39,6 +42,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
+import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
+import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
@@ -65,6 +70,7 @@ export default function ProjectDetailPage() {
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [isReporting, setIsReporting] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
@@ -145,9 +151,48 @@ export default function ProjectDetailPage() {
   };
 
   const handleReportSubmit = (data: { reason: string; explanation: string }) => {
-    console.log("Reported:", project?.id, data);
+    if (!gate.publicKey || !project) return;
+
+    const result = projectReportService.createReport(
+      {
+        projectId: project.id,
+        reason: data.reason,
+        explanation: data.explanation,
+      },
+      gate.publicKey
+    );
+
+    if (result.success) {
+      toast.success("Project reported successfully");
+    } else {
+      const errorMsg = result.errors?.[0]?.message || "Failed to report project";
+      toast.error(errorMsg);
+    }
+
     setIsReporting(false);
-    toast.success("Project reported successfully");
+  };
+
+  const handleClaimSubmit = (data: { proofType: string; proofValue: string; explanation: string }) => {
+    if (!gate.publicKey || !project) return;
+
+    const result = projectClaimService.createRequest(
+      {
+        projectId: project.id,
+        proofType: data.proofType,
+        proofValue: data.proofValue,
+        explanation: data.explanation,
+      },
+      gate.publicKey
+    );
+
+    if (result.success) {
+      toast.success("Claim request submitted successfully");
+    } else {
+      const errorMsg = result.errors?.[0]?.message || "Failed to submit claim request";
+      toast.error(errorMsg);
+    }
+
+    setIsClaiming(false);
   };
 
   const handleReportReview = (review: Review) => {
@@ -782,8 +827,27 @@ export default function ProjectDetailPage() {
                   </Button>
                   <Button
                     variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      if (gate.state !== "ready") {
+                        setShowWalletGate(true);
+                        return;
+                      }
+                      setIsClaiming(true);
+                    }}
+                  >
+                    Claim Ownership
+                  </Button>
+                  <Button
+                    variant="outline"
                     className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
-                    onClick={() => setIsReporting(true)}
+                    onClick={() => {
+                      if (gate.state !== "ready") {
+                        setShowWalletGate(true);
+                        return;
+                      }
+                      setIsReporting(true);
+                    }}
                   >
                     Report Project
                   </Button>
@@ -793,6 +857,12 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
+        <ClaimProjectModal
+          isOpen={isClaiming}
+          projectName={project?.name || ""}
+          onClose={() => setIsClaiming(false)}
+          onSubmit={handleClaimSubmit}
+        />
         <ReportProjectModal
           isOpen={isReporting}
           projectName={project?.name || ""}
