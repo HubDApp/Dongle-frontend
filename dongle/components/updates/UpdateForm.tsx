@@ -18,7 +18,7 @@ interface UpdateFormProps {
 }
 
 export default function UpdateForm({
-  projectId,
+  projectId: _projectId,
   initialUpdate,
   onSubmit,
   onCancel,

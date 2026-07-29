@@ -36,11 +36,14 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
   // Load existing draft on mount
   useEffect(() => {
     const existing = draftService.getDraftForProject(mode, projectId);
-    if (existing) {
+    if (!existing) return;
+    // Schedule state updates as a microtask to avoid synchronous setState-in-effect.
+    const id = setTimeout(() => {
       setHasDraft(true);
       setLoadedDraft(existing.data);
       setLastSaved(existing.lastSaved);
-    }
+    }, 0);
+    return () => clearTimeout(id);
   }, [mode, projectId]);
 
   // Save draft function

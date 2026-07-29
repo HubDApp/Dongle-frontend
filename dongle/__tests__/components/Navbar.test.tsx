@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import Navbar from "@/components/layout/Navbar";
 import * as walletContext from "@/context/wallet.context";
+import * as adminAccess from "@/hooks/useAdminAccess";
 
 const mockPathname = vi.fn(() => "/");
 
@@ -38,6 +39,18 @@ describe("Navbar active navigation", () => {
       walletNetworkLabel: "Unknown",
       connectWallet: vi.fn(),
       disconnectWallet: vi.fn(),
+    });
+    vi.spyOn(adminAccess, "useAdminAccess").mockReturnValue({
+      isAdmin: false,
+      isAdminChecking: false,
+      gate: {
+        state: "disconnected",
+        publicKey: null,
+        walletNetworkLabel: "Unknown",
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
+        isConnecting: false,
+      },
     });
   });
 
@@ -76,6 +89,18 @@ describe("Navbar active navigation", () => {
       walletNetworkLabel: "Testnet",
       connectWallet: vi.fn(),
       disconnectWallet: vi.fn(),
+    });
+    vi.spyOn(adminAccess, "useAdminAccess").mockReturnValue({
+      isAdmin: true,
+      isAdminChecking: false,
+      gate: {
+        state: "ready",
+        publicKey: "GADMIN1234567890",
+        walletNetworkLabel: "Testnet",
+        connectWallet: vi.fn(),
+        disconnectWallet: vi.fn(),
+        isConnecting: false,
+      },
     });
 
     render(<Navbar />);

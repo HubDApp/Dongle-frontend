@@ -1,41 +1,26 @@
-import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
+import { Review, REVIEW_CONSTRAINTS, ReviewValidationError, reviewSchema } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 
 const STORAGE_KEY = "dongle_reviews";
 
 /**
  * Validates review data before persistence
+ * Enforces rating constraints (1-5) and comment length limits (10-1000 chars)
  */
 function validateReview(
   rating: number,
   comment: string
 ): ReviewValidationError[] {
-  const errors: ReviewValidationError[] = [];
-
-  // Validate rating
-  if (!Number.isInteger(rating) || rating < REVIEW_CONSTRAINTS.RATING_MIN || rating > REVIEW_CONSTRAINTS.RATING_MAX) {
-    errors.push({
-      field: "rating",
-      message: `Rating must be an integer between ${REVIEW_CONSTRAINTS.RATING_MIN} and ${REVIEW_CONSTRAINTS.RATING_MAX}`,
-    });
+  const result = reviewSchema.safeParse({ rating, comment });
+  
+  if (result.success) {
+    return [];
   }
 
-  // Validate comment
-  if (comment.trim().length < REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH) {
-    errors.push({
-      field: "comment",
-      message: `Comment must be at least ${REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters`,
-    });
-  }
-
-  if (comment.length > REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH) {
-    errors.push({
-      field: "comment",
-      message: `Comment cannot exceed ${REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH} characters`,
-    });
-  }
-
-  return errors;
+  return result.error.issues.map((err) => ({
+    field: err.path[0] as "rating" | "comment",
+    message: err.message,
+  }));
 }
 
 /**

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useComparison } from "@/context/comparison.context";
 import { useRouter } from "next/navigation";
-import { Star, ExternalLink, Github, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
+import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { Button } from "@/components/ui/Button";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
@@ -32,11 +32,7 @@ export default function ComparePage() {
       setIsLoading(false);
     };
 
-    if (selectedProjects.length > 0) {
-      void fetchStatuses();
-    } else {
-      setIsLoading(false);
-    }
+    void fetchStatuses();
   }, [selectedProjects]);
 
   if (selectedProjects.length === 0) {
@@ -240,7 +236,7 @@ export default function ComparePage() {
 
                 <ComparisonRow
                   label="GitHub"
-                  icon={<Github className="w-4 h-4" />}
+                  icon={<GitBranch className="w-4 h-4" />}
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.githubUrl ? (
@@ -251,7 +247,7 @@ export default function ComparePage() {
                           className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1 justify-center"
                         >
                           View Repo
-                          <Github className="w-3 h-3" />
+                          <GitBranch className="w-3 h-3" />
                         </a>
                       ) : (
                         <span className="text-zinc-400 text-sm">N/A</span>
@@ -435,7 +431,7 @@ export default function ComparePage() {
                         className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1"
                       >
                         View Repo
-                        <Github className="w-3 h-3" />
+                        <GitBranch className="w-3 h-3" />
                       </a>
                     ) : (
                       <span className="text-zinc-400">N/A</span>
