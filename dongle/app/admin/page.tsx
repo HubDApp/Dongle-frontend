@@ -46,10 +46,12 @@ export default function AdminDashboard() {
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
 
   // Load reports and moderation log
   useEffect(() => {
-    if (isAdmin) {
+    if (!isAdmin) return;
+    const id = setTimeout(() => {
       setReports(reviewReportService.getReports());
       setProjectReports(projectReportService.getReports());
       setClaimRequests(projectClaimService.getRequests());
@@ -57,16 +59,6 @@ export default function AdminDashboard() {
       setProjectModerationLog(projectReportService.getModerationLog());
     }
   }, [isAdmin]);
-
-  const handleAction = (id: string, status: "approved" | "rejected") => {
-    setRequests((prev) =>
-      prev.map((req) => (req.id === id ? { ...req, status } : req)),
-    );
-  };
-
-  const handleSaveFee = () => {
-    toast.success(`Verification fee updated to ${fee} XLM`);
-  };
 
   const handleResolveReport = (reportId: string) => {
     const reason = moderationReason[reportId]?.trim() || "Review content complies with guidelines";
@@ -123,7 +115,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviewService.getReviews().find((r) => r.id === reviewId);
+    return reviewsById[reviewId];
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {
