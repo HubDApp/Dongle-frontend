@@ -39,12 +39,6 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
       ? "text-amber-500"
       : "text-zinc-500";
 
-    const baseBorder = error || isAtLimit
-      ? "border-red-500/50 focus:border-red-500"
-      : isNearLimit
-      ? "border-amber-500/50 focus:border-amber-500"
-      : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
-
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">

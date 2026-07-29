@@ -4,7 +4,6 @@ import React from "react";
 import { ProjectUpdate } from "@/types/update";
 import { formatDate } from "@/lib/date";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { Megaphone, Shield, Target, Bell, Edit2, Trash2 } from "lucide-react";
 
 interface UpdateListProps {

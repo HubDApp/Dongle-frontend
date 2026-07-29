@@ -34,7 +34,7 @@ export function validateRepositoryUrl(
     const hostname = parsedUrl.hostname.toLowerCase();
 
     // Check if host is supported
-    if (!SUPPORTED_HOSTS.includes(hostname as any)) {
+    if (!SUPPORTED_HOSTS.includes(hostname as (typeof SUPPORTED_HOSTS)[number])) {
       return {
         isValid: false,
         error: `Unsupported repository host. Supported hosts: ${SUPPORTED_HOSTS.join(", ")}`,
@@ -81,7 +81,7 @@ export function validateRepositoryUrl(
         repo: cleanRepo,
       },
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       isValid: false,
       error: "Invalid URL format",

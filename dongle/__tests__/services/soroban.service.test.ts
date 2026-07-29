@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PROJECT_CATEGORIES } from "@/types/project";
 
 // Vitest mocks for stellar-sdk RPC + builders.
 const mockServer = {
@@ -93,7 +94,7 @@ describe("sorobanService - no-wallet error path", () => {
     await expect(
       sorobanService.registerProject({
         name: "My Project",
-        category: "cat",
+        category: PROJECT_CATEGORIES.DEFI,
         description: "desc",
         websiteUrl: "https://example.com",
       }),
@@ -106,7 +107,7 @@ describe("sorobanService - no-wallet error path", () => {
     const err = await sorobanService
       .registerProject({
         name: "My Project",
-        category: "cat",
+        category: PROJECT_CATEGORIES.DEFI,
         description: "desc",
         websiteUrl: "https://example.com",
       })
@@ -122,7 +123,7 @@ describe("sorobanService - no-wallet error path", () => {
     const result = await sorobanService
       .registerProject({
         name: "My Project",
-        category: "cat",
+        category: PROJECT_CATEGORIES.DEFI,
         description: "desc",
         websiteUrl: "https://example.com",
       })
@@ -143,7 +144,7 @@ describe("sorobanService - no-wallet error path", () => {
     await expect(
       sorobanService.updateProject("proj-123", {
         name: "Updated Name",
-        category: "defi",
+        category: PROJECT_CATEGORIES.DEFI,
         description: "desc",
         websiteUrl: "https://example.com",
       }),
@@ -156,7 +157,7 @@ describe("sorobanService - no-wallet error path", () => {
     const result = await sorobanService
       .updateProject("proj-123", {
         name: "Updated Name",
-        category: "defi",
+        category: PROJECT_CATEGORIES.DEFI,
         description: "desc",
         websiteUrl: "https://example.com",
       })
@@ -195,7 +196,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
 
     const res = await sorobanService.registerProject({
       name: "My Project",
-      category: "cat",
+      category: PROJECT_CATEGORIES.DEFI,
       description: "desc",
       websiteUrl: "https://example.com",
       logoUrl: "https://example.com/logo.png",
@@ -228,7 +229,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
     const promise = sorobanService
       .registerProject({
         name: "My Project",
-        category: "cat",
+        category: PROJECT_CATEGORIES.DEFI,
         description: "desc",
         websiteUrl: "https://example.com",
       })
@@ -255,7 +256,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
       .registerProject(
         {
           name: "My Project",
-          category: "cat",
+          category: PROJECT_CATEGORIES.DEFI,
           description: "desc",
           websiteUrl: "https://example.com",
         },
@@ -283,7 +284,7 @@ describe("sorobanService - sequence + simulate/prepare + polling", () => {
       .registerProject(
         {
           name: "My Project",
-          category: "cat",
+          category: PROJECT_CATEGORIES.DEFI,
           description: "desc",
           websiteUrl: "https://example.com",
         },

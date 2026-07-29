@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Button } from "@/components/ui/Button";
 
 import AddressDisplay from "@/components/ui/AddressDisplay";
@@ -21,6 +22,8 @@ export default function Navbar() {
     connectWallet,
     disconnectWallet,
   } = useWallet();
+
+  const { isAdmin } = useAdminAccess();
 
   const menuRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
@@ -109,7 +112,7 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {isConnected && (
+            {isAdmin && (
               <Link
                 href="/admin"
                 className={`py-2 px-1 transition-all border-b-2 ${
@@ -215,7 +218,7 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {isConnected && (
+            {isAdmin && (
               <Link
                 href="/admin"
                 className={`block py-2 text-sm font-medium transition-colors ${
