@@ -11,13 +11,12 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
-import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
+import { Review, ReviewReportReason } from "@/types/review";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { reviewReportService } from "@/services/review/review-report.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
@@ -36,13 +35,9 @@ import {
   GitBranch,
   Globe,
   Info,
-  Bookmark,
-  BookmarkCheck,
   Shield,
-  Bug,
   Megaphone,
   MessageSquare,
-  Shield,
   Star,
   UserPlus,
 } from "lucide-react";
@@ -53,6 +48,7 @@ import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -925,6 +921,11 @@ export default function ProjectDetailPage() {
                     {abbreviateStellarAddress(project.ownerAddress)}
                   </p>
                 </div>
+              )}
+
+              {/* Contract Addresses */}
+              {project.contractAddresses && project.contractAddresses.length > 0 && (
+                <ContractAddressList addresses={project.contractAddresses} />
               )}
             </div>
           </div>
