@@ -1,57 +1,50 @@
-import {
-  ReviewReport,
-  ReviewReportReason,
-  ReviewReportStatus,
-  ReviewReportValidationError,
-  ModerationAction,
-  ModerationActionType,
-  REVIEW_REPORT_CONSTRAINTS,
-} from "@/types/review";
 import { generateId } from "@/lib/id-generator";
-import { reviewService } from "./review.service";
+import { projectService } from "./project.service";
+import {
+  ProjectModerationAction,
+  ProjectReport,
+  ProjectReportReason,
+  ProjectReportStatus,
+  ProjectReportValidationError,
+  PROJECT_REPORT_CONSTRAINTS,
+} from "@/types/project";
 
-const STORAGE_KEY_REPORTS = "dongle_review_reports";
-const STORAGE_KEY_MODERATION_LOG = "dongle_review_moderation_log";
+const STORAGE_KEY_REPORTS = "dongle_project_reports";
+const STORAGE_KEY_MODERATION_LOG = "dongle_project_moderation_log";
 
-/**
- * Validates report data before persistence
- */
 function validateReport(
   reason: string,
   explanation: string
-): ReviewReportValidationError[] {
-  const errors: ReviewReportValidationError[] = [];
+): ProjectReportValidationError[] {
+  const errors: ProjectReportValidationError[] = [];
 
-  const validReasons: ReviewReportReason[] = [
-    "spam",
-    "abusive",
+  const validReasons: ProjectReportReason[] = [
+    "phishing",
+    "impersonation",
+    "broken_links",
+    "fraud",
     "inappropriate",
-    "misleading",
-    "harassment",
-    "other",
   ];
 
-  if (!validReasons.includes(reason as ReviewReportReason)) {
+  if (!validReasons.includes(reason as ProjectReportReason)) {
     errors.push({
       field: "reason",
       message: "Please select a valid reason for reporting",
     });
   }
 
-  if (explanation.length > REVIEW_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH) {
+  if (explanation.length > PROJECT_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH) {
     errors.push({
       field: "explanation",
-      message: `Explanation cannot exceed ${REVIEW_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH} characters`,
+      message: `Explanation cannot exceed ${PROJECT_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH} characters`,
     });
   }
 
   return errors;
 }
 
-export const reviewReportService = {
-  // ─── Report CRUD ─────────────────────────────────────────────────────────
-
-  getReports(): ReviewReport[] {
+export const projectReportService = {
+  getReports(): ProjectReport[] {
     if (typeof window === "undefined") return [];
     const stored = localStorage.getItem(STORAGE_KEY_REPORTS);
     if (!stored) return [];
@@ -67,117 +60,100 @@ export const reviewReportService = {
       return [];
     }
 
-    const validatedReports: ReviewReport[] = [];
+    const validatedReports: ProjectReport[] = [];
     for (const item of parsed) {
       if (!item || typeof item !== "object") continue;
 
       const record = item as Record<string, unknown>;
 
       if (typeof record.id !== "string" || !record.id) continue;
-      if (typeof record.reviewId !== "string" || !record.reviewId) continue;
+      if (typeof record.projectId !== "string" || !record.projectId) continue;
       if (typeof record.reporterAddress !== "string" || !record.reporterAddress) continue;
       if (typeof record.reason !== "string") continue;
       if (typeof record.explanation !== "string") continue;
       if (typeof record.status !== "string") continue;
       if (typeof record.createdAt !== "string") continue;
 
-      const report: ReviewReport = {
+      validatedReports.push({
         id: record.id,
-        reviewId: record.reviewId,
+        projectId: record.projectId,
         reporterAddress: record.reporterAddress,
-        reason: record.reason as ReviewReportReason,
+        reason: record.reason as ProjectReportReason,
         explanation: record.explanation,
-        status: record.status as ReviewReportStatus,
+        status: record.status as ProjectReportStatus,
         createdAt: record.createdAt,
-      };
-
-      validatedReports.push(report);
+      });
     }
 
     return validatedReports;
   },
 
-  getReportById(id: string): ReviewReport | null {
-    return this.getReports().find((r) => r.id === id) ?? null;
+  getReportById(id: string): ProjectReport | null {
+    return this.getReports().find((report) => report.id === id) ?? null;
   },
 
-  getReportsByReview(reviewId: string): ReviewReport[] {
-    return this.getReports().filter((r) => r.reviewId === reviewId);
+  getReportsByProject(projectId: string): ProjectReport[] {
+    return this.getReports().filter((report) => report.projectId === projectId);
   },
 
-  getReportsByReporter(reporterAddress: string): ReviewReport[] {
-    return this.getReports().filter((r) => r.reporterAddress === reporterAddress);
+  getReportsByReporter(reporterAddress: string): ProjectReport[] {
+    return this.getReports().filter((report) => report.reporterAddress === reporterAddress);
   },
 
-  getPendingReports(): ReviewReport[] {
-    return this.getReports().filter((r) => r.status === "pending");
+  getPendingReports(): ProjectReport[] {
+    return this.getReports().filter((report) => report.status === "pending");
   },
 
-  hasUserReportedReview(reviewId: string, userAddress: string): boolean {
+  hasUserReportedProject(projectId: string, userAddress: string): boolean {
     return this.getReports().some(
-      (r) => r.reviewId === reviewId && r.reporterAddress === userAddress
+      (report) => report.projectId === projectId && report.reporterAddress === userAddress
     );
   },
 
-  async createReport(
+  createReport(
     data: {
-      reviewId: string;
+      projectId: string;
       reason: string;
       explanation: string;
     },
     reporterAddress: string
-  ): Promise<{
+  ): {
     success: boolean;
-    data?: ReviewReport;
-    errors?: ReviewReportValidationError[];
-  }> {
-    // Validate input
+    data?: ProjectReport;
+    errors?: ProjectReportValidationError[];
+  } {
     const validationErrors = validateReport(data.reason, data.explanation);
     if (validationErrors.length > 0) {
       return { success: false, errors: validationErrors };
     }
 
-    // Verify the review exists
-    const reviews = await reviewService.getReviews();
-    const review = reviews.find((r) => r.id === data.reviewId);
-    if (!review) {
+    const project = projectService.getProjectById(data.projectId);
+    if (!project) {
       return {
         success: false,
-        errors: [{ field: "reason", message: "Review not found" }],
+        errors: [{ field: "reason", message: "Project not found" }],
       };
     }
 
-    // Prevent self-reporting: review authors cannot report their own reviews
-    if (review.userAddress === reporterAddress) {
+    if (project.ownerAddress && project.ownerAddress === reporterAddress) {
       return {
         success: false,
-        errors: [
-          {
-            field: "reason",
-            message: "You cannot report your own review",
-          },
-        ],
+        errors: [{ field: "reason", message: "You cannot report your own project" }],
       };
     }
 
-    // Prevent duplicate reports from the same user on the same review
-    if (this.hasUserReportedReview(data.reviewId, reporterAddress)) {
+    if (this.hasUserReportedProject(data.projectId, reporterAddress)) {
       return {
         success: false,
-        errors: [
-          {
-            field: "reason",
-            message: "You have already reported this review",
-          },
-        ],
+        errors: [{ field: "reason", message: "You have already reported this project" }],
       };
     }
 
-    const newReport: ReviewReport = {
+    const newReport: ProjectReport = {
       id: generateId(),
-      reviewId: data.reviewId,
+      projectId: data.projectId,
       reporterAddress,
-      reason: data.reason as ReviewReportReason,
+      reason: data.reason as ProjectReportReason,
       explanation: data.explanation,
       status: "pending",
       createdAt: new Date().toISOString(),
@@ -190,15 +166,13 @@ export const reviewReportService = {
     return { success: true, data: newReport };
   },
 
-  // ─── Moderation Actions ──────────────────────────────────────────────────
-
   resolveReport(
     reportId: string,
     moderatorAddress: string,
     reason: string
   ): { success: boolean; error?: string } {
     const reports = this.getReports();
-    const index = reports.findIndex((r) => r.id === reportId);
+    const index = reports.findIndex((report) => report.id === reportId);
 
     if (index === -1) {
       return { success: false, error: "Report not found" };
@@ -208,15 +182,13 @@ export const reviewReportService = {
       return { success: false, error: "Report has already been moderated" };
     }
 
-    // Update report status
     reports[index] = {
       ...reports[index],
       status: "resolved",
     };
     localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
 
-    // Record audit trail
-    const action: ModerationAction = {
+    const action: ProjectModerationAction = {
       id: generateId(),
       reportId,
       moderatorAddress,
@@ -238,7 +210,7 @@ export const reviewReportService = {
     reason: string
   ): { success: boolean; error?: string } {
     const reports = this.getReports();
-    const index = reports.findIndex((r) => r.id === reportId);
+    const index = reports.findIndex((report) => report.id === reportId);
 
     if (index === -1) {
       return { success: false, error: "Report not found" };
@@ -248,15 +220,13 @@ export const reviewReportService = {
       return { success: false, error: "Report has already been moderated" };
     }
 
-    // Update report status
     reports[index] = {
       ...reports[index],
       status: "dismissed",
     };
     localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
 
-    // Record audit trail
-    const action: ModerationAction = {
+    const action: ProjectModerationAction = {
       id: generateId(),
       reportId,
       moderatorAddress,
@@ -272,9 +242,7 @@ export const reviewReportService = {
     return { success: true };
   },
 
-  // ─── Audit Trail ─────────────────────────────────────────────────────────
-
-  getModerationLog(): ModerationAction[] {
+  getModerationLog(): ProjectModerationAction[] {
     if (typeof window === "undefined") return [];
     const stored = localStorage.getItem(STORAGE_KEY_MODERATION_LOG);
     if (!stored) return [];
@@ -290,7 +258,7 @@ export const reviewReportService = {
       return [];
     }
 
-    const validatedActions: ModerationAction[] = [];
+    const validatedActions: ProjectModerationAction[] = [];
     for (const item of parsed) {
       if (!item || typeof item !== "object") continue;
 
@@ -303,22 +271,20 @@ export const reviewReportService = {
       if (typeof record.reason !== "string") continue;
       if (typeof record.timestamp !== "string") continue;
 
-      const action: ModerationAction = {
+      validatedActions.push({
         id: record.id,
         reportId: record.reportId,
         moderatorAddress: record.moderatorAddress,
-        action: record.action as ModerationActionType,
+        action: record.action as ProjectModerationAction["action"],
         reason: record.reason,
         timestamp: record.timestamp,
-      };
-
-      validatedActions.push(action);
+      });
     }
 
     return validatedActions;
   },
 
-  getModerationLogByReport(reportId: string): ModerationAction[] {
-    return this.getModerationLog().filter((a) => a.reportId === reportId);
+  getModerationLogByReport(reportId: string): ProjectModerationAction[] {
+    return this.getModerationLog().filter((action) => action.reportId === reportId);
   },
 };

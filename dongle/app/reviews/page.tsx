@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { reviewService, getReviewPersistenceLabel, isReviewPersistenceApi } from "@/services/review/review.service";
+import { reviewService, isReviewPersistenceApi } from "@/services/review/review.service";
 import { projectService } from "@/services/project/project.service";
 import { Review, Project as ReviewProject } from "@/types/review";
 import ReviewList from "@/components/reviews/ReviewList";
@@ -13,6 +13,7 @@ import WalletStatePanel, {
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { AlertTriangle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { trackReviewSubmit } from "@/lib/analytics";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
@@ -124,12 +125,29 @@ export default function ReviewsPage() {
     if (editingReview) {
       const result = await reviewService.updateReview(editingReview.id, data, gate.publicKey);
       if (result.success) {
+        trackReviewSubmit({
+          success: true,
+          action: "update",
+          projectId: selectedProject.id,
+          rating: data.rating,
+          commentLength: data.comment.length,
+          walletAddress: gate.publicKey,
+        });
         setReviews(await reviewService.getReviews());
         setIsAddingReview(false);
         setEditingReview(null);
         setSelectedProject(null);
         toast.success("Review updated");
       } else {
+        trackReviewSubmit({
+          success: false,
+          action: "update",
+          projectId: selectedProject.id,
+          rating: data.rating,
+          commentLength: data.comment.length,
+          walletAddress: gate.publicKey,
+          errorCode: "validation_or_auth",
+        });
         toast.error(result.errors?.[0]?.message || "Failed to update review");
       }
     } else {
@@ -143,12 +161,29 @@ export default function ReviewsPage() {
         gate.publicKey,
       );
       if (result.success) {
+        trackReviewSubmit({
+          success: true,
+          action: "create",
+          projectId: selectedProject.id,
+          rating: data.rating,
+          commentLength: data.comment.length,
+          walletAddress: gate.publicKey,
+        });
         setReviews(await reviewService.getReviews());
         setIsAddingReview(false);
         setEditingReview(null);
         setSelectedProject(null);
         toast.success("Review posted");
       } else {
+        trackReviewSubmit({
+          success: false,
+          action: "create",
+          projectId: selectedProject.id,
+          rating: data.rating,
+          commentLength: data.comment.length,
+          walletAddress: gate.publicKey,
+          errorCode: "validation_or_auth",
+        });
         toast.error(result.errors?.[0]?.message || "Failed to post review");
       }
     }
