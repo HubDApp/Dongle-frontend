@@ -16,6 +16,7 @@ import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { auditLogService } from "@/services/audit/audit-log.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
+import type { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 
 interface VerificationRequest {
@@ -47,17 +48,29 @@ export default function AdminDashboard() {
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
 
-  // Load reports and moderation log
+  // Load reports, moderation log, and reviews
   useEffect(() => {
     if (!isAdmin) return;
-    const id = setTimeout(() => {
+    const id = setTimeout(async () => {
       setReports(reviewReportService.getReports());
       setProjectReports(projectReportService.getReports());
       setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
       setProjectModerationLog(projectReportService.getModerationLog());
-    }
+
+      // Build a lookup map of reviews by ID for the report viewer
+      try {
+        const allReviews = await reviewService.getReviews();
+        const byId: Record<string, Review> = {};
+        allReviews.forEach((r) => { byId[r.id] = r; });
+        setReviewsById(byId);
+      } catch {
+        // reviews are a non-critical enhancement for the reports UI
+      }
+    }, 0);
+    return () => clearTimeout(id);
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
@@ -462,7 +475,7 @@ export default function AdminDashboard() {
                     No pending reports
                   </p>
                   <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
-                    All reviews are currently in good standing.
+                    All reviews and projects are currently in good standing.
                   </p>
                 </div>
               ) : (
@@ -549,8 +562,6 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
-                </div>
-              )}
 
                   {pendingProjectReports.map((report) => {
                     const project = projectService.getProjectById(report.projectId);

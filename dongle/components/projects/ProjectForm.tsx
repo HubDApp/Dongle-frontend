@@ -138,12 +138,13 @@ export default function ProjectForm({
     },
   });
 
-  // Show notification when draft is restored
+  // Restore draft data into the form and show notification when a draft is loaded
   useEffect(() => {
     if (draft.loadedDraft) {
       setDraftRestored(true);
+      reset(draft.loadedDraft);
     }
-  }, [draft.loadedDraft]);
+  }, [draft.loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useUnsavedChanges(isDirty, isSubmitting);
 
