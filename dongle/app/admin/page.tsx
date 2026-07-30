@@ -8,13 +8,14 @@ import WalletStatePanel, {
 } from "@/components/wallet/WalletStatePanel";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { formatDate } from "@/lib/date";
-import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare, ScrollText } from "lucide-react";
+import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare, ScrollText, User, UserMinus } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { auditLogService } from "@/services/audit/audit-log.service";
+import { verificationService } from "@/services/stellar/verification.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 
@@ -47,6 +48,8 @@ export default function AdminDashboard() {
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [verificationFilter, setVerificationFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
+  const [reportFilter, setReportFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
 
   // Load reports and moderation log
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function AdminDashboard() {
       setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
       setProjectModerationLog(projectReportService.getModerationLog());
-    }
+    }, 0);
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
@@ -153,6 +156,84 @@ export default function AdminDashboard() {
       setClaimRequests(projectClaimService.getRequests());
     } else {
       toast.error(result.error || "Failed to reject claim");
+    }
+  };
+
+  const handleAssignVerification = async (requestId: string, assignedTo: string) => {
+    if (!gate.publicKey) return;
+
+    try {
+      await verificationService.assignRequest(requestId, gate.publicKey, assignedTo);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "verification_assigned",
+        targetId: requestId,
+        targetLabel: `Verification Request ${requestId}`,
+        metadata: { assignedTo },
+      });
+      toast.success("Request assigned");
+      setRequests((prev) => prev.map((r: any) => 
+        r.id === requestId ? { ...r, assignedTo, assignedAt: new Date().toISOString() } : r
+      ));
+    } catch (error) {
+      toast.error("Failed to assign request");
+    }
+  };
+
+  const handleUnassignVerification = async (requestId: string) => {
+    if (!gate.publicKey) return;
+
+    try {
+      await verificationService.unassignRequest(requestId, gate.publicKey);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "verification_unassigned",
+        targetId: requestId,
+        targetLabel: `Verification Request ${requestId}`,
+      });
+      toast.success("Request unassigned");
+      setRequests((prev) => prev.map((r: any) => 
+        r.id === requestId ? { ...r, assignedTo: undefined, assignedAt: undefined } : r
+      ));
+    } catch (error) {
+      toast.error("Failed to unassign request");
+    }
+  };
+
+  const handleAssignReport = (reportId: string, assignedTo: string) => {
+    if (!gate.publicKey) return;
+
+    const result = reviewReportService.assignReport(reportId, gate.publicKey, assignedTo);
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_assigned",
+        targetId: reportId,
+        targetLabel: `Report ${reportId}`,
+        metadata: { assignedTo },
+      });
+      toast.success("Report assigned");
+      setReports(reviewReportService.getReports());
+    } else {
+      toast.error(result.error || "Failed to assign report");
+    }
+  };
+
+  const handleUnassignReport = (reportId: string) => {
+    if (!gate.publicKey) return;
+
+    const result = reviewReportService.unassignReport(reportId, gate.publicKey);
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_unassigned",
+        targetId: reportId,
+        targetLabel: `Report ${reportId}`,
+      });
+      toast.success("Report unassigned");
+      setReports(reviewReportService.getReports());
+    } else {
+      toast.error(result.error || "Failed to unassign report");
     }
   };
 
@@ -273,18 +354,59 @@ export default function AdminDashboard() {
         {activeTab === "verification" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <span className="w-2 h-8 bg-purple-500 rounded-full" />
-                Verification Requests
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <span className="w-2 h-8 bg-purple-500 rounded-full" />
+                  Verification Requests
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setVerificationFilter("all")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      verificationFilter === "all"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setVerificationFilter("assigned-to-me")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      verificationFilter === "assigned-to-me"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    Assigned to me
+                  </button>
+                  <button
+                    onClick={() => setVerificationFilter("unassigned")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      verificationFilter === "unassigned"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    Unassigned
+                  </button>
+                </div>
+              </div>
 
               <div className="space-y-4">
-                {requests.map((req) => (
+                {requests
+                  .filter((req: any) => {
+                    if (verificationFilter === "all") return true;
+                    if (verificationFilter === "assigned-to-me") return req.assignedTo === gate.publicKey;
+                    if (verificationFilter === "unassigned") return !req.assignedTo;
+                    return true;
+                  })
+                  .map((req: any) => (
                   <div
                     key={req.id}
                     className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-lg"
                   >
-                    <div>
+                    <div className="flex-1">
                       <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
                       <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
                         <span>Submitted by:</span>
@@ -292,7 +414,7 @@ export default function AdminDashboard() {
                         <span className="text-zinc-300 dark:text-zinc-700">•</span>
                         <span>{formatDate(req.timestamp, "short")}</span>
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center gap-2">
                         <span
                           className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
                             req.status === "pending"
@@ -304,25 +426,59 @@ export default function AdminDashboard() {
                         >
                           {req.status}
                         </span>
+                        {req.assignedTo && (
+                          <span className="text-[10px] uppercase font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-500">
+                            Assigned to <AddressDisplay address={req.assignedTo} copyable={false} truncated={true} inline={true} />
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {req.status === "pending" && (
-                      <div className="flex gap-2 w-full md:w-auto">
+                    <div className="flex gap-2 w-full md:w-auto">
+                      {req.assignedTo ? (
+                        req.assignedTo === gate.publicKey ? (
+                          <button
+                            onClick={() => handleUnassignVerification(req.id)}
+                            className="flex-1 md:flex-none px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                          >
+                            <UserMinus className="w-4 h-4" />
+                            Unassign
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleAssignVerification(req.id, gate.publicKey!)}
+                            className="flex-1 md:flex-none px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                          >
+                            <User className="w-4 h-4" />
+                            Reassign to me
+                          </button>
+                        )
+                      ) : (
                         <button
-                          onClick={() => handleAction(req.id, "approved")}
-                          className="flex-1 md:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                          onClick={() => handleAssignVerification(req.id, gate.publicKey!)}
+                          className="flex-1 md:flex-none px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
                         >
-                          Approve
+                          <User className="w-4 h-4" />
+                          Assign to me
                         </button>
-                        <button
-                          onClick={() => handleAction(req.id, "rejected")}
-                          className="flex-1 md:flex-none px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
+                      )}
+                      {req.status === "pending" && (
+                        <>
+                          <button
+                            onClick={() => handleAction(req.id, "approved")}
+                            className="flex-1 md:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleAction(req.id, "rejected")}
+                            className="flex-1 md:flex-none px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -380,15 +536,49 @@ export default function AdminDashboard() {
         {activeTab === "reports" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <span className="w-2 h-8 bg-red-500 rounded-full" />
-                Pending Reports
-                {(pendingReports.length + pendingProjectReports.length) > 0 && (
-                  <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
-                    ({pendingReports.length + pendingProjectReports.length} pending)
-                  </span>
-                )}
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <span className="w-2 h-8 bg-red-500 rounded-full" />
+                  Pending Reports
+                  {(pendingReports.length + pendingProjectReports.length) > 0 && (
+                    <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                      ({pendingReports.length + pendingProjectReports.length} pending)
+                    </span>
+                  )}
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setReportFilter("all")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      reportFilter === "all"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setReportFilter("assigned-to-me")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      reportFilter === "assigned-to-me"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    Assigned to me
+                  </button>
+                  <button
+                    onClick={() => setReportFilter("unassigned")}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      reportFilter === "unassigned"
+                        ? "bg-blue-500 text-white"
+                        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                  >
+                    Unassigned
+                  </button>
+                </div>
+              </div>
 
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl">
                 <div className="flex items-center justify-between mb-4">
@@ -467,7 +657,14 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {pendingReports.map((report) => {
+                  {pendingReports
+                    .filter((report: any) => {
+                      if (reportFilter === "all") return true;
+                      if (reportFilter === "assigned-to-me") return report.assignedTo === gate.publicKey;
+                      if (reportFilter === "unassigned") return !report.assignedTo;
+                      return true;
+                    })
+                    .map((report: any) => {
                     const review = getReviewForReport(report.reviewId);
                     return (
                       <div
@@ -485,11 +682,45 @@ export default function AdminDashboard() {
                                 <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 px-1.5 py-0.5 rounded-full uppercase">
                                   {report.reason}
                                 </span>
+                                {report.assignedTo && (
+                                  <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-500 px-1.5 py-0.5 rounded-full uppercase">
+                                    Assigned to <AddressDisplay address={report.assignedTo} copyable={false} truncated={true} inline={true} />
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-zinc-500">
                                 Reported by <AddressDisplay address={report.reporterAddress} copyable={true} truncated={true} inline={true} /> • {formatDate(report.createdAt, "relative")}
                               </div>
                             </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {report.assignedTo ? (
+                              report.assignedTo === gate.publicKey ? (
+                                <button
+                                  onClick={() => handleUnassignReport(report.id)}
+                                  className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                                >
+                                  <UserMinus className="w-4 h-4" />
+                                  Unassign
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleAssignReport(report.id, gate.publicKey!)}
+                                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                                >
+                                  <User className="w-4 h-4" />
+                                  Reassign to me
+                                </button>
+                              )
+                            ) : (
+                              <button
+                                onClick={() => handleAssignReport(report.id, gate.publicKey!)}
+                                className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                              >
+                                <User className="w-4 h-4" />
+                                Assign to me
+                              </button>
+                            )}
                           </div>
                         </div>
 

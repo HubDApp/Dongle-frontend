@@ -89,6 +89,8 @@ export const reviewReportService = {
         explanation: record.explanation,
         status: record.status as ReviewReportStatus,
         createdAt: record.createdAt,
+        assignedTo: typeof record.assignedTo === "string" ? record.assignedTo : undefined,
+        assignedAt: typeof record.assignedAt === "string" ? record.assignedAt : undefined,
       };
 
       validatedReports.push(report);
@@ -111,6 +113,59 @@ export const reviewReportService = {
 
   getPendingReports(): ReviewReport[] {
     return this.getReports().filter((r) => r.status === "pending");
+  },
+
+  assignReport(
+    reportId: string,
+    assignedBy: string,
+    assignedTo: string,
+  ): { success: boolean; error?: string } {
+    const reports = this.getReports();
+    const index = reports.findIndex((r) => r.id === reportId);
+
+    if (index === -1) {
+      return { success: false, error: "Report not found" };
+    }
+
+    // Update report assignment
+    reports[index] = {
+      ...reports[index],
+      assignedTo,
+      assignedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
+
+    return { success: true };
+  },
+
+  unassignReport(
+    reportId: string,
+    unassignedBy: string,
+  ): { success: boolean; error?: string } {
+    const reports = this.getReports();
+    const index = reports.findIndex((r) => r.id === reportId);
+
+    if (index === -1) {
+      return { success: false, error: "Report not found" };
+    }
+
+    // Remove assignment
+    reports[index] = {
+      ...reports[index],
+      assignedTo: undefined,
+      assignedAt: undefined,
+    };
+    localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
+
+    return { success: true };
+  },
+
+  getReportsAssignedTo(adminAddress: string): ReviewReport[] {
+    return this.getReports().filter((r) => r.assignedTo === adminAddress);
+  },
+
+  getUnassignedReports(): ReviewReport[] {
+    return this.getReports().filter((r) => !r.assignedTo);
   },
 
   hasUserReportedReview(reviewId: string, userAddress: string): boolean {

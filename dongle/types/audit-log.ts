@@ -9,17 +9,25 @@
 export type AuditAction =
   | "verification_approved"
   | "verification_rejected"
+  | "verification_assigned"
+  | "verification_unassigned"
   | "fee_updated"
   | "report_resolved"
-  | "report_dismissed";
+  | "report_dismissed"
+  | "report_assigned"
+  | "report_unassigned";
 
 /** Human-readable labels for each action. */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   verification_approved: "Verification Approved",
   verification_rejected: "Verification Rejected",
+  verification_assigned: "Verification Assigned",
+  verification_unassigned: "Verification Unassigned",
   fee_updated: "Fee Updated",
   report_resolved: "Report Resolved",
   report_dismissed: "Report Dismissed",
+  report_assigned: "Report Assigned",
+  report_unassigned: "Report Unassigned",
 };
 
 /**
