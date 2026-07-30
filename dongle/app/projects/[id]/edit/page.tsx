@@ -157,6 +157,8 @@ export default function EditProjectPage() {
             githubUrl: project.githubUrl,
             logoUrl: project.logoUrl,
             docsUrl: project.docsUrl,
+            auditReportUrl: project.auditReportUrl,
+            bugBountyUrl: project.bugBountyUrl,
           }}
         />
       </div>
