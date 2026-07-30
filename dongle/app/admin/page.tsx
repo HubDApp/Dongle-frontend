@@ -183,6 +183,7 @@ export default function AdminDashboard() {
             publicKey={gate.publicKey}
             onConnect={gate.connectWallet}
             onDisconnect={gate.disconnectWallet}
+            onRetry={gate.retryAccountLoad}
           />
         )}
       </div>

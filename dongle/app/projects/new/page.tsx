@@ -32,6 +32,7 @@ export default function NewProjectPage() {
                 publicKey={gate.publicKey}
                 onConnect={gate.connectWallet}
                 onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
               />
             )}
 

@@ -83,6 +83,7 @@ export default function ProjectDetailPage() {
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
@@ -117,6 +118,7 @@ export default function ProjectDetailPage() {
         
         // Fetch verification status with cancellation support
         const fetchVerification = async () => {
+          if (!cancelled) setVerificationError(null);
           try {
             const status = await sorobanService.getVerificationStatus(projectId, abortController.signal);
             if (!cancelled) {
@@ -125,7 +127,9 @@ export default function ProjectDetailPage() {
           } catch (error) {
             if (!cancelled) {
               console.error("Failed to fetch verification status:", error);
-              setVerificationStatus("NONE");
+              setVerificationError(
+                error instanceof Error ? error.message : "Failed to load verification status",
+              );
             }
           }
         };
@@ -143,6 +147,21 @@ export default function ProjectDetailPage() {
       abortController.abort();
     };
   }, [projectId, gate.publicKey]);
+
+  const retryVerification = React.useCallback(() => {
+    setVerificationError(null);
+    setVerificationStatus(null);
+    const abortController = new AbortController();
+    void sorobanService
+      .getVerificationStatus(projectId, abortController.signal)
+      .then(setVerificationStatus)
+      .catch((err) => {
+        console.error("Failed to fetch verification status:", err);
+        setVerificationError(
+          err instanceof Error ? err.message : "Failed to load verification status",
+        );
+      });
+  }, [projectId]);
 
   const actualRating = React.useMemo(() => {
     if (reviews.length === 0) return project?.rating || 0;
@@ -794,6 +813,7 @@ export default function ProjectDetailPage() {
                       publicKey={gate.publicKey}
                       onConnect={gate.connectWallet}
                       onDisconnect={gate.disconnectWallet}
+                      onRetry={gate.retryAccountLoad}
                       compact
                     />
                   </div>
@@ -825,7 +845,14 @@ export default function ProjectDetailPage() {
             <div className="space-y-6">
               {/* Verification Status */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
-                <h3 className="text-lg font-bold mb-4">Verification Status</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">Verification Status</h3>
+                  {verificationError && (
+                    <Button variant="outline" size="sm" onClick={retryVerification}>
+                      Retry
+                    </Button>
+                  )}
+                </div>
                 <VerificationStatus initialProjectId={project.id} />
               </div>
 
