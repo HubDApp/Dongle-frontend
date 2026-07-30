@@ -1,4 +1,5 @@
 "use client";
+import { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ export default function AdminDashboard() {
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   // Load reports and moderation log
   useEffect(() => {
@@ -57,7 +59,8 @@ export default function AdminDashboard() {
       setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
       setProjectModerationLog(projectReportService.getModerationLog());
-    }
+      reviewService.getReviews().then(setReviews).catch(() => {});
+    }, 0);
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected") => {
@@ -157,7 +160,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviewsById[reviewId];
+    return reviews.find(r => r.id === reviewId);
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {
@@ -552,6 +555,8 @@ export default function AdminDashboard() {
                 </div>
               )}
 
+                  {pendingProjectReports.length > 0 && (
+                <div className="space-y-4 mt-8">
                   {pendingProjectReports.map((report) => {
                     const project = projectService.getProjectById(report.projectId);
                     return (

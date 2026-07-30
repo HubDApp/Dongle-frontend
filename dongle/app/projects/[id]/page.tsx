@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useParams,
+  useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -11,20 +13,23 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
-import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
+import { Review,
+  ReviewReport,
+  ReviewReportReason } from "@/types/review";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
-import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { reviewReportService } from "@/services/review/review-report.service";
+import { reviewService,
+  getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
-import WalletStatePanel, {
+import WalletStatePanel,
+  {
   WalletDisconnectedBanner,
-} from "@/components/wallet/WalletStatePanel";
+  } from "@/components/wallet/WalletStatePanel";
 import {
   AlertCircle,
   ArrowLeft,
@@ -36,15 +41,11 @@ import {
   GitBranch,
   Globe,
   Info,
-  Bookmark,
-  BookmarkCheck,
   Shield,
-  Bug,
   Megaphone,
   MessageSquare,
-  Shield,
   Star,
-  UserPlus,
+  UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
@@ -369,8 +370,7 @@ export default function ProjectDetailPage() {
         {
           projectId: project.id,
           ...data,
-          authorAddress: gate.publicKey,
-        },
+},
         gate.publicKey
       );
       toast.success("Update published successfully");
