@@ -25,8 +25,10 @@ export default function ReviewsPage() {
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [selectedProject, setSelectedProject] = useState<ReviewProject | null>(null);
-  const [sortBy, setSortBy] = useState<"recent" | "helpfulness">("recent");
+  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "highest" | "lowest" | "helpfulness">("recent");
   const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [ratingFilter, setRatingFilter] = useState<string>("all");
+  const [userFilter, setUserFilter] = useState<"all" | "mine">("all");
   const [showWalletGate, setShowWalletGate] = useState(false);
 
   useEffect(() => {
@@ -189,25 +191,67 @@ export default function ReviewsPage() {
     }
   };
 
+  const allProjects = useMemo(() => projectService.getAllProjects(), []);
+
   const sortedReviews = useMemo(() => {
     let list = [...reviews];
+
     if (projectFilter !== "all") {
       list = list.filter((r) => r.projectId === projectFilter);
     }
-    if (sortBy === "helpfulness") {
-      return list.sort((a, b) => {
-        const votesA = a.helpfulVotes?.length || 0;
-        const votesB = b.helpfulVotes?.length || 0;
-        if (votesA !== votesB) {
-          return votesB - votesA;
-        }
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
-    }
-    return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [reviews, sortBy, projectFilter]);
 
-  const allProjects = projectService.getAllProjects();
+    if (ratingFilter !== "all") {
+      const ratingNum = parseInt(ratingFilter, 10);
+      list = list.filter((r) => r.rating === ratingNum);
+    }
+
+    if (userFilter === "mine" && gate.publicKey) {
+      list = list.filter((r) => r.userAddress === gate.publicKey);
+    }
+
+    switch (sortBy) {
+      case "oldest":
+        return list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      case "highest":
+        return list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "lowest":
+        return list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      case "helpfulness":
+        return list.sort((a, b) => {
+          const votesA = a.helpfulVotes?.length || 0;
+          const votesB = b.helpfulVotes?.length || 0;
+          if (votesA !== votesB) {
+            return votesB - votesA;
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      case "recent":
+      default:
+        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  }, [reviews, sortBy, projectFilter, ratingFilter, userFilter, gate.publicKey]);
+
+  const emptyStateMessage = useMemo(() => {
+    if (reviews.length === 0) {
+      return "No reviews yet. Be the first to leave one!";
+    }
+    const activeFilters: string[] = [];
+    if (userFilter === "mine") {
+      activeFilters.push("your reviews");
+    }
+    if (projectFilter !== "all") {
+      const projName = allProjects.find((p) => p.id === projectFilter)?.name || "selected project";
+      activeFilters.push(`project "${projName}"`);
+    }
+    if (ratingFilter !== "all") {
+      activeFilters.push(`${ratingFilter}-star rating`);
+    }
+    if (activeFilters.length > 0) {
+      return `No reviews found matching ${activeFilters.join(" and ")}. Try adjusting your filters.`;
+    }
+    return "No reviews match the selected filter criteria.";
+  }, [reviews.length, userFilter, projectFilter, ratingFilter, allProjects]);
+
   const topProjects = allProjects.slice(0, 6);
 
   const walletBlocked =
@@ -304,15 +348,38 @@ export default function ReviewsPage() {
 
             <div className="grid grid-cols-1 gap-12">
               <section>
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <span className="w-2 h-8 bg-blue-500 rounded-full" />
-                    {sortBy === "helpfulness" ? "Most Helpful Reviews" : "Recent Activity"}
+                    {sortBy === "helpfulness"
+                      ? "Most Helpful Reviews"
+                      : sortBy === "highest"
+                      ? "Highest Rated Reviews"
+                      : sortBy === "lowest"
+                      ? "Lowest Rated Reviews"
+                      : sortBy === "oldest"
+                      ? "Oldest Reviews"
+                      : "Recent Activity"}
                   </h2>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    {gate.publicKey && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-zinc-500 whitespace-nowrap">Show:</span>
+                        <select
+                          aria-label="Filter reviews by user ownership"
+                          value={userFilter}
+                          onChange={(e) => setUserFilter(e.target.value as "all" | "mine")}
+                          className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
+                        >
+                          <option value="all">All Reviews</option>
+                          <option value="mine">My Reviews</option>
+                        </select>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 whitespace-nowrap">Filter by:</span>
+                      <span className="text-zinc-500 whitespace-nowrap">Project:</span>
                       <select
+                        aria-label="Filter reviews by project"
                         value={projectFilter}
                         onChange={(e) => setProjectFilter(e.target.value)}
                         className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold max-w-[150px] truncate"
@@ -326,13 +393,33 @@ export default function ReviewsPage() {
                       </select>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 whitespace-nowrap">Sort by:</span>
+                      <span className="text-zinc-500 whitespace-nowrap">Rating:</span>
                       <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as "recent" | "helpfulness")}
+                        aria-label="Filter reviews by rating"
+                        value={ratingFilter}
+                        onChange={(e) => setRatingFilter(e.target.value)}
                         className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
                       >
-                        <option value="recent">Recent</option>
+                        <option value="all">All Ratings</option>
+                        <option value="5">5 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="2">2 Stars</option>
+                        <option value="1">1 Star</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-500 whitespace-nowrap">Sort by:</span>
+                      <select
+                        aria-label="Sort reviews"
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as "recent" | "oldest" | "highest" | "lowest" | "helpfulness")}
+                        className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
+                      >
+                        <option value="recent">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="highest">Highest Rating</option>
+                        <option value="lowest">Lowest Rating</option>
                         <option value="helpfulness">Most Helpful</option>
                       </select>
                     </div>
@@ -346,6 +433,8 @@ export default function ReviewsPage() {
                   onDelete={handleDeleteReview}
                   onVoteHelpful={handleVoteHelpful}
                   onVoteUnhelpful={handleVoteUnhelpful}
+                  emptyMessage={emptyStateMessage}
+                  emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
                 />
               </section>
             </div>

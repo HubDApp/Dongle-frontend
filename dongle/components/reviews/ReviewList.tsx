@@ -14,6 +14,8 @@ interface ReviewListProps {
   onVoteHelpful?: (id: string) => void;
   onVoteUnhelpful?: (id: string) => void;
   onReport?: (review: Review) => void;
+  emptyMessage?: string;
+  emptyTitle?: string;
 }
 
 export default function ReviewList({ 
@@ -23,12 +25,15 @@ export default function ReviewList({
   onDelete,
   onVoteHelpful,
   onVoteUnhelpful,
-  onReport
+  onReport,
+  emptyMessage,
+  emptyTitle
 }: ReviewListProps) {
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
-        <p className="text-zinc-500">No reviews yet. Be the first to leave one!</p>
+      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
+        {emptyTitle && <p className="text-base font-bold text-zinc-700 dark:text-zinc-300 mb-1">{emptyTitle}</p>}
+        <p className="text-zinc-500">{emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
       </div>
     );
   }
