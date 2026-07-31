@@ -16,6 +16,7 @@ import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { auditLogService } from "@/services/audit/audit-log.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
+import { ProjectReport, ProjectModerationAction, ProjectClaimRequest } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 
 interface VerificationRequest {
@@ -45,23 +46,41 @@ export default function AdminDashboard() {
   const [claimRequests, setClaimRequests] = useState<ProjectClaimRequest[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
+  const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
+  // Reason input states
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
+  const [verificationReason, setVerificationReason] = useState<Record<string, string>>({});
+  const [claimReason, setClaimReason] = useState<Record<string, string>>({});
+  const [projectReportReason, setProjectReportReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
 
-  // Load reports and moderation log
+  // Load reports, moderation log, and reviews
   useEffect(() => {
     if (!isAdmin) return;
-    const id = setTimeout(() => {
+    const id = setTimeout(async () => {
       setReports(reviewReportService.getReports());
       setProjectReports(projectReportService.getReports());
       setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
       setProjectModerationLog(projectReportService.getModerationLog());
-    }
+
+      // Load reviews and build a lookup map for review reports
+      const allReviews = await reviewService.getReviews();
+      const reviewsMap: Record<string, Review> = {};
+      for (const review of allReviews) {
+        reviewsMap[review.id] = review;
+      }
+      setReviewsById(reviewsMap);
+    }, 0);
+    return () => clearTimeout(id);
   }, [isAdmin]);
 
-  const handleAction = (id: string, status: "approved" | "rejected") => {
+  const handleAction = (id: string, status: "approved" | "rejected", reason?: string) => {
     const req = requests.find((r) => r.id === id);
+    if (!reason?.trim() && status === "rejected") {
+      toast.error("A reason is required for rejection");
+      return;
+    }
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status } : r)),
     );
@@ -71,8 +90,11 @@ export default function AdminDashboard() {
         action: status === "approved" ? "verification_approved" : "verification_rejected",
         targetId: req.id,
         targetLabel: req.projectName,
+        reason: reason?.trim() || undefined,
       });
     }
+    toast.success(`Verification ${status === "approved" ? "approved" : "rejected"}`);
+    setVerificationReason((prev) => ({ ...prev, [id]: "" }));
   };
 
   const handleSaveFee = () => {
@@ -133,26 +155,96 @@ export default function AdminDashboard() {
   };
 
   const handleApproveClaim = (requestId: string) => {
+    const reason = claimReason[requestId]?.trim() || "Claim approved by admin";
     if (!gate.publicKey) return;
 
-    const result = projectClaimService.approveRequest(requestId, gate.publicKey, "Approved by admin");
+    const result = projectClaimService.approveRequest(requestId, gate.publicKey, reason);
     if (result.success) {
+      const claim = claimRequests.find((c) => c.id === requestId);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "claim_approved",
+        targetId: requestId,
+        targetLabel: claim?.projectId || "Project claim",
+        reason,
+      });
       toast.success("Claim approved");
       setClaimRequests(projectClaimService.getRequests());
+      setClaimReason((prev) => ({ ...prev, [requestId]: "" }));
     } else {
       toast.error(result.error || "Failed to approve claim");
     }
   };
 
   const handleRejectClaim = (requestId: string) => {
+    const reason = claimReason[requestId]?.trim();
+    if (!reason) {
+      toast.error("A reason is required for rejection");
+      return;
+    }
     if (!gate.publicKey) return;
 
-    const result = projectClaimService.rejectRequest(requestId, gate.publicKey, "Rejected by admin");
+    const result = projectClaimService.rejectRequest(requestId, gate.publicKey, reason);
     if (result.success) {
+      const claim = claimRequests.find((c) => c.id === requestId);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "claim_rejected",
+        targetId: requestId,
+        targetLabel: claim?.projectId || "Project claim",
+        reason,
+      });
       toast.success("Claim rejected");
       setClaimRequests(projectClaimService.getRequests());
+      setClaimReason((prev) => ({ ...prev, [requestId]: "" }));
     } else {
       toast.error(result.error || "Failed to reject claim");
+    }
+  };
+
+  const handleResolveProjectReport = (reportId: string) => {
+    const reason = projectReportReason[reportId]?.trim() || "Project complies with guidelines";
+    if (!gate.publicKey) return;
+
+    const result = projectReportService.resolveReport(reportId, gate.publicKey, reason);
+    if (result.success) {
+      const report = projectReports.find((r) => r.id === reportId);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_resolved",
+        targetId: reportId,
+        targetLabel: `Project report ${reportId}`,
+        reason,
+      });
+      toast.success("Project report resolved");
+      setProjectReports(projectReportService.getReports());
+      setProjectModerationLog(projectReportService.getModerationLog());
+      setProjectReportReason((prev) => ({ ...prev, [reportId]: "" }));
+    } else {
+      toast.error(result.error || "Failed to resolve project report");
+    }
+  };
+
+  const handleDismissProjectReport = (reportId: string) => {
+    const reason = projectReportReason[reportId]?.trim() || "Project does not violate guidelines";
+    if (!gate.publicKey) return;
+
+    const result = projectReportService.dismissReport(reportId, gate.publicKey, reason);
+    if (result.success) {
+      const report = projectReports.find((r) => r.id === reportId);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_dismissed",
+        targetId: reportId,
+        targetLabel: `Project report ${reportId}`,
+        reason,
+      });
+      toast.success("Project report dismissed");
+      setProjectReports(projectReportService.getReports());
+      setProjectModerationLog(projectReportService.getModerationLog());
+      setProjectReportReason((prev) => ({ ...prev, [reportId]: "" }));
+    } else {
+      toast.error(result.error || "Failed to dismiss project report");
     }
   };
 
@@ -282,45 +374,68 @@ export default function AdminDashboard() {
                 {requests.map((req) => (
                   <div
                     key={req.id}
-                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-lg"
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl flex flex-col gap-4 transition-all hover:shadow-lg"
                   >
-                    <div>
-                      <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
-                      <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
-                        <span>Submitted by:</span>
-                        <AddressDisplay address={req.submittedBy} copyable={true} truncated={true} inline={true} />
-                        <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                        <span>{formatDate(req.timestamp, "short")}</span>
-                      </div>
-                      <div className="mt-2">
-                        <span
-                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                            req.status === "pending"
-                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500"
-                              : req.status === "approved"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500"
-                                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500"
-                          }`}
-                        >
-                          {req.status}
-                        </span>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
+                        <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
+                          <span>Submitted by:</span>
+                          <AddressDisplay address={req.submittedBy} copyable={true} truncated={true} inline={true} />
+                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                          <span>{formatDate(req.timestamp, "short")}</span>
+                        </div>
+                        <div className="mt-2">
+                          <span
+                            className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
+                              req.status === "pending"
+                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500"
+                                : req.status === "approved"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500"
+                                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500"
+                            }`}
+                          >
+                            {req.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {req.status === "pending" && (
-                      <div className="flex gap-2 w-full md:w-auto">
-                        <button
-                          onClick={() => handleAction(req.id, "approved")}
-                          className="flex-1 md:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => handleAction(req.id, "rejected")}
-                          className="flex-1 md:flex-none px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
-                        >
-                          Reject
-                        </button>
+                      <div className="space-y-3">
+                        <textarea
+                          placeholder="Reason for decision (required for rejection)"
+                          value={verificationReason[req.id] || ""}
+                          onChange={(e) =>
+                            setVerificationReason((prev) => ({
+                              ...prev,
+                              [req.id]: e.target.value,
+                            }))
+                          }
+                          className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                          rows={2}
+                        />
+                        <div className="flex gap-2 w-full">
+                          <button
+                            onClick={() => handleAction(req.id, "approved", verificationReason[req.id])}
+                            className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleAction(req.id, "rejected", verificationReason[req.id])}
+                            className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {req.status !== "pending" && verificationReason[req.id] && (
+                      <div className="text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl">
+                        <span className="font-medium">Reason: </span>
+                        {verificationReason[req.id]}
                       </div>
                     )}
                   </div>
@@ -413,39 +528,56 @@ export default function AdminDashboard() {
                       const project = projectService.getProjectById(request.projectId);
                       return (
                         <div key={request.id} className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <div className="font-semibold text-sm">
-                                {project?.name || "Unknown project"}
-                              </div>
-                              <div className="text-xs text-zinc-500 mt-1">
-                                Requested by <AddressDisplay address={request.requestedBy} copyable={true} truncated={true} inline={true} /> • {formatDate(request.createdAt, "relative")}
-                              </div>
-                              <div className="mt-2 text-xs uppercase font-bold text-blue-600 dark:text-blue-400">
-                                {request.proofType}
-                              </div>
-                              <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
-                                {request.proofValue}
-                              </div>
-                              {request.explanation && (
-                                <div className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap">
-                                  {request.explanation}
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="font-semibold text-sm">
+                                  {project?.name || "Unknown project"}
                                 </div>
-                              )}
+                                <div className="text-xs text-zinc-500 mt-1">
+                                  Requested by <AddressDisplay address={request.requestedBy} copyable={true} truncated={true} inline={true} /> • {formatDate(request.createdAt, "relative")}
+                                </div>
+                                <div className="mt-2 text-xs uppercase font-bold text-blue-600 dark:text-blue-400">
+                                  {request.proofType}
+                                </div>
+                                <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                                  {request.proofValue}
+                                </div>
+                                {request.explanation && (
+                                  <div className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap">
+                                    {request.explanation}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button
-                                onClick={() => handleApproveClaim(request.id)}
-                                className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRejectClaim(request.id)}
-                                className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
-                              >
-                                Reject
-                              </button>
+
+                            <div className="space-y-2">
+                              <textarea
+                                placeholder="Reason for decision (required for rejection)"
+                                value={claimReason[request.id] || ""}
+                                onChange={(e) =>
+                                  setClaimReason((prev) => ({
+                                    ...prev,
+                                    [request.id]: e.target.value,
+                                  }))
+                                }
+                                className="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                                rows={2}
+                              />
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={() => handleApproveClaim(request.id)}
+                                  className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRejectClaim(request.id)}
+                                  className="flex-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
+                                >
+                                  Reject
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -511,7 +643,7 @@ export default function AdminDashboard() {
 
                         {report.explanation && (
                           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter's explanation:</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
                           </div>
                         )}
@@ -549,8 +681,6 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
-                </div>
-              )}
 
                   {pendingProjectReports.map((report) => {
                     const project = projectService.getProjectById(report.projectId);
@@ -592,44 +722,40 @@ export default function AdminDashboard() {
 
                         {report.explanation && (
                           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter's explanation:</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
                           </div>
                         )}
 
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              const result = projectReportService.resolveReport(report.id, gate.publicKey!, "Project complies with guidelines");
-                              if (result.success) {
-                                setProjectReports(projectReportService.getReports());
-                                setProjectModerationLog(projectReportService.getModerationLog());
-                                toast.success("Project report resolved");
-                              } else {
-                                toast.error(result.error || "Failed to resolve project report");
-                              }
-                            }}
-                            className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Resolve
-                          </button>
-                          <button
-                            onClick={() => {
-                              const result = projectReportService.dismissReport(report.id, gate.publicKey!, "Project does not violate guidelines");
-                              if (result.success) {
-                                setProjectReports(projectReportService.getReports());
-                                setProjectModerationLog(projectReportService.getModerationLog());
-                                toast.success("Project report dismissed");
-                              } else {
-                                toast.error(result.error || "Failed to dismiss project report");
-                              }
-                            }}
-                            className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Dismiss
-                          </button>
+                        <div className="space-y-3">
+                          <textarea
+                            placeholder="Moderation reason (optional)"
+                            value={projectReportReason[report.id] || ""}
+                            onChange={(e) =>
+                              setProjectReportReason((prev) => ({
+                                ...prev,
+                                [report.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                            rows={2}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleResolveProjectReport(report.id)}
+                              className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Resolve
+                            </button>
+                            <button
+                              onClick={() => handleDismissProjectReport(report.id)}
+                              className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Dismiss
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
