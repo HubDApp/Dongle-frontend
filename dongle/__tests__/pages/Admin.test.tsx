@@ -85,7 +85,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
     it("displays verification requests list", () => {
       render(<AdminPage />);
-      expect(screen.getByText(/verification requests/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/verification requests/i).length).toBeGreaterThan(0);
       expect(screen.getByText("Lumina DEX")).toBeInTheDocument();
     });
 
@@ -172,7 +172,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
     it("renders verification requests section", () => {
       render(<AdminPage />);
-      expect(screen.getByText(/verification requests/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/verification requests/i).length).toBeGreaterThan(0);
     });
 
     it("renders system settings section", () => {

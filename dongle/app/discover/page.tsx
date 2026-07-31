@@ -14,6 +14,7 @@ import type { VerificationStatus } from "@/components/projects/VerificationBadge
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+import { trackSearch, trackFilter } from "@/lib/analytics";
 
 const ITEMS_PER_PAGE = 9;
 
@@ -96,6 +97,19 @@ function DiscoverContent() {
   const hasMore = visibleCount < filteredCount;
 
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSearchRef = useRef<string | null>(null);
+
+  // Emit a privacy-safe search event when the debounced query changes
+  useEffect(() => {
+    if (isInitialLoading) return;
+    if (lastSearchRef.current === searchQuery) return;
+    lastSearchRef.current = searchQuery;
+    trackSearch({
+      queryLength: searchQuery.length,
+      resultCount: filteredCount,
+      source: "discover",
+    });
+  }, [searchQuery, filteredCount, isInitialLoading]);
 
   useEffect(() => {
     return () => {
@@ -104,6 +118,34 @@ function DiscoverContent() {
       }
     };
   }, []);
+
+  const handleCategoryChange = (cat: string) => {
+    setCategory(cat);
+    trackFilter({ filterType: "category", filterValue: cat, source: "discover" });
+  };
+
+  const handleSortChange = (value: SortBy) => {
+    setSortBy(value);
+    trackFilter({ filterType: "sort", filterValue: value, source: "discover" });
+  };
+
+  const handleVerificationFilterChange = (value: VerificationStatus | "ALL") => {
+    setVerificationFilter(value);
+    trackFilter({
+      filterType: "verification",
+      filterValue: value,
+      source: "discover",
+    });
+  };
+
+  const handleTagsChange = (nextTags: string[]) => {
+    setTags(nextTags);
+    trackFilter({
+      filterType: "tags",
+      filterValue: nextTags.length > 0 ? `count:${nextTags.length}` : "none",
+      source: "discover",
+    });
+  };
 
   const handleLoadMore = () => {
     setIsLoadingMore(true);
@@ -145,7 +187,7 @@ function DiscoverContent() {
                 {categories.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setCategory(cat)}
+                    onClick={() => handleCategoryChange(cat)}
                     className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                       category === cat
                         ? "bg-blue-500 text-white"
@@ -162,7 +204,11 @@ function DiscoverContent() {
               {/* Verification Filter */}
               <select
                 value={verificationFilter}
-                onChange={(e) => setVerificationFilter(e.target.value as VerificationStatus | "ALL")}
+                onChange={(e) =>
+                  handleVerificationFilterChange(
+                    e.target.value as VerificationStatus | "ALL",
+                  )
+                }
                 disabled={isInitialLoading}
                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -176,7 +222,7 @@ function DiscoverContent() {
               {/* Sort */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortBy)}
+                onChange={(e) => handleSortChange(e.target.value as SortBy)}
                 disabled={isInitialLoading}
                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -192,7 +238,7 @@ function DiscoverContent() {
              <TagInput
                label="Filter by Tags"
                tags={tags}
-               onChange={setTags}
+               onChange={handleTagsChange}
                placeholder="Add tags to filter..."
              />
           </div>

@@ -63,7 +63,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           onChange={handleChange}
           aria-invalid={error || isAtLimit ? true : undefined}
           aria-describedby={[error ? errorId : "", props.maxLength ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
-          className={`${className} ${baseBorder}`}
+          className={className}
         />
         {error && (
           <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
