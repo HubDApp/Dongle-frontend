@@ -37,14 +37,13 @@ import {
   Info,
   Megaphone,
   MessageSquare,
-  Shield,
   Star,
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
+import { reviewReportService } from "@/services/review/review-report.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
@@ -52,6 +51,8 @@ import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
+import { shouldBypassLinkWarning, getExternalLinkWarningOptions } from "@/lib/externalLinkWarning";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
 
@@ -442,26 +443,15 @@ export default function ProjectDetailPage() {
 
   const handleExternalLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
     e.preventDefault();
-    
-    // Check if the domain is verified and can bypass the warning
-    // Verified project domains can bypass the warning if approved (i.e. verificationStatus is VERIFIED).
-    const targetDomain = extractDomain(url);
-    const isVerifiedDomain = verificationStatus === "VERIFIED";
 
-    if (isVerifiedDomain) {
-      // Bypass the warning and open link safely
+    if (shouldBypassLinkWarning(verificationStatus)) {
       window.open(url, "_blank", "noopener,noreferrer");
       return;
     }
 
-    // Otherwise, show confirmation interstitial/modal
-    const ok = await confirm({
-      title: "External Link Safety Warning",
-      description: `You are about to visit the following external domain: ${targetDomain}.\nFull URL: ${url}\n\nMake sure you trust this site before proceeding.`,
-      confirmLabel: "Proceed to Site",
-      cancelLabel: "Stay Here",
-      variant: "warning",
-    });
+    const targetDomain = extractDomain(url);
+    const options = getExternalLinkWarningOptions(targetDomain, url, verificationStatus);
+    const ok = await confirm(options);
 
     if (ok) {
       window.open(url, "_blank", "noopener,noreferrer");
@@ -519,30 +509,8 @@ export default function ProjectDetailPage() {
             Back
           </button>
 
-          {/* Warning Banner */}
-          {verificationStatus === "REJECTED" && (
-            <div className="mb-6 p-5 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 rounded-3xl border border-red-200 dark:border-red-900/50 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
-              <AlertCircle className="w-6 h-6 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
-              <div>
-                <h4 className="font-bold text-base mb-1">High Risk Warning: Rejected Project</h4>
-                <p className="text-sm opacity-90 leading-relaxed">
-                  This project was rejected by the community verification process. Please be extremely cautious: do not connect your wallet, share private keys, or interact with external links unless you are absolutely sure of its safety.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {(verificationStatus === "NONE" || verificationStatus === "PENDING") && (
-            <div className="mb-6 p-5 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 rounded-3xl border border-amber-200 dark:border-amber-900/50 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
-              <Info className="w-6 h-6 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-              <div>
-                <h4 className="font-bold text-base mb-1">Unverified Project Context</h4>
-                <p className="text-sm opacity-90 leading-relaxed">
-                  This project has not completed the community verification process. It is currently unverified. Please exercise due diligence when interacting with the project and checking external resources.
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Verification Status Banner */}
+          <ProjectStatusBanner status={verificationStatus} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -640,12 +608,22 @@ export default function ProjectDetailPage() {
 
                   {activeTab === "updates" && (
                     <div className="space-y-4">
-                      {isOwner && !isAddingUpdate && (
-                        <Button variant="primary" onClick={handleAddUpdate}>
-                          <Megaphone className="w-4 h-4 mr-2" />
-                          Post Update
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {isOwner && !isAddingUpdate && (
+                          <Button variant="primary" onClick={handleAddUpdate}>
+                            <Megaphone className="w-4 h-4 mr-2" />
+                            Post Update
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/projects/${projectId}/updates`)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View full feed
                         </Button>
-                      )}
+                      </div>
 
                       {isAddingUpdate && project && (
                         <UpdateForm
