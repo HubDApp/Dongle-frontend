@@ -416,5 +416,54 @@ describe("Review Service", () => {
       expect(res.data?.helpfulVotes).toContain("user2");
       expect(res.data?.unhelpfulVotes).not.toContain("user2");
     });
+
+    it("should allow a user to vote unhelpful and prevent duplicates via toggling", async () => {
+      const res1 = await reviewService.voteUnhelpful(reviewId, "user2");
+      expect(res1.success).toBe(true);
+      expect(res1.data?.unhelpfulVotes).toContain("user2");
+      expect(res1.data?.unhelpfulVotes).toHaveLength(1);
+
+      const res2 = await reviewService.voteUnhelpful(reviewId, "user2");
+      expect(res2.success).toBe(true);
+      expect(res2.data?.unhelpfulVotes).not.toContain("user2");
+      expect(res2.data?.unhelpfulVotes).toHaveLength(0);
+    });
+
+    it("should remove helpful vote when voting unhelpful", async () => {
+      await reviewService.voteHelpful(reviewId, "user2");
+      const reviews = await reviewService.getReviews();
+      expect(reviews[0].helpfulVotes).toContain("user2");
+
+      const res = await reviewService.voteUnhelpful(reviewId, "user2");
+      expect(res.success).toBe(true);
+      expect(res.data?.unhelpfulVotes).toContain("user2");
+      expect(res.data?.helpfulVotes).not.toContain("user2");
+    });
+
+    it("should return error when voting helpful on non-existent review", async () => {
+      const res = await reviewService.voteHelpful("nonexistent-id", "user2");
+      expect(res.success).toBe(false);
+      expect(res.error).toContain("not found");
+    });
+
+    it("should return error when voting unhelpful on non-existent review", async () => {
+      const res = await reviewService.voteUnhelpful("nonexistent-id", "user2");
+      expect(res.success).toBe(false);
+      expect(res.error).toContain("not found");
+    });
+
+    it("should accumulate votes from multiple users independently", async () => {
+      await reviewService.voteHelpful(reviewId, "user2");
+      await reviewService.voteHelpful(reviewId, "user3");
+      await reviewService.voteUnhelpful(reviewId, "user4");
+
+      const reviews = await reviewService.getReviews();
+      const review = reviews.find((r) => r.id === reviewId);
+      expect(review?.helpfulVotes).toHaveLength(2);
+      expect(review?.helpfulVotes).toContain("user2");
+      expect(review?.helpfulVotes).toContain("user3");
+      expect(review?.unhelpfulVotes).toHaveLength(1);
+      expect(review?.unhelpfulVotes).toContain("user4");
+    });
   });
 });

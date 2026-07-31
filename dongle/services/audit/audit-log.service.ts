@@ -27,6 +27,10 @@ const VALID_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "fee_updated",
   "report_resolved",
   "report_dismissed",
+  "claim_approved",
+  "claim_rejected",
+  "project_flagged",
+  "takedown",
 ]);
 
 /** Hydrate, validate, and return all stored entries (SSR-safe). */

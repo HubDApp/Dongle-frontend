@@ -8,6 +8,7 @@ import {
   REVIEW_REPORT_CONSTRAINTS,
 } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
+import { nowUTC } from "@/lib/date";
 import { reviewService } from "./review.service";
 
 const STORAGE_KEY_REPORTS = "dongle_review_reports";
@@ -180,7 +181,7 @@ export const reviewReportService = {
       reason: data.reason as ReviewReportReason,
       explanation: data.explanation,
       status: "pending",
-      createdAt: new Date().toISOString(),
+      createdAt: nowUTC(),
     };
 
     const reports = this.getReports();
@@ -222,7 +223,7 @@ export const reviewReportService = {
       moderatorAddress,
       action: "resolved",
       reason,
-      timestamp: new Date().toISOString(),
+      timestamp: nowUTC(),
     };
 
     const log = this.getModerationLog();
@@ -262,7 +263,7 @@ export const reviewReportService = {
       moderatorAddress,
       action: "dismissed",
       reason,
-      timestamp: new Date().toISOString(),
+      timestamp: nowUTC(),
     };
 
     const log = this.getModerationLog();
