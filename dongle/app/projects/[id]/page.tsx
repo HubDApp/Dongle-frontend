@@ -12,6 +12,9 @@ import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
 import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
+import { reviewReportService } from "@/services/review/review-report.service";
+import { projectReportService } from "@/services/project/project-report.service";
+import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
@@ -22,20 +25,21 @@ import WalletStatePanel, {
   WalletDisconnectedBanner,
 } from "@/components/wallet/WalletStatePanel";
 import {
+  AlertCircle,
   ArrowLeft,
+  Bookmark,
+  BookmarkCheck,
+  Bug,
+  Calendar,
   ExternalLink,
   GitBranch,
   Globe,
-  Star,
-  MessageSquare,
-  Calendar,
-  AlertCircle,
   Info,
-  Bookmark,
-  BookmarkCheck,
   Shield,
-  Bug,
   Megaphone,
+  MessageSquare,
+  Star,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
@@ -43,6 +47,7 @@ import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
+import { abbreviateStellarAddress } from "@/lib/stellar-address";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -50,6 +55,7 @@ import { VerificationBadge } from "@/components/projects/VerificationBadge";
 import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
 import { shouldBypassLinkWarning, getExternalLinkWarningOptions } from "@/lib/externalLinkWarning";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
+import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -69,6 +75,7 @@ export default function ProjectDetailPage() {
   const [isAddingReview, setIsAddingReview] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [isReporting, setIsReporting] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
@@ -77,10 +84,17 @@ export default function ProjectDetailPage() {
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
   const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
+  const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   useEffect(() => {
+    const abortController = new AbortController();
+    let cancelled = false;
+
     // Simulate data loading
     const timer = setTimeout(() => {
+      if (cancelled || abortController.signal.aborted) return;
+
       const foundProject = projectService.getProjectById(projectId);
       setProject(foundProject);
 
@@ -94,23 +108,37 @@ export default function ProjectDetailPage() {
         
         // Track this project view
         recentViewsService.addView(foundProject.id, gate.publicKey || undefined);
+        trackProjectView(foundProject.id, {
+          category: foundProject.primaryCategory,
+        });
         
-        // Fetch verification status
-        void (async () => {
+        // Fetch verification status with cancellation support
+        const fetchVerification = async () => {
           try {
-            const status = await sorobanService.getVerificationStatus(projectId);
-            setVerificationStatus(status);
+            const status = await sorobanService.getVerificationStatus(projectId, abortController.signal);
+            if (!cancelled) {
+              setVerificationStatus(status);
+            }
           } catch (error) {
-            console.error("Failed to fetch verification status:", error);
-            setVerificationStatus("NONE");
+            if (!cancelled) {
+              console.error("Failed to fetch verification status:", error);
+              setVerificationStatus("NONE");
+            }
           }
-        })();
+        };
+        fetchVerification();
       }
 
-      setIsLoading(false);
+      if (!cancelled) {
+        setIsLoading(false);
+      }
     }, 600);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      abortController.abort();
+    };
   }, [projectId, gate.publicKey]);
 
   const actualRating = React.useMemo(() => {
@@ -149,9 +177,48 @@ export default function ProjectDetailPage() {
   };
 
   const handleReportSubmit = (data: { reason: string; explanation: string }) => {
-    console.log("Reported:", project?.id, data);
+    if (!gate.publicKey || !project) return;
+
+    const result = projectReportService.createReport(
+      {
+        projectId: project.id,
+        reason: data.reason,
+        explanation: data.explanation,
+      },
+      gate.publicKey
+    );
+
+    if (result.success) {
+      toast.success("Project reported successfully");
+    } else {
+      const errorMsg = result.errors?.[0]?.message || "Failed to report project";
+      toast.error(errorMsg);
+    }
+
     setIsReporting(false);
-    toast.success("Project reported successfully");
+  };
+
+  const handleClaimSubmit = (data: { proofType: string; proofValue: string; explanation: string }) => {
+    if (!gate.publicKey || !project) return;
+
+    const result = projectClaimService.createRequest(
+      {
+        projectId: project.id,
+        proofType: data.proofType,
+        proofValue: data.proofValue,
+        explanation: data.explanation,
+      },
+      gate.publicKey
+    );
+
+    if (result.success) {
+      toast.success("Claim request submitted successfully");
+    } else {
+      const errorMsg = result.errors?.[0]?.message || "Failed to submit claim request";
+      toast.error(errorMsg);
+    }
+
+    setIsClaiming(false);
   };
 
   const handleReportReview = (review: Review) => {
@@ -163,10 +230,10 @@ export default function ProjectDetailPage() {
     setIsReportingReview(true);
   };
 
-  const handleReportReviewSubmit = (data: { reason: string; explanation: string }) => {
+  const handleReportReviewSubmit = async (data: { reason: string; explanation: string }) => {
     if (!gate.publicKey || !reportingReview) return;
 
-    const result = reviewReportService.createReport(
+    const result = await reviewReportService.createReport(
       {
         reviewId: reportingReview.id,
         reason: data.reason as ReviewReportReason,
@@ -233,23 +300,45 @@ export default function ProjectDetailPage() {
   const handleSubmitReview = async (data: { rating: number; comment: string }) => {
     if (!gate.publicKey || !project) return;
 
-    if (editingReview) {
-      await reviewService.updateReview(editingReview.id, data, gate.publicKey);
-    } else {
-      await reviewService.addReview(
-        {
-          projectId: project.id,
-          projectName: project.name,
-          userAddress: gate.publicKey,
-          ...data,
-        },
-        gate.publicKey
-      );
-    }
+    const action = editingReview ? "update" : "create";
+    try {
+      if (editingReview) {
+        await reviewService.updateReview(editingReview.id, data, gate.publicKey);
+      } else {
+        await reviewService.addReview(
+          {
+            projectId: project.id,
+            projectName: project.name,
+            userAddress: gate.publicKey,
+            ...data,
+          },
+          gate.publicKey
+        );
+      }
 
-    setReviews(await reviewService.getReviewsByProject(projectId));
-    setIsAddingReview(false);
-    setEditingReview(null);
+      trackReviewSubmit({
+        success: true,
+        action,
+        projectId: project.id,
+        rating: data.rating,
+        commentLength: data.comment.length,
+        walletAddress: gate.publicKey,
+      });
+
+      setReviews(await reviewService.getReviewsByProject(projectId));
+      setIsAddingReview(false);
+      setEditingReview(null);
+    } catch (error) {
+      trackReviewSubmit({
+        success: false,
+        action,
+        projectId: project.id,
+        rating: data.rating,
+        commentLength: data.comment.length,
+        walletAddress: gate.publicKey,
+        errorCode: error instanceof Error ? error.name || "Error" : "unknown",
+      });
+    }
   };
 
   const handleCancelReview = () => {
@@ -277,6 +366,7 @@ export default function ProjectDetailPage() {
         {
           projectId: project.id,
           ...data,
+          authorAddress: gate.publicKey,
         },
         gate.publicKey
       );
@@ -486,12 +576,22 @@ export default function ProjectDetailPage() {
 
                   {activeTab === "updates" && (
                     <div className="space-y-4">
-                      {isOwner && !isAddingUpdate && (
-                        <Button variant="primary" onClick={handleAddUpdate}>
-                          <Megaphone className="w-4 h-4 mr-2" />
-                          Post Update
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {isOwner && !isAddingUpdate && (
+                          <Button variant="primary" onClick={handleAddUpdate}>
+                            <Megaphone className="w-4 h-4 mr-2" />
+                            Post Update
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/projects/${projectId}/updates`)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View full feed
                         </Button>
-                      )}
+                      </div>
 
                       {isAddingUpdate && project && (
                         <UpdateForm
@@ -504,7 +604,7 @@ export default function ProjectDetailPage() {
 
                       <UpdateList
                         updates={updates}
-                        canManage={isOwner}
+                        canManage={Boolean(isOwner)}
                         onEdit={handleEditUpdate}
                         onDelete={handleDeleteUpdate}
                       />
@@ -753,17 +853,63 @@ export default function ProjectDetailPage() {
                   </Button>
                   <Button
                     variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      if (gate.state !== "ready") {
+                        setShowWalletGate(true);
+                        return;
+                      }
+                      setIsClaiming(true);
+                    }}
+                  >
+                    Claim Ownership
+                  </Button>
+                  <Button
+                    variant="outline"
                     className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
-                    onClick={() => setIsReporting(true)}
+                    onClick={() => {
+                      if (gate.state !== "ready") {
+                        setShowWalletGate(true);
+                        return;
+                      }
+                      setIsReporting(true);
+                    }}
                   >
                     Report Project
                   </Button>
+
+                  {isOwner && (
+                    <Button
+                      variant="outline"
+                      className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 border-amber-200 dark:border-amber-900"
+                      onClick={() => setShowTransferModal(true)}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Transfer Ownership
+                    </Button>
+                  )}
                 </div>
               </div>
+
+              {/* Owner Address Display */}
+              {project.ownerAddress && (
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+                  <h3 className="text-lg font-bold mb-4">Owner</h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono break-all">
+                    {abbreviateStellarAddress(project.ownerAddress)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
+        <ClaimProjectModal
+          isOpen={isClaiming}
+          projectName={project?.name || ""}
+          onClose={() => setIsClaiming(false)}
+          onSubmit={handleClaimSubmit}
+        />
         <ReportProjectModal
           isOpen={isReporting}
           projectName={project?.name || ""}

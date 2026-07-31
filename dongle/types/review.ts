@@ -1,5 +1,4 @@
 import { Project } from "@/types/project";
-import { z } from "zod";
 
 export interface Review {
   id: string;

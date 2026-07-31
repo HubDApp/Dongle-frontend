@@ -6,6 +6,7 @@ import { projectService } from "@/services/project/project.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { useConfirm } from "@/hooks/useConfirm";
 import { PROJECT_CATEGORIES } from "@/types/project";
+import type { ProjectCategory } from "@/types/project";
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "test-project-id" }),
@@ -29,7 +30,7 @@ vi.mock("@/services/stellar/soroban.service", () => ({
 
 vi.mock("@/services/review/review.service", () => ({
   reviewService: {
-    getReviewsByProject: vi.fn(() => []),
+    getReviewsByProject: vi.fn(() => Promise.resolve([])),
   },
   getReviewPersistenceLabel: vi.fn(() => "local"),
 }));
@@ -353,8 +354,8 @@ describe("Project Detail Page - layout shell", () => {
   const mockProject = {
     id: "test-project-id",
     name: "Test Secure Project",
-    category: "DeFi / DEX" as any,
-    primaryCategory: "DeFi / DEX" as any,
+    category: PROJECT_CATEGORIES.DEFI as ProjectCategory,
+    primaryCategory: PROJECT_CATEGORIES.DEFI as ProjectCategory,
     description: "A test project description.",
     rating: 4.8,
     reviews: 5,

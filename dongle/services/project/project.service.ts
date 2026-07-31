@@ -1,9 +1,17 @@
 import { mockProjects } from "@/data/mockProjects";
 import { Project } from "@/types/project";
+import { projectOwnerService } from "./project-owner.service";
+import { registry } from "@/services/data-access/registry";
 
 /**
  * Unified project service that provides a single source of truth
- * for project data across the application
+ * for project data across the application.
+ *
+ * Data access is delegated to the IProjectRepository implementation
+ * registered in the DataAccessRegistry.  In local development the mock
+ * (in-memory) repository is used automatically; a real backend / indexer
+ * can be swapped in via `registry.setProjectRepository(...)` without
+ * touching this file or any UI component.
  */
 export const projectService = {
   /**
@@ -18,7 +26,15 @@ export const projectService = {
    * Returns null if project not found
    */
   getProjectById(id: string): Project | null {
-    return mockProjects.find((p) => p.id === id) ?? null;
+    const project = mockProjects.find((p) => p.id === id) ?? null;
+    if (!project) return null;
+
+    const overrideOwner = projectOwnerService.getProjectOwnerOverride(project.id);
+    if (overrideOwner) {
+      return { ...project, ownerAddress: overrideOwner };
+    }
+
+    return project;
   },
 
   /**
@@ -82,5 +98,32 @@ export const projectService = {
       );
     }
     return sorted;
+  },
+
+  // ── Repository-backed async API ──────────────────────────────────────────
+  // These methods go through the DataAccessRegistry so that a real backend
+  // or indexer can be plugged in without modifying UI components.
+
+  /** Async: fetch all projects via the active repository implementation. */
+  async fetchAll(): Promise<Project[]> {
+    return registry.projects.getAll();
+  },
+
+  /** Async: fetch a single project by ID via the active repository. */
+  async fetchById(id: string): Promise<Project | null> {
+    const project = await registry.projects.getById(id);
+    if (!project) return null;
+    const overrideOwner = projectOwnerService.getProjectOwnerOverride(project.id);
+    return overrideOwner ? { ...project, ownerAddress: overrideOwner } : project;
+  },
+
+  /** Async: fetch projects filtered by category via the active repository. */
+  async fetchByCategory(category: string): Promise<Project[]> {
+    return registry.projects.getByCategory(category);
+  },
+
+  /** Async: full-text search via the active repository. */
+  async fetchSearch(query: string): Promise<Project[]> {
+    return registry.projects.search(query);
   },
 };

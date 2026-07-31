@@ -1,8 +1,11 @@
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import ProjectImage from "@/components/projects/ProjectImage";
+import { VerificationBadge, type VerificationStatus } from "@/components/projects/VerificationBadge";
+import { sorobanService } from "@/services/stellar/soroban.service";
 import { Clock, X, Star } from "lucide-react";
 
 interface RecentlyViewedProjectsProps {
@@ -17,6 +20,29 @@ export function RecentlyViewedProjects({
   compact = false,
 }: RecentlyViewedProjectsProps) {
   const router = useRouter();
+  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
+
+  // Fetch verification statuses for displayed projects
+  useEffect(() => {
+    if (projects.length === 0) return;
+
+    const fetchStatuses = async () => {
+      const statuses: Record<string, VerificationStatus> = {};
+      await Promise.all(
+        projects.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id);
+            statuses[project.id] = status;
+          } catch {
+            statuses[project.id] = "NONE";
+          }
+        }),
+      );
+      setVerificationStatuses(statuses);
+    };
+
+    void fetchStatuses();
+  }, [projects]);
 
   if (projects.length === 0) {
     return null;
@@ -61,6 +87,12 @@ export function RecentlyViewedProjects({
                   <Badge variant="secondary" className="text-xs">
                     {project.primaryCategory}
                   </Badge>
+                  {verificationStatuses[project.id] && (
+                    <VerificationBadge
+                      status={verificationStatuses[project.id]}
+                      showIcon={false}
+                    />
+                  )}
                   <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                     <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                     <span>{project.rating}</span>
@@ -123,6 +155,12 @@ export function RecentlyViewedProjects({
                 <Badge variant="secondary" className="text-xs">
                   {project.primaryCategory}
                 </Badge>
+                {verificationStatuses[project.id] && (
+                  <VerificationBadge
+                    status={verificationStatuses[project.id]}
+                    showIcon={false}
+                  />
+                )}
                 <div className="flex items-center gap-1 text-sm text-zinc-500 dark:text-zinc-400">
                   <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                   <span className="font-bold text-zinc-900 dark:text-zinc-100">
