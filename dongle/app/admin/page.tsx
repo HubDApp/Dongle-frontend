@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
   WalletStateLoadingPanel,
 } from "@/components/wallet/WalletStatePanel";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
+import {
+  AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare,
+  CheckCheck, Archive, UserPlus, X,
+} from "lucide-react";
 import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare, ScrollText } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
@@ -19,12 +24,22 @@ import { ReviewReport, ModerationAction, Review } from "@/types/review";
 import { ProjectReport, ProjectModerationAction, ProjectClaimRequest } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 
+type RequestStatus = "pending" | "approved" | "rejected" | "archived";
+
 interface VerificationRequest {
   id: string;
   projectName: string;
   submittedBy: string;
-  status: "pending" | "approved" | "rejected";
+  status: RequestStatus;
   timestamp: string;
+}
+
+type BulkAction = "approve" | "reject" | "archive" | "assign";
+
+interface BulkActionResult {
+  action: BulkAction;
+  succeeded: string[];
+  failed: { id: string; reason: string }[];
 }
 
 const MOCK_REQUESTS: VerificationRequest[] = [
@@ -36,8 +51,87 @@ const MOCK_REQUESTS: VerificationRequest[] = [
 const ADMIN_PURPOSE =
   "Connect an authorized admin Freighter wallet to manage verification requests, review reports, and system settings.";
 
+const STATUS_STYLES: Record<RequestStatus, string> = {
+  pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500",
+  approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500",
+  rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500",
+  archived: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400",
+};
+
+const BULK_ACTION_CONFIG: Record<BulkAction, { label: string; icon: React.ReactNode; confirmTitle: string; confirmDescription: (count: number) => string }> = {
+  approve: {
+    label: "Approve Selected",
+    icon: <CheckCheck className="w-4 h-4" />,
+    confirmTitle: "Approve requests?",
+    confirmDescription: (count) => `Are you sure you want to approve ${count} verification request${count !== 1 ? "s" : ""}? This will mark them as verified.`,
+  },
+  reject: {
+    label: "Reject Selected",
+    icon: <X className="w-4 h-4" />,
+    confirmTitle: "Reject requests?",
+    confirmDescription: (count) => `Are you sure you want to reject ${count} verification request${count !== 1 ? "s" : ""}? The submitters will be notified.`,
+  },
+  archive: {
+    label: "Archive Selected",
+    icon: <Archive className="w-4 h-4" />,
+    confirmTitle: "Archive requests?",
+    confirmDescription: (count) => `Are you sure you want to archive ${count} verification request${count !== 1 ? "s" : ""}? Archived items are hidden from the active queue.`,
+  },
+  assign: {
+    label: "Assign to Me",
+    icon: <UserPlus className="w-4 h-4" />,
+    confirmTitle: "Assign requests?",
+    confirmDescription: (count) => `Are you sure you want to assign ${count} verification request${count !== 1 ? "s" : ""} to yourself?`,
+  },
+};
+
+function BulkFailureDetail({ result }: { result: BulkActionResult }) {
+  if (result.failed.length === 0) return null;
+
+  return (
+    <div className="mt-2 text-xs">
+      <p className="font-medium mb-1">Failed ({result.failed.length}):</p>
+      <ul className="list-disc list-inside space-y-0.5 text-zinc-500">
+        {result.failed.map((f) => (
+          <li key={f.id}>
+            <span className="font-mono">{f.id}</span>: {f.reason}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function reportBulkActionResult(result: BulkActionResult) {
+  const actionLabel = BULK_ACTION_CONFIG[result.action].label;
+  if (result.succeeded.length > 0 && result.failed.length === 0) {
+    toast.success(`${actionLabel}: ${result.succeeded.length} succeeded`, {
+      description: `All ${result.succeeded.length} request${result.succeeded.length !== 1 ? "s" : ""} processed successfully.`,
+    });
+  } else if (result.succeeded.length > 0 && result.failed.length > 0) {
+    toast.warning(`${actionLabel}: ${result.succeeded.length} succeeded, ${result.failed.length} failed`, {
+      description: "Some requests could not be processed.",
+      duration: 8000,
+    });
+    toast.error(`Partial failure details`, {
+      description: <BulkFailureDetail result={result} />,
+      duration: 10000,
+    });
+  } else {
+    toast.error(`${actionLabel}: All ${result.failed.length} failed`, {
+      description: "None of the selected requests could be processed.",
+      duration: 8000,
+    });
+    toast.error(`Failure details`, {
+      description: <BulkFailureDetail result={result} />,
+      duration: 10000,
+    });
+  }
+}
+
 export default function AdminDashboard() {
   const { isAdmin, isAdminChecking, gate } = useAdminAccess();
+  const confirm = useConfirm();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<"verification" | "reports" | "audit-log">("verification");
@@ -53,6 +147,8 @@ export default function AdminDashboard() {
   const [claimReason, setClaimReason] = useState<Record<string, string>>({});
   const [projectReportReason, setProjectReportReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   // Load reports, moderation log, and reviews
   useEffect(() => {
@@ -96,6 +192,98 @@ export default function AdminDashboard() {
     toast.success(`Verification ${status === "approved" ? "approved" : "rejected"}`);
     setVerificationReason((prev) => ({ ...prev, [id]: "" }));
   };
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const allSelectable = requests
+        .filter((r) => r.status === "pending")
+        .map((r) => r.id);
+      if (allSelectable.every((id) => prev.has(id))) {
+        return new Set();
+      }
+      return new Set(allSelectable);
+    });
+  }, [requests]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkAction = useCallback(async (action: BulkAction) => {
+    const config = BULK_ACTION_CONFIG[action];
+    const count = selectedIds.size;
+
+    if (count === 0) return;
+
+    const confirmed = await confirm({
+      title: config.confirmTitle,
+      description: config.confirmDescription(count),
+      variant: action === "reject" ? "danger" : "warning",
+      confirmLabel: action === "approve" ? "Approve All"
+        : action === "reject" ? "Reject All"
+        : action === "archive" ? "Archive All"
+        : "Assign All",
+    });
+
+    if (!confirmed) return;
+
+    setIsBulkProcessing(true);
+
+    const succeeded: string[] = [];
+    const failed: { id: string; reason: string }[] = [];
+
+    setRequests((prev) => {
+      const updated = prev.map((req) => {
+        if (!selectedIds.has(req.id)) return req;
+
+        if (req.status !== "pending") {
+          failed.push({ id: req.id, reason: `Cannot ${action} request with status "${req.status}"` });
+          return req;
+        }
+
+        let newStatus: RequestStatus;
+        switch (action) {
+          case "approve":
+            newStatus = "approved";
+            break;
+          case "reject":
+            newStatus = "rejected";
+            break;
+          case "archive":
+            newStatus = "archived";
+            break;
+          case "assign":
+            newStatus = req.status;
+            break;
+          default:
+            return req;
+        }
+
+        succeeded.push(req.id);
+        return { ...req, status: newStatus };
+      });
+
+      return updated;
+    });
+
+    setTimeout(() => {
+      setIsBulkProcessing(false);
+      setSelectedIds(new Set());
+      reportBulkActionResult({ action, succeeded, failed });
+    }, 0);
+  }, [selectedIds, confirm]);
 
   const handleSaveFee = () => {
     if (gate.publicKey) {
@@ -365,81 +553,108 @@ export default function AdminDashboard() {
         {activeTab === "verification" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <span className="w-2 h-8 bg-purple-500 rounded-full" />
-                Verification Requests
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <span className="w-2 h-8 bg-purple-500 rounded-full" />
+                  Verification Requests
+                </h2>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={clearSelection}
+                    className="text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                  >
+                    Clear selection ({selectedIds.size})
+                  </button>
+                )}
+              </div>
+
+              {/* Select-all toggle */}
+              {requests.some((r) => r.status === "pending") && (
+                <div className="flex items-center gap-3 px-1">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={
+                        requests.filter((r) => r.status === "pending").length > 0 &&
+                        requests.filter((r) => r.status === "pending").every((r) => selectedIds.has(r.id))
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 text-purple-500 focus:ring-purple-500 cursor-pointer"
+                      aria-label="Select all pending requests"
+                    />
+                    <span className="text-xs text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">
+                      {requests.filter((r) => r.status === "pending").every((r) => selectedIds.has(r.id))
+                        ? "Deselect all"
+                        : "Select all pending"}
+                    </span>
+                  </label>
+                </div>
+              )}
 
               <div className="space-y-4">
-                {requests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl flex flex-col gap-4 transition-all hover:shadow-lg"
-                  >
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
-                        <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
-                          <span>Submitted by:</span>
-                          <AddressDisplay address={req.submittedBy} copyable={true} truncated={true} inline={true} />
-                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                          <span>{formatDate(req.timestamp, "short")}</span>
-                        </div>
-                        <div className="mt-2">
-                          <span
-                            className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                              req.status === "pending"
-                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500"
-                                : req.status === "approved"
-                                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500"
-                                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500"
-                            }`}
-                          >
-                            {req.status}
-                          </span>
+                {requests.map((req) => {
+                  const isPending = req.status === "pending";
+                  return (
+                    <div
+                      key={req.id}
+                      className={`bg-white dark:bg-zinc-900 border p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-lg ${
+                        selectedIds.has(req.id)
+                          ? "border-purple-400 dark:border-purple-500 shadow-lg shadow-purple-500/5"
+                          : req.status === "archived"
+                            ? "border-zinc-100 dark:border-zinc-800/50 opacity-60"
+                            : "border-zinc-200 dark:border-zinc-800"
+                      }`}
+                    >
+                      <div className="flex items-start gap-4 w-full">
+                        {isPending && (
+                          <div className="pt-1">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(req.id)}
+                              onChange={() => toggleSelection(req.id)}
+                              className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 text-purple-500 focus:ring-purple-500 cursor-pointer"
+                              aria-label={`Select ${req.projectName}`}
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
+                          <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
+                            <span>Submitted by:</span>
+                            <AddressDisplay address={req.submittedBy} copyable={true} truncated={true} inline={true} />
+                            <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                            <span>{formatDate(req.timestamp, "short")}</span>
+                          </div>
+                          <div className="mt-2">
+                            <span
+                              className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${STATUS_STYLES[req.status]}`}
+                            >
+                              {req.status}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {req.status === "pending" && (
-                      <div className="space-y-3">
-                        <textarea
-                          placeholder="Reason for decision (required for rejection)"
-                          value={verificationReason[req.id] || ""}
-                          onChange={(e) =>
-                            setVerificationReason((prev) => ({
-                              ...prev,
-                              [req.id]: e.target.value,
-                            }))
-                          }
-                          className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
-                          rows={2}
-                        />
-                        <div className="flex gap-2 w-full">
+                      {isPending && (
+                        <div className="flex gap-2 w-full md:w-auto md:shrink-0">
                           <button
-                            onClick={() => handleAction(req.id, "approved", verificationReason[req.id])}
-                            className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                            onClick={() => handleAction(req.id, "approved")}
+                            className="flex-1 md:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
                           >
                             Approve
                           </button>
                           <button
-                            onClick={() => handleAction(req.id, "rejected", verificationReason[req.id])}
-                            className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
+                            onClick={() => handleAction(req.id, "rejected")}
+                            className="flex-1 md:flex-none px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
                           >
                             Reject
                           </button>
                         </div>
-                      </div>
-                    )}
-
-                    {req.status !== "pending" && verificationReason[req.id] && (
-                      <div className="text-xs text-zinc-500 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl">
-                        <span className="font-medium">Reason: </span>
-                        {verificationReason[req.id]}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -488,6 +703,50 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Floating bulk action bar */}
+        {selectedIds.size > 0 && activeTab === "verification" && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-200">
+            <div className="bg-zinc-950 dark:bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3">
+              <span className="text-sm text-zinc-400 font-medium whitespace-nowrap">
+                {selectedIds.size} selected
+              </span>
+              <div className="w-px h-6 bg-zinc-800" />
+              <div className="flex items-center gap-2">
+                {(Object.entries(BULK_ACTION_CONFIG) as [BulkAction, typeof BULK_ACTION_CONFIG[BulkAction]][]).map(([action, config]) => (
+                  <button
+                    key={action}
+                    onClick={() => handleBulkAction(action)}
+                    disabled={isBulkProcessing}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] ${
+                      action === "reject"
+                        ? "bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                        : action === "approve"
+                          ? "bg-green-500/10 text-green-400 hover:bg-green-500/20 hover:text-green-300"
+                          : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                    }`}
+                  >
+                    {isBulkProcessing ? (
+                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      config.icon
+                    )}
+                    {config.label}
+                  </button>
+                ))}
+              </div>
+              <div className="w-px h-6 bg-zinc-800" />
+              <button
+                onClick={clearSelection}
+                disabled={isBulkProcessing}
+                className="p-2 text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-50"
+                aria-label="Cancel selection"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
