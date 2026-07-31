@@ -1,5 +1,6 @@
 import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
+import { nowUTC, isValidDate } from "@/lib/date";
 import { reviewApiService } from "./review-api.service";
 
 const STORAGE_KEY = "dongle_reviews";
@@ -66,10 +67,10 @@ function getLocalReviews(): Review[] {
     const id = typeof record.id === "string" && record.id ? record.id : generateId();
     const projectName = typeof record.projectName === "string" && record.projectName ? record.projectName : "Unknown Project";
     let createdAt: string;
-    if (typeof record.createdAt === "string" && !isNaN(Date.parse(record.createdAt))) {
+    if (typeof record.createdAt === "string" && isValidDate(record.createdAt)) {
       createdAt = record.createdAt;
     } else {
-      createdAt = new Date().toISOString();
+      createdAt = nowUTC();
     }
     const review: Review = { id, projectId: record.projectId, projectName, userAddress: record.userAddress, rating, comment: record.comment, createdAt };
     if (Array.isArray(record.helpfulVotes)) {
