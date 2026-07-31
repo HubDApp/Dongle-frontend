@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Button } from "@/components/ui/Button";
-import { useTranslation } from "@/lib/i18n/useTranslation";
+import { getPrefetchValue } from "@/lib/prefetch-config";
 
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { IconButton } from "@/components/ui/IconButton";
@@ -112,7 +112,7 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link href="/" className="text-xl font-bold tracking-tighter">
+          <Link href="/" prefetch={getPrefetchValue("landing")} className="text-xl font-bold tracking-tighter">
             DONGLE
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium">
@@ -120,6 +120,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={getPrefetchValue("navigation")}
                 className={`py-2 px-1 transition-all border-b-2 ${
                   isActive(link.href)
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
@@ -132,6 +133,7 @@ export default function Navbar() {
             {isAdmin && (
               <Link
                 href="/admin"
+                prefetch={getPrefetchValue("admin")}
                 className={`py-2 px-1 transition-all border-b-2 ${
                   isActive("/admin")
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"

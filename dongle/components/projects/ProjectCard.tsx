@@ -10,6 +10,7 @@ import { VerificationBadge, VerificationStatus } from "@/components/projects/Ver
 import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
+import { getPrefetchValue } from "@/lib/prefetch-config";
 
 interface ProjectCardProps {
   project: Project;
@@ -97,7 +98,7 @@ export const ProjectCard = ({
         </IconButton>
       )}
 
-      <Link href={`/projects/${project.id}`} className="flex h-full flex-col">
+      <Link href={`/projects/${project.id}`} prefetch={getPrefetchValue("project-detail")} className="flex h-full flex-col">
         <ProjectImage
           logoUrl={project.logoUrl}
           name={project.name}
