@@ -35,6 +35,7 @@ import {
   GitBranch,
   Globe,
   Info,
+  Shield,
   Megaphone,
   MessageSquare,
   Star,
@@ -47,6 +48,7 @@ import { reviewReportService } from "@/services/review/review-report.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -934,6 +936,11 @@ export default function ProjectDetailPage() {
                     {abbreviateStellarAddress(project.ownerAddress)}
                   </p>
                 </div>
+              )}
+
+              {/* Contract Addresses */}
+              {project.contractAddresses && project.contractAddresses.length > 0 && (
+                <ContractAddressList addresses={project.contractAddresses} />
               )}
             </div>
           </div>
