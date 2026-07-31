@@ -11,7 +11,11 @@ export type AuditAction =
   | "verification_rejected"
   | "fee_updated"
   | "report_resolved"
-  | "report_dismissed";
+  | "report_dismissed"
+  | "claim_approved"
+  | "claim_rejected"
+  | "project_flagged"
+  | "takedown";
 
 /** Human-readable labels for each action. */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -20,6 +24,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   fee_updated: "Fee Updated",
   report_resolved: "Report Resolved",
   report_dismissed: "Report Dismissed",
+  claim_approved: "Claim Approved",
+  claim_rejected: "Claim Rejected",
+  project_flagged: "Project Flagged",
+  takedown: "Takedown",
 };
 
 /**
