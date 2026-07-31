@@ -11,7 +11,7 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
-import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
+import { Review, ReviewReportReason } from "@/types/review";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
@@ -35,7 +35,6 @@ import {
   GitBranch,
   Globe,
   Info,
-  Shield,
   Megaphone,
   MessageSquare,
   Star,
@@ -78,7 +77,7 @@ export default function ProjectDetailPage() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
-  const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
+  const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine" | "helpfulness">("newest");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
@@ -271,6 +270,13 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
       list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (reviewSort === "helpfulness") {
+      list.sort((a, b) => {
+        const votesA = a.helpfulVotes?.length || 0;
+        const votesB = b.helpfulVotes?.length || 0;
+        if (votesA !== votesB) return votesB - votesA;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
     } else {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
@@ -344,6 +350,32 @@ export default function ProjectDetailPage() {
   const handleCancelReview = () => {
     setIsAddingReview(false);
     setEditingReview(null);
+  };
+
+  const handleVoteHelpful = async (id: string) => {
+    if (!gate.publicKey) {
+      toast.error("Please connect your wallet to vote");
+      return;
+    }
+    const result = await reviewService.voteHelpful(id, gate.publicKey);
+    if (result.success) {
+      setReviews(await reviewService.getReviewsByProject(projectId));
+    } else {
+      toast.error(result.error || "Failed to submit vote");
+    }
+  };
+
+  const handleVoteUnhelpful = async (id: string) => {
+    if (!gate.publicKey) {
+      toast.error("Please connect your wallet to vote");
+      return;
+    }
+    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+    if (result.success) {
+      setReviews(await reviewService.getReviewsByProject(projectId));
+    } else {
+      toast.error(result.error || "Failed to submit vote");
+    }
   };
 
   const handleAddUpdate = () => {
@@ -688,12 +720,13 @@ export default function ProjectDetailPage() {
                   <div className="flex gap-2">
                     <select
                       value={reviewSort}
-                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine")}
+                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine" | "helpfulness")}
                       className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
                       <option value="newest">Newest First</option>
                       <option value="highest">Highest Rating</option>
                       <option value="lowest">Lowest Rating</option>
+                      <option value="helpfulness">Most Helpful</option>
                       {gate.publicKey && <option value="mine">My Reviews</option>}
                     </select>
                     {!isAddingReview && !isOwner && (
@@ -790,6 +823,8 @@ export default function ProjectDetailPage() {
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onVoteHelpful={handleVoteHelpful}
+                  onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
                 />
               </div>
