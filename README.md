@@ -150,10 +150,8 @@ PREVIEW_URL=https://your-preview.vercel.app npm run preview:smoke
 - **Off-chain evidence storage.** Written reviews and verification evidence are stored on IPFS and referenced on-chain by CID — the frontend depends on that off-chain content being pinned/available; it is not itself persisted on-chain.
 - **Admin access is allowlist-based.** Admin routes are gated purely by the `NEXT_PUBLIC_ADMIN_ALLOWLIST` public keys; leaving it empty disables the admin dashboard entirely rather than restricting it.
 
-## Type Checking
+## Prerequisites
 
-Run TypeScript validation without emitting files:
-```bash
-npm run typecheck
-```
+- Node.js >= 20.0.0
+- npm >= 10.0.0
 
