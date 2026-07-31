@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
-import { ProjectUpdate } from "@/types/update";
-import { formatDate } from "@/lib/date";
+import React, { useState, useMemo } from "react";
+import { ProjectUpdate, UpdateType, UPDATE_TYPES } from "@/types/update";
+import { formatDateUTC, formatRelative } from "@/lib/date";
 import { Badge } from "@/components/ui/Badge";
-import { Megaphone, Shield, Target, Bell, Edit2, Trash2 } from "lucide-react";
+import { Megaphone, Shield, Target, Bell, Edit2, Trash2, ArrowUpDown } from "lucide-react";
 
 interface UpdateListProps {
   updates: ProjectUpdate[];
@@ -13,18 +13,26 @@ interface UpdateListProps {
   onDelete?: (id: string) => void;
 }
 
-const UPDATE_ICONS = {
-  Release: Bell,
-  "Security Audit": Shield,
-  Milestone: Target,
-  Announcement: Megaphone,
+const UPDATE_ICONS: Record<UpdateType, React.ElementType> = {
+  [UPDATE_TYPES.RELEASE]: Bell,
+  [UPDATE_TYPES.AUDIT]: Shield,
+  [UPDATE_TYPES.MILESTONE]: Target,
+  [UPDATE_TYPES.ANNOUNCEMENT]: Megaphone,
 };
 
-const UPDATE_COLORS = {
-  Release: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
-  "Security Audit": "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
-  Milestone: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
-  Announcement: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
+const UPDATE_COLORS: Record<UpdateType, string> = {
+  [UPDATE_TYPES.RELEASE]: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  [UPDATE_TYPES.AUDIT]: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
+  [UPDATE_TYPES.MILESTONE]: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
+  [UPDATE_TYPES.ANNOUNCEMENT]: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400",
+};
+
+type SortOption = "newest" | "oldest" | "type";
+
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  type: "By type",
 };
 
 export default function UpdateList({
@@ -33,6 +41,44 @@ export default function UpdateList({
   onEdit,
   onDelete,
 }: UpdateListProps) {
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [typeFilter, setTypeFilter] = useState<UpdateType | "All">("All");
+
+  const updateTypes = useMemo((): UpdateType[] => {
+    const seen = new Set<UpdateType>();
+    updates.forEach((u) => seen.add(u.type));
+    return Array.from(seen).sort();
+  }, [updates]);
+
+  const sorted = useMemo(() => {
+    let list = typeFilter === "All"
+      ? [...updates]
+      : updates.filter((u) => u.type === typeFilter);
+
+    if (sortBy === "newest") {
+      list.sort(
+        (a, b) =>
+          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+      );
+    } else if (sortBy === "oldest") {
+      list.sort(
+        (a, b) =>
+          new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime(),
+      );
+    } else if (sortBy === "type") {
+      list.sort((a, b) => {
+        const typeCmp = a.type.localeCompare(b.type);
+        if (typeCmp !== 0) return typeCmp;
+        // Secondary: newest within same type
+        return (
+          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+        );
+      });
+    }
+
+    return list;
+  }, [updates, sortBy, typeFilter]);
+
   if (updates.length === 0) {
     return (
       <div className="text-center py-12">
@@ -46,7 +92,73 @@ export default function UpdateList({
 
   return (
     <div className="space-y-4">
-      {updates.map((update) => {
+      {/* Sort + Filter bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Sort selector */}
+        <div className="flex items-center gap-2 text-sm">
+          <ArrowUpDown className="w-4 h-4 text-zinc-400" aria-hidden="true" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            aria-label="Sort updates"
+          >
+            {(Object.keys(SORT_LABELS) as SortOption[]).map((opt) => (
+              <option key={opt} value={opt}>
+                {SORT_LABELS[opt]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Type filter pills */}
+        {updateTypes.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setTypeFilter("All")}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                typeFilter === "All"
+                  ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              }`}
+            >
+              All
+            </button>
+            {updateTypes.map((t) => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  typeFilter === t
+                    ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Result count */}
+        {typeFilter !== "All" && (
+          <span className="text-xs text-zinc-400 ml-auto">
+            {sorted.length} of {updates.length}
+          </span>
+        )}
+      </div>
+
+      {/* Empty filtered state */}
+      {sorted.length === 0 && (
+        <div className="text-center py-8">
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+            No {typeFilter} updates yet.
+          </p>
+        </div>
+      )}
+
+      {/* Update cards */}
+      {sorted.map((update) => {
         const Icon = UPDATE_ICONS[update.type];
         const colorClass = UPDATE_COLORS[update.type];
 
@@ -57,7 +169,10 @@ export default function UpdateList({
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3">
-                <div className={`p-2 rounded-lg ${colorClass}`}>
+                <div
+                  className={`p-2 rounded-lg ${colorClass}`}
+                  aria-hidden="true"
+                >
                   <Icon className="w-5 h-5" />
                 </div>
                 <div>
@@ -73,7 +188,13 @@ export default function UpdateList({
                     <Badge variant="secondary" className="text-xs">
                       {update.type}
                     </Badge>
-                    <span>{formatDate(update.publishedAt, "long")}</span>
+                    {/* Primary: human-readable UTC date; secondary: relative */}
+                    <time
+                      dateTime={update.publishedAt}
+                      title={formatRelative(update.publishedAt)}
+                    >
+                      {formatDateUTC(update.publishedAt, "long")}
+                    </time>
                   </div>
                 </div>
               </div>
