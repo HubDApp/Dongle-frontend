@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
@@ -136,8 +136,7 @@ export default function AdminDashboard() {
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<"verification" | "reports" | "audit-log">("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
-  const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
-  const [claimRequests, setClaimRequests] = useState<ProjectClaimRequest[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
@@ -150,25 +149,20 @@ export default function AdminDashboard() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
-  // Load reports, moderation log, and reviews
+  // Load reports, reviews, and moderation log
   useEffect(() => {
     if (!isAdmin) return;
-    const id = setTimeout(async () => {
-      setReports(reviewReportService.getReports());
-      setProjectReports(projectReportService.getReports());
-      setClaimRequests(projectClaimService.getRequests());
-      setModerationLog(reviewReportService.getModerationLog());
-      setProjectModerationLog(projectReportService.getModerationLog());
 
-      // Load reviews and build a lookup map for review reports
-      const allReviews = await reviewService.getReviews();
-      const reviewsMap: Record<string, Review> = {};
-      for (const review of allReviews) {
-        reviewsMap[review.id] = review;
-      }
-      setReviewsById(reviewsMap);
-    }, 0);
-    return () => clearTimeout(id);
+    let cancelled = false;
+    setReports(reviewReportService.getReports());
+    setModerationLog(reviewReportService.getModerationLog());
+    void reviewService.getReviews().then((loaded) => {
+      if (!cancelled) setReviews(loaded);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected", reason?: string) => {
@@ -437,7 +431,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviewsById[reviewId];
+    return reviews.find((r) => r.id === reviewId);
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {
@@ -489,7 +483,6 @@ export default function AdminDashboard() {
   }
 
   // ── 3. Authorized — render dashboard ────────────────────────────────────────
-
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
