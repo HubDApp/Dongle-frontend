@@ -108,8 +108,8 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!gate.publicKey) {
-      setUserReviews([]);
-      return;
+      const id = setTimeout(() => setUserReviews([]), 0);
+      return () => clearTimeout(id);
     }
 
     let cancelled = false;
