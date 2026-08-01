@@ -87,6 +87,8 @@ export interface ProjectData {
   githubUrl?: string;
   logoUrl: string;
   docsUrl: string;
+  auditReportUrl?: string;
+  bugBountyUrl?: string;
   owner: string;
   createdAt: string;
 }
@@ -342,6 +344,8 @@ export const sorobanService = {
           githubUrl: "https://github.com/example/soroban-swap",
           logoUrl: "https://example.com/logo1.png",
           docsUrl: "https://docs.soroban-swap.com",
+          auditReportUrl: "https://example.com/audit-soroban-swap.pdf",
+          bugBountyUrl: "https://example.com/bounty-soroban-swap",
           owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
           createdAt: "2024-11-10T00:00:00Z",
         },

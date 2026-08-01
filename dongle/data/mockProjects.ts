@@ -137,6 +137,8 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       githubUrl: base.githubUrl,
       logoUrl: base.logoUrl,
       docsUrl: base.docsUrl,
+      auditReportUrl: base.auditReportUrl,
+      bugBountyUrl: base.bugBountyUrl,
       domain: base.websiteUrl ? extractDomain(base.websiteUrl) : undefined,
       contractAddresses: base.contractAddresses,
       ownerAddress: base.ownerAddress || `GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890${i.toString().padStart(4, '0')}ABCDEFGHIJKLMNOPQR`,
