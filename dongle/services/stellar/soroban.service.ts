@@ -101,8 +101,12 @@ export interface ProjectRegistrationParams {
   githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
-  auditReportUrl?: string;
-  bugBountyUrl?: string;
+  /**
+   * Optional list of Soroban contract IDs associated with the project.
+   * Each entry must be a valid 56-character address starting with 'C'.
+   * Empty strings are ignored.
+   */
+  contractAddresses?: string[];
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
@@ -252,8 +256,9 @@ export const sorobanService = {
       nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
-      nativeToScVal(params.auditReportUrl),
-      nativeToScVal(params.bugBountyUrl),
+      nativeToScVal(
+        (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
+      ),
     ];
 
     const result = await executeContractTransaction(
@@ -395,8 +400,9 @@ export const sorobanService = {
       nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
-      nativeToScVal(params.auditReportUrl),
-      nativeToScVal(params.bugBountyUrl),
+      nativeToScVal(
+        (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
+      ),
     ];
 
     const result = await executeContractTransaction(

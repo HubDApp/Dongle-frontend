@@ -19,8 +19,10 @@ const baseProjects: Partial<Project>[] = [
     websiteUrl: "https://soroban-swap.example.com",
     githubUrl: "https://github.com/example/soroban-swap",
     docsUrl: "https://docs.soroban-swap.example.com",
-    auditReportUrl: "https://example.com/audit-soroban-swap.pdf",
-    bugBountyUrl: "https://example.com/bounty-soroban-swap",
+    contractAddresses: [
+      "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    ],
   },
   {
     name: "Stellar Guardians",
@@ -31,7 +33,9 @@ const baseProjects: Partial<Project>[] = [
     reviews: 89,
     websiteUrl: "https://stellar-guardians.example.com",
     githubUrl: "https://github.com/example/stellar-guardians",
-    auditReportUrl: "https://example.com/audit-stellar-guardians.pdf",
+    contractAddresses: [
+      "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC2",
+    ],
   },
   {
     name: "Anchor Connect",
@@ -136,6 +140,7 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       auditReportUrl: base.auditReportUrl,
       bugBountyUrl: base.bugBountyUrl,
       domain: base.websiteUrl ? extractDomain(base.websiteUrl) : undefined,
+      contractAddresses: base.contractAddresses,
       ownerAddress: base.ownerAddress || `GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890${i.toString().padStart(4, '0')}ABCDEFGHIJKLMNOPQR`,
     };
   },
