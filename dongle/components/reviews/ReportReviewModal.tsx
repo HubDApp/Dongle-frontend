@@ -1,4 +1,5 @@
 "use client";
+import AddressDisplay from "@/components/ui/AddressDisplay";
 
 import React, { useState, useEffect, useRef } from "react";
 import { Flag } from "lucide-react";
@@ -99,7 +100,7 @@ export function ReportReviewModal({
         <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-yellow-500 font-bold">{review.rating}/5</span>
-            <span className="text-xs text-zinc-500">•</span>
+            <span className="text-xs text-zinc-500">â€¢</span>
             <span className="text-xs text-zinc-500">{review.projectName}</span>
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3">
@@ -141,3 +142,5 @@ export function ReportReviewModal({
     </div>
   );
 }
+
+

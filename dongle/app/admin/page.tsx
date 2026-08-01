@@ -1,4 +1,5 @@
 "use client";
+import { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -146,23 +147,19 @@ export default function AdminDashboard() {
   const [claimReason, setClaimReason] = useState<Record<string, string>>({});
   const [projectReportReason, setProjectReportReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   // Load reports, reviews, and moderation log
   useEffect(() => {
     if (!isAdmin) return;
-
-    let cancelled = false;
-    setReports(reviewReportService.getReports());
-    setModerationLog(reviewReportService.getModerationLog());
-    void reviewService.getReviews().then((loaded) => {
-      if (!cancelled) setReviews(loaded);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    const id = setTimeout(() => {
+      setReports(reviewReportService.getReports());
+      setProjectReports(projectReportService.getReports());
+      setClaimRequests(projectClaimService.getRequests());
+      setModerationLog(reviewReportService.getModerationLog());
+      setProjectModerationLog(projectReportService.getModerationLog());
+      reviewService.getReviews().then(setReviews).catch(() => {});
+    }, 0);
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected", reason?: string) => {
@@ -431,7 +428,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviews.find((r) => r.id === reviewId);
+    return reviews.find(r => r.id === reviewId);
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {
@@ -934,6 +931,8 @@ export default function AdminDashboard() {
                     );
                   })}
 
+                  {pendingProjectReports.length > 0 && (
+                <div className="space-y-4 mt-8">
                   {pendingProjectReports.map((report) => {
                     const project = projectService.getProjectById(report.projectId);
                     return (
