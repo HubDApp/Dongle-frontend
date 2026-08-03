@@ -5,6 +5,9 @@ import {
   useParams,
   useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
+import { projectStatusService } from "@/services/project/project-status.service";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -50,7 +53,7 @@ import {
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
-import { reviewReportService } from "@/services/review/review-report.service";
+import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
@@ -60,6 +63,7 @@ import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
 import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
+import { ProjectLifecycleStatusBadge } from "@/components/projects/ProjectLifecycleStatusBadge";
 import { shouldBypassLinkWarning, getExternalLinkWarningOptions } from "@/lib/externalLinkWarning";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
@@ -72,6 +76,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const gate = useWalletPageGate();
   const confirm = useConfirm();
+  const { isAdmin } = useAdminAccess();
   const { isProjectSaved, toggleSavedProject, canManageSavedProjects } = useSavedProjects();
   const projectId = params.id as string;
 
@@ -157,7 +162,15 @@ export default function ProjectDetailPage() {
   const actualReviewCount = reviews.length || project?.reviews || 0;
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
+  const canManageStatus = Boolean(project && gate.publicKey && (isOwner || isAdmin));
   const isSaved = project ? isProjectSaved(project.id) : false;
+
+  const handleStatusChange = (status: ProjectStatus) => {
+    if (!project) return;
+    projectStatusService.setProjectStatus(project.id, status);
+    setProject({ ...project, status });
+    toast.success(`Project status updated to ${PROJECT_STATUS_LABELS[status]}`);
+  };
 
   const handleToggleSaved = () => {
     if (!project) return;
@@ -530,6 +543,7 @@ export default function ProjectDetailPage() {
                       <Badge variant="primary">
                         {project.primaryCategory}
                       </Badge>
+                      <ProjectLifecycleStatusBadge status={project.status} />
                       {verificationStatus && (
                         <VerificationBadge status={verificationStatus} />
                       )}
@@ -881,7 +895,44 @@ export default function ProjectDetailPage() {
                     </span>
                     <span className="font-bold">{project.primaryCategory}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Status
+                    </span>
+                    <ProjectLifecycleStatusBadge status={project.status} />
+                  </div>
                 </div>
+              </div>
+
+              {/* Lifecycle Status */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+                <h3 className="text-lg font-bold mb-4">Lifecycle Status</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                  Current status:{" "}
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                    {getProjectStatusLabel(project.status)}
+                  </span>
+                </p>
+                {canManageStatus ? (
+                  <label className="block">
+                    <span className="sr-only">Update project status</span>
+                    <select
+                      value={project.status ?? "active"}
+                      onChange={(e) => handleStatusChange(e.target.value as ProjectStatus)}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      {PROJECT_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {PROJECT_STATUS_LABELS[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                    Only the project owner or an admin can update this status.
+                  </p>
+                )}
               </div>
 
               {/* Actions */}

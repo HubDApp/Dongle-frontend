@@ -423,3 +423,49 @@ describe("Project Detail Page - layout shell", () => {
     expect(shell?.className).toMatch(/pb-24/);
   });
 });
+
+describe("Project Detail Page - lifecycle status", () => {
+  const mockProject = {
+    id: "test-project-id",
+    name: "Test Secure Project",
+    category: PROJECT_CATEGORIES.DEFI as ProjectCategory,
+    primaryCategory: PROJECT_CATEGORIES.DEFI as ProjectCategory,
+    description: "A test project description.",
+    rating: 4.8,
+    reviews: 5,
+    createdAt: "2026-01-01T00:00:00Z",
+    websiteUrl: "https://secure-test.xyz",
+    githubUrl: "https://github.com/secure-test/repo",
+    ownerAddress: "G_OWNER_123",
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    vi.mocked(useConfirm).mockReturnValue(vi.fn());
+    vi.mocked(sorobanService.getVerificationStatus).mockResolvedValue("NONE");
+    vi.mocked(projectService.getProjectById).mockReturnValue(mockProject);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows the lifecycle status badge on the detail page", async () => {
+    render(<ProjectDetailPage />);
+    await finishInitialLoad();
+    expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
+  });
+
+  it("lets the owner update the project status", async () => {
+    render(<ProjectDetailPage />);
+    await finishInitialLoad();
+
+    const statusSelect = screen.getByLabelText(/Update project status/i) as HTMLSelectElement;
+    expect(statusSelect).toBeTruthy();
+
+    fireEvent.change(statusSelect, { target: { value: "archived" } });
+    expect(statusSelect.value).toBe("archived");
+    expect(screen.getAllByText("Archived").length).toBeGreaterThan(0);
+  });
+});

@@ -7,6 +7,7 @@ import ProjectImage from "@/components/projects/ProjectImage";
 import { formatDate } from "@/lib/date";
 import { Star, Plus, Check, Bookmark, BookmarkCheck } from "lucide-react";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
+import { ProjectLifecycleStatusBadge } from "@/components/projects/ProjectLifecycleStatusBadge";
 import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
@@ -113,6 +114,7 @@ export const ProjectCard = ({
             {verificationStatus && (
               <VerificationBadge status={verificationStatus} showIcon={false} />
             )}
+            <ProjectLifecycleStatusBadge status={project.status} />
           </div>
           <div className="flex items-center gap-1 text-sm font-bold shrink-0">
             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
