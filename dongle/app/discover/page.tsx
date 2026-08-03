@@ -11,6 +11,7 @@ import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type ProjectStatus } from "@/types/project";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
@@ -25,6 +26,7 @@ function DiscoverContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
   const gate = useWalletPageGate();
   const { recentProjects, hasHistory } = useRecentViews(gate.publicKey || undefined);
 
@@ -87,9 +89,13 @@ function DiscoverContent() {
       result = result.filter((p) => verificationStatuses[p.id] === verificationFilter);
     }
 
+    if (statusFilter !== "ALL") {
+      result = result.filter((p) => (p.status ?? "active") === statusFilter);
+    }
+
     result = projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, category, tags, sortBy, verificationFilter, verificationStatuses]);
+  }, [searchQuery, category, tags, sortBy, verificationFilter, verificationStatuses, statusFilter]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -138,6 +144,15 @@ function DiscoverContent() {
     });
   };
 
+  const handleStatusFilterChange = (value: ProjectStatus | "ALL") => {
+    setStatusFilter(value);
+    trackFilter({
+      filterType: "lifecycle-status",
+      filterValue: value,
+      source: "discover",
+    });
+  };
+
   const handleTagsChange = (nextTags: string[]) => {
     setTags(nextTags);
     trackFilter({
@@ -153,6 +168,12 @@ function DiscoverContent() {
       loadNextPage();
       setIsLoadingMore(false);
     }, 600);
+  };
+
+  const handleClearFilters = () => {
+    clearFilters();
+    setStatusFilter("ALL");
+    setVerificationFilter("ALL");
   };
 
   return (
@@ -198,6 +219,26 @@ function DiscoverContent() {
                   </button>
                 ))}
               </div>
+
+              <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-800 hidden lg:block mx-2" />
+
+              {/* Lifecycle Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  handleStatusFilterChange(e.target.value as ProjectStatus | "ALL")
+                }
+                disabled={isInitialLoading}
+                aria-label="Filter by lifecycle status"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">All Status</option>
+                {PROJECT_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {PROJECT_STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
 
               <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-800 hidden lg:block mx-2" />
 
@@ -280,7 +321,7 @@ function DiscoverContent() {
               Try adjusting your search or filters to find what you&apos;re
               looking for.
             </p>
-            <Button variant="outline" className="mt-6" onClick={clearFilters}>
+            <Button variant="outline" className="mt-6" onClick={handleClearFilters}>
               Clear Filters
             </Button>
           </div>

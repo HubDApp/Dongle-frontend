@@ -1,8 +1,39 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { projectService } from "@/services/project/project.service";
+import { projectStatusService } from "@/services/project/project-status.service";
 import { mockProjects } from "@/data/mockProjects";
 
+// The current Node/jsdom combo does not expose `localStorage` on the global
+// object, so provide a tiny in-memory implementation for hermetic tests.
+function createLocalStorageMock() {
+  let store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, String(value));
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => {
+      store.clear();
+    },
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+}
+
 describe("projectService", () => {
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", createLocalStorageMock());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("returns all mock projects", () => {
     const all = projectService.getAllProjects();
     expect(all.length).toEqual(mockProjects.length);
@@ -46,5 +77,13 @@ describe("projectService", () => {
     expect(new Date(byNewest[0].createdAt).getTime()).toBeGreaterThanOrEqual(
       new Date(byNewest[1].createdAt).getTime(),
     );
+  });
+
+  it("reflects persisted lifecycle-status overrides", () => {
+    const project = mockProjects[0];
+    projectStatusService.setProjectStatus(project.id, "archived");
+    const all = projectService.getAllProjects();
+    expect(all.find((p) => p.id === project.id)?.status).toBe("archived");
+    expect(projectService.getProjectById(project.id)?.status).toBe("archived");
   });
 });

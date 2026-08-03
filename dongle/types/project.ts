@@ -65,6 +65,55 @@ export const CATEGORY_FORM_OPTIONS = [
 ];
 
 /**
+ * Lifecycle state for a project.
+ *
+ * Projects are no longer treated as always active. A project can be archived,
+ * deprecated, paused, flagged, or removed by an owner or admin.
+ */
+export type ProjectStatus =
+  | "active"
+  | "paused"
+  | "deprecated"
+  | "archived"
+  | "flagged"
+  | "removed";
+
+export const PROJECT_STATUSES: ProjectStatus[] = [
+  "active",
+  "paused",
+  "deprecated",
+  "archived",
+  "flagged",
+  "removed",
+];
+
+export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
+  active: "Active",
+  paused: "Paused",
+  deprecated: "Deprecated",
+  archived: "Archived",
+  flagged: "Flagged",
+  removed: "Removed",
+};
+
+/**
+ * The lifecycle status of a project, or "active" when the field is absent.
+ * Older records without a `status` field are treated as active.
+ */
+export function getProjectStatus(status?: ProjectStatus): ProjectStatus {
+  return status && status in PROJECT_STATUS_LABELS ? status : "active";
+}
+
+export function getProjectStatusLabel(status?: ProjectStatus): string {
+  return PROJECT_STATUS_LABELS[getProjectStatus(status)];
+}
+
+/** True only for projects that are currently active. */
+export function isProjectActive(status?: ProjectStatus): boolean {
+  return getProjectStatus(status) === "active";
+}
+
+/**
  * Canonical Project interface.
  * Use `primaryCategory` everywhere — it holds the display-label form of the
  * category (e.g. "DeFi / DEX"). Never store raw form values ("defi") here.
@@ -73,6 +122,8 @@ export interface Project {
   id: string;
   name: string;
   primaryCategory: ProjectCategory;
+  /** Lifecycle state; defaults to "active" when omitted. */
+  status?: ProjectStatus;
   tags?: string[];
   description: string;
   rating: number;
