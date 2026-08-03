@@ -152,7 +152,7 @@ export default function AdminDashboard() {
   // Load reports, reviews, and moderation log
   useEffect(() => {
     if (!isAdmin) return;
-    const id = setTimeout(() => {
+    const id = setTimeout(async () => {
       setReports(reviewReportService.getReports());
       setProjectReports(projectReportService.getReports());
       setClaimRequests(projectClaimService.getRequests());
@@ -843,7 +843,7 @@ export default function AdminDashboard() {
                     No pending reports
                   </p>
                   <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
-                    All reviews are currently in good standing.
+                    All reviews and projects are currently in good standing.
                   </p>
                 </div>
               ) : (
