@@ -16,6 +16,8 @@ export interface VerificationRequest {
   statusUpdatedAt: string;
   statusUpdatedBy?: string;
   rejectionReason?: string;
+  assignedTo?: string;
+  assignedAt?: string;
 }
 
 const VERIFICATION_STORAGE_KEY = "dongle_verification_requests";
@@ -122,6 +124,95 @@ class VerificationService {
       );
     } catch (error) {
       console.error("[VerificationService] Error getting pending requests:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Assigns a verification request to an admin.
+   */
+  async assignRequest(
+    projectId: string,
+    assignedBy: string,
+    assignedTo: string,
+  ): Promise<VerificationRequest> {
+    try {
+      const request = await this.getVerificationRequest(projectId);
+      
+      if (!request) {
+        throw new Error("Verification request not found");
+      }
+
+      // Update request assignment
+      request.assignedTo = assignedTo;
+      request.assignedAt = new Date().toISOString();
+
+      // Persist updated request
+      await this.persistRequest(request);
+
+      console.log(`[VerificationService] Request assigned: ${projectId} to ${assignedTo}`);
+      return request;
+    } catch (error) {
+      console.error("[VerificationService] Error assigning request:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unassigns a verification request (removes assignment).
+   */
+  async unassignRequest(
+    projectId: string,
+    unassignedBy: string,
+  ): Promise<VerificationRequest> {
+    try {
+      const request = await this.getVerificationRequest(projectId);
+      
+      if (!request) {
+        throw new Error("Verification request not found");
+      }
+
+      // Remove assignment
+      delete request.assignedTo;
+      delete request.assignedAt;
+
+      // Persist updated request
+      await this.persistRequest(request);
+
+      console.log(`[VerificationService] Request unassigned: ${projectId}`);
+      return request;
+    } catch (error) {
+      console.error("[VerificationService] Error unassigning request:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets verification requests assigned to a specific admin.
+   */
+  async getRequestsAssignedTo(adminAddress: string): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests
+        .filter((r) => r.assignedTo === adminAddress)
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    } catch (error) {
+      console.error("[VerificationService] Error getting assigned requests:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets unassigned verification requests.
+   */
+  async getUnassignedRequests(): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests
+        .filter((r) => !r.assignedTo)
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    } catch (error) {
+      console.error("[VerificationService] Error getting unassigned requests:", error);
       return [];
     }
   }

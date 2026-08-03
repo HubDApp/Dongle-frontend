@@ -24,13 +24,13 @@ export const AUDIT_LOG_STORAGE_KEY = "dongle_audit_log";
 const VALID_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "verification_approved",
   "verification_rejected",
+  "verification_assigned",
+  "verification_unassigned",
   "fee_updated",
   "report_resolved",
   "report_dismissed",
-  "claim_approved",
-  "claim_rejected",
-  "project_flagged",
-  "takedown",
+  "report_assigned",
+  "report_unassigned",
 ]);
 
 /** Hydrate, validate, and return all stored entries (SSR-safe). */
