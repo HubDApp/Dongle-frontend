@@ -1,4 +1,5 @@
 "use client";
+import { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -7,6 +8,7 @@ import WalletStatePanel, {
   WalletStateLoadingPanel,
 } from "@/components/wallet/WalletStatePanel";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
 import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare, ScrollText, User, UserMinus } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
@@ -17,14 +19,25 @@ import { reviewService } from "@/services/review/review.service";
 import { auditLogService } from "@/services/audit/audit-log.service";
 import { verificationService } from "@/services/stellar/verification.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
+import { ProjectReport, ProjectModerationAction, ProjectClaimRequest } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
+
+type RequestStatus = "pending" | "approved" | "rejected" | "archived";
 
 interface VerificationRequest {
   id: string;
   projectName: string;
   submittedBy: string;
-  status: "pending" | "approved" | "rejected";
+  status: RequestStatus;
   timestamp: string;
+}
+
+type BulkAction = "approve" | "reject" | "archive" | "assign";
+
+interface BulkActionResult {
+  action: BulkAction;
+  succeeded: string[];
+  failed: { id: string; reason: string }[];
 }
 
 const MOCK_REQUESTS: VerificationRequest[] = [
@@ -36,22 +49,105 @@ const MOCK_REQUESTS: VerificationRequest[] = [
 const ADMIN_PURPOSE =
   "Connect an authorized admin Freighter wallet to manage verification requests, review reports, and system settings.";
 
+const STATUS_STYLES: Record<RequestStatus, string> = {
+  pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500",
+  approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500",
+  rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500",
+  archived: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400",
+};
+
+const BULK_ACTION_CONFIG: Record<BulkAction, { label: string; icon: React.ReactNode; confirmTitle: string; confirmDescription: (count: number) => string }> = {
+  approve: {
+    label: "Approve Selected",
+    icon: <CheckCheck className="w-4 h-4" />,
+    confirmTitle: "Approve requests?",
+    confirmDescription: (count) => `Are you sure you want to approve ${count} verification request${count !== 1 ? "s" : ""}? This will mark them as verified.`,
+  },
+  reject: {
+    label: "Reject Selected",
+    icon: <X className="w-4 h-4" />,
+    confirmTitle: "Reject requests?",
+    confirmDescription: (count) => `Are you sure you want to reject ${count} verification request${count !== 1 ? "s" : ""}? The submitters will be notified.`,
+  },
+  archive: {
+    label: "Archive Selected",
+    icon: <Archive className="w-4 h-4" />,
+    confirmTitle: "Archive requests?",
+    confirmDescription: (count) => `Are you sure you want to archive ${count} verification request${count !== 1 ? "s" : ""}? Archived items are hidden from the active queue.`,
+  },
+  assign: {
+    label: "Assign to Me",
+    icon: <UserPlus className="w-4 h-4" />,
+    confirmTitle: "Assign requests?",
+    confirmDescription: (count) => `Are you sure you want to assign ${count} verification request${count !== 1 ? "s" : ""} to yourself?`,
+  },
+};
+
+function BulkFailureDetail({ result }: { result: BulkActionResult }) {
+  if (result.failed.length === 0) return null;
+
+  return (
+    <div className="mt-2 text-xs">
+      <p className="font-medium mb-1">Failed ({result.failed.length}):</p>
+      <ul className="list-disc list-inside space-y-0.5 text-zinc-500">
+        {result.failed.map((f) => (
+          <li key={f.id}>
+            <span className="font-mono">{f.id}</span>: {f.reason}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function reportBulkActionResult(result: BulkActionResult) {
+  const actionLabel = BULK_ACTION_CONFIG[result.action].label;
+  if (result.succeeded.length > 0 && result.failed.length === 0) {
+    toast.success(`${actionLabel}: ${result.succeeded.length} succeeded`, {
+      description: `All ${result.succeeded.length} request${result.succeeded.length !== 1 ? "s" : ""} processed successfully.`,
+    });
+  } else if (result.succeeded.length > 0 && result.failed.length > 0) {
+    toast.warning(`${actionLabel}: ${result.succeeded.length} succeeded, ${result.failed.length} failed`, {
+      description: "Some requests could not be processed.",
+      duration: 8000,
+    });
+    toast.error(`Partial failure details`, {
+      description: <BulkFailureDetail result={result} />,
+      duration: 10000,
+    });
+  } else {
+    toast.error(`${actionLabel}: All ${result.failed.length} failed`, {
+      description: "None of the selected requests could be processed.",
+      duration: 8000,
+    });
+    toast.error(`Failure details`, {
+      description: <BulkFailureDetail result={result} />,
+      duration: 10000,
+    });
+  }
+}
+
 export default function AdminDashboard() {
   const { isAdmin, isAdminChecking, gate } = useAdminAccess();
+  const confirm = useConfirm();
   const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<"verification" | "reports" | "audit-log">("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
-  const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
-  const [claimRequests, setClaimRequests] = useState<ProjectClaimRequest[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
+  const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
+  // Reason input states
   const [moderationReason, setModerationReason] = useState<Record<string, string>>({});
+  const [verificationReason, setVerificationReason] = useState<Record<string, string>>({});
+  const [claimReason, setClaimReason] = useState<Record<string, string>>({});
+  const [projectReportReason, setProjectReportReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
   const [verificationFilter, setVerificationFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
   const [reportFilter, setReportFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
 
-  // Load reports and moderation log
+  // Load reports, reviews, and moderation log
   useEffect(() => {
     if (!isAdmin) return;
     const id = setTimeout(() => {
@@ -63,8 +159,12 @@ export default function AdminDashboard() {
     }, 0);
   }, [isAdmin]);
 
-  const handleAction = (id: string, status: "approved" | "rejected") => {
+  const handleAction = (id: string, status: "approved" | "rejected", reason?: string) => {
     const req = requests.find((r) => r.id === id);
+    if (!reason?.trim() && status === "rejected") {
+      toast.error("A reason is required for rejection");
+      return;
+    }
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status } : r)),
     );
@@ -74,9 +174,104 @@ export default function AdminDashboard() {
         action: status === "approved" ? "verification_approved" : "verification_rejected",
         targetId: req.id,
         targetLabel: req.projectName,
+        reason: reason?.trim() || undefined,
       });
     }
+    toast.success(`Verification ${status === "approved" ? "approved" : "rejected"}`);
+    setVerificationReason((prev) => ({ ...prev, [id]: "" }));
   };
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const allSelectable = requests
+        .filter((r) => r.status === "pending")
+        .map((r) => r.id);
+      if (allSelectable.every((id) => prev.has(id))) {
+        return new Set();
+      }
+      return new Set(allSelectable);
+    });
+  }, [requests]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkAction = useCallback(async (action: BulkAction) => {
+    const config = BULK_ACTION_CONFIG[action];
+    const count = selectedIds.size;
+
+    if (count === 0) return;
+
+    const confirmed = await confirm({
+      title: config.confirmTitle,
+      description: config.confirmDescription(count),
+      variant: action === "reject" ? "danger" : "warning",
+      confirmLabel: action === "approve" ? "Approve All"
+        : action === "reject" ? "Reject All"
+        : action === "archive" ? "Archive All"
+        : "Assign All",
+    });
+
+    if (!confirmed) return;
+
+    setIsBulkProcessing(true);
+
+    const succeeded: string[] = [];
+    const failed: { id: string; reason: string }[] = [];
+
+    setRequests((prev) => {
+      const updated = prev.map((req) => {
+        if (!selectedIds.has(req.id)) return req;
+
+        if (req.status !== "pending") {
+          failed.push({ id: req.id, reason: `Cannot ${action} request with status "${req.status}"` });
+          return req;
+        }
+
+        let newStatus: RequestStatus;
+        switch (action) {
+          case "approve":
+            newStatus = "approved";
+            break;
+          case "reject":
+            newStatus = "rejected";
+            break;
+          case "archive":
+            newStatus = "archived";
+            break;
+          case "assign":
+            newStatus = req.status;
+            break;
+          default:
+            return req;
+        }
+
+        succeeded.push(req.id);
+        return { ...req, status: newStatus };
+      });
+
+      return updated;
+    });
+
+    setTimeout(() => {
+      setIsBulkProcessing(false);
+      setSelectedIds(new Set());
+      reportBulkActionResult({ action, succeeded, failed });
+    }, 0);
+  }, [selectedIds, confirm]);
 
   const handleSaveFee = () => {
     if (gate.publicKey) {
@@ -136,24 +331,48 @@ export default function AdminDashboard() {
   };
 
   const handleApproveClaim = (requestId: string) => {
+    const reason = claimReason[requestId]?.trim() || "Claim approved by admin";
     if (!gate.publicKey) return;
 
-    const result = projectClaimService.approveRequest(requestId, gate.publicKey, "Approved by admin");
+    const result = projectClaimService.approveRequest(requestId, gate.publicKey, reason);
     if (result.success) {
+      const claim = claimRequests.find((c) => c.id === requestId);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "claim_approved",
+        targetId: requestId,
+        targetLabel: claim?.projectId || "Project claim",
+        reason,
+      });
       toast.success("Claim approved");
       setClaimRequests(projectClaimService.getRequests());
+      setClaimReason((prev) => ({ ...prev, [requestId]: "" }));
     } else {
       toast.error(result.error || "Failed to approve claim");
     }
   };
 
   const handleRejectClaim = (requestId: string) => {
+    const reason = claimReason[requestId]?.trim();
+    if (!reason) {
+      toast.error("A reason is required for rejection");
+      return;
+    }
     if (!gate.publicKey) return;
 
-    const result = projectClaimService.rejectRequest(requestId, gate.publicKey, "Rejected by admin");
+    const result = projectClaimService.rejectRequest(requestId, gate.publicKey, reason);
     if (result.success) {
+      const claim = claimRequests.find((c) => c.id === requestId);
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "claim_rejected",
+        targetId: requestId,
+        targetLabel: claim?.projectId || "Project claim",
+        reason,
+      });
       toast.success("Claim rejected");
       setClaimRequests(projectClaimService.getRequests());
+      setClaimReason((prev) => ({ ...prev, [requestId]: "" }));
     } else {
       toast.error(result.error || "Failed to reject claim");
     }
@@ -238,7 +457,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviewsById[reviewId];
+    return reviews.find(r => r.id === reviewId);
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {
@@ -290,7 +509,6 @@ export default function AdminDashboard() {
   }
 
   // ── 3. Authorized — render dashboard ────────────────────────────────────────
-
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
@@ -533,6 +751,50 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Floating bulk action bar */}
+        {selectedIds.size > 0 && activeTab === "verification" && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-8 fade-in duration-200">
+            <div className="bg-zinc-950 dark:bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl px-5 py-3 flex items-center gap-3">
+              <span className="text-sm text-zinc-400 font-medium whitespace-nowrap">
+                {selectedIds.size} selected
+              </span>
+              <div className="w-px h-6 bg-zinc-800" />
+              <div className="flex items-center gap-2">
+                {(Object.entries(BULK_ACTION_CONFIG) as [BulkAction, typeof BULK_ACTION_CONFIG[BulkAction]][]).map(([action, config]) => (
+                  <button
+                    key={action}
+                    onClick={() => handleBulkAction(action)}
+                    disabled={isBulkProcessing}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] ${
+                      action === "reject"
+                        ? "bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                        : action === "approve"
+                          ? "bg-green-500/10 text-green-400 hover:bg-green-500/20 hover:text-green-300"
+                          : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                    }`}
+                  >
+                    {isBulkProcessing ? (
+                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      config.icon
+                    )}
+                    {config.label}
+                  </button>
+                ))}
+              </div>
+              <div className="w-px h-6 bg-zinc-800" />
+              <button
+                onClick={clearSelection}
+                disabled={isBulkProcessing}
+                className="p-2 text-zinc-500 hover:text-zinc-300 transition-colors disabled:opacity-50"
+                aria-label="Cancel selection"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === "reports" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
@@ -603,39 +865,56 @@ export default function AdminDashboard() {
                       const project = projectService.getProjectById(request.projectId);
                       return (
                         <div key={request.id} className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <div className="font-semibold text-sm">
-                                {project?.name || "Unknown project"}
-                              </div>
-                              <div className="text-xs text-zinc-500 mt-1">
-                                Requested by <AddressDisplay address={request.requestedBy} copyable={true} truncated={true} inline={true} /> • {formatDate(request.createdAt, "relative")}
-                              </div>
-                              <div className="mt-2 text-xs uppercase font-bold text-blue-600 dark:text-blue-400">
-                                {request.proofType}
-                              </div>
-                              <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
-                                {request.proofValue}
-                              </div>
-                              {request.explanation && (
-                                <div className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap">
-                                  {request.explanation}
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="font-semibold text-sm">
+                                  {project?.name || "Unknown project"}
                                 </div>
-                              )}
+                                <div className="text-xs text-zinc-500 mt-1">
+                                  Requested by <AddressDisplay address={request.requestedBy} copyable={true} truncated={true} inline={true} /> • {formatDate(request.createdAt, "relative")}
+                                </div>
+                                <div className="mt-2 text-xs uppercase font-bold text-blue-600 dark:text-blue-400">
+                                  {request.proofType}
+                                </div>
+                                <div className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                                  {request.proofValue}
+                                </div>
+                                {request.explanation && (
+                                  <div className="mt-3 text-sm text-zinc-500 dark:text-zinc-400 whitespace-pre-wrap">
+                                    {request.explanation}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button
-                                onClick={() => handleApproveClaim(request.id)}
-                                className="px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRejectClaim(request.id)}
-                                className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
-                              >
-                                Reject
-                              </button>
+
+                            <div className="space-y-2">
+                              <textarea
+                                placeholder="Reason for decision (required for rejection)"
+                                value={claimReason[request.id] || ""}
+                                onChange={(e) =>
+                                  setClaimReason((prev) => ({
+                                    ...prev,
+                                    [request.id]: e.target.value,
+                                  }))
+                                }
+                                className="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                                rows={2}
+                              />
+                              <div className="flex gap-2 shrink-0">
+                                <button
+                                  onClick={() => handleApproveClaim(request.id)}
+                                  className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRejectClaim(request.id)}
+                                  className="flex-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
+                                >
+                                  Reject
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -742,7 +1021,7 @@ export default function AdminDashboard() {
 
                         {report.explanation && (
                           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter's explanation:</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
                           </div>
                         )}
@@ -780,9 +1059,9 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
-                </div>
-              )}
 
+                  {pendingProjectReports.length > 0 && (
+                <div className="space-y-4 mt-8">
                   {pendingProjectReports.map((report) => {
                     const project = projectService.getProjectById(report.projectId);
                     return (
@@ -823,44 +1102,40 @@ export default function AdminDashboard() {
 
                         {report.explanation && (
                           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter's explanation:</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
                           </div>
                         )}
 
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              const result = projectReportService.resolveReport(report.id, gate.publicKey!, "Project complies with guidelines");
-                              if (result.success) {
-                                setProjectReports(projectReportService.getReports());
-                                setProjectModerationLog(projectReportService.getModerationLog());
-                                toast.success("Project report resolved");
-                              } else {
-                                toast.error(result.error || "Failed to resolve project report");
-                              }
-                            }}
-                            className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Resolve
-                          </button>
-                          <button
-                            onClick={() => {
-                              const result = projectReportService.dismissReport(report.id, gate.publicKey!, "Project does not violate guidelines");
-                              if (result.success) {
-                                setProjectReports(projectReportService.getReports());
-                                setProjectModerationLog(projectReportService.getModerationLog());
-                                toast.success("Project report dismissed");
-                              } else {
-                                toast.error(result.error || "Failed to dismiss project report");
-                              }
-                            }}
-                            className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Dismiss
-                          </button>
+                        <div className="space-y-3">
+                          <textarea
+                            placeholder="Moderation reason (optional)"
+                            value={projectReportReason[report.id] || ""}
+                            onChange={(e) =>
+                              setProjectReportReason((prev) => ({
+                                ...prev,
+                                [report.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                            rows={2}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleResolveProjectReport(report.id)}
+                              className="flex-1 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Resolve
+                            </button>
+                            <button
+                              onClick={() => handleDismissProjectReport(report.id)}
+                              className="flex-1 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Dismiss
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

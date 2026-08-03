@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Button } from "@/components/ui/Button";
+import { getPrefetchValue } from "@/lib/prefetch-config";
 
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { IconButton } from "@/components/ui/IconButton";
@@ -14,6 +15,7 @@ import { Menu, X } from "lucide-react";
 export default function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { t } = useTranslation();
   const {
     isConnected,
     isConnecting,
@@ -31,11 +33,11 @@ export default function Navbar() {
   const firstMenuItemRef = useRef<HTMLAnchorElement>(null);
 
   const navLinks = [
-    { href: "/discover", label: "Discover" },
-    { href: "/reviews", label: "Reviews" },
-    { href: "/verify", label: "Verify" },
-    { href: "/projects/new", label: "Submit Project" },
-    { href: "/profile", label: "Profile" },
+    { href: "/discover", label: t("nav.discover") },
+    { href: "/reviews", label: t("nav.reviews") },
+    { href: "/verify", label: t("nav.verify") },
+    { href: "/projects/new", label: t("nav.submitProject") },
+    { href: "/profile", label: t("nav.profile") },
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -110,7 +112,7 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link href="/" className="text-xl font-bold tracking-tighter">
+          <Link href="/" prefetch={getPrefetchValue("landing")} className="text-xl font-bold tracking-tighter">
             DONGLE
           </Link>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium">
@@ -118,6 +120,7 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={getPrefetchValue("navigation")}
                 className={`py-2 px-1 transition-all border-b-2 ${
                   isActive(link.href)
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
@@ -130,6 +133,7 @@ export default function Navbar() {
             {isAdmin && (
               <Link
                 href="/admin"
+                prefetch={getPrefetchValue("admin")}
                 className={`py-2 px-1 transition-all border-b-2 ${
                   isActive("/admin")
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
@@ -169,7 +173,7 @@ export default function Navbar() {
                   <AddressDisplay address={publicKey} copyable={true} truncated={true} inline={true} />
                 ) : (
                   <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
-                    Connected
+                    {t("wallet.connected")}
                   </span>
                 )}
                 <Button
@@ -178,7 +182,7 @@ export default function Navbar() {
                   size="sm"
                   className="rounded-full text-xs py-1 px-3 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
                 >
-                  Disconnect
+                  {t("wallet.disconnect")}
                 </Button>
               </div>
             </div>
@@ -189,7 +193,7 @@ export default function Navbar() {
               size="sm"
               className="rounded-full"
             >
-              {isConnecting ? "Connecting..." : "Connect Wallet"}
+              {isConnecting ? t("wallet.connecting") : t("wallet.connect")}
             </Button>
           )}
 
@@ -203,7 +207,7 @@ export default function Navbar() {
                 openMenu();
               }
             }}
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            aria-label={isMenuOpen ? t("nav.closeMenu") : t("nav.openMenu")}
             aria-expanded={isMenuOpen}
             aria-controls="mobile-menu"
             size="md"
@@ -249,7 +253,7 @@ export default function Navbar() {
                     : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"
                 }`}
               >
-                Admin
+                {t("nav.admin")}
               </Link>
             )}
           </div>
