@@ -87,6 +87,12 @@ export interface Project {
   domain?: string;
   ownerAddress?: string;
   repositoryMetadata?: RepositoryMetadata; // Cached repository metadata
+  /**
+   * Optional list of Soroban contract IDs associated with this project.
+   * Each entry must be a valid Soroban contract address: starts with 'C',
+   * followed by 55 base-32 characters (A-Z, 2-7), total length 56.
+   */
+  contractAddresses?: string[];
 }
 
 export type ClaimProofType = "website" | "repository" | "admin_review";

@@ -34,6 +34,8 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useConfirm } from "@/hooks/useConfirm";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { sorobanService } from "@/services/stellar/soroban.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 
 interface StellarNonNativeBalance {
@@ -54,6 +56,7 @@ export default function ProfilePage() {
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
   const [userReviews, setUserReviews] = useState<Review[]>([]);
+  const [savedProjectVerificationStatuses, setSavedProjectVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
 
   const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
   const loadingVerifications =
@@ -61,6 +64,28 @@ export default function ProfilePage() {
   const savedProjects = savedProjectIds
     .map((projectId) => projectService.getProjectById(projectId))
     .filter((project): project is NonNullable<typeof project> => Boolean(project));
+
+  // Fetch verification statuses for saved projects
+  useEffect(() => {
+    if (savedProjects.length === 0) return;
+
+    const fetchStatuses = async () => {
+      const statuses: Record<string, VerificationStatus> = {};
+      await Promise.all(
+        savedProjects.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id);
+            statuses[project.id] = status;
+          } catch {
+            statuses[project.id] = "NONE";
+          }
+        }),
+      );
+      setSavedProjectVerificationStatuses(statuses);
+    };
+
+    void fetchStatuses();
+  }, [savedProjectIds]);
 
   const handleClearHistory = async () => {
     const ok = await confirm({
@@ -337,7 +362,11 @@ export default function ProfilePage() {
                 {savedProjects.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {savedProjects.map((project) => (
-                      <ProjectCard key={project.id} project={project} />
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        verificationStatus={savedProjectVerificationStatuses[project.id]}
+                      />
                     ))}
                   </div>
                 ) : (

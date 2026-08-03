@@ -19,6 +19,10 @@ const baseProjects: Partial<Project>[] = [
     websiteUrl: "https://soroban-swap.example.com",
     githubUrl: "https://github.com/example/soroban-swap",
     docsUrl: "https://docs.soroban-swap.example.com",
+    contractAddresses: [
+      "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+    ],
   },
   {
     name: "Stellar Guardians",
@@ -29,6 +33,9 @@ const baseProjects: Partial<Project>[] = [
     reviews: 89,
     websiteUrl: "https://stellar-guardians.example.com",
     githubUrl: "https://github.com/example/stellar-guardians",
+    contractAddresses: [
+      "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC2",
+    ],
   },
   {
     name: "Anchor Connect",
@@ -131,6 +138,7 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       logoUrl: base.logoUrl,
       docsUrl: base.docsUrl,
       domain: base.websiteUrl ? extractDomain(base.websiteUrl) : undefined,
+      contractAddresses: base.contractAddresses,
       ownerAddress: base.ownerAddress || `GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890${i.toString().padStart(4, '0')}ABCDEFGHIJKLMNOPQR`,
     };
   },

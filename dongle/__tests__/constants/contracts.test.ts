@@ -6,6 +6,7 @@ import {
   DEV_CONTRACT_PLACEHOLDER,
   DEV_RPC_URL,
   DEV_NETWORK_PASSPHRASE,
+  hasPlaceholderContracts,
 } from "../../constants/contracts";
 
 // ---------------------------------------------------------------------------
@@ -14,12 +15,14 @@ import {
 
 const VALID_CONTRACT = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const VALID_CONTRACT_2 = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+const VALID_CONTRACT_3 = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC";
 const VALID_PUBLIC_KEY = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
+/** Production-safe env — must not use the all-A development placeholder. */
 const FULL_VALID_ENV = {
-  NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: VALID_CONTRACT,
-  NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: VALID_CONTRACT,
-  NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: VALID_CONTRACT,
+  NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: VALID_CONTRACT_2,
+  NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: VALID_CONTRACT_3,
+  NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: VALID_CONTRACT_2,
   NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org:443",
   NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015",
 };
@@ -179,13 +182,25 @@ describe("parseEnv — production mode", () => {
 
   it("succeeds with a fully valid environment", () => {
     const env = parseEnv(FULL_VALID_ENV, false);
-    expect(env.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT).toBe(VALID_CONTRACT);
+    expect(env.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT).toBe(VALID_CONTRACT_2);
     expect(env.NEXT_PUBLIC_SOROBAN_RPC_URL).toBe(
       "https://soroban-testnet.stellar.org:443",
     );
     expect(env.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE).toBe(
       "Test SDF Network ; September 2015",
     );
+  });
+
+  it("rejects the development placeholder contract ID in production", () => {
+    expect(() =>
+      parseEnv(
+        {
+          ...FULL_VALID_ENV,
+          NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: DEV_CONTRACT_PLACEHOLDER,
+        },
+        false,
+      ),
+    ).toThrow();
   });
 
   it("throws on an invalid contract ID format in production", () => {
@@ -229,7 +244,7 @@ describe("parseEnv — production mode", () => {
     expect(() =>
       parseEnv(
         {
-          NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: VALID_CONTRACT,
+          NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: VALID_CONTRACT_2,
           // REVIEW and VERIFICATION missing
           NEXT_PUBLIC_SOROBAN_RPC_URL: "https://soroban-testnet.stellar.org:443",
           NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015",
@@ -263,5 +278,27 @@ describe("exported constants", () => {
 
   it("DEV_NETWORK_PASSPHRASE is a non-empty string", () => {
     expect(DEV_NETWORK_PASSPHRASE.length).toBeGreaterThan(0);
+  });
+});
+
+describe("hasPlaceholderContracts", () => {
+  it("returns true when any contract is the all-A placeholder", () => {
+    expect(
+      hasPlaceholderContracts({
+        PROJECT_REGISTRY: DEV_CONTRACT_PLACEHOLDER,
+        REVIEW_REGISTRY: VALID_CONTRACT_2,
+        VERIFICATION_REGISTRY: VALID_CONTRACT_2,
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when all contracts are real IDs", () => {
+    expect(
+      hasPlaceholderContracts({
+        PROJECT_REGISTRY: VALID_CONTRACT_2,
+        REVIEW_REGISTRY: VALID_CONTRACT_3,
+        VERIFICATION_REGISTRY: VALID_CONTRACT_2,
+      }),
+    ).toBe(false);
   });
 });

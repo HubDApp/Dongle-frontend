@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { formatDate } from "@/lib/date";
+import { formatDate, nowUTC, toUTCString, isValidDate } from "@/lib/date";
 
 describe("Date Formatting Utility", () => {
   beforeEach(() => {
@@ -12,6 +12,33 @@ describe("Date Formatting Utility", () => {
     vi.useRealTimers();
   });
 
+  describe("UTC timestamp creation", () => {
+    it("creates UTC ISO string", () => {
+      const timestamp = nowUTC();
+      expect(timestamp).toBe("2026-06-24T19:00:00.000Z");
+      expect(timestamp.endsWith("Z")).toBe(true);
+    });
+
+    it("converts various inputs to UTC strings", () => {
+      const date = new Date("2024-11-10T15:30:00Z");
+      expect(toUTCString(date)).toBe("2024-11-10T15:30:00.000Z");
+      expect(toUTCString("2024-11-10T15:30:00Z")).toBe("2024-11-10T15:30:00.000Z");
+      expect(toUTCString(date.getTime())).toBe("2024-11-10T15:30:00.000Z");
+    });
+  });
+
+  describe("date validation", () => {
+    it("validates dates correctly", () => {
+      expect(isValidDate(new Date())).toBe(true);
+      expect(isValidDate("2024-11-10")).toBe(true);
+      expect(isValidDate(1699630245123)).toBe(true);
+      expect(isValidDate(null)).toBe(false);
+      expect(isValidDate(undefined)).toBe(false);
+      expect(isValidDate("invalid")).toBe(false);
+      expect(isValidDate(new Date(NaN))).toBe(false);
+    });
+  });
+
   it("handles invalid dates gracefully", () => {
     expect(formatDate(null)).toBe("N/A");
     expect(formatDate(undefined)).toBe("N/A");
@@ -19,13 +46,15 @@ describe("Date Formatting Utility", () => {
     expect(formatDate(new Date(NaN))).toBe("N/A");
   });
 
-  it("formats short date correctly and stably", () => {
+  it("formats short date correctly and stably with UTC", () => {
     const testDate = new Date("2024-11-10T00:00:00Z");
+    // Should display UTC date regardless of local timezone
     expect(formatDate(testDate, "short")).toBe("11/10/2024");
   });
 
-  it("formats long date correctly and stably", () => {
+  it("formats long date correctly and stably with UTC", () => {
     const testDate = new Date("2024-11-10T00:00:00Z");
+    // Should display UTC date regardless of local timezone
     expect(formatDate(testDate, "long")).toBe("November 10, 2024");
   });
 
@@ -63,6 +92,12 @@ describe("Date Formatting Utility", () => {
     it("handles future dates gracefully by returning 'just now'", () => {
       const futureDate = new Date("2026-06-24T20:00:00Z");
       expect(formatDate(futureDate, "relative")).toBe("just now");
+    });
+
+    it("is timezone-independent for relative calculations", () => {
+      // Relative time uses elapsed milliseconds, unaffected by timezone display
+      const hoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      expect(formatDate(hoursAgo, "relative")).toBe("2 hours ago");
     });
   });
 });
