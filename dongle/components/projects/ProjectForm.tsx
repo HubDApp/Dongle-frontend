@@ -173,8 +173,9 @@ export default function ProjectForm({
   useEffect(() => {
     if (draft.loadedDraft) {
       setDraftRestored(true);
+      reset(draft.loadedDraft);
     }
-  }, [draft.loadedDraft]);
+  }, [draft.loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useUnsavedChanges(isDirty, isSubmitting);
 
