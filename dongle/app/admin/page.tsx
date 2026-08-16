@@ -24,6 +24,8 @@ import { auditLogService } from "@/services/audit/audit-log.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
 import { ProjectReport, ProjectModerationAction, ProjectClaimRequest } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
+import Pagination from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 type RequestStatus = "pending" | "approved" | "rejected" | "archived";
 
@@ -440,6 +442,12 @@ export default function AdminDashboard() {
   const pendingProjectReports = projectReports.filter((report) => report.status === "pending");
   const pendingClaimRequests = claimRequests.filter((request) => request.status === "pending");
   const resolvedProjectReports = projectReports.filter((report) => report.status !== "pending");
+
+  // Pagination hooks
+  const verificationPagination = usePagination({ items: requests, itemsPerPage: 10 });
+  const reportsPagination = usePagination({ items: pendingReports, itemsPerPage: 10 });
+  const projectReportsPagination = usePagination({ items: pendingProjectReports, itemsPerPage: 10 });
+  const claimsPagination = usePagination({ items: pendingClaimRequests, itemsPerPage: 10 });
 
   if (gate.state !== "ready") {
     return (
