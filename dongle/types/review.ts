@@ -60,6 +60,8 @@ export interface ReviewReport {
   explanation: string;
   status: ReviewReportStatus;
   createdAt: string;
+  assignedTo?: string;
+  assignedAt?: string;
 }
 
 export interface ModerationAction {
