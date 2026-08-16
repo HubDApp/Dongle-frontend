@@ -77,6 +77,7 @@ export default function EditProjectPage() {
                 publicKey={gate.publicKey}
                 onConnect={gate.connectWallet}
                 onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
               />
             )}
           </div>

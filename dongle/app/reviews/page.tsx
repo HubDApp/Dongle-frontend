@@ -324,6 +324,7 @@ export default function ReviewsPage() {
                   publicKey={gate.publicKey}
                   onConnect={gate.connectWallet}
                   onDisconnect={gate.disconnectWallet}
+                  onRetry={gate.retryAccountLoad}
                   compact
                 />
               </div>
