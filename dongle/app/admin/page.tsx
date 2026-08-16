@@ -22,7 +22,7 @@ import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { auditLogService } from "@/services/audit/audit-log.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
-import { ProjectReport, ProjectModerationAction, ProjectClaimRequest } from "@/types/project";
+import { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
@@ -140,6 +140,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"verification" | "reports" | "audit-log">("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
+  const [claimRequests, setClaimRequests] = useState<ProjectClaimRequest[]>([]);
   const [moderationLog, setModerationLog] = useState<ModerationAction[]>([]);
   const [projectModerationLog, setProjectModerationLog] = useState<ProjectModerationAction[]>([]);
   const [reviewsById, setReviewsById] = useState<Record<string, Review>>({});
@@ -154,14 +156,15 @@ export default function AdminDashboard() {
   // Load reports, reviews, and moderation log
   useEffect(() => {
     if (!isAdmin) return;
-    const id = setTimeout(async () => {
+    const id = setTimeout(() => {
+      void reviewService.getReviews().then(setReviews);
       setReports(reviewReportService.getReports());
       setProjectReports(projectReportService.getReports());
       setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
       setProjectModerationLog(projectReportService.getModerationLog());
-      reviewService.getReviews().then(setReviews).catch(() => {});
     }, 0);
+    return () => clearTimeout(id);
   }, [isAdmin]);
 
   const handleAction = (id: string, status: "approved" | "rejected", reason?: string) => {
@@ -430,7 +433,7 @@ export default function AdminDashboard() {
   };
 
   const getReviewForReport = (reviewId: string): Review | undefined => {
-    return reviews.find(r => r.id === reviewId);
+    return reviews.find((r) => r.id === reviewId);
   };
 
   const getModerationActionsForReport = (reportId: string): ModerationAction[] => {

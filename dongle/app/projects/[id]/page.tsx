@@ -20,8 +20,7 @@ import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
-import { reviewService,
-  getReviewPersistenceLabel } from "@/services/review/review.service";
+import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
@@ -41,7 +40,6 @@ import {
   GitBranch,
   Globe,
   Info,
-  Shield,
   Megaphone,
   MessageSquare,
   Star,
@@ -85,7 +83,8 @@ export default function ProjectDetailPage() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
-  const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine" | "helpfulness">("newest");
+  const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
+  const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
@@ -274,22 +273,39 @@ export default function ProjectDetailPage() {
     let list = [...reviews];
     if (reviewSort === "mine") {
       list = list.filter((r) => r.userAddress === gate.publicKey);
-    } else if (reviewSort === "highest") {
+    }
+    if (ratingFilter !== "all") {
+      const ratingNum = parseInt(ratingFilter, 10);
+      list = list.filter((r) => r.rating === ratingNum);
+    }
+    if (reviewSort === "highest") {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
       list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else if (reviewSort === "helpfulness") {
-      list.sort((a, b) => {
-        const votesA = a.helpfulVotes?.length || 0;
-        const votesB = b.helpfulVotes?.length || 0;
-        if (votesA !== votesB) return votesB - votesA;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
+    } else if (reviewSort === "oldest") {
+      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
-  }, [reviews, reviewSort, gate.publicKey]);
+  }, [reviews, reviewSort, ratingFilter, gate.publicKey]);
+
+  const projectEmptyMessage = React.useMemo(() => {
+    if (reviews.length === 0) {
+      return "No reviews yet. Be the first to leave one!";
+    }
+    const activeFilters: string[] = [];
+    if (reviewSort === "mine") {
+      activeFilters.push("your reviews");
+    }
+    if (ratingFilter !== "all") {
+      activeFilters.push(`${ratingFilter}-star rating`);
+    }
+    if (activeFilters.length > 0) {
+      return `No reviews found matching ${activeFilters.join(" and ")}. Try adjusting your filter controls.`;
+    }
+    return "No reviews match the selected filter options.";
+  }, [reviews.length, reviewSort, ratingFilter]);
 
   const handleEdit = (review: Review) => {
     setEditingReview(review);
@@ -406,7 +422,7 @@ export default function ProjectDetailPage() {
         {
           projectId: project.id,
           ...data,
-},
+        },
         gate.publicKey
       );
       toast.success("Update published successfully");
@@ -733,18 +749,38 @@ export default function ProjectDetailPage() {
                       </span>
                     )}
                   </h2>
-                  <div className="flex gap-2">
-                    <select
-                      value={reviewSort}
-                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine" | "helpfulness")}
-                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    >
-                      <option value="newest">Newest First</option>
-                      <option value="highest">Highest Rating</option>
-                      <option value="lowest">Lowest Rating</option>
-                      <option value="helpfulness">Most Helpful</option>
-                      {gate.publicKey && <option value="mine">My Reviews</option>}
-                    </select>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 text-sm">
+                      <span className="text-zinc-500 text-xs font-medium">Rating:</span>
+                      <select
+                        aria-label="Filter reviews by rating"
+                        value={ratingFilter}
+                        onChange={(e) => setRatingFilter(e.target.value)}
+                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="all">All Ratings</option>
+                        <option value="5">5 Stars</option>
+                        <option value="4">4 Stars</option>
+                        <option value="3">3 Stars</option>
+                        <option value="2">2 Stars</option>
+                        <option value="1">1 Star</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm">
+                      <span className="text-zinc-500 text-xs font-medium">Sort:</span>
+                      <select
+                        aria-label="Sort reviews"
+                        value={reviewSort}
+                        onChange={(e) => setReviewSort(e.target.value as "newest" | "oldest" | "highest" | "lowest" | "mine")}
+                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="highest">Highest Rating</option>
+                        <option value="lowest">Lowest Rating</option>
+                        {gate.publicKey && <option value="mine">My Reviews</option>}
+                      </select>
+                    </div>
                     {!isAddingReview && !isOwner && (
                       <Button
                         variant="primary"
@@ -842,6 +878,8 @@ export default function ProjectDetailPage() {
                   onVoteHelpful={handleVoteHelpful}
                   onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
+                  emptyMessage={projectEmptyMessage}
+                  emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
                 />
               </div>
             </div>
