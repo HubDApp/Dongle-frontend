@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useParams,
+  useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -11,20 +13,23 @@ import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
-import { Review, ReviewReport, ReviewReportReason } from "@/types/review";
+import { Review,
+  ReviewReport,
+  ReviewReportReason } from "@/types/review";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
-import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { reviewReportService } from "@/services/review/review-report.service";
+import { reviewService,
+  getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
-import WalletStatePanel, {
+import WalletStatePanel,
+  {
   WalletDisconnectedBanner,
-} from "@/components/wallet/WalletStatePanel";
+  } from "@/components/wallet/WalletStatePanel";
 import {
   AlertCircle,
   ArrowLeft,
@@ -36,27 +41,26 @@ import {
   GitBranch,
   Globe,
   Info,
-  Bookmark,
-  BookmarkCheck,
   Shield,
-  Bug,
   Megaphone,
   MessageSquare,
-  Shield,
   Star,
-  UserPlus,
+  UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
+import { reviewReportService } from "@/services/review/review-report.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
+import { shouldBypassLinkWarning, getExternalLinkWarningOptions } from "@/lib/externalLinkWarning";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
 
@@ -81,7 +85,7 @@ export default function ProjectDetailPage() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
-  const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine">("newest");
+  const [reviewSort, setReviewSort] = useState<"newest" | "highest" | "lowest" | "mine" | "helpfulness">("newest");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
@@ -274,6 +278,13 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
       list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (reviewSort === "helpfulness") {
+      list.sort((a, b) => {
+        const votesA = a.helpfulVotes?.length || 0;
+        const votesB = b.helpfulVotes?.length || 0;
+        if (votesA !== votesB) return votesB - votesA;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
     } else {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
@@ -349,6 +360,32 @@ export default function ProjectDetailPage() {
     setEditingReview(null);
   };
 
+  const handleVoteHelpful = async (id: string) => {
+    if (!gate.publicKey) {
+      toast.error("Please connect your wallet to vote");
+      return;
+    }
+    const result = await reviewService.voteHelpful(id, gate.publicKey);
+    if (result.success) {
+      setReviews(await reviewService.getReviewsByProject(projectId));
+    } else {
+      toast.error(result.error || "Failed to submit vote");
+    }
+  };
+
+  const handleVoteUnhelpful = async (id: string) => {
+    if (!gate.publicKey) {
+      toast.error("Please connect your wallet to vote");
+      return;
+    }
+    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+    if (result.success) {
+      setReviews(await reviewService.getReviewsByProject(projectId));
+    } else {
+      toast.error(result.error || "Failed to submit vote");
+    }
+  };
+
   const handleAddUpdate = () => {
     setIsAddingUpdate(true);
   };
@@ -369,8 +406,7 @@ export default function ProjectDetailPage() {
         {
           projectId: project.id,
           ...data,
-          authorAddress: gate.publicKey,
-        },
+},
         gate.publicKey
       );
       toast.success("Update published successfully");
@@ -414,26 +450,15 @@ export default function ProjectDetailPage() {
 
   const handleExternalLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
     e.preventDefault();
-    
-    // Check if the domain is verified and can bypass the warning
-    // Verified project domains can bypass the warning if approved (i.e. verificationStatus is VERIFIED).
-    const targetDomain = extractDomain(url);
-    const isVerifiedDomain = verificationStatus === "VERIFIED";
 
-    if (isVerifiedDomain) {
-      // Bypass the warning and open link safely
+    if (shouldBypassLinkWarning(verificationStatus)) {
       window.open(url, "_blank", "noopener,noreferrer");
       return;
     }
 
-    // Otherwise, show confirmation interstitial/modal
-    const ok = await confirm({
-      title: "External Link Safety Warning",
-      description: `You are about to visit the following external domain: ${targetDomain}.\nFull URL: ${url}\n\nMake sure you trust this site before proceeding.`,
-      confirmLabel: "Proceed to Site",
-      cancelLabel: "Stay Here",
-      variant: "warning",
-    });
+    const targetDomain = extractDomain(url);
+    const options = getExternalLinkWarningOptions(targetDomain, url, verificationStatus);
+    const ok = await confirm(options);
 
     if (ok) {
       window.open(url, "_blank", "noopener,noreferrer");
@@ -491,30 +516,8 @@ export default function ProjectDetailPage() {
             Back
           </button>
 
-          {/* Warning Banner */}
-          {verificationStatus === "REJECTED" && (
-            <div className="mb-6 p-5 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 rounded-3xl border border-red-200 dark:border-red-900/50 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
-              <AlertCircle className="w-6 h-6 shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
-              <div>
-                <h4 className="font-bold text-base mb-1">High Risk Warning: Rejected Project</h4>
-                <p className="text-sm opacity-90 leading-relaxed">
-                  This project was rejected by the community verification process. Please be extremely cautious: do not connect your wallet, share private keys, or interact with external links unless you are absolutely sure of its safety.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {(verificationStatus === "NONE" || verificationStatus === "PENDING") && (
-            <div className="mb-6 p-5 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 rounded-3xl border border-amber-200 dark:border-amber-900/50 shadow-sm flex items-start gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
-              <Info className="w-6 h-6 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-              <div>
-                <h4 className="font-bold text-base mb-1">Unverified Project Context</h4>
-                <p className="text-sm opacity-90 leading-relaxed">
-                  This project has not completed the community verification process. It is currently unverified. Please exercise due diligence when interacting with the project and checking external resources.
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Verification Status Banner */}
+          <ProjectStatusBanner status={verificationStatus} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -532,6 +535,15 @@ export default function ProjectDetailPage() {
                       )}
                     </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>
+                    {project.tags && project.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {project.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex items-center gap-6 text-sm text-zinc-500 dark:text-zinc-400">
                       <div className="flex items-center gap-2">
                         <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
@@ -612,12 +624,22 @@ export default function ProjectDetailPage() {
 
                   {activeTab === "updates" && (
                     <div className="space-y-4">
-                      {isOwner && !isAddingUpdate && (
-                        <Button variant="primary" onClick={handleAddUpdate}>
-                          <Megaphone className="w-4 h-4 mr-2" />
-                          Post Update
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {isOwner && !isAddingUpdate && (
+                          <Button variant="primary" onClick={handleAddUpdate}>
+                            <Megaphone className="w-4 h-4 mr-2" />
+                            Post Update
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/projects/${projectId}/updates`)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View full feed
                         </Button>
-                      )}
+                      </div>
 
                       {isAddingUpdate && project && (
                         <UpdateForm
@@ -714,12 +736,13 @@ export default function ProjectDetailPage() {
                   <div className="flex gap-2">
                     <select
                       value={reviewSort}
-                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine")}
+                      onChange={(e) => setReviewSort(e.target.value as "newest" | "highest" | "lowest" | "mine" | "helpfulness")}
                       className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     >
                       <option value="newest">Newest First</option>
                       <option value="highest">Highest Rating</option>
                       <option value="lowest">Lowest Rating</option>
+                      <option value="helpfulness">Most Helpful</option>
                       {gate.publicKey && <option value="mine">My Reviews</option>}
                     </select>
                     {!isAddingReview && !isOwner && (
@@ -816,6 +839,8 @@ export default function ProjectDetailPage() {
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onVoteHelpful={handleVoteHelpful}
+                  onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
                 />
               </div>
@@ -925,6 +950,11 @@ export default function ProjectDetailPage() {
                     {abbreviateStellarAddress(project.ownerAddress)}
                   </p>
                 </div>
+              )}
+
+              {/* Contract Addresses */}
+              {project.contractAddresses && project.contractAddresses.length > 0 && (
+                <ContractAddressList addresses={project.contractAddresses} />
               )}
             </div>
           </div>
