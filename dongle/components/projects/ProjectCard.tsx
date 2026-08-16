@@ -10,6 +10,7 @@ import { VerificationBadge, VerificationStatus } from "@/components/projects/Ver
 import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
+import { getPrefetchValue } from "@/lib/prefetch-config";
 
 interface ProjectCardProps {
   project: Project;
@@ -97,7 +98,7 @@ export const ProjectCard = ({
         </IconButton>
       )}
 
-      <Link href={`/projects/${project.id}`} className="flex h-full flex-col">
+      <Link href={`/projects/${project.id}`} prefetch={getPrefetchValue("project-detail")} className="flex h-full flex-col">
         <ProjectImage
           logoUrl={project.logoUrl}
           name={project.name}
@@ -121,9 +122,21 @@ export const ProjectCard = ({
         <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">
           {project.name}
         </h3>
-        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 line-clamp-2 grow">
+        <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4 line-clamp-2 grow">
           {project.description}
         </p>
+        {project.tags && project.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4 px-2">
+            {project.tags.map((tag) => (
+              <span
+                key={tag}
+                className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex justify-between items-center text-xs text-zinc-400 dark:text-zinc-500 mt-auto">
           <span>{project.reviews} reviews</span>
           <span>Added {formatDate(project.createdAt, "short")}</span>

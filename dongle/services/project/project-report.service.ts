@@ -1,4 +1,5 @@
 import { generateId } from "@/lib/id-generator";
+import { nowUTC } from "@/lib/date";
 import { projectService } from "./project.service";
 import {
   ProjectModerationAction,
@@ -156,7 +157,7 @@ export const projectReportService = {
       reason: data.reason as ProjectReportReason,
       explanation: data.explanation,
       status: "pending",
-      createdAt: new Date().toISOString(),
+      createdAt: nowUTC(),
     };
 
     const reports = this.getReports();
@@ -194,7 +195,7 @@ export const projectReportService = {
       moderatorAddress,
       action: "resolved",
       reason,
-      timestamp: new Date().toISOString(),
+      timestamp: nowUTC(),
     };
 
     const log = this.getModerationLog();
@@ -232,7 +233,7 @@ export const projectReportService = {
       moderatorAddress,
       action: "dismissed",
       reason,
-      timestamp: new Date().toISOString(),
+      timestamp: nowUTC(),
     };
 
     const log = this.getModerationLog();

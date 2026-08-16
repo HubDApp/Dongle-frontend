@@ -1,0 +1,70 @@
+name: Preview Validation
+
+# Lightweight checks that preview/production deployments render core routes
+# and that production configuration is present when secrets are supplied.
+#
+# Manual:
+#   gh workflow run preview-validation.yml -f preview_url=https://….vercel.app
+#
+# Or from Actions → Preview Validation → Run workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: "Preview or production base URL (e.g. https://….vercel.app)"
+        required: true
+        type: string
+      validate_env:
+        description: "Also run strict env validation (requires repo secrets)"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  preview-smoke:
+    name: Smoke-test main routes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Run preview smoke tests
+        env:
+          PREVIEW_URL: ${{ inputs.preview_url }}
+        run: node scripts/preview-smoke.js
+
+  validate-production-env:
+    name: Validate production env
+    if: ${{ inputs.validate_env == true || inputs.validate_env == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Validate required configuration
+        env:
+          NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT }}
+          NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT }}
+          NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT }}
+          NEXT_PUBLIC_SOROBAN_RPC_URL: ${{ secrets.NEXT_PUBLIC_SOROBAN_RPC_URL }}
+          NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE: ${{ secrets.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE }}
+        run: node scripts/validate-production-env.js
