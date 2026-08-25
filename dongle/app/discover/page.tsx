@@ -9,8 +9,9 @@ import { Search, Filter } from "lucide-react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
@@ -43,29 +44,30 @@ function DiscoverContent() {
     clearFilters,
   } = useDiscoverParams();
 
-  // Fetch verification statuses for all projects
+  // Fetch verification statuses for all projects using batched fetch
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchVerificationStatuses = async () => {
       const projects = projectService.getDiscoverableProjects();
-      const statuses: Record<string, VerificationStatus> = {};
-      
-      await Promise.all(
-        projects.map(async (project) => {
-          try {
-            const status = await sorobanService.getVerificationStatus(project.id);
-            statuses[project.id] = status;
-          } catch (error) {
-            console.error(`Failed to fetch verification status for ${project.id}:`, error);
-            statuses[project.id] = "NONE";
-          }
-        })
+      const ids = projects.map((p) => p.id);
+
+      const statuses = await batchFetchVerificationStatuses(
+        ids,
+        controller.signal,
       );
-      
-      setVerificationStatuses(statuses);
-      setIsInitialLoading(false);
+
+      if (!controller.signal.aborted) {
+        setVerificationStatuses(statuses);
+        setIsInitialLoading(false);
+      }
     };
 
     void fetchVerificationStatuses();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   const categories = projectService.getCategories();
@@ -254,13 +256,37 @@ function DiscoverContent() {
           </div>
         )}
 
-        {/* Initial loading */}
+        {/* Initial loading skeleton grid */}
         {isInitialLoading ? (
-          <div className="flex flex-col items-center justify-center py-24">
-            <Spinner size="lg" className="mb-4" />
-            <p className="text-zinc-500 dark:text-zinc-400">
-              Loading projects...
-            </p>
+          <div
+            aria-busy="true"
+            aria-label="Loading projects"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 flex flex-col gap-4"
+              >
+                {/* Logo placeholder */}
+                <Skeleton className="h-40 w-full rounded-2xl" />
+                {/* Category + badge row */}
+                <div className="flex items-center gap-2 px-2">
+                  <Skeleton className="h-5 w-20 rounded" />
+                  <Skeleton className="h-5 w-16 rounded" />
+                </div>
+                {/* Title */}
+                <Skeleton className="h-7 w-3/4 rounded" />
+                {/* Description lines */}
+                <Skeleton className="h-4 w-full rounded" />
+                <Skeleton className="h-4 w-5/6 rounded" />
+                {/* Footer meta */}
+                <div className="flex justify-between mt-auto pt-2">
+                  <Skeleton className="h-3 w-20 rounded" />
+                  <Skeleton className="h-3 w-24 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredCount > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
