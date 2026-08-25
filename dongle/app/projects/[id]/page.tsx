@@ -26,7 +26,6 @@ import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
-import { extractDomain } from "@/lib/url";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import WalletStatePanel,
@@ -46,6 +45,7 @@ import {
   Info,
   Megaphone,
   MessageSquare,
+  Shield,
   Star,
   UserPlus
 } from "lucide-react";
@@ -63,7 +63,8 @@ import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
 import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
 import { ClaimStatusBanner } from "@/components/projects/ClaimStatusBanner";
-import { shouldBypassLinkWarning, getExternalLinkWarningOptions } from "@/lib/externalLinkWarning";
+import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
+import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
 
@@ -483,22 +484,7 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleExternalLinkClick = async (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
-    e.preventDefault();
-
-    if (shouldBypassLinkWarning(verificationStatus)) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    const targetDomain = extractDomain(url);
-    const options = getExternalLinkWarningOptions(targetDomain, url, verificationStatus);
-    const ok = await confirm(options);
-
-    if (ok) {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  };
+  const approvedExternalUrls = project ? getApprovedProjectUrls(project) : [];
 
   if (isLoading) {
     return (
@@ -698,60 +684,56 @@ export default function ProjectDetailPage() {
                 {/* Links */}
                 <div className="flex flex-wrap gap-3">
                   {project.websiteUrl && (
-                    <a
+                    <SafeExternalLink
                       href={project.websiteUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => handleExternalLinkClick(e, project.websiteUrl!)}
+                      verificationStatus={verificationStatus}
+                      approvedUrls={approvedExternalUrls}
                     >
                       <Button variant="outline" size="sm">
                         <Globe className="w-4 h-4 mr-2" />
                         Website
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Button>
-                    </a>
+                    </SafeExternalLink>
                   )}
                   {project.githubUrl && (
-                    <a
+                    <SafeExternalLink
                       href={project.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => handleExternalLinkClick(e, project.githubUrl!)}
+                      verificationStatus={verificationStatus}
+                      approvedUrls={approvedExternalUrls}
                     >
                       <Button variant="outline" size="sm">
                         <GitBranch className="w-4 h-4 mr-2" />
                         GitHub
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Button>
-                    </a>
+                    </SafeExternalLink>
                   )}
                   {project.auditReportUrl && (
-                    <a
+                    <SafeExternalLink
                       href={project.auditReportUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => handleExternalLinkClick(e, project.auditReportUrl!)}
+                      verificationStatus={verificationStatus}
+                      approvedUrls={approvedExternalUrls}
                     >
                       <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50 dark:hover:bg-green-900/20">
                         <Shield className="w-4 h-4 mr-2" />
                         Audit Report
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Button>
-                    </a>
+                    </SafeExternalLink>
                   )}
                   {project.bugBountyUrl && (
-                    <a
+                    <SafeExternalLink
                       href={project.bugBountyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => handleExternalLinkClick(e, project.bugBountyUrl!)}
+                      verificationStatus={verificationStatus}
+                      approvedUrls={approvedExternalUrls}
                     >
                       <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50 dark:hover:bg-amber-900/20">
                         <Bug className="w-4 h-4 mr-2" />
                         Bug Bounty
                         <ExternalLink className="w-3 h-3 ml-1" />
                       </Button>
-                    </a>
+                    </SafeExternalLink>
                   )}
                 </div>
               </div>

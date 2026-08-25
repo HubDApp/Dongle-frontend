@@ -115,6 +115,26 @@ describe("validateRepositoryUrl", () => {
     expect(result.isValid).toBe(false);
   });
 
+  it("accepts GitLab and Bitbucket URLs", () => {
+    expect(validateRepositoryUrl("https://gitlab.com/group/project").isValid).toBe(true);
+    expect(validateRepositoryUrl("https://bitbucket.org/team/repo").isValid).toBe(true);
+  });
+
+  it("accepts www hosts and URLs without a protocol", () => {
+    const www = validateRepositoryUrl("https://www.github.com/owner/repo");
+    expect(www.isValid).toBe(true);
+    expect(www.metadata).toEqual({ host: "github", owner: "owner", repo: "repo" });
+
+    const bare = validateRepositoryUrl("github.com/owner/repo");
+    expect(bare.isValid).toBe(true);
+  });
+
+  it("rejects a URL missing the repository name", () => {
+    const result = validateRepositoryUrl("https://github.com/owner");
+    expect(result.isValid).toBe(false);
+    expect(result.error).toMatch(/owner\/repo/i);
+  });
+
   it("rejects javascript: protocol", () => {
     const result = validateRepositoryUrl("javascript:alert(1)");
     expect(result.isValid).toBe(false);

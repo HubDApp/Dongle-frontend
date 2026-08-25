@@ -14,6 +14,10 @@ export interface ConfirmDialogOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: ConfirmDialogVariant;
+  /** Hostname shown in the destination preview (external-link interstitial). */
+  destinationDomain?: string;
+  /** Full destination URL shown before leaving the app. */
+  destinationUrl?: string;
 }
 
 interface ConfirmDialogProps extends ConfirmDialogOptions {
@@ -60,6 +64,8 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "danger",
+  destinationDomain,
+  destinationUrl,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -111,10 +117,30 @@ export function ConfirmDialog({
         </h2>
         <p
           id="confirm-dialog-description"
-          className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8"
+          className={`text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed whitespace-pre-line ${
+            destinationDomain || destinationUrl ? "mb-6" : "mb-8"
+          }`}
         >
           {description}
         </p>
+
+        {(destinationDomain || destinationUrl) && (
+          <div className="mb-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">
+              Destination
+            </p>
+            {destinationDomain && (
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 break-all">
+                {destinationDomain}
+              </p>
+            )}
+            {destinationUrl && (
+              <p className="mt-1 text-xs font-mono text-zinc-600 dark:text-zinc-300 break-all">
+                {destinationUrl}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">

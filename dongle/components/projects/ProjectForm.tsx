@@ -466,7 +466,7 @@ export default function ProjectForm({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
-            label="GitHub URL (Optional)"
+            label="Repository URL (Optional)"
             placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}

@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +29,8 @@ function DiscoverContent() {
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
   const gate = useWalletPageGate();
-  const { recentProjects, hasHistory } = useRecentViews(gate.publicKey || undefined);
+  const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
+  const confirm = useConfirm();
 
   const {
     searchInput,
@@ -276,6 +278,16 @@ function DiscoverContent() {
             <RecentlyViewedProjects
               projects={recentProjects.slice(0, 5)}
               compact
+              onClear={async () => {
+                const ok = await confirm({
+                  title: "Clear viewing history",
+                  description: "This will permanently remove your recently viewed projects. This action cannot be undone.",
+                  confirmLabel: "Clear History",
+                  cancelLabel: "Cancel",
+                  variant: "danger",
+                });
+                if (ok) clearHistory();
+              }}
             />
           </div>
         )}

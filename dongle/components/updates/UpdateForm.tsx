@@ -3,6 +3,7 @@
 import React, { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { UPDATE_TYPES, UpdateType, ProjectUpdate } from "@/types/update";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X } from "lucide-react";
 
 interface UpdateFormProps {
@@ -30,10 +31,19 @@ export default function UpdateForm({
   const [content, setContent] = useState(initialUpdate?.content || "");
   const [version, setVersion] = useState(initialUpdate?.version || "");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const updateTypeId = useId();
   const versionId = useId();
   const titleId = useId();
   const contentId = useId();
+
+  const isDirty =
+    type !== (initialUpdate?.type || UPDATE_TYPES.ANNOUNCEMENT) ||
+    title !== (initialUpdate?.title || "") ||
+    content !== (initialUpdate?.content || "") ||
+    version !== (initialUpdate?.version || "");
+
+  useUnsavedChanges(isDirty, isSubmitting);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -61,6 +71,7 @@ export default function UpdateForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validate()) {
+      setIsSubmitting(true);
       onSubmit({
         type,
         title: title.trim(),
@@ -68,6 +79,11 @@ export default function UpdateForm({
         version: type === UPDATE_TYPES.RELEASE ? version.trim() : undefined,
       });
     }
+  };
+
+  const handleCancel = () => {
+    setIsSubmitting(true);
+    onCancel();
   };
 
   return (
@@ -78,7 +94,7 @@ export default function UpdateForm({
         </h3>
         <button
           type="button"
-          onClick={onCancel}
+          onClick={handleCancel}
           className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
           aria-label="Close update form"
         >
@@ -183,7 +199,7 @@ export default function UpdateForm({
           <Button
             type="button"
             variant="outline"
-            onClick={onCancel}
+            onClick={handleCancel}
             className="flex-1"
           >
             Cancel

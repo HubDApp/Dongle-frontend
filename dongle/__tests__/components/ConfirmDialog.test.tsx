@@ -112,6 +112,23 @@ describe("ConfirmDialog", () => {
     await user.keyboard("{Escape}");
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  it("renders the full destination domain and URL", () => {
+    render(
+      <ConfirmDialog
+        isOpen
+        title="External Link"
+        description="You are about to leave Dongle."
+        destinationDomain="unknown-phish.example"
+        destinationUrl="https://unknown-phish.example/wallet"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("unknown-phish.example")).toBeInTheDocument();
+    expect(screen.getByText("https://unknown-phish.example/wallet")).toBeInTheDocument();
+  });
 });
 
 describe("useConfirm + ConfirmDialogProvider", () => {

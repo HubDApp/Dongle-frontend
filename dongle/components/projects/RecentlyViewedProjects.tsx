@@ -1,4 +1,4 @@
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/Button";
@@ -19,10 +19,8 @@ export function RecentlyViewedProjects({
   onClear,
   compact = false,
 }: RecentlyViewedProjectsProps) {
-  const router = useRouter();
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
 
-  // Fetch verification statuses for displayed projects
   useEffect(() => {
     if (projects.length === 0) return;
 
@@ -68,10 +66,10 @@ export function RecentlyViewedProjects({
         </div>
         <div className="space-y-3">
           {projects.slice(0, 5).map((project) => (
-            <div
+            <Link
               key={project.id}
-              onClick={() => router.push(`/projects/${project.id}`)}
-              className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors cursor-pointer group"
+              href={`/projects/${project.id}`}
+              className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors group"
             >
               <ProjectImage
                 logoUrl={project.logoUrl}
@@ -99,18 +97,16 @@ export function RecentlyViewedProjects({
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         {projects.length > 5 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-3"
-            onClick={() => router.push("/profile")}
+          <Link
+            href="/profile"
+            className="inline-flex items-center justify-center w-full mt-3 px-4 py-2 text-sm rounded-xl font-medium bg-transparent border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white hover:bg-zinc-50 dark:hover:bg-zinc-900"
           >
             View All ({projects.length})
-          </Button>
+          </Link>
         )}
       </div>
     );
@@ -133,10 +129,10 @@ export function RecentlyViewedProjects({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {projects.map((project) => (
-          <div
+          <Link
             key={project.id}
-            onClick={() => router.push(`/projects/${project.id}`)}
-            className="flex items-start gap-4 p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-sm transition-all cursor-pointer group"
+            href={`/projects/${project.id}`}
+            className="flex items-start gap-4 p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:shadow-sm transition-all group"
           >
             <ProjectImage
               logoUrl={project.logoUrl}
@@ -170,7 +166,7 @@ export function RecentlyViewedProjects({
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
