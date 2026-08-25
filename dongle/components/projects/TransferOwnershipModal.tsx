@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { UserPlus, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { validateStellarAddress, abbreviateStellarAddress } from "@/lib/stellar-address";
 
 interface TransferOwnershipModalProps {
@@ -28,22 +29,7 @@ export function TransferOwnershipModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus input when modal opens
-  useEffect(() => {
-    if (!isOpen) return;
-    const focusTimer = setTimeout(() => inputRef.current?.focus(), 100);
-    return () => clearTimeout(focusTimer);
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  useModalFocusTrap(isOpen, dialogRef, inputRef, onClose);
 
   if (!isOpen) return null;
 
@@ -75,7 +61,6 @@ export function TransferOwnershipModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
-      aria-hidden="true"
     >
       <div
         ref={dialogRef}

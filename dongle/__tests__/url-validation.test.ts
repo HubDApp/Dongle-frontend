@@ -1,22 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { normalizeUrl, extractDomain } from "@/lib/url";
+import { normalizeUrl, extractDomain, encodeUrlForHtml, sanitizeAndEncodeUrl } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 
-describe("normalizeUrl", () => {
-  it("rejects javascript: protocol", () => {
-    expect(() => normalizeUrl("javascript:alert(1)")).toThrow();
-  });
-
-  it("rejects data: protocol", () => {
-    expect(() => normalizeUrl("data:text/html,<script>alert(1)</script>")).toThrow();
-  });
-
-  it("rejects other unsupported protocols", () => {
-    expect(() => normalizeUrl("ftp://example.com")).toThrow();
-    expect(() => normalizeUrl("file:///etc/passwd")).toThrow();
-  });
-
-  it("accepts http and https", () => {
+describe("normalizeUrl - Basic Validation", () => {
+  it("accepts valid http and https URLs", () => {
     expect(() => normalizeUrl("http://example.com")).not.toThrow();
     expect(() => normalizeUrl("https://example.com")).not.toThrow();
   });
@@ -41,6 +28,59 @@ describe("normalizeUrl", () => {
 
   it("throws on malformed URLs", () => {
     expect(() => normalizeUrl("not a url")).toThrow();
+  });
+});
+
+describe("normalizeUrl - XSS Payloads & OWASP Test Vectors", () => {
+  it("rejects direct javascript: protocol vectors", () => {
+    expect(() => normalizeUrl("javascript:alert(1)")).toThrow();
+    expect(() => normalizeUrl("javascript:alert('XSS')")).toThrow();
+    expect(() => normalizeUrl("javascript:eval('alert(1)')")).toThrow();
+  });
+
+  it("rejects data: protocol vectors", () => {
+    expect(() => normalizeUrl("data:text/html,<script>alert(1)</script>")).toThrow();
+    expect(() => normalizeUrl("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==")).toThrow();
+  });
+
+  it("rejects vbscript:, file:, blob: and other non-http/https schemes", () => {
+    expect(() => normalizeUrl("vbscript:msgbox(1)")).toThrow();
+    expect(() => normalizeUrl("file:///etc/passwd")).toThrow();
+    expect(() => normalizeUrl("blob:https://example.com/uuid")).toThrow();
+    expect(() => normalizeUrl("ftp://example.com")).toThrow();
+  });
+
+  it("rejects null-byte and whitespace obfuscated javascript: schemes", () => {
+    expect(() => normalizeUrl("java\0script:alert(1)")).toThrow();
+    expect(() => normalizeUrl("java\r\nscript:alert(1)")).toThrow();
+    expect(() => normalizeUrl(" java script:alert(1)")).toThrow();
+  });
+
+  it("rejects HTML entity-encoded scheme bypass vectors", () => {
+    expect(() => normalizeUrl("javascript&#x3A;alert(1)")).toThrow();
+    expect(() => normalizeUrl("javascript&colon;alert(1)")).toThrow();
+  });
+
+  it("sanitizes HTML tags and script injections embedded in URLs", () => {
+    expect(() => normalizeUrl("<script>alert(1)</script>")).toThrow();
+    expect(() => normalizeUrl("https://example.com/<script>alert(1)</script>")).not.toThrow();
+    const cleanUrl = normalizeUrl("https://example.com/<script>alert(1)</script>");
+    expect(cleanUrl).not.toContain("<script>");
+  });
+});
+
+describe("encodeUrlForHtml & sanitizeAndEncodeUrl", () => {
+  it("encodes HTML special characters to prevent attribute breakout XSS", () => {
+    const rawUrl = 'https://example.com/" onload="alert(1)"';
+    const encoded = encodeUrlForHtml(rawUrl);
+    expect(encoded).not.toContain('"');
+    expect(encoded).toContain("&quot;");
+  });
+
+  it("sanitizeAndEncodeUrl returns safe HTML-encoded URL or empty string for invalid payload", () => {
+    expect(sanitizeAndEncodeUrl("javascript:alert(1)")).toBe("");
+    const result = sanitizeAndEncodeUrl('https://example.com/test?a=1&b=2');
+    expect(result).toBe("https://example.com/test?a=1&amp;b=2");
   });
 });
 

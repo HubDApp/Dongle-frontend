@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.ipfs.io" },
       { protocol: "https", hostname: "**.ipfs.dweb.link" },
       { protocol: "https", hostname: "ipfs.io" },
+      { protocol: "https", hostname: "cloudflare-ipfs.com" },
+      { protocol: "https", hostname: "gateway.pinata.cloud" },
+      { protocol: "https", hostname: "gateway.io" },
       { protocol: "https", hostname: "arweave.net" },
       { protocol: "https", hostname: "**.arweave.net" },
       // Code hosting / raw assets

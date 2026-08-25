@@ -123,3 +123,4 @@ export function sanitizeAndEncodeUrl(urlStr: string): string {
     return "";
   }
 }
+}

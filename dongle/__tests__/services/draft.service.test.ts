@@ -1,10 +1,11 @@
 /**
- * Tests for the updated DraftService (hybrid localStorage + API)
+ * Tests for the updated DraftService (hybrid encrypted localStorage + API)
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { draftService, type ProjectDraft } from "@/services/draft/draft.service";
 import { draftApiService } from "@/services/draft/draft-api.service";
+import { isEncrypted, ENCRYPTION_PREFIX } from "@/lib/crypto-storage";
 
 // ---------------------------------------------------------------------------
 // Mock localStorage
@@ -43,6 +44,7 @@ const apiDelete = vi.mocked(draftApiService.deleteDraft);
 // ---------------------------------------------------------------------------
 
 const WALLET = "GBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX123456";
+const OTHER_WALLET = "GAYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY654321";
 
 const baseDraftData: ProjectDraft["data"] = {
   name: "Test Project",
@@ -68,85 +70,113 @@ function makeDraft(overrides?: Partial<ProjectDraft>): Omit<ProjectDraft, "lastS
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("DraftService – localStorage operations", () => {
+describe("DraftService – encrypted localStorage operations", () => {
   beforeEach(() => {
     localStorageMock.clear();
     vi.clearAllMocks();
   });
 
-  it("saves and retrieves a draft from localStorage", () => {
-    draftService.saveDraft(makeDraft());
-    const retrieved = draftService.getDraft("test-draft");
+  it("saves and retrieves a draft from localStorage with encryption", () => {
+    draftService.saveDraft(makeDraft(), WALLET);
+    const retrieved = draftService.getDraft("test-draft", WALLET);
 
     expect(retrieved).not.toBeNull();
     expect(retrieved?.id).toBe("test-draft");
     expect(retrieved?.data.name).toBe("Test Project");
+
+    // Verify raw storage content is encrypted
+    const rawStored = localStorage.getItem("dongle_project_drafts");
+    expect(rawStored).not.toBeNull();
+    expect(isEncrypted(rawStored)).toBe(true);
+    expect(rawStored).not.toContain("Test Project");
   });
 
-  it("updates an existing draft in localStorage", () => {
-    draftService.saveDraft(makeDraft());
-    draftService.saveDraft(makeDraft({ data: { ...baseDraftData, name: "Updated" } }));
+  it("migrates existing unencrypted drafts on first load", () => {
+    const unencrypted = JSON.stringify([
+      { id: "legacy-1", mode: "create", data: baseDraftData, lastSaved: "2026-01-01" },
+    ]);
+    localStorage.setItem("dongle_project_drafts", unencrypted);
+    expect(isEncrypted(localStorage.getItem("dongle_project_drafts"))).toBe(false);
 
-    const all = draftService.getAllDrafts();
+    const drafts = draftService.getAllDrafts(WALLET);
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].id).toBe("legacy-1");
+
+    // Verify it is now migrated and encrypted
+    expect(isEncrypted(localStorage.getItem("dongle_project_drafts"))).toBe(true);
+  });
+
+  it("logs warning and returns empty array when decryption fails due to wrong key", () => {
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Save with WALLET key
+    draftService.saveDraft(makeDraft(), WALLET);
+
+    // Try to load with OTHER_WALLET key
+    const drafts = draftService.getAllDrafts(OTHER_WALLET);
+    expect(drafts).toEqual([]);
+    expect(consoleWarnSpy).toHaveBeenCalled();
+  });
+
+  it("updates an existing draft in encrypted localStorage", () => {
+    draftService.saveDraft(makeDraft(), WALLET);
+    draftService.saveDraft(makeDraft({ data: { ...baseDraftData, name: "Updated" } }), WALLET);
+
+    const all = draftService.getAllDrafts(WALLET);
     expect(all).toHaveLength(1);
     expect(all[0].data.name).toBe("Updated");
   });
 
   it("gets draft for create mode", () => {
-    draftService.saveDraft(makeDraft({ mode: "create" }));
-    const retrieved = draftService.getDraftForProject("create");
+    draftService.saveDraft(makeDraft({ mode: "create" }), WALLET);
+    const retrieved = draftService.getDraftForProject("create", undefined, WALLET);
 
     expect(retrieved).not.toBeNull();
     expect(retrieved?.mode).toBe("create");
   });
 
   it("gets draft for edit mode with projectId", () => {
-    draftService.saveDraft(makeDraft({ id: "edit-123", mode: "edit", projectId: "123" }));
-    const retrieved = draftService.getDraftForProject("edit", "123");
+    draftService.saveDraft(makeDraft({ id: "edit-123", mode: "edit", projectId: "123" }), WALLET);
+    const retrieved = draftService.getDraftForProject("edit", "123", WALLET);
 
     expect(retrieved).not.toBeNull();
     expect(retrieved?.projectId).toBe("123");
   });
 
   it("returns null when no matching draft exists", () => {
-    expect(draftService.getDraftForProject("edit", "nonexistent")).toBeNull();
+    expect(draftService.getDraftForProject("edit", "nonexistent", WALLET)).toBeNull();
   });
 
-  it("deletes a draft from localStorage", () => {
-    draftService.saveDraft(makeDraft());
-    expect(draftService.getDraft("test-draft")).not.toBeNull();
+  it("deletes a draft from encrypted localStorage", () => {
+    draftService.saveDraft(makeDraft(), WALLET);
+    expect(draftService.getDraft("test-draft", WALLET)).not.toBeNull();
 
-    draftService.deleteDraft("test-draft");
-    expect(draftService.getDraft("test-draft")).toBeNull();
+    draftService.deleteDraft("test-draft", WALLET);
+    expect(draftService.getDraft("test-draft", WALLET)).toBeNull();
   });
 
   it("clears all drafts from localStorage", () => {
-    draftService.saveDraft(makeDraft({ id: "draft-1" }));
-    draftService.saveDraft(makeDraft({ id: "draft-2" }));
-    expect(draftService.getAllDrafts()).toHaveLength(2);
+    draftService.saveDraft(makeDraft({ id: "draft-1" }), WALLET);
+    draftService.saveDraft(makeDraft({ id: "draft-2" }), WALLET);
+    expect(draftService.getAllDrafts(WALLET)).toHaveLength(2);
 
     draftService.clearAllDrafts();
-    expect(draftService.getAllDrafts()).toHaveLength(0);
+    expect(draftService.getAllDrafts(WALLET)).toHaveLength(0);
   });
 
   it("handles multiple drafts independently", () => {
-    draftService.saveDraft(makeDraft({ id: "d-1", mode: "create" }));
-    draftService.saveDraft(makeDraft({ id: "d-2", mode: "edit", projectId: "456" }));
+    draftService.saveDraft(makeDraft({ id: "d-1", mode: "create" }), WALLET);
+    draftService.saveDraft(makeDraft({ id: "d-2", mode: "edit", projectId: "456" }), WALLET);
 
-    expect(draftService.getAllDrafts()).toHaveLength(2);
-    expect(draftService.getDraft("d-1")).not.toBeNull();
-    expect(draftService.getDraft("d-2")).not.toBeNull();
+    expect(draftService.getAllDrafts(WALLET)).toHaveLength(2);
+    expect(draftService.getDraft("d-1", WALLET)).not.toBeNull();
+    expect(draftService.getDraft("d-2", WALLET)).not.toBeNull();
   });
 
-  it("returns empty array during SSR (no window object)", () => {
-    // Cannot simulate SSR in jsdom, but getAllDrafts with empty storage returns []
-    localStorageMock.clear();
-    expect(draftService.getAllDrafts()).toEqual([]);
-  });
-
-  it("returns empty array when localStorage contains invalid JSON", () => {
-    localStorageMock.setItem("dongle_project_drafts", "{{invalid}");
-    expect(draftService.getAllDrafts()).toEqual([]);
+  it("returns empty array when localStorage contains invalid corrupted string", () => {
+    localStorageMock.setItem("dongle_project_drafts", `${ENCRYPTION_PREFIX}invalid_corrupt_ciphertext`);
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(draftService.getAllDrafts(WALLET)).toEqual([]);
   });
 });
 
