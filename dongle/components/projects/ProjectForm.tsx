@@ -10,6 +10,10 @@ import { TextAreaField } from "@/components/ui/TextAreaField";
 import { TagInput } from "@/components/ui/TagInput";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { projectService } from "@/services/project/project.service";
+import { projectSubmissionService } from "@/services/project/project-submission.service";
+import { walletService } from "@/services/wallet/wallet.service";
+import { generateProjectIdFromName } from "@/lib/project-id";
+import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
 import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
@@ -225,6 +229,37 @@ export default function ProjectForm({
         });
 
         if (result) {
+          if (mode !== "edit") {
+            try {
+              let submittedBy = "unknown";
+              try {
+                submittedBy = await walletService.getPublicKey();
+              } catch {
+                // wallet may disconnect after tx
+              }
+
+              const qualityScore = computeQualityScore(cleanedPayload);
+              const existingNames = projectService
+                .getAllProjects()
+                .map((p) => p.name);
+              const flagReasons = detectSuspiciousFlags(
+                cleanedPayload,
+                qualityScore,
+                existingNames,
+              );
+
+              projectSubmissionService.recordSubmission({
+                projectId: generateProjectIdFromName(cleanedPayload.name),
+                projectName: cleanedPayload.name,
+                submittedBy,
+                qualityScore,
+                flagReasons,
+              });
+            } catch (moderationError) {
+              console.error("[ProjectForm] Failed to record submission moderation:", moderationError);
+            }
+          }
+
           trackProjectSubmit({
             success: true,
             mode,

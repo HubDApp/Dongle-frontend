@@ -46,7 +46,7 @@ function DiscoverContent() {
   // Fetch verification statuses for all projects
   useEffect(() => {
     const fetchVerificationStatuses = async () => {
-      const projects = projectService.getAllProjects();
+      const projects = projectService.getDiscoverableProjects();
       const statuses: Record<string, VerificationStatus> = {};
       
       await Promise.all(
@@ -73,7 +73,7 @@ function DiscoverContent() {
   const filteredAndSortedProjects = useMemo(() => {
     let result = searchQuery
       ? projectService.searchProjects(searchQuery)
-      : projectService.getAllProjects();
+      : projectService.getDiscoverableProjects();
 
     if (category !== "All") {
       result = result.filter((p) => p.primaryCategory === category);

@@ -114,6 +114,22 @@ class VerificationService {
   }
 
   /**
+   * Gets all verification requests (for admin dashboard).
+   */
+  async getAllRequests(): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests.sort(
+        (a, b) =>
+          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+      );
+    } catch (error) {
+      console.error("[VerificationService] Error getting all requests:", error);
+      return [];
+    }
+  }
+
+  /**
    * Gets all pending verification requests (for admin dashboard).
    */
   async getPendingRequests(): Promise<VerificationRequest[]> {
@@ -340,10 +356,12 @@ class VerificationService {
     request: VerificationRequest | null;
   }> {
     try {
+      const { projectService } = await import("../project/project.service");
+      const projectExists = projectService.getProjectById(projectId) !== null;
       const request = await this.getVerificationRequest(projectId);
-      
+
       return {
-        projectExists: true, // Would check against project registry in real implementation
+        projectExists,
         requestExists: request !== null,
         request,
       };

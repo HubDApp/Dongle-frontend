@@ -175,6 +175,36 @@ export interface ProjectReportValidationError {
   message: string;
 }
 
+export type ProjectSubmissionModerationStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "flagged";
+
+export interface ProjectSubmission {
+  id: string;
+  projectId: string;
+  projectName: string;
+  submittedBy: string;
+  submittedAt: string;
+  status: ProjectSubmissionModerationStatus;
+  qualityScore: number;
+  flagReasons: string[];
+  statusUpdatedAt?: string;
+  statusUpdatedBy?: string;
+  rejectionReason?: string;
+}
+
+export interface ProjectSubmissionModerationAction {
+  id: string;
+  submissionId: string;
+  projectId: string;
+  moderatorAddress: string;
+  action: ProjectSubmissionModerationStatus;
+  reason: string;
+  timestamp: string;
+}
+
 /**
  * Normalize a category string to canonical form
  * Handles various input formats and returns the canonical category

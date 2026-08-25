@@ -11,6 +11,10 @@ import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import {
+  RatingDistributionSummary,
+  computeRatingDistribution,
+} from "@/components/reviews/RatingDistributionSummary";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
 import { Review,
@@ -278,15 +282,10 @@ export default function ProjectDetailPage() {
     setReportingReview(null);
   };
 
-  const ratingDistribution = React.useMemo(() => {
-    const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-    reviews.forEach((r) => {
-      if (r.rating >= 1 && r.rating <= 5) {
-        dist[r.rating as keyof typeof dist]++;
-      }
-    });
-    return dist;
-  }, [reviews]);
+  const ratingDistribution = React.useMemo(
+    () => computeRatingDistribution(reviews),
+    [reviews],
+  );
 
   const sortedReviews = React.useMemo(() => {
     let list = [...reviews];
@@ -811,38 +810,12 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                {reviews.length > 0 && (
-                  <div className="mb-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row gap-8 items-center">
-                    <div className="text-center md:text-left">
-                      <div className="text-5xl font-black mb-1">{actualRating}</div>
-                      <div className="flex items-center justify-center md:justify-start gap-1 mb-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} className={`w-4 h-4 ${star <= actualRating ? 'text-yellow-500 fill-yellow-500' : 'text-zinc-300 dark:text-zinc-700'}`} />
-                        ))}
-                      </div>
-                      <div className="text-sm text-zinc-500 dark:text-zinc-400">{reviews.length} total reviews</div>
-                    </div>
-                    <div className="flex-1 w-full max-w-sm space-y-2">
-                      {[5, 4, 3, 2, 1].map((star) => {
-                        const count = ratingDistribution[star as keyof typeof ratingDistribution];
-                        const percentage = reviews.length > 0 ? Math.round((count / reviews.length) * 100) : 0;
-                        return (
-                          <div key={star} className="flex items-center gap-3 text-sm">
-                            <div className="w-12 text-zinc-500 dark:text-zinc-400 font-medium flex items-center gap-1">
-                              {star} <Star className="w-3 h-3" />
-                            </div>
-                            <div className="flex-1 h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                              <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${percentage}%` }} />
-                            </div>
-                            <div className="w-10 text-right text-zinc-500 dark:text-zinc-400">
-                              {percentage}%
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <RatingDistributionSummary
+                  distribution={ratingDistribution}
+                  totalReviews={reviews.length}
+                  averageRating={actualRating}
+                  className="mb-8"
+                />
 
                 {isOwner && (
                   <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 text-sm flex items-start gap-3">

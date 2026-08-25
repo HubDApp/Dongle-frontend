@@ -1,7 +1,12 @@
 "use client";
-import { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
+import {
+  ProjectReport,
+  ProjectClaimRequest,
+  ProjectModerationAction,
+  ProjectSubmission,
+} from "@/types/project";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletStatePanel, {
@@ -10,29 +15,34 @@ import WalletStatePanel, {
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
-import { AlertCircle, Flag, Shield, CheckCircle, XCircle, Clock, MessageSquare, ScrollText, User, UserMinus } from "lucide-react";
+import {
+  AlertCircle,
+  Flag,
+  Shield,
+  CheckCircle,
+  XCircle,
+  Clock,
+  MessageSquare,
+  ScrollText,
+  User,
+  UserMinus,
+  Package,
+} from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
+import { projectSubmissionService } from "@/services/project/project-submission.service";
 import { projectService } from "@/services/project/project.service";
 import { reviewService } from "@/services/review/review.service";
 import { auditLogService } from "@/services/audit/audit-log.service";
-import { verificationService } from "@/services/stellar/verification.service";
+import {
+  verificationService,
+  type VerificationRequest,
+} from "@/services/stellar/verification.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
-import { ProjectReport, ProjectClaimRequest, ProjectModerationAction } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
-
-type RequestStatus = "pending" | "approved" | "rejected" | "archived";
-
-interface VerificationRequest {
-  id: string;
-  projectName: string;
-  submittedBy: string;
-  status: RequestStatus;
-  timestamp: string;
-}
 
 type BulkAction = "approve" | "reject" | "archive" | "assign";
 
@@ -42,20 +52,21 @@ interface BulkActionResult {
   failed: { id: string; reason: string }[];
 }
 
-const MOCK_REQUESTS: VerificationRequest[] = [
-  { id: "req_1", projectName: "Lumina DEX", submittedBy: "GABC...1234", status: "pending", timestamp: "2024-03-20T10:00:00Z" },
-  { id: "req_2", projectName: "Stellar Stake", submittedBy: "GDEF...5678", status: "pending", timestamp: "2024-03-21T14:30:00Z" },
-  { id: "req_3", projectName: "Orbit NFT", submittedBy: "GHIJ...9012", status: "approved", timestamp: "2024-03-19T09:15:00Z" },
-];
-
 const ADMIN_PURPOSE =
   "Connect an authorized admin Freighter wallet to manage verification requests, review reports, and system settings.";
 
-const STATUS_STYLES: Record<RequestStatus, string> = {
+const VERIFICATION_STATUS_STYLES: Record<VerificationRequest["status"], string> = {
+  PENDING: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500",
+  VERIFIED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500",
+  REJECTED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500",
+  NONE: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400",
+};
+
+const SUBMISSION_STATUS_STYLES: Record<ProjectSubmission["status"], string> = {
   pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500",
   approved: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500",
   rejected: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500",
-  archived: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/50 dark:text-zinc-400",
+  flagged: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-500",
 };
 
 const BULK_ACTION_CONFIG: Record<BulkAction, { label: string; icon: React.ReactNode; confirmTitle: string; confirmDescription: (count: number) => string }> = {
@@ -132,9 +143,18 @@ function reportBulkActionResult(result: BulkActionResult) {
 export default function AdminDashboard() {
   const { isAdmin, isAdminChecking, gate } = useAdminAccess();
   const confirm = useConfirm();
-  const [requests, setRequests] = useState<VerificationRequest[]>(MOCK_REQUESTS);
+  const [requests, setRequests] = useState<VerificationRequest[]>([]);
+  const [submissions, setSubmissions] = useState<ProjectSubmission[]>([]);
+  const [verificationStats, setVerificationStats] = useState({
+    total: 0,
+    pending: 0,
+    verified: 0,
+    rejected: 0,
+  });
   const [fee, setFee] = useState(1.5);
-  const [activeTab, setActiveTab] = useState<"verification" | "reports" | "audit-log">("verification");
+  const [activeTab, setActiveTab] = useState<
+    "verification" | "submissions" | "reports" | "audit-log"
+  >("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
@@ -148,10 +168,24 @@ export default function AdminDashboard() {
   const [claimReason, setClaimReason] = useState<Record<string, string>>({});
   const [projectReportReason, setProjectReportReason] = useState<Record<string, string>>({});
   const [expandedReport, setExpandedReport] = useState<string | null>(null);
+  const [submissionReason, setSubmissionReason] = useState<Record<string, string>>({});
   const [verificationFilter, setVerificationFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
   const [reportFilter, setReportFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
 
-  // Load reports, reviews, and moderation log
+  const reloadVerificationRequests = useCallback(async () => {
+    const [allRequests, stats] = await Promise.all([
+      verificationService.getAllRequests(),
+      verificationService.getStats(),
+    ]);
+    setRequests(allRequests);
+    setVerificationStats(stats);
+  }, []);
+
+  const reloadSubmissions = useCallback(() => {
+    setSubmissions(projectSubmissionService.getAllSubmissions());
+  }, []);
+
+  // Load reports, reviews, verification requests, and moderation log
   useEffect(() => {
     if (!isAdmin) return;
     const id = setTimeout(() => {
@@ -161,20 +195,35 @@ export default function AdminDashboard() {
       setClaimRequests(projectClaimService.getRequests());
       setModerationLog(reviewReportService.getModerationLog());
       setProjectModerationLog(projectReportService.getModerationLog());
+      void reloadVerificationRequests();
+      reloadSubmissions();
     }, 0);
     return () => clearTimeout(id);
-  }, [isAdmin]);
+  }, [isAdmin, reloadVerificationRequests, reloadSubmissions]);
 
-  const handleAction = (id: string, status: "approved" | "rejected", reason?: string) => {
-    const req = requests.find((r) => r.id === id);
+  const handleAction = async (
+    projectId: string,
+    status: "approved" | "rejected",
+    reason?: string,
+  ) => {
+    const req = requests.find((r) => r.projectId === projectId);
     if (!reason?.trim() && status === "rejected") {
       toast.error("A reason is required for rejection");
       return;
     }
-    setRequests((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status } : r)),
-    );
-    if (req && gate.publicKey) {
+    if (!gate.publicKey || !req) return;
+
+    try {
+      if (status === "approved") {
+        await verificationService.approveRequest(projectId, gate.publicKey);
+      } else {
+        await verificationService.rejectRequest(
+          projectId,
+          gate.publicKey,
+          reason?.trim(),
+        );
+      }
+
       auditLogService.append({
         actor: gate.publicKey,
         action: status === "approved" ? "verification_approved" : "verification_rejected",
@@ -182,9 +231,50 @@ export default function AdminDashboard() {
         targetLabel: req.projectName,
         reason: reason?.trim() || undefined,
       });
+
+      await reloadVerificationRequests();
+      toast.success(`Verification ${status === "approved" ? "approved" : "rejected"}`);
+      setVerificationReason((prev) => ({ ...prev, [projectId]: "" }));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update verification request",
+      );
     }
-    toast.success(`Verification ${status === "approved" ? "approved" : "rejected"}`);
-    setVerificationReason((prev) => ({ ...prev, [id]: "" }));
+  };
+
+  const handleSubmissionAction = (
+    projectId: string,
+    status: "approved" | "rejected" | "flagged",
+    reason?: string,
+  ) => {
+    if ((status === "rejected" || status === "flagged") && !reason?.trim()) {
+      toast.error("A reason is required");
+      return;
+    }
+    if (!gate.publicKey) return;
+
+    const result = projectSubmissionService.updateStatus(
+      projectId,
+      status,
+      gate.publicKey,
+      reason?.trim(),
+    );
+
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "submission_moderated",
+        targetId: projectId,
+        targetLabel: result.submission?.projectName ?? projectId,
+        reason: reason?.trim() || `Marked as ${status}`,
+        metadata: { status },
+      });
+      reloadSubmissions();
+      toast.success(`Submission ${status}`);
+      setSubmissionReason((prev) => ({ ...prev, [projectId]: "" }));
+    } else {
+      toast.error(result.error || "Failed to update submission");
+    }
   };
 
   const toggleSelection = useCallback((id: string) => {
@@ -384,43 +474,39 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAssignVerification = async (requestId: string, assignedTo: string) => {
+  const handleAssignVerification = async (projectId: string, assignedTo: string) => {
     if (!gate.publicKey) return;
 
     try {
-      await verificationService.assignRequest(requestId, gate.publicKey, assignedTo);
+      await verificationService.assignRequest(projectId, gate.publicKey, assignedTo);
       auditLogService.append({
         actor: gate.publicKey,
         action: "verification_assigned",
-        targetId: requestId,
-        targetLabel: `Verification Request ${requestId}`,
+        targetId: projectId,
+        targetLabel: `Verification Request ${projectId}`,
         metadata: { assignedTo },
       });
       toast.success("Request assigned");
-      setRequests((prev) => prev.map((r: any) => 
-        r.id === requestId ? { ...r, assignedTo, assignedAt: new Date().toISOString() } : r
-      ));
-    } catch (error) {
+      await reloadVerificationRequests();
+    } catch {
       toast.error("Failed to assign request");
     }
   };
 
-  const handleUnassignVerification = async (requestId: string) => {
+  const handleUnassignVerification = async (projectId: string) => {
     if (!gate.publicKey) return;
 
     try {
-      await verificationService.unassignRequest(requestId, gate.publicKey);
+      await verificationService.unassignRequest(projectId, gate.publicKey);
       auditLogService.append({
         actor: gate.publicKey,
         action: "verification_unassigned",
-        targetId: requestId,
-        targetLabel: `Verification Request ${requestId}`,
+        targetId: projectId,
+        targetLabel: `Verification Request ${projectId}`,
       });
       toast.success("Request unassigned");
-      setRequests((prev) => prev.map((r: any) => 
-        r.id === requestId ? { ...r, assignedTo: undefined, assignedAt: undefined } : r
-      ));
-    } catch (error) {
+      await reloadVerificationRequests();
+    } catch {
       toast.error("Failed to unassign request");
     }
   };
@@ -470,6 +556,9 @@ export default function AdminDashboard() {
     return moderationLog.filter((a) => a.reportId === reportId);
   };
 
+  const pendingSubmissions = submissions.filter(
+    (s) => s.status === "pending" || s.status === "flagged",
+  );
   const pendingReports = reports.filter((r) => r.status === "pending");
   const resolvedReports = reports.filter((r) => r.status !== "pending");
   const pendingProjectReports = projectReports.filter((report) => report.status === "pending");
@@ -544,6 +633,25 @@ export default function AdminDashboard() {
           >
             Verification Requests
             {activeTab === "verification" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("submissions")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "submissions"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Submissions
+            {pendingSubmissions.length > 0 && (
+              <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                {pendingSubmissions.length}
+              </span>
+            )}
+            {activeTab === "submissions" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -626,34 +734,29 @@ export default function AdminDashboard() {
 
               <div className="space-y-4">
                 {requests
-                  .filter((req: any) => {
+                  .filter((req) => {
                     if (verificationFilter === "all") return true;
                     if (verificationFilter === "assigned-to-me") return req.assignedTo === gate.publicKey;
                     if (verificationFilter === "unassigned") return !req.assignedTo;
                     return true;
                   })
-                  .map((req: any) => (
+                  .map((req) => (
                   <div
                     key={req.id}
                     className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all hover:shadow-lg"
                   >
                     <div className="flex-1">
                       <h3 className="font-bold text-lg mb-1">{req.projectName}</h3>
+                      <p className="text-xs text-zinc-400 font-mono mb-1">{req.projectId}</p>
                       <div className="text-xs text-zinc-500 font-mono flex items-center gap-1.5 flex-wrap">
                         <span>Submitted by:</span>
                         <AddressDisplay address={req.submittedBy} copyable={true} truncated={true} inline={true} />
                         <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                        <span>{formatDate(req.timestamp, "short")}</span>
+                        <span>{formatDate(req.submittedAt, "short")}</span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <span
-                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
-                            req.status === "pending"
-                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500"
-                              : req.status === "approved"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500"
-                                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500"
-                          }`}
+                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${VERIFICATION_STATUS_STYLES[req.status]}`}
                         >
                           {req.status}
                         </span>
@@ -669,7 +772,7 @@ export default function AdminDashboard() {
                       {req.assignedTo ? (
                         req.assignedTo === gate.publicKey ? (
                           <button
-                            onClick={() => handleUnassignVerification(req.id)}
+                            onClick={() => handleUnassignVerification(req.projectId)}
                             className="flex-1 md:flex-none px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
                           >
                             <UserMinus className="w-4 h-4" />
@@ -677,7 +780,7 @@ export default function AdminDashboard() {
                           </button>
                         ) : (
                           <button
-                            onClick={() => handleAssignVerification(req.id, gate.publicKey!)}
+                            onClick={() => handleAssignVerification(req.projectId, gate.publicKey!)}
                             className="flex-1 md:flex-none px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
                           >
                             <User className="w-4 h-4" />
@@ -686,23 +789,26 @@ export default function AdminDashboard() {
                         )
                       ) : (
                         <button
-                          onClick={() => handleAssignVerification(req.id, gate.publicKey!)}
+                          onClick={() => handleAssignVerification(req.projectId, gate.publicKey!)}
                           className="flex-1 md:flex-none px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
                         >
                           <User className="w-4 h-4" />
                           Assign to me
                         </button>
                       )}
-                      {req.status === "pending" && (
+                      {req.status === "PENDING" && (
                         <>
                           <button
-                            onClick={() => handleAction(req.id, "approved")}
+                            onClick={() => handleAction(req.projectId, "approved")}
                             className="flex-1 md:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors"
                           >
                             Approve
                           </button>
                           <button
-                            onClick={() => handleAction(req.id, "rejected")}
+                            onClick={() => {
+                              const reason = verificationReason[req.projectId];
+                              handleAction(req.projectId, "rejected", reason);
+                            }}
                             className="flex-1 md:flex-none px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all"
                           >
                             Reject
@@ -751,12 +857,12 @@ export default function AdminDashboard() {
                 <h3 className="font-bold mb-4">Stats Overview</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl">
-                    <div className="text-xs text-zinc-500 uppercase font-bold mb-1">Active</div>
-                    <div className="text-2xl font-black">24</div>
+                    <div className="text-xs text-zinc-500 uppercase font-bold mb-1">Verified</div>
+                    <div className="text-2xl font-black">{verificationStats.verified}</div>
                   </div>
                   <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl">
                     <div className="text-xs text-zinc-500 uppercase font-bold mb-1">Queue</div>
-                    <div className="text-2xl font-black">12</div>
+                    <div className="text-2xl font-black">{verificationStats.pending}</div>
                   </div>
                 </div>
               </div>
@@ -805,6 +911,128 @@ export default function AdminDashboard() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        )}
+
+        {activeTab === "submissions" && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <span className="w-2 h-8 bg-orange-500 rounded-full" />
+                Project Submission Moderation
+                {pendingSubmissions.length > 0 && (
+                  <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                    ({pendingSubmissions.length} in queue)
+                  </span>
+                )}
+              </h2>
+            </div>
+
+            {submissions.length === 0 ? (
+              <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
+                <Package className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                <p className="text-zinc-500">No project submissions to review yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {submissions.map((submission) => (
+                  <div
+                    key={submission.id}
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl"
+                  >
+                    <div className="flex flex-col md:flex-row justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg mb-1">{submission.projectName}</h3>
+                        <p className="text-xs text-zinc-400 font-mono mb-2">{submission.projectId}</p>
+                        <div className="text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap mb-3">
+                          <span>Submitted by:</span>
+                          <AddressDisplay
+                            address={submission.submittedBy}
+                            copyable={true}
+                            truncated={true}
+                            inline={true}
+                          />
+                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                          <span>{formatDate(submission.submittedAt, "short")}</span>
+                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                          <span>Quality: {submission.qualityScore}%</span>
+                        </div>
+                        <span
+                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${SUBMISSION_STATUS_STYLES[submission.status]}`}
+                        >
+                          {submission.status}
+                        </span>
+                        {submission.flagReasons.length > 0 && (
+                          <ul className="mt-3 text-xs text-orange-600 dark:text-orange-400 space-y-1">
+                            {submission.flagReasons.map((flag) => (
+                              <li key={flag}>• {flag}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {submission.rejectionReason && (
+                          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                            Reason: {submission.rejectionReason}
+                          </p>
+                        )}
+                      </div>
+
+                      {(submission.status === "pending" || submission.status === "flagged") && (
+                        <div className="flex flex-col gap-2 w-full md:w-64">
+                          <input
+                            type="text"
+                            placeholder="Reason (required for reject/flag)"
+                            value={submissionReason[submission.projectId] || ""}
+                            onChange={(e) =>
+                              setSubmissionReason((prev) => ({
+                                ...prev,
+                                [submission.projectId]: e.target.value,
+                              }))
+                            }
+                            className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() =>
+                                handleSubmissionAction(submission.projectId, "approved")
+                              }
+                              className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleSubmissionAction(
+                                  submission.projectId,
+                                  "rejected",
+                                  submissionReason[submission.projectId],
+                                )
+                              }
+                              className="flex-1 px-3 py-2 bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold"
+                            >
+                              Reject
+                            </button>
+                            {submission.status !== "flagged" && (
+                              <button
+                                onClick={() =>
+                                  handleSubmissionAction(
+                                    submission.projectId,
+                                    "flagged",
+                                    submissionReason[submission.projectId],
+                                  )
+                                }
+                                className="flex-1 px-3 py-2 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white rounded-xl text-sm font-bold"
+                              >
+                                Flag
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

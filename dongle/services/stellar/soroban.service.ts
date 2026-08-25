@@ -310,20 +310,64 @@ export const sorobanService = {
     projectId: string,
     signal?: AbortSignal,
   ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
     try {
       const { verificationService } = await import("./verification.service");
       const status = await verificationService.getVerificationStatus(projectId);
+
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
       console.log(
         `[SorobanService] Verification status for ${projectId}: ${status}`,
       );
       return status;
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
       console.error(
         "[SorobanService] Error getting verification status:",
         error,
       );
       return "NONE";
     }
+  },
+
+  /**
+   * Returns verification status with project/request context for UI distinction.
+   */
+  async getVerificationRequestStatus(
+    projectId: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    projectExists: boolean;
+    requestExists: boolean;
+    status: "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
+    rejectionReason?: string;
+  }> {
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    const { verificationService } = await import("./verification.service");
+    const result = await verificationService.getRequestStatus(projectId);
+
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    const status = result.request?.status ?? "NONE";
+    return {
+      projectExists: result.projectExists,
+      requestExists: result.requestExists,
+      status,
+      rejectionReason: result.request?.rejectionReason,
+    };
   },
 
   /**
