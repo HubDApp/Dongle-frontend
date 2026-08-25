@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { UPDATE_TYPES, UpdateType, ProjectUpdate } from "@/types/update";
 import { X } from "lucide-react";
@@ -30,6 +30,10 @@ export default function UpdateForm({
   const [content, setContent] = useState(initialUpdate?.content || "");
   const [version, setVersion] = useState(initialUpdate?.version || "");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const updateTypeId = useId();
+  const versionId = useId();
+  const titleId = useId();
+  const contentId = useId();
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -84,10 +88,11 @@ export default function UpdateForm({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label htmlFor={updateTypeId} className="block text-sm font-medium mb-2">
             Update Type
           </label>
           <select
+            id={updateTypeId}
             value={type}
             onChange={(e) => setType(e.target.value as UpdateType)}
             className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
@@ -102,10 +107,11 @@ export default function UpdateForm({
 
         {type === UPDATE_TYPES.RELEASE && (
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label htmlFor={versionId} className="block text-sm font-medium mb-2">
               Version <span className="text-red-500">*</span>
             </label>
             <input
+              id={versionId}
               type="text"
               value={version}
               onChange={(e) => setVersion(e.target.value)}
@@ -123,10 +129,11 @@ export default function UpdateForm({
         )}
 
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label htmlFor={titleId} className="block text-sm font-medium mb-2">
             Title <span className="text-red-500">*</span>
           </label>
           <input
+            id={titleId}
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -149,10 +156,11 @@ export default function UpdateForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">
+          <label htmlFor={contentId} className="block text-sm font-medium mb-2">
             Content <span className="text-red-500">*</span>
           </label>
           <textarea
+            id={contentId}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Describe your update in detail..."

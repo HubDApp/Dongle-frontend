@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef } from "react";
 import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react";
 import { MappedError } from "@/lib/error-mapper";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ErrorDisplayProps {
   error: MappedError;
@@ -47,6 +49,10 @@ export default function ErrorDisplay({
 
   const Icon = icons[severity];
   const colorScheme = colors[severity];
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useModalFocusTrap(variant === "modal", dialogRef, closeButtonRef, onClose);
 
   if (variant === "inline") {
     return (
@@ -120,10 +126,16 @@ export default function ErrorDisplay({
   if (variant === "modal") {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-md w-full border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="error-dialog-title"
+          className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-md w-full border border-zinc-200 dark:border-zinc-800 overflow-hidden"
+        >
           <div className={`flex items-center gap-3 px-6 py-4 border-b ${colorScheme.bg} ${colorScheme.border}`}>
             <Icon className={`w-6 h-6 shrink-0 ${colorScheme.icon}`} />
-            <h3 className={`font-bold text-lg ${colorScheme.text}`}>
+            <h3 id="error-dialog-title" className={`font-bold text-lg ${colorScheme.text}`}>
               {severity === "error" ? "Error" : severity === "warning" ? "Warning" : "Information"}
             </h3>
           </div>
@@ -150,6 +162,7 @@ export default function ErrorDisplay({
           </div>
           <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-800/50 flex justify-end border-t border-zinc-200 dark:border-zinc-800">
             <button
+              ref={closeButtonRef}
               onClick={onClose}
               className="px-4 py-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-xl font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
             >
