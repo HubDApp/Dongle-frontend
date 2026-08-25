@@ -1,61 +1,150 @@
 /**
- * Draft Indicator Component
- * Shows draft status, last saved time, and allows discarding drafts
+ * DraftIndicator component
+ *
+ * Shows the current draft-save status:
+ *   • "Saving…"  – animated spinner while auto-save is in progress
+ *   • "Saved"    – green check with relative timestamp after a successful save
+ *   • Error hint – amber warning when save failed (fell back to localStorage)
+ *
+ * Also provides the "Discard Draft" action.
  */
 
-import React from "react";
-import { Save, Clock, Trash2 } from "lucide-react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Save, CheckCircle2, Clock, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface DraftIndicatorProps {
   hasDraft: boolean;
   lastSaved: string | null;
+  isSaving?: boolean;
+  saveError?: string | null;
   onDiscard: () => void;
+}
+
+function formatLastSaved(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffMs / 60_000);
+
+  if (diffSecs < 10) return "just now";
+  if (diffMins < 1) return `${diffSecs}s ago`;
+  if (diffMins < 60) return `${diffMins}m ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
 }
 
 export function DraftIndicator({
   hasDraft,
   lastSaved,
+  isSaving = false,
+  saveError = null,
   onDiscard,
 }: DraftIndicatorProps) {
-  if (!hasDraft || !lastSaved) return null;
+  // Tick every 30 s so the relative timestamp stays fresh
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
-  const formatLastSaved = (isoString: string): string => {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+  // Nothing to show when no draft exists and we are not currently saving
+  if (!hasDraft && !isSaving) return null;
 
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
-  };
-
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
-      <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
-        <Save className="w-4 h-4" />
-        <span className="font-medium">Draft saved</span>
-        <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-          <Clock className="w-3.5 h-3.5" />
-          <span>{formatLastSaved(lastSaved)}</span>
+  // ── Saving state ──────────────────────────────────────────────────────────
+  if (isSaving) {
+    return (
+      <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
+        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          <span className="font-medium">Saving…</span>
         </div>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onDiscard}
-        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-        leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-      >
-        Discard Draft
-      </Button>
-    </div>
-  );
+    );
+  }
+
+  // ── Error state (fell back to localStorage) ───────────────────────────────
+  if (saveError) {
+    return (
+      <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
+        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="w-4 h-4" />
+          <span className="font-medium">Saved locally</span>
+          {lastSaved && (
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {formatLastSaved(lastSaved)}
+            </span>
+          )}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onDiscard}
+          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+        >
+          Discard
+        </Button>
+      </div>
+    );
+  }
+
+  // ── Saved state ───────────────────────────────────────────────────────────
+  if (hasDraft && lastSaved) {
+    return (
+      <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm">
+        <div className="flex items-center gap-3 text-green-600 dark:text-green-400">
+          <CheckCircle2 className="w-4 h-4" />
+          <span className="font-medium">Saved</span>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{formatLastSaved(lastSaved)}</span>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onDiscard}
+          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+        >
+          Discard Draft
+        </Button>
+      </div>
+    );
+  }
+
+  // Draft exists but no timestamp yet (edge case)
+  if (hasDraft) {
+    return (
+      <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
+        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+          <Save className="w-4 h-4" />
+          <span className="font-medium">Draft saved</span>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onDiscard}
+          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+        >
+          Discard Draft
+        </Button>
+      </div>
+    );
+  }
+
+  return null;
 }
