@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+// Bundle analyzer setup
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const nextConfig: NextConfig = {
   // Strict mode catches potential issues early
   reactStrictMode: true,
@@ -53,4 +58,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

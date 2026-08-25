@@ -79,9 +79,16 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
 
   // ── Initialize BroadcastChannel ──────────────────────────────────────────
   useEffect(() => {
-    if (typeof window === "undefined" || !("BroadcastChannel" in window)) {
-      return;
-    }
+    const existing = draftService.getDraftForProject(mode, projectId);
+    if (!existing) return;
+    // Schedule state updates as a microtask to avoid synchronous setState-in-effect.
+    const id = setTimeout(() => {
+      setHasDraft(true);
+      setLoadedDraft(existing.data);
+      setLastSaved(existing.lastSaved);
+    }, 0);
+    return () => clearTimeout(id);
+  }, [mode, projectId]);
 
     const channel = new BroadcastChannel(CHANNEL_NAME);
     channelRef.current = channel;

@@ -34,7 +34,7 @@ describe("useProjectFilters", () => {
     act(() => {
       result.current.setCategory("DeFi / DEX");
     });
-    const categories = result.current.filtered.map((p) => p.category);
+    const categories = result.current.filtered.map((p) => p.primaryCategory);
     expect(categories.every((c) => c === "DeFi / DEX")).toBe(true);
   });
 
@@ -44,7 +44,7 @@ describe("useProjectFilters", () => {
       result.current.setCategory("DAO");
     });
     // DAO projects exist in our data — just verify it filters correctly
-    const daoProjects = projects.filter((p) => p.category === "DAO");
+    const daoProjects = projects.filter((p) => p.primaryCategory === "DAO");
     expect(result.current.filtered.length).toBe(daoProjects.length);
   });
 

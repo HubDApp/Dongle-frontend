@@ -6,7 +6,6 @@ export const projects: Project[] = [
   {
     id: "soroban-swap",
     name: "Soroban Swap",
-    category: PROJECT_CATEGORIES.DEFI,
     primaryCategory: PROJECT_CATEGORIES.DEFI,
     tags: ["DEX", "AMM"],
     description: "Next-generation automated market maker on Soroban.",
@@ -20,7 +19,6 @@ export const projects: Project[] = [
   {
     id: "stellar-guardians",
     name: "Stellar Guardians",
-    category: PROJECT_CATEGORIES.GAMING,
     primaryCategory: PROJECT_CATEGORIES.GAMING,
     tags: ["Strategy", "P2E"],
     description: "A decentralized strategy game with on-chain assets.",
@@ -33,7 +31,6 @@ export const projects: Project[] = [
   {
     id: "anchor-connect",
     name: "Anchor Connect",
-    category: PROJECT_CATEGORIES.INFRASTRUCTURE,
     primaryCategory: PROJECT_CATEGORIES.INFRASTRUCTURE,
     tags: ["On-ramp", "SDK"],
     description: "Seamless on/off ramp protocol for Stellar anchors.",
@@ -47,7 +44,6 @@ export const projects: Project[] = [
   {
     id: "xlm-pay",
     name: "XLM Pay",
-    category: PROJECT_CATEGORIES.PAYMENTS,
     primaryCategory: PROJECT_CATEGORIES.PAYMENTS,
     tags: ["Payments", "Cross-border"],
     description: "Instant cross-border payments powered by Stellar.",
@@ -59,7 +55,6 @@ export const projects: Project[] = [
   {
     id: "stellar-dao",
     name: "Stellar DAO",
-    category: PROJECT_CATEGORIES.DAO,
     primaryCategory: PROJECT_CATEGORIES.DAO,
     tags: ["Governance", "Treasury"],
     description: "On-chain governance and treasury management for Stellar communities.",
@@ -72,7 +67,6 @@ export const projects: Project[] = [
   {
     id: "nft-forge",
     name: "NFT Forge",
-    category: PROJECT_CATEGORIES.GAMING,
     primaryCategory: PROJECT_CATEGORIES.GAMING,
     tags: ["NFT", "Marketplace"],
     description: "Mint, trade, and showcase NFTs on the Stellar network.",

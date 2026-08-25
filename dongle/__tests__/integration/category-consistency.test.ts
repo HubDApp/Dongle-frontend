@@ -230,4 +230,69 @@ describe("Category System Consistency", () => {
       expect(validCategories).not.toContain("All");
     });
   });
+
+  describe("Project interface has no ambiguous category field", () => {
+    it("every project only uses primaryCategory, never a raw form value", () => {
+      const formValues = Object.keys(CATEGORY_FORM_MAP);
+      const allProjects = projectService.getAllProjects();
+
+      for (const project of allProjects) {
+        // primaryCategory must be a canonical display label, not a form value
+        expect(
+          formValues,
+          `Project ${project.id} primaryCategory "${project.primaryCategory}" is a form value, not a display label`,
+        ).not.toContain(project.primaryCategory);
+
+        // must be a recognised category
+        expect(
+          isValidCategory(project.primaryCategory),
+          `Project ${project.id} has unrecognised primaryCategory: "${project.primaryCategory}"`,
+        ).toBe(true);
+      }
+    });
+
+    it("ProjectData returned from soroban.service uses canonical category values", () => {
+      // CATEGORY_DISPLAY_TO_FORM maps display→form; ProjectData.category should
+      // never be a key in CATEGORY_FORM_MAP (those are the form/raw values).
+      const formValues = Object.keys(CATEGORY_FORM_MAP);
+      const canonicalValues = Object.values(PROJECT_CATEGORIES);
+
+      for (const canonical of canonicalValues) {
+        // Every canonical value must NOT appear in the form-value keys list
+        expect(formValues).not.toContain(canonical);
+        // And must pass isValidCategory
+        expect(isValidCategory(canonical)).toBe(true);
+      }
+    });
+  });
+
+  describe("Form default values map correctly to display labels", () => {
+    it("each CATEGORY_FORM_OPTIONS value round-trips to its label via CATEGORY_FORM_MAP", () => {
+      for (const option of CATEGORY_FORM_OPTIONS) {
+        const displayLabel = CATEGORY_FORM_MAP[option.value];
+        expect(displayLabel).toBe(option.label);
+        expect(isValidCategory(displayLabel)).toBe(true);
+      }
+    });
+
+    it("CATEGORY_DISPLAY_TO_FORM converts display labels back to the primary form value", () => {
+      for (const option of CATEGORY_FORM_OPTIONS) {
+        const displayLabel = CATEGORY_FORM_MAP[option.value];
+        const backToForm = CATEGORY_DISPLAY_TO_FORM[displayLabel];
+        // The reverse mapping must produce a value that maps back to the same label
+        expect(CATEGORY_FORM_MAP[backToForm]).toBe(displayLabel);
+      }
+    });
+
+    it("normalizeCategory converts form values to display labels used in project data", () => {
+      for (const option of CATEGORY_FORM_OPTIONS) {
+        const normalized = normalizeCategory(option.value);
+        // The normalised value must match the canonical display label
+        expect(normalized).toBe(option.label);
+        // And must be usable as a filter key in projectService
+        const filtered = projectService.getProjectsByCategory(normalized!);
+        expect(filtered.every((p) => p.primaryCategory === normalized)).toBe(true);
+      }
+    });
+  });
 });

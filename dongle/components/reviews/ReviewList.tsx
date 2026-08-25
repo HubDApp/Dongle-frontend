@@ -3,16 +3,19 @@
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
-import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 
 interface ReviewListProps {
   reviews: Review[];
   currentUserAddress: string | null;
   onEdit: (review: Review) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onVoteHelpful?: (id: string) => void;
   onVoteUnhelpful?: (id: string) => void;
+  onReport?: (review: Review) => void;
+  emptyMessage?: string;
+  emptyTitle?: string;
 }
 
 export default function ReviewList({ 
@@ -21,12 +24,16 @@ export default function ReviewList({
   onEdit, 
   onDelete,
   onVoteHelpful,
-  onVoteUnhelpful
+  onVoteUnhelpful,
+  onReport,
+  emptyMessage,
+  emptyTitle
 }: ReviewListProps) {
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
-        <p className="text-zinc-500">No reviews yet. Be the first to leave one!</p>
+      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
+        {emptyTitle && <p className="text-base font-bold text-zinc-700 dark:text-zinc-300 mb-1">{emptyTitle}</p>}
+        <p className="text-zinc-500">{emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
       </div>
     );
   }
@@ -100,26 +107,39 @@ export default function ReviewList({
               </div>
             </div>
             
-            {currentUserAddress === review.userAddress && (
-              <div className="flex gap-2">
-                <IconButton
-                  onClick={() => onEdit(review)}
-                  aria-label="Edit review"
-                  variant="default"
-                  size="sm"
-                >
-                  <Pencil className="w-4 h-4" />
-                </IconButton>
-                <IconButton
-                  onClick={() => onDelete(review.id)}
-                  aria-label="Delete review"
-                  variant="error"
-                  size="sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </IconButton>
-              </div>
-            )}
+            <div className="flex gap-2">
+              {currentUserAddress === review.userAddress ? (
+                <>
+                  <IconButton
+                    onClick={() => onEdit(review)}
+                    aria-label="Edit review"
+                    variant="default"
+                    size="sm"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </IconButton>
+                  <IconButton
+                    onClick={() => onDelete(review.id)}
+                    aria-label="Delete review"
+                    variant="error"
+                    size="sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </IconButton>
+                </>
+              ) : (
+                currentUserAddress && onReport && (
+                  <IconButton
+                    onClick={() => onReport(review)}
+                    aria-label="Report review"
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <Flag className="w-4 h-4 text-zinc-400 hover:text-red-500" />
+                  </IconButton>
+                )
+              )}
+            </div>
           </div>
         </div>
       ))}

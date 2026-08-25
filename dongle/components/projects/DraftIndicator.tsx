@@ -14,6 +14,7 @@
 import React, { useEffect, useState } from "react";
 import { Save, CheckCircle2, Clock, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { formatDate } from "@/lib/date";
 
 interface DraftIndicatorProps {
   hasDraft: boolean;
@@ -48,67 +49,16 @@ export function DraftIndicator({
   saveError = null,
   onDiscard,
 }: DraftIndicatorProps) {
-  // Tick every 30 s so the relative timestamp stays fresh
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 30_000);
-    return () => clearInterval(id);
-  }, []);
+  if (!hasDraft || !lastSaved) return null;
 
-  // Nothing to show when no draft exists and we are not currently saving
-  if (!hasDraft && !isSaving) return null;
-
-  // ── Saving state ──────────────────────────────────────────────────────────
-  if (isSaving) {
-    return (
-      <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
-        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span className="font-medium">Saving…</span>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Error state (fell back to localStorage) ───────────────────────────────
-  if (saveError) {
-    return (
-      <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
-        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="w-4 h-4" />
-          <span className="font-medium">Saved locally</span>
-          {lastSaved && (
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {formatLastSaved(lastSaved)}
-            </span>
-          )}
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onDiscard}
-          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-        >
-          Discard
-        </Button>
-      </div>
-    );
-  }
-
-  // ── Saved state ───────────────────────────────────────────────────────────
-  if (hasDraft && lastSaved) {
-    return (
-      <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm">
-        <div className="flex items-center gap-3 text-green-600 dark:text-green-400">
-          <CheckCircle2 className="w-4 h-4" />
-          <span className="font-medium">Saved</span>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            <Clock className="w-3.5 h-3.5" />
-            <span>{formatLastSaved(lastSaved)}</span>
-          </div>
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
+      <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
+        <Save className="w-4 h-4" />
+        <span className="font-medium">Draft saved</span>
+        <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <Clock className="w-3.5 h-3.5" />
+          <span>{formatDate(lastSaved, "relative")}</span>
         </div>
         <Button
           type="button"

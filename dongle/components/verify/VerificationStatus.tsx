@@ -19,20 +19,23 @@ export default function VerificationStatus({ initialProjectId }: VerificationSta
   const [searchInput, setSearchInput] = useState(initialProjectId ?? "");
   const [status, setStatus] = useState<Status>("NONE");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isMountedRef = React.useRef(true);
 
   const fetchStatus = async (id: string) => {
     if (!id) return;
     setIsLoading(true);
+    setError(null);
     try {
       const result = await sorobanService.getVerificationStatus(id);
       if (!isMountedRef.current) return;
       setStatus(result);
-    } catch (error) {
+    } catch (err) {
       if (!isMountedRef.current) return;
-      console.error(error);
-      setStatus("NONE");
+      const msg = err instanceof Error ? err.message : "Failed to check verification status";
+      console.error(err);
+      setError(msg);
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
@@ -107,7 +110,25 @@ export default function VerificationStatus({ initialProjectId }: VerificationSta
         </form>
       </Card>
 
-      {projectId && (
+      {projectId && error && (
+        <Card className="transition-all duration-300 border-2 border-red-500/50 bg-red-500/5" padding="lg">
+          <div className="flex flex-col items-center text-center gap-4">
+            <AlertCircle className="w-12 h-12 text-red-500" />
+            <h3 className="text-xl font-bold">Check Failed</h3>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm">{error}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fetchStatus(projectId)}
+              isLoading={isLoading}
+            >
+              Try Again
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {projectId && !error && (
         <Card className={`transition-all duration-300 border-2 ${config.color}`} padding="lg">
           <div className="flex flex-col items-center text-center gap-4">
             {isLoading ? (

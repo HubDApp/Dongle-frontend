@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
-import { reviewService } from "@/services/review/review.service";
+import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
+import { Review } from "@/types/review";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -14,6 +15,7 @@ import WalletStatePanel, {
 } from "@/components/wallet/WalletStatePanel";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
+import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import {
   LogOut,
   Star,
@@ -32,6 +34,8 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useConfirm } from "@/hooks/useConfirm";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { sorobanService } from "@/services/stellar/soroban.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 
 interface StellarNonNativeBalance {
@@ -51,10 +55,8 @@ export default function ProfilePage() {
   const { savedProjectIds } = useSavedProjects();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
-
-  const userReviews = gate.publicKey
-    ? reviewService.getReviewsByUser(gate.publicKey)
-    : [];
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
+  const [savedProjectVerificationStatuses, setSavedProjectVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
 
   const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
   const loadingVerifications =
@@ -62,6 +64,28 @@ export default function ProfilePage() {
   const savedProjects = savedProjectIds
     .map((projectId) => projectService.getProjectById(projectId))
     .filter((project): project is NonNullable<typeof project> => Boolean(project));
+
+  // Fetch verification statuses for saved projects
+  useEffect(() => {
+    if (savedProjects.length === 0) return;
+
+    const fetchStatuses = async () => {
+      const statuses: Record<string, VerificationStatus> = {};
+      await Promise.all(
+        savedProjects.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id);
+            statuses[project.id] = status;
+          } catch {
+            statuses[project.id] = "NONE";
+          }
+        }),
+      );
+      setSavedProjectVerificationStatuses(statuses);
+    };
+
+    void fetchStatuses();
+  }, [savedProjectIds]);
 
   const handleClearHistory = async () => {
     const ok = await confirm({
@@ -107,6 +131,26 @@ export default function ProfilePage() {
     };
   }, [gate.publicKey]);
 
+  useEffect(() => {
+    if (!gate.publicKey) {
+      const id = setTimeout(() => setUserReviews([]), 0);
+      return () => clearTimeout(id);
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const reviews = await reviewService.getReviewsByUser(gate.publicKey!);
+      if (!cancelled) {
+        setUserReviews(reviews);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gate.publicKey]);
+
   if (gate.state !== "ready") {
     return (
       <LayoutWrapper>
@@ -122,6 +166,7 @@ export default function ProfilePage() {
                 publicKey={gate.publicKey}
                 onConnect={gate.connectWallet}
                 onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
               />
             )}
           </div>
@@ -173,6 +218,29 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
+                <div className="mb-8">
+                  <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
+                    Network
+                  </label>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl space-y-2">
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">
+                      Connected to{" "}
+                      <span className="font-semibold font-mono">
+                        {gate.walletNetworkLabel}
+                      </span>
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Dongle requires Stellar{" "}
+                      <span className="font-semibold font-mono">
+                        {EXPECTED_NETWORK_LABEL}
+                      </span>{" "}
+                      (Soroban testnet). Before signing, confirm Freighter is on
+                      this network via Settings → Network. Wrong-network
+                      transactions are blocked automatically.
+                    </p>
+                  </div>
+                </div>
+
                 {balances && balances.length > 0 && (
                   <div>
                     <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 block">
@@ -220,6 +288,11 @@ export default function ProfilePage() {
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <MessageSquare className="w-6 h-6" />
                     Your Reviews
+                    {getReviewPersistenceLabel() !== "API" && (
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full">
+                        DEV-ONLY
+                      </span>
+                    )}
                   </h2>
                   <Badge variant="secondary">{userReviews.length}</Badge>
                 </div>
@@ -290,7 +363,11 @@ export default function ProfilePage() {
                 {savedProjects.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {savedProjects.map((project) => (
-                      <ProjectCard key={project.id} project={project} />
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        verificationStatus={savedProjectVerificationStatuses[project.id]}
+                      />
                     ))}
                   </div>
                 ) : (

@@ -59,6 +59,7 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           )}
         </div>
         <textarea
+          {...props}
           ref={ref}
           id={textareaId}
           rows={4}
@@ -69,7 +70,6 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           aria-invalid={error || isAtLimit ? true : undefined}
           aria-describedby={[error ? errorId : "", maxLength ? counterId : ""].filter(Boolean).join(" ") || undefined}
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
-          {...props}
         />
         {error && (
           <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">

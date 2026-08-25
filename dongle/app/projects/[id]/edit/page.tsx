@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ProjectForm from "@/components/projects/ProjectForm";
 import { sorobanService, ProjectData } from "@/services/stellar/soroban.service";
+import { CATEGORY_DISPLAY_TO_FORM } from "@/types/project";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -76,6 +77,7 @@ export default function EditProjectPage() {
                 publicKey={gate.publicKey}
                 onConnect={gate.connectWallet}
                 onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
               />
             )}
           </div>
@@ -148,12 +150,16 @@ export default function EditProjectPage() {
           projectId={projectId}
           initialData={{
             name: project.name,
-            category: project.category,
+            // Map the canonical display label back to the form value the
+            // SelectField expects (e.g. "DeFi / DEX" → "defi")
+            primaryCategory: CATEGORY_DISPLAY_TO_FORM[project.category] ?? "",
             description: project.description,
             websiteUrl: project.websiteUrl,
             githubUrl: project.githubUrl,
             logoUrl: project.logoUrl,
             docsUrl: project.docsUrl,
+            auditReportUrl: project.auditReportUrl,
+            bugBountyUrl: project.bugBountyUrl,
           }}
         />
       </div>

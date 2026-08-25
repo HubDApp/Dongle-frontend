@@ -13,8 +13,9 @@ import {
   EXPECTED_NETWORK_PASSPHRASE,
   getNetworkLabel,
 } from "@/context/wallet.context";
-import { generateId } from "@/lib/id-generator";
+import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
+import { validateStellarAddress } from "@/lib/stellar-address";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,
@@ -51,6 +52,21 @@ export class NetworkMismatchError extends Error {
   }
 }
 
+// ─── Wallet not connected error ──────────────────────────────────────────────
+
+/**
+ * Thrown when a transaction is attempted without a connected wallet.
+ * Always surfaces as a real error — never silently falls back to mock data.
+ */
+export class WalletNotConnectedError extends Error {
+  constructor() {
+    super(
+      "No wallet connected. Please connect your Freighter wallet and try again.",
+    );
+    this.name = "WalletNotConnectedError";
+  }
+}
+
 /**
  * Validates that the wallet is on the expected network before any transaction.
  * Throws NetworkMismatchError if the network does not match.
@@ -65,24 +81,32 @@ async function assertCorrectNetwork(): Promise<void> {
 export interface ProjectData {
   id: string;
   name: string;
-  category: string;
+  category: ProjectCategory;
   description: string;
   websiteUrl: string;
   githubUrl?: string;
   logoUrl: string;
   docsUrl: string;
+  auditReportUrl?: string;
+  bugBountyUrl?: string;
   owner: string;
   createdAt: string;
 }
 
 export interface ProjectRegistrationParams {
   name: string;
-  category: string;
+  category: ProjectCategory;
   description: string;
   websiteUrl: string;
   githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
+  /**
+   * Optional list of Soroban contract IDs associated with the project.
+   * Each entry must be a valid 56-character address starting with 'C'.
+   * Empty strings are ignored.
+   */
+  contractAddresses?: string[];
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
@@ -221,23 +245,7 @@ export const sorobanService = {
     try {
       publicKey = await walletService.getPublicKey();
     } catch {
-      console.warn(
-        "[SorobanService] No wallet connected, using mock registration",
-      );
-      options.onPhaseChange?.("preparing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      options.onPhaseChange?.("signing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      options.onPhaseChange?.("submitting");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const hash = "mock_hash_" + generateId();
-      options.onPhaseChange?.("confirming", { txHash: hash });
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      options.onPhaseChange?.("success", { txHash: hash });
-      return {
-        hash,
-        status: "SUCCESS",
-      };
+      throw new WalletNotConnectedError();
     }
 
     const args = [
@@ -248,6 +256,9 @@ export const sorobanService = {
       nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
+      nativeToScVal(
+        (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
+      ),
     ];
 
     const result = await executeContractTransaction(
@@ -297,6 +308,7 @@ export const sorobanService = {
    */
   async getVerificationStatus(
     projectId: string,
+    signal?: AbortSignal,
   ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
     try {
       const { verificationService } = await import("./verification.service");
@@ -326,19 +338,21 @@ export const sorobanService = {
         {
           id: "soroban-swap",
           name: "Soroban Swap",
-          category: "defi",
+          category: PROJECT_CATEGORIES.DEFI,
           description: "Next-generation automated market maker on Soroban.",
           websiteUrl: "https://soroban-swap.com",
           githubUrl: "https://github.com/example/soroban-swap",
           logoUrl: "https://example.com/logo1.png",
           docsUrl: "https://docs.soroban-swap.com",
+          auditReportUrl: "https://example.com/audit-soroban-swap.pdf",
+          bugBountyUrl: "https://example.com/bounty-soroban-swap",
           owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
           createdAt: "2024-11-10T00:00:00Z",
         },
         {
           id: "stellar-guardians",
           name: "Stellar Guardians",
-          category: "gaming",
+          category: PROJECT_CATEGORIES.GAMING,
           description: "A decentralized strategy game with on-chain assets.",
           websiteUrl: "https://stellar-guardians.com",
           githubUrl: "https://github.com/example/stellar-guardians",
@@ -368,17 +382,7 @@ export const sorobanService = {
     try {
       publicKey = await walletService.getPublicKey();
     } catch {
-      console.warn(
-        "[SorobanService] No wallet connected, using mock update",
-      );
-      options.onPhaseChange?.("preparing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const hash = "mock_update_hash_" + generateId();
-      options.onPhaseChange?.("success", { txHash: hash });
-      return {
-        hash,
-        status: "SUCCESS",
-      };
+      throw new WalletNotConnectedError();
     }
 
     const project = await this.getProject(projectId);
@@ -396,6 +400,9 @@ export const sorobanService = {
       nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
+      nativeToScVal(
+        (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
+      ),
     ];
 
     const result = await executeContractTransaction(
@@ -405,6 +412,55 @@ export const sorobanService = {
     );
 
     console.log("[SorobanService] Update successful:", result.hash);
+    return result;
+  },
+
+  /**
+   * Transfer ownership of a project to a new Stellar address.
+   * Only the current owner can initiate this transfer.
+   * The new owner address is validated before submission.
+   *
+   * Note: This operation requires underlying contract support (`transfer_ownership`).
+   */
+  async transferOwnership(
+    projectId: string,
+    newOwnerAddress: string,
+    options: SorobanTransactionOptions = {},
+  ) {
+    let publicKey: string;
+    try {
+      publicKey = await walletService.getPublicKey();
+    } catch {
+      throw new WalletNotConnectedError();
+    }
+
+    const project = await this.getProject(projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.owner !== publicKey) {
+      throw new Error("Only the current project owner can transfer ownership");
+    }
+
+    // Validate new owner address
+    const validation = validateStellarAddress(newOwnerAddress);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    const args = [
+      nativeToScVal(projectId),
+      nativeToScVal(newOwnerAddress),
+    ];
+
+    const result = await executeContractTransaction(
+      publicKey,
+      (contract) => contract.call("transfer_ownership", ...args),
+      options,
+    );
+
+    console.log(
+      "[SorobanService] Ownership transfer successful:",
+      result.hash,
+    );
     return result;
   },
 

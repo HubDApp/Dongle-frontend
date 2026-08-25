@@ -65,13 +65,14 @@ export const CATEGORY_FORM_OPTIONS = [
 ];
 
 /**
- * Canonical Project interface
+ * Canonical Project interface.
+ * Use `primaryCategory` everywhere — it holds the display-label form of the
+ * category (e.g. "DeFi / DEX"). Never store raw form values ("defi") here.
  */
 export interface Project {
   id: string;
   name: string;
   primaryCategory: ProjectCategory;
-  category?: ProjectCategory; // For backward compatibility/migration
   tags?: string[];
   description: string;
   rating: number;
@@ -86,6 +87,92 @@ export interface Project {
   domain?: string;
   ownerAddress?: string;
   repositoryMetadata?: RepositoryMetadata; // Cached repository metadata
+  /**
+   * Optional list of Soroban contract IDs associated with this project.
+   * Each entry must be a valid Soroban contract address: starts with 'C',
+   * followed by 55 base-32 characters (A-Z, 2-7), total length 56.
+   */
+  contractAddresses?: string[];
+}
+
+export type ClaimProofType = "website" | "repository" | "admin_review";
+
+export type ProjectClaimRequestStatus = "pending" | "approved" | "rejected";
+
+export const PROJECT_CLAIM_CONSTRAINTS = {
+  EXPLANATION_MAX_LENGTH: 2000,
+} as const;
+
+export interface ProjectClaimRequest {
+  id: string;
+  projectId: string;
+  requestedBy: string;
+  proofType: ClaimProofType;
+  proofValue: string;
+  explanation: string;
+  status: ProjectClaimRequestStatus;
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
+}
+
+export interface ProjectClaimRequestValidationError {
+  field: "projectId" | "proofType" | "proofValue" | "explanation";
+  message: string;
+}
+
+export const PROJECT_CLAIM_PROOF_OPTIONS: { value: ClaimProofType; label: string }[] = [
+  { value: "website", label: "Website or Domain Proof" },
+  { value: "repository", label: "Repository Proof" },
+  { value: "admin_review", label: "Admin Review" },
+];
+
+export type ProjectReportReason =
+  | "phishing"
+  | "impersonation"
+  | "broken_links"
+  | "fraud"
+  | "inappropriate";
+
+export type ProjectReportStatus = "pending" | "resolved" | "dismissed";
+
+export type ProjectModerationActionType = "resolved" | "dismissed";
+
+export const PROJECT_REPORT_REASONS: { value: ProjectReportReason; label: string }[] = [
+  { value: "phishing", label: "Phishing or Scam" },
+  { value: "impersonation", label: "Impersonation" },
+  { value: "broken_links", label: "Broken Links" },
+  { value: "fraud", label: "Fraud" },
+  { value: "inappropriate", label: "Inappropriate Content" },
+];
+
+export const PROJECT_REPORT_CONSTRAINTS = {
+  EXPLANATION_MAX_LENGTH: 2000,
+} as const;
+
+export interface ProjectReport {
+  id: string;
+  projectId: string;
+  reporterAddress: string;
+  reason: ProjectReportReason;
+  explanation: string;
+  status: ProjectReportStatus;
+  createdAt: string;
+}
+
+export interface ProjectModerationAction {
+  id: string;
+  reportId: string;
+  moderatorAddress: string;
+  action: ProjectModerationActionType;
+  reason: string;
+  timestamp: string;
+}
+
+export interface ProjectReportValidationError {
+  field: "reason" | "explanation";
+  message: string;
 }
 
 /**
