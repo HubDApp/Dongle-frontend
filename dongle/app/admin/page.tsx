@@ -153,7 +153,7 @@ export default function AdminDashboard() {
   });
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<
-    "verification" | "submissions" | "reports" | "audit-log"
+    "verification" | "submissions" | "reports" | "claims" | "audit-log"
   >("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -671,6 +671,25 @@ export default function AdminDashboard() {
               </span>
             )}
             {activeTab === "reports" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("claims")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "claims"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Ownership Claims
+            {pendingClaimRequests.length > 0 && (
+              <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
+                {pendingClaimRequests.length}
+              </span>
+            )}
+            {activeTab === "claims" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -1584,6 +1603,253 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+        {activeTab === "claims" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* ── Left column: pending + resolved claims ── */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <span className="w-2 h-8 bg-blue-500 rounded-full" />
+                  Ownership Claims
+                  {pendingClaimRequests.length > 0 && (
+                    <span className="text-sm font-normal text-zinc-500 dark:text-zinc-400">
+                      ({pendingClaimRequests.length} pending)
+                    </span>
+                  )}
+                </h2>
+              </div>
+
+              {/* Pending claims */}
+              {pendingClaimRequests.length === 0 ? (
+                <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
+                  <Shield className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                  <p className="text-zinc-500 dark:text-zinc-400 font-medium">
+                    No pending ownership claims
+                  </p>
+                  <p className="text-sm text-zinc-400 dark:text-zinc-500 mt-1">
+                    All claims have been reviewed.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingClaimRequests.map((request) => {
+                    const project = projectService.getProjectById(request.projectId);
+                    return (
+                      <div
+                        key={request.id}
+                        className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:shadow-lg"
+                      >
+                        <div className="flex flex-col gap-4">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h3 className="font-bold text-lg">
+                                {project?.name || "Unknown project"}
+                              </h3>
+                              <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                                {request.projectId}
+                              </p>
+                              <div className="text-xs text-zinc-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                                <span>Claimed by:</span>
+                                <AddressDisplay
+                                  address={request.requestedBy}
+                                  copyable={true}
+                                  truncated={true}
+                                  inline={true}
+                                />
+                                <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                                <span>{formatDate(request.createdAt, "relative")}</span>
+                              </div>
+                            </div>
+                            <span className="shrink-0 text-[10px] uppercase font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-500">
+                              Pending
+                            </span>
+                          </div>
+
+                          {/* Proof section */}
+                          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700 space-y-2">
+                            <div className="text-xs uppercase font-bold text-blue-600 dark:text-blue-400 tracking-wide">
+                              Proof type: {request.proofType.replace("_", " ")}
+                            </div>
+                            <p className="text-sm text-zinc-700 dark:text-zinc-300 break-words whitespace-pre-wrap">
+                              {request.proofValue}
+                            </p>
+                            {request.explanation && (
+                              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">
+                                  Additional context:
+                                </p>
+                                <p className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                                  {request.explanation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Decision area */}
+                          <div className="space-y-2">
+                            <textarea
+                              placeholder="Decision note (required for rejection, optional for approval)"
+                              value={claimReason[request.id] || ""}
+                              onChange={(e) =>
+                                setClaimReason((prev) => ({
+                                  ...prev,
+                                  [request.id]: e.target.value,
+                                }))
+                              }
+                              className="w-full px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleApproveClaim(request.id)}
+                                className="flex-1 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                Approve &amp; Transfer
+                              </button>
+                              <button
+                                onClick={() => handleRejectClaim(request.id)}
+                                className="flex-1 px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+                              >
+                                <XCircle className="w-4 h-4" />
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Resolved claims history */}
+              {claimRequests.filter((r) => r.status !== "pending").length > 0 && (
+                <div className="mt-10">
+                  <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
+                    <span className="w-2 h-6 bg-zinc-400 rounded-full" />
+                    Claim History
+                  </h3>
+                  <div className="space-y-3">
+                    {claimRequests
+                      .filter((r) => r.status !== "pending")
+                      .sort(
+                        (a, b) =>
+                          new Date(b.reviewedAt ?? b.createdAt).getTime() -
+                          new Date(a.reviewedAt ?? a.createdAt).getTime()
+                      )
+                      .map((request) => {
+                        const project = projectService.getProjectById(request.projectId);
+                        return (
+                          <div
+                            key={request.id}
+                            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl"
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {request.status === "approved" ? (
+                                  <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                                ) : (
+                                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <span className="text-sm font-medium">
+                                    {project?.name || request.projectId}
+                                  </span>
+                                  <span
+                                    className={`ml-2 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                                      request.status === "approved"
+                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-500"
+                                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-500"
+                                    }`}
+                                  >
+                                    {request.status}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-xs text-zinc-400 shrink-0">
+                                {formatDate(request.reviewedAt ?? request.createdAt, "short")}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap">
+                              <span>Claimant:</span>
+                              <AddressDisplay
+                                address={request.requestedBy}
+                                copyable={true}
+                                truncated={true}
+                                inline={true}
+                              />
+                              {request.reviewedBy && (
+                                <>
+                                  <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                                  <span>Reviewed by:</span>
+                                  <AddressDisplay
+                                    address={request.reviewedBy}
+                                    copyable={true}
+                                    truncated={true}
+                                    inline={true}
+                                  />
+                                </>
+                              )}
+                            </div>
+                            {request.reviewNote && (
+                              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                Note: {request.reviewNote}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Right column: stats ── */}
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Claims Overview
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400">Total</span>
+                    <span className="font-bold">{claimRequests.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400">Pending</span>
+                    <span className="font-bold text-yellow-500">{pendingClaimRequests.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400">Approved</span>
+                    <span className="font-bold text-green-500">
+                      {claimRequests.filter((r) => r.status === "approved").length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400">Rejected</span>
+                    <span className="font-bold text-red-500">
+                      {claimRequests.filter((r) => r.status === "rejected").length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 p-5 rounded-2xl text-sm text-blue-700 dark:text-blue-300 space-y-2">
+                <p className="font-semibold">How claim approval works</p>
+                <ul className="space-y-1 text-xs text-blue-600 dark:text-blue-400 list-disc list-inside">
+                  <li>Review the submitted proof carefully.</li>
+                  <li>Approving transfers ownership to the claimant&apos;s wallet.</li>
+                  <li>Claimant is notified of your decision either way.</li>
+                  <li>All decisions are recorded in the Audit Log.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === "audit-log" && (
           <AuditLogViewer entries={auditLogService.list()} />
         )}

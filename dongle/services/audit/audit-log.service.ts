@@ -22,6 +22,8 @@ import { generateId } from "@/lib/id-generator";
 export const AUDIT_LOG_STORAGE_KEY = "dongle_audit_log";
 
 const VALID_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
+  "admin_login",
+  "admin_logout",
   "verification_approved",
   "verification_rejected",
   "verification_assigned",
@@ -31,6 +33,11 @@ const VALID_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "report_dismissed",
   "report_assigned",
   "report_unassigned",
+  "submission_moderated",
+  "claim_submitted",
+  "claim_approved",
+  "claim_rejected",
+  "ownership_transferred",
 ]);
 
 /** Hydrate, validate, and return all stored entries (SSR-safe). */

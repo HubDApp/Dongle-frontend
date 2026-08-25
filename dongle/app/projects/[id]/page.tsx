@@ -62,6 +62,7 @@ import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
 import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
+import { ClaimStatusBanner } from "@/components/projects/ClaimStatusBanner";
 import { shouldBypassLinkWarning, getExternalLinkWarningOptions } from "@/lib/externalLinkWarning";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
