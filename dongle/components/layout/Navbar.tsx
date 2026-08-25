@@ -11,6 +11,7 @@ import { getPrefetchValue } from "@/lib/prefetch-config";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { IconButton } from "@/components/ui/IconButton";
 import { Menu, X } from "lucide-react";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 export default function Navbar() {
   const pathname = usePathname();
