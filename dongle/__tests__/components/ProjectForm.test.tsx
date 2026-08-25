@@ -53,6 +53,10 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   useUnsavedChanges: vi.fn(),
 }));
 
+vi.mock("@/context/wallet.context", () => ({
+  useWallet: () => ({ publicKey: "GTESTWALLET" }),
+}));
+
 vi.mock("@/lib/analytics", () => ({
   trackProjectSubmit: trackSubmitMock,
 }));
@@ -104,7 +108,7 @@ describe("ProjectForm component", () => {
     expect(screen.getByLabelText(/tags/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/project website/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/github url/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/repository url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/logo url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/documentation url/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/audit report url/i)).toBeInTheDocument();
@@ -139,7 +143,7 @@ describe("ProjectForm component", () => {
     fireEvent.change(screen.getByLabelText(/^category$/i), { target: { value: "defi" } });
     await user.type(screen.getByLabelText(/description/i), "A lending protocol for Stellar.");
     await user.type(screen.getByLabelText(/project website/i), "https://stellarlend.example");
-    await user.type(screen.getByLabelText(/github url/i), "https://example.com/owner/repo");
+    await user.type(screen.getByLabelText(/repository url/i), "https://example.com/owner/repo");
 
     fireEvent.click(screen.getByRole("button", { name: /submit registration/i }));
 
@@ -147,6 +151,56 @@ describe("ProjectForm component", () => {
       expect(screen.getByText(/unsupported repository host/i)).toBeInTheDocument();
     });
     expect(sorobanMocks.registerProject).not.toHaveBeenCalled();
+  });
+
+  it("accepts a valid GitHub repository URL", async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(await screen.findByLabelText(/project name/i), "Stellar Lend");
+    fireEvent.change(screen.getByLabelText(/^category$/i), { target: { value: "defi" } });
+    await user.type(screen.getByLabelText(/description/i), "A lending protocol for Stellar.");
+    await user.type(screen.getByLabelText(/project website/i), "https://stellarlend.example");
+    await user.type(screen.getByLabelText(/repository url/i), "https://github.com/stellar/lend");
+
+    fireEvent.click(screen.getByRole("button", { name: /submit registration/i }));
+
+    await waitFor(() => {
+      expect(sorobanMocks.registerProject).toHaveBeenCalledTimes(1);
+    });
+    expect(sorobanMocks.registerProject.mock.calls[0][0].githubUrl).toBe(
+      "https://github.com/stellar/lend",
+    );
+  });
+
+  it("pre-fills and allows editing the repository URL", async () => {
+    const user = userEvent.setup();
+    renderForm({
+      mode: "edit",
+      projectId: "proj-9",
+      initialData: {
+        name: "Stellar Lend",
+        primaryCategory: "defi",
+        tags: [],
+        description: "A lending protocol for Stellar.",
+        websiteUrl: "https://stellarlend.example",
+        githubUrl: "https://github.com/stellar/old-repo",
+      },
+    });
+
+    const repoField = await screen.findByLabelText(/repository url/i);
+    expect(repoField).toHaveValue("https://github.com/stellar/old-repo");
+
+    await user.clear(repoField);
+    await user.type(repoField, "https://github.com/stellar/lend");
+    fireEvent.click(screen.getByRole("button", { name: /update project/i }));
+
+    await waitFor(() => {
+      expect(sorobanMocks.updateProject).toHaveBeenCalledTimes(1);
+    });
+    expect(sorobanMocks.updateProject.mock.calls[0][1].githubUrl).toBe(
+      "https://github.com/stellar/lend",
+    );
   });
 
   it("rejects an invalid Soroban contract ID", async () => {

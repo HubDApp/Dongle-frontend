@@ -4,6 +4,7 @@ import { render, screen, fireEvent, act, waitFor } from "@testing-library/react"
 import ProjectDetailPage from "@/app/projects/[id]/page";
 import { projectService } from "@/services/project/project.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
+import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { useConfirm } from "@/hooks/useConfirm";
 import { PROJECT_CATEGORIES } from "@/types/project";
 import type { ProjectCategory } from "@/types/project";
@@ -154,6 +155,32 @@ describe("Project Detail Page - Verification and Safety Warnings", () => {
       "_blank",
       "noopener,noreferrer",
     );
+
+    windowOpenSpy.mockRestore();
+  });
+
+  it("still warns on unknown domains even when the project is VERIFIED", async () => {
+    vi.mocked(projectService.getProjectById).mockReturnValue({
+      ...mockProject,
+      auditReportUrl: "https://random-audit.example/report.pdf",
+    });
+    vi.mocked(sorobanService.getVerificationStatus).mockResolvedValue("VERIFIED");
+    confirmMock.mockResolvedValue(false);
+    const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<ProjectDetailPage />);
+    await finishInitialLoad();
+    vi.useRealTimers();
+
+    fireEvent.click(screen.getByRole("link", { name: /Audit Report/i }));
+
+    expect(confirmMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destinationDomain: "random-audit.example",
+        destinationUrl: "https://random-audit.example/report.pdf",
+      }),
+    );
+    expect(windowOpenSpy).not.toHaveBeenCalled();
 
     windowOpenSpy.mockRestore();
   });
@@ -417,6 +444,7 @@ describe("Project Detail Page - layout shell", () => {
     await finishInitialLoad();
 
     expect(screen.getByRole("heading", { name: mockProject.name })).toBeInTheDocument();
+    expect(recentViewsService.addView).toHaveBeenCalledWith("test-project-id", "G_OWNER_123");
     const shell = screen.getByRole("heading", { name: mockProject.name }).closest("main");
     expect(shell?.className).toMatch(/min-h-screen/);
     expect(shell?.className).toMatch(/pt-32/);

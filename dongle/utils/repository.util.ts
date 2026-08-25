@@ -7,9 +7,25 @@ import {
   SUPPORTED_HOSTS,
 } from "@/types/repository";
 
+const HOST_MAP: Record<string, "github" | "gitlab" | "bitbucket"> = {
+  "github.com": "github",
+  "gitlab.com": "gitlab",
+  "bitbucket.org": "bitbucket",
+};
+
+const HOST_CANONICAL: Record<"github" | "gitlab" | "bitbucket", string> = {
+  github: "github.com",
+  gitlab: "gitlab.com",
+  bitbucket: "bitbucket.org",
+};
+
+function stripWww(hostname: string): string {
+  return hostname.replace(/^www\./i, "");
+}
+
 /**
- * Validate and parse a repository URL
- * Supports GitHub, GitLab, and Bitbucket
+ * Validate and parse a repository URL.
+ * Supports GitHub, GitLab, and Bitbucket.
  */
 export function validateRepositoryUrl(
   url: string
@@ -24,16 +40,21 @@ export function validateRepositoryUrl(
     const normalized = url.trim();
     let parsedUrl: URL;
 
-    // Handle URLs without protocol
     if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
       parsedUrl = new URL(`https://${normalized}`);
     } else {
       parsedUrl = new URL(normalized);
     }
 
-    const hostname = parsedUrl.hostname.toLowerCase();
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      return {
+        isValid: false,
+        error: "Invalid URL format. Repository URLs must use http or https.",
+      };
+    }
 
-    // Check if host is supported
+    const hostname = stripWww(parsedUrl.hostname.toLowerCase());
+
     if (!SUPPORTED_HOSTS.includes(hostname as (typeof SUPPORTED_HOSTS)[number])) {
       return {
         isValid: false,
@@ -41,7 +62,6 @@ export function validateRepositoryUrl(
       };
     }
 
-    // Parse path to extract owner and repo
     const pathParts = parsedUrl.pathname
       .split("/")
       .filter((part) => part.length > 0);
@@ -53,9 +73,9 @@ export function validateRepositoryUrl(
       };
     }
 
-    const [owner, repo] = pathParts;
+    const owner = pathParts[0];
+    const repo = pathParts[1];
 
-    // Validate owner and repo names
     if (!owner || !repo) {
       return {
         isValid: false,
@@ -63,25 +83,24 @@ export function validateRepositoryUrl(
       };
     }
 
-    // Remove .git suffix if present
     const cleanRepo = repo.replace(/\.git$/, "");
 
-    // Map hostname to host type
-    const hostMap: Record<string, "github" | "gitlab" | "bitbucket"> = {
-      "github.com": "github",
-      "gitlab.com": "gitlab",
-      "bitbucket.org": "bitbucket",
-    };
+    if (!/^[\w.-]+$/.test(owner) || !/^[\w.-]+$/.test(cleanRepo)) {
+      return {
+        isValid: false,
+        error: "Repository owner and name contain invalid characters",
+      };
+    }
 
     return {
       isValid: true,
       metadata: {
-        host: hostMap[hostname],
+        host: HOST_MAP[hostname],
         owner,
         repo: cleanRepo,
       },
     };
-  } catch (_error) {
+  } catch {
     return {
       isValid: false,
       error: "Invalid URL format",
@@ -94,19 +113,13 @@ export function validateRepositoryUrl(
  */
 export function normalizeRepositoryUrl(url: string): string {
   const validation = validateRepositoryUrl(url);
-  
+
   if (!validation.isValid || !validation.metadata) {
     return url;
   }
 
   const { host, owner, repo } = validation.metadata;
-  const hostMap: Record<string, string> = {
-    github: "github.com",
-    gitlab: "gitlab.com",
-    bitbucket: "bitbucket.org",
-  };
-
-  return `https://${hostMap[host]}/${owner}/${repo}`;
+  return `https://${HOST_CANONICAL[host]}/${owner}/${repo}`;
 }
 
 /**

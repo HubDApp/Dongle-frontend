@@ -13,6 +13,8 @@ export type { InputProps } from "./Input";
 export { default as OfflineBanner, OfflineWarning } from "./OfflineBanner";
 export { default as Pagination } from "./Pagination";
 export { RouteErrorFallback } from "./RouteErrorFallback";
+export { SafeExternalLink } from "./SafeExternalLink";
+export type { SafeExternalLinkProps } from "./SafeExternalLink";
 export { SelectField } from "./SelectField";
 export type { SelectOption } from "./SelectField";
 export { Skeleton } from "./skeleton";
