@@ -1,6 +1,7 @@
 import { mockProjects } from "@/data/mockProjects";
 import { Project } from "@/types/project";
 import { projectOwnerService } from "./project-owner.service";
+import { projectSubmissionService } from "./project-submission.service";
 import { registry } from "@/services/data-access/registry";
 
 /**
@@ -59,11 +60,30 @@ export const projectService = {
   },
 
   /**
+   * Get projects owned by a wallet address
+   */
+  getProjectsByOwner(ownerAddress: string): Project[] {
+    const normalized = ownerAddress.trim();
+    return this.getAllProjects().filter(
+      (p) => p.ownerAddress?.trim() === normalized,
+    );
+  },
+
+  /**
+   * Get projects discoverable in the directory (excludes moderated-out submissions)
+   */
+  getDiscoverableProjects(): Project[] {
+    return this.getAllProjects().filter((p) =>
+      projectSubmissionService.isDiscoverable(p.id),
+    );
+  },
+
+  /**
    * Search projects by name or description
    */
   searchProjects(query: string): Project[] {
     const q = query.toLowerCase();
-    return this.getAllProjects().filter(
+    return this.getDiscoverableProjects().filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.description.toLowerCase().includes(q) ||
