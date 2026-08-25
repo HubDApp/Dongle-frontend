@@ -7,6 +7,8 @@
 
 /** The set of admin actions that are recorded. */
 export type AuditAction =
+  | "admin_login"
+  | "admin_logout"
   | "verification_approved"
   | "verification_rejected"
   | "verification_assigned"
@@ -19,6 +21,8 @@ export type AuditAction =
 
 /** Human-readable labels for each action. */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  admin_login: "Admin Login",
+  admin_logout: "Admin Logout",
   verification_approved: "Verification Approved",
   verification_rejected: "Verification Rejected",
   verification_assigned: "Verification Assigned",
