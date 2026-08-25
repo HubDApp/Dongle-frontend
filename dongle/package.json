@@ -14,6 +14,9 @@
     "lint": "eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish",
     "test": "vitest --run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
     "typecheck": "tsc --noEmit",
     "audit": "node scripts/audit-check.js",
     "analyze:deps": "node scripts/analyze-dependencies.js"
@@ -37,6 +40,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@rolldown/binding-win32-x64-msvc": "1.0.0-rc.17",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
@@ -60,7 +64,6 @@
     "@rolldown/binding-darwin-x64": "1.0.0-rc.17",
     "@rolldown/binding-linux-x64-gnu": "1.0.0-rc.17",
     "@rolldown/binding-linux-x64-musl": "1.0.0-rc.17",
-    "@rolldown/binding-win32-x64-msvc": "1.0.0-rc.17",
     "lightningcss-darwin-arm64": "^1.32.0"
   },
   "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
