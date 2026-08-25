@@ -21,6 +21,7 @@ import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 import { useDraft } from "@/hooks/useDraft";
 import { DraftIndicator } from "@/components/projects/DraftIndicator";
 import { SubmissionChecklist } from "@/components/projects/SubmissionChecklist";
+import { useWallet } from "@/context/wallet.context";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -140,9 +141,15 @@ export default function ProjectForm({
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
-  
-  // Draft management
-  const draft = useDraft({ mode, projectId, autoSave: true });
+  const { publicKey } = useWallet();
+
+  // Draft management – passes wallet address so drafts sync to the server
+  const draft = useDraft({
+    mode,
+    projectId,
+    autoSave: true,
+    walletAddress: publicKey,
+  });
   const [draftRestored, setDraftRestored] = React.useState(false);
 
   const {
@@ -342,8 +349,8 @@ export default function ProjectForm({
     setDiscardDialogOpen(true);
   };
 
-  const confirmDiscardDraft = () => {
-    draft.deleteDraft();
+  const confirmDiscardDraft = async () => {
+    await draft.deleteDraft();
     setDraftRestored(false);
     reset({
       name: initialData?.name || "",
@@ -392,6 +399,8 @@ export default function ProjectForm({
         <DraftIndicator
           hasDraft={draft.hasDraft}
           lastSaved={draft.lastSaved}
+          isSaving={draft.isSaving}
+          saveError={draft.saveError}
           onDiscard={handleDiscardDraft}
         />
 
@@ -653,7 +662,7 @@ export default function ProjectForm({
         confirmLabel="Discard Draft"
         cancelLabel="Keep Draft"
         variant="danger"
-        onConfirm={confirmDiscardDraft}
+        onConfirm={() => void confirmDiscardDraft()}
         onCancel={() => setDiscardDialogOpen(false)}
       />
     </Card>
