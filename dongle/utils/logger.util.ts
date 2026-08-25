@@ -1,3 +1,5 @@
+import { redactWalletAddress } from "./stellar-address.util";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 const WALLET_ADDRESS_RE = /\bG[A-Z2-7]{55}\b/g;
@@ -11,7 +13,7 @@ function isEnabled(level: LogLevel): boolean {
 
 function redactMessage(message: string): string {
   return message
-    .replace(WALLET_ADDRESS_RE, "[wallet]")
+    .replace(WALLET_ADDRESS_RE, (address) => redactWalletAddress(address))
     .replace(CONTRACT_ID_RE, "[contract]")
     .replace(HASH_RE, (m) => `${m.slice(0, 6)}…${m.slice(-4)}`);
 }
@@ -22,8 +24,19 @@ function formatArg(arg: unknown): unknown {
     const err = arg as Error;
     const safe = new Error(redactMessage(err.message));
     safe.name = err.name;
-    safe.stack = err.stack;
+    safe.stack = err.stack ? redactMessage(err.stack) : undefined;
     return safe;
+  }
+  if (Array.isArray(arg)) return arg.map(formatArg);
+  if (arg && typeof arg === "object") {
+    return Object.fromEntries(
+      Object.entries(arg).map(([key, value]) => [
+        key,
+        /address|publickey|wallet|recipient|submittedby|assignedto/i.test(key) && typeof value === "string"
+          ? redactWalletAddress(value)
+          : formatArg(value),
+      ]),
+    );
   }
   return arg;
 }
@@ -60,6 +73,5 @@ export function truncateHash(hash: string): string {
 }
 
 export function truncateAddress(address: string): string {
-  if (!address || address.length < 8) return address ?? "";
-  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+  return redactWalletAddress(address);
 }

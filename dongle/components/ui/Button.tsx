@@ -77,32 +77,34 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <Loader2 className="w-4 h-4 shrink-0 animate-spin" aria-hidden="true" />
     );
 
+    const loadingStatus = loadingText || (children ? `${children}...` : "Loading...");
+
     return (
-      <button
-        ref={ref}
-        {...props}
-        disabled={isLoading || disabled}
-        aria-busy={isLoading || undefined}
-        aria-live={isLoading ? "polite" : undefined}
-        className={cn(
-          "inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none font-medium",
-          variants[variant],
-          sizes[size],
-          className,
-        )}
-      >
-        {replaceLeftIconWithSpinner ? spinner : leftIcon}
+      <>
+        <button
+          ref={ref}
+          {...props}
+          disabled={isLoading || disabled}
+          aria-busy={isLoading || undefined}
+          className={cn(
+            "inline-flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none font-medium",
+            variants[variant],
+            sizes[size],
+            className,
+          )}
+        >
+          {replaceLeftIconWithSpinner ? spinner : leftIcon}
 
-        {displayText}
+          {displayText}
 
-        {!isLoading && rightIcon}
+          {!isLoading && rightIcon}
 
-        {showTrailingSpinner && spinner}
-
-        {isLoading && !loadingText && !children && (
-          <span className="sr-only">Loading...</span>
-        )}
-      </button>
+          {showTrailingSpinner && spinner}
+        </button>
+        <span role="status" aria-live="polite" className="sr-only">
+          {isLoading ? loadingStatus : ""}
+        </span>
+      </>
     );
   },
 );

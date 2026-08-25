@@ -16,12 +16,12 @@
  *   registry.setProjectRepository(new ApiProjectRepository());
  */
 
-import { IProjectRepository } from "./IProjectRepository";
-import { IReviewRepository } from "./IReviewRepository";
-import { IUpdateRepository } from "./IUpdateRepository";
-import { MockProjectRepository } from "./MockProjectRepository";
-import { MockReviewRepository } from "./MockReviewRepository";
-import { MockUpdateRepository } from "./MockUpdateRepository";
+import { IProjectRepository } from "./IProjectRepository.service";
+import { IReviewRepository } from "./IReviewRepository.service";
+import { IUpdateRepository } from "./IUpdateRepository.service";
+import { MockProjectRepository } from "./MockProjectRepository.service";
+import { MockReviewRepository } from "./MockReviewRepository.service";
+import { MockUpdateRepository } from "./MockUpdateRepository.service";
 
 class DataAccessRegistry {
   private _projects: IProjectRepository = new MockProjectRepository();

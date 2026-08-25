@@ -6,6 +6,7 @@ import {
   requestAccess,
   signTransaction,
 } from "@stellar/freighter-api";
+import { redactWalletAddress } from "@/utils/stellar-address.util";
 
 function isFreighterMissingError(message: string | undefined): boolean {
   if (!message) return false;
@@ -36,7 +37,7 @@ export const walletService = {
       throw new Error(error?.message ?? "Wallet connection failed");
     }
 
-    console.info("Wallet connected:", address);
+    console.info("Wallet connected:", redactWalletAddress(address));
     return address;
   },
 

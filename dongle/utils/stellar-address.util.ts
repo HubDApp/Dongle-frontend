@@ -74,6 +74,13 @@ export function abbreviateStellarAddress(address: string): string {
   return `${address.slice(0, 4)}…${address.slice(-4)}`;
 }
 
+/** Redacts a wallet address while retaining a recognizable five-character boundary. */
+export function redactWalletAddress(address: string | null | undefined): string {
+  if (!address) return "";
+  if (address.length <= 10) return "[wallet]";
+  return `${address.slice(0, 5)}…${address.slice(-5)}`;
+}
+
 // ─── Soroban Contract ID ─────────────────────────────────────────────────────
 
 /**

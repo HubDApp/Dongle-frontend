@@ -10,10 +10,10 @@
  * so that future shape changes can be migrated automatically on load.
  */
 
-import { IReviewRepository } from "./IReviewRepository";
+import { IReviewRepository } from "./IReviewRepository.service";
 import { Review } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
-import { stamp, migrateRecordArray, VersionedRecord } from "./migration";
+import { stamp, migrateRecordArray, VersionedRecord } from "./migration.service";
 
 const STORAGE_KEY = "dongle_reviews";
 

@@ -7,7 +7,7 @@
  * changing any UI code.
  */
 
-import { IProjectRepository } from "./IProjectRepository";
+import { IProjectRepository } from "./IProjectRepository.service";
 import { Project } from "@/types/project";
 import { mockProjects } from "@/data/mockProjects";
 

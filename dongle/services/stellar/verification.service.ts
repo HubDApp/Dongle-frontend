@@ -4,6 +4,8 @@
  * Persists state via localStorage (development) or contract storage (production).
  */
 
+import { redactWalletAddress } from "@/utils/stellar-address.util";
+
 export type VerificationStatus = "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface VerificationRequest {
@@ -166,7 +168,7 @@ class VerificationService {
       // Persist updated request
       await this.persistRequest(request);
 
-      console.log(`[VerificationService] Request assigned: ${projectId} to ${assignedTo}`);
+      console.log(`[VerificationService] Request assigned: ${projectId} to ${redactWalletAddress(assignedTo)}`);
       return request;
     } catch (error) {
       console.error("[VerificationService] Error assigning request:", error);
