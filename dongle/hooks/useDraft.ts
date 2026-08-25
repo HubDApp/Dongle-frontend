@@ -79,7 +79,7 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
 
   // ── Initialize BroadcastChannel ──────────────────────────────────────────
   useEffect(() => {
-    const existing = draftService.getDraftForProject(mode, projectId);
+    const existing = draftService.getDraftForProject(mode, projectId, walletAddress);
     if (!existing) return;
     // Schedule state updates as a microtask to avoid synchronous setState-in-effect.
     const id = setTimeout(() => {
@@ -88,7 +88,7 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
       setLastSaved(existing.lastSaved);
     }, 0);
     return () => clearTimeout(id);
-  }, [mode, projectId]);
+  }, [mode, projectId, walletAddress]);
 
     const channel = new BroadcastChannel(CHANNEL_NAME);
     channelRef.current = channel;
@@ -131,8 +131,8 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
         }
       }
 
-      // Fall back to localStorage
-      const local = draftService.getDraftForProject(mode, projectId);
+      // Fall back to localStorage (encrypted with Stellar public key hash)
+      const local = draftService.getDraftForProject(mode, projectId, walletAddress);
       if (cancelled) return;
       if (local) {
         setHasDraft(true);
@@ -161,8 +161,8 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
       };
 
       if (!autoSave) {
-        // Immediate synchronous localStorage save
-        draftService.saveDraft(draft);
+        // Immediate synchronous localStorage save (encrypted)
+        draftService.saveDraft(draft, walletAddress);
         const ts = new Date().toISOString();
         setHasDraft(true);
         setLastSaved(ts);
@@ -190,14 +190,14 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
             );
             if (!savedDraft) {
               // Remote failed – fall back to localStorage and surface error
-              draftService.saveDraft(draft);
+              draftService.saveDraft(draft, walletAddress);
               setSaveError("Could not sync to server; saved locally.");
-              savedDraft = draftService.getDraft(draftId);
+              savedDraft = draftService.getDraft(draftId, walletAddress);
             }
           } else {
-            // localStorage only
-            draftService.saveDraft(draft);
-            savedDraft = draftService.getDraft(draftId);
+            // localStorage only (encrypted)
+            draftService.saveDraft(draft, walletAddress);
+            savedDraft = draftService.getDraft(draftId, walletAddress);
           }
 
           const ts = savedDraft?.lastSaved ?? new Date().toISOString();
@@ -233,7 +233,7 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
       debounceRef.current = null;
     }
 
-    draftService.deleteDraft(draftId);
+    draftService.deleteDraft(draftId, walletAddress);
 
     if (walletAddress) {
       await draftService.deleteDraftRemote(walletAddress, draftId);

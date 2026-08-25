@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { mockProjects } from "@/data/mockProjects";
+import { isEncrypted } from "@/lib/crypto-storage";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -28,6 +29,34 @@ Object.defineProperty(window, "localStorage", {
 describe("recentViewsService", () => {
   beforeEach(() => {
     localStorageMock.clear();
+    vi.restoreAllMocks();
+  });
+
+  describe("encryption & storage", () => {
+    it("stores views in encrypted format", () => {
+      const projectId = mockProjects[0].id;
+      recentViewsService.addView(projectId, "WALLET1");
+
+      const rawStored = localStorageMock.getItem("dongle_recent_views");
+      expect(rawStored).not.toBeNull();
+      expect(isEncrypted(rawStored)).toBe(true);
+      expect(rawStored).not.toContain(projectId);
+    });
+
+    it("migrates legacy unencrypted views on read", () => {
+      const legacyViews = JSON.stringify([
+        { projectId: "legacy-proj-1", viewedAt: "2026-01-01" },
+      ]);
+      localStorageMock.setItem("dongle_recent_views", legacyViews);
+      expect(isEncrypted(localStorageMock.getItem("dongle_recent_views"))).toBe(false);
+
+      const views = recentViewsService.getAllViews();
+      expect(views).toHaveLength(1);
+      expect(views[0].projectId).toBe("legacy-proj-1");
+
+      // Verify it is now migrated and encrypted
+      expect(isEncrypted(localStorageMock.getItem("dongle_recent_views"))).toBe(true);
+    });
   });
 
   describe("addView", () => {
@@ -46,7 +75,7 @@ describe("recentViewsService", () => {
       const walletAddress = "GABC123";
       recentViewsService.addView(projectId, walletAddress);
 
-      const views = recentViewsService.getAllViews();
+      const views = recentViewsService.getAllViews(walletAddress);
       expect(views).toHaveLength(1);
       expect(views[0].projectId).toBe(projectId);
       expect(views[0].walletAddress).toBe(walletAddress);

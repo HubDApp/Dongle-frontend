@@ -59,6 +59,16 @@ export default function ReviewForm({
     return newErrors.length === 0;
   };
 
+  const handleCommentChange = (value: string) => {
+    setComment(value);
+    if (errors.length > 0) {
+      // Clear error as user types valid content
+      if (value.trim().length >= REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH && value.length <= REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH) {
+        setErrors((prev) => prev.filter((e) => e.field !== "comment"));
+      }
+    }
+  };
+
   const handleCancel = () => {
     setIsSubmitting(true);
     onCancel();
@@ -71,6 +81,8 @@ export default function ReviewForm({
       onSubmit({ rating, comment });
     }
   };
+
+  const commentError = errors.find((e) => e.field === "comment")?.message;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
@@ -124,15 +136,18 @@ export default function ReviewForm({
             required
             value={comment}
             maxLength={REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e) => handleCommentChange(e.target.value)}
             placeholder="Share your experience with this project..."
-            error={errors.find((e) => e.field === "comment")?.message}
+            error={commentError}
             className="h-32"
           />
-          <div className="flex justify-end items-start mt-2">
-            <p className="text-xs text-zinc-500">
-              Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} chars
-            </p>
+          <div className="flex justify-between items-start mt-2 text-xs text-zinc-500">
+            <span>Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters</span>
+            {comment.length > 0 && comment.trim().length < REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH && (
+              <span className="text-amber-500 font-medium">
+                {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH - comment.trim().length} more character(s) required
+              </span>
+            )}
           </div>
         </div>
       </div>
