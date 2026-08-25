@@ -13,6 +13,11 @@ vi.mock("@/services/stellar/soroban.service", () => ({
   },
 }));
 
+// Mock the batch verification module so it resolves immediately in tests
+vi.mock("@/services/stellar/batch-verification", () => ({
+  batchFetchVerificationStatuses: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("@/hooks/useDiscoverParams", () => ({
   useDiscoverParams: () => {
     const [searchInput, setSearchInputState] = React.useState("");
@@ -139,18 +144,19 @@ describe("Discover Page - High Risk Flows", () => {
   });
 
   describe("Loading State", () => {
-    it("displays loading spinner on initial render", () => {
+    it("displays loading skeleton on initial render", () => {
       render(<DiscoverPage />);
-      expect(screen.getByText("Loading projects...")).toBeInTheDocument();
+      // The skeleton grid uses aria-busy="true" and aria-label during loading
+      expect(screen.getByLabelText("Loading projects")).toBeInTheDocument();
     });
 
-    it("hides loading state after timeout", async () => {
+    it("hides loading skeleton after fetch completes", async () => {
       render(<DiscoverPage />);
-      expect(screen.getByText("Loading projects...")).toBeInTheDocument();
+      expect(screen.getByLabelText("Loading projects")).toBeInTheDocument();
 
       await finishInitialLoad();
 
-      expect(screen.queryByText("Loading projects...")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Loading projects")).not.toBeInTheDocument();
     });
   });
 
