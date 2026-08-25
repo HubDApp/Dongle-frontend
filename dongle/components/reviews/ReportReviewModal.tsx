@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { cn } from "@/lib/utils";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { Review, REVIEW_REPORT_REASONS, REVIEW_REPORT_CONSTRAINTS } from "@/types/review";
 
 interface ReportReviewModalProps {
@@ -38,20 +39,12 @@ export function ReportReviewModal({
       setReason("");
       setExplanation("");
       setError("");
-      initialFocusRef.current?.focus();
     }, 0);
     return () => clearTimeout(id);
   }, [isOpen]);
 
   // Handle escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  useModalFocusTrap(isOpen, dialogRef, initialFocusRef, onClose);
 
   if (!isOpen) return null;
 
@@ -68,7 +61,6 @@ export function ReportReviewModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
-      aria-hidden="true"
     >
       <div
         ref={dialogRef}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useId, useState } from "react";
 import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X, Star } from "lucide-react";
@@ -26,6 +26,8 @@ export default function ReviewForm({
   const [comment, setComment] = useState(initialReview?.comment || "");
   const [errors, setErrors] = useState<ReviewValidationError[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const ratingLabelId = useId();
+  const ratingGroupId = useId();
 
   const isDirty = rating !== (initialReview?.rating || 5) || comment !== (initialReview?.comment || "");
 
@@ -92,14 +94,18 @@ export default function ReviewForm({
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-2">Rating</label>
-          <div className="flex gap-2">
+          <label id={ratingLabelId} className="block text-sm font-medium mb-2">
+            Rating
+          </label>
+          <div role="radiogroup" aria-labelledby={ratingLabelId} className="flex gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
+                id={`${ratingGroupId}-${star}`}
                 onClick={() => setRating(star)}
                 aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
+                aria-checked={rating === star}
                 aria-pressed={rating === star}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                   rating >= star 

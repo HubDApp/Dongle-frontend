@@ -32,13 +32,19 @@ export const ProjectCard = ({
   const selected = isSelected(project.id);
   const isSaved = isProjectSaved(project.id);
 
-  const handleCompareToggle = (e: React.MouseEvent) => {
+  const handleCompareToggle = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (selected) {
       removeProject(project.id);
     } else if (canAddMore) {
       addProject(project);
+    }
+  };
+
+  const handleCompareKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      handleCompareToggle(e);
     }
   };
 
@@ -72,6 +78,7 @@ export const ProjectCard = ({
         <IconButton
           type="button"
           onClick={handleCompareToggle}
+          onKeyDown={handleCompareKeyDown}
           disabled={!selected && !canAddMore}
           aria-pressed={selected}
           aria-label={
@@ -82,7 +89,7 @@ export const ProjectCard = ({
               : `Add ${project.name} to comparison`
           }
           size="md"
-          className={`absolute left-4 top-4 z-10 rounded-full ${
+          className={`absolute left-4 top-4 z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
             selected
               ? "bg-blue-500 text-white hover:bg-blue-600 hover:text-white"
               : !canAddMore
