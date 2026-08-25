@@ -4,13 +4,24 @@
  * Hybrid persistence strategy:
  *   • Wallet connected  → save/load/delete via the server API
  *                         (keyed by wallet address, 30-day TTL)
- *   • No wallet         → fall back to localStorage
+ *   • No wallet         → fall back to localStorage (ENCRYPTED via crypto-storage)
  *
- * The service itself is stateless with respect to the wallet address.
- * Callers (the useDraft hook) pass the wallet address when one is available.
+ * Encrypted LocalStorage Architecture:
+ *   • Drafts stored locally are encrypted with AES-256 using crypto-js.
+ *   • Encryption key is derived using the SHA-256 hash of the user's Stellar public key:
+ *       `key = CryptoJS.SHA256(publicKey).toString()`
+ *   • If no wallet/public key is provided, a fallback app key hash is used.
+ *   • Legacy unencrypted drafts are automatically migrated to encrypted format on first read.
+ *   • Warnings are logged and handled safely if decryption fails (e.g. wrong key or corrupted payload).
  */
 
 import { draftApiService } from "@/services/draft/draft-api.service";
+import {
+  getItemAndDecrypt,
+  setItemAndEncrypt,
+  isEncrypted,
+  type DecryptOptions,
+} from "@/lib/crypto-storage";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -49,37 +60,55 @@ export const AUTO_SAVE_DEBOUNCE_MS = 2000;
 // ---------------------------------------------------------------------------
 
 class DraftService {
-  // ── localStorage helpers ──────────────────────────────────────────────────
+  // ── Encrypted localStorage helpers ────────────────────────────────────────
 
   /**
-   * Return all drafts stored in localStorage.
+   * Return all drafts stored in localStorage (encrypted).
+   * Encrypted using user's Stellar public key hash (or fallback key if not connected).
+   * Automatically migrates legacy unencrypted drafts on read.
    * Safe to call during SSR (returns empty array).
+   *
+   * @param publicKey - Optional Stellar public key
+   * @param options - Decryption options (warnings, callbacks)
    */
-  getAllDrafts(): ProjectDraft[] {
+  getAllDrafts(publicKey?: string | null, options?: DecryptOptions): ProjectDraft[] {
     if (typeof window === "undefined") return [];
     try {
-      const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (!stored) return [];
-      return JSON.parse(stored) as ProjectDraft[];
-    } catch {
+      const drafts = getItemAndDecrypt<ProjectDraft[]>(DRAFT_STORAGE_KEY, publicKey, {
+        showConsoleWarning: true,
+        ...options,
+      });
+      return drafts ?? [];
+    } catch (err) {
+      console.warn("[DraftService Warning] Failed to read or decrypt drafts:", err);
       return [];
     }
   }
 
-  /** Get a specific draft from localStorage by ID. */
-  getDraft(draftId: string): ProjectDraft | null {
-    return this.getAllDrafts().find((d) => d.id === draftId) ?? null;
+  /**
+   * Get a specific draft from encrypted localStorage by ID.
+   *
+   * @param draftId - Unique ID of the draft
+   * @param publicKey - Optional Stellar public key
+   */
+  getDraft(draftId: string, publicKey?: string | null): ProjectDraft | null {
+    return this.getAllDrafts(publicKey).find((d) => d.id === draftId) ?? null;
   }
 
   /**
    * Get the localStorage draft matching a mode/projectId combo.
-   * Used by the hook when no wallet is available.
+   * Used by the hook when no wallet is available or offline.
+   *
+   * @param mode - "create" | "edit"
+   * @param projectId - Optional project ID for edit mode
+   * @param publicKey - Optional Stellar public key
    */
   getDraftForProject(
     mode: "create" | "edit",
-    projectId?: string
+    projectId?: string,
+    publicKey?: string | null
   ): ProjectDraft | null {
-    const drafts = this.getAllDrafts();
+    const drafts = this.getAllDrafts(publicKey);
     if (mode === "create") {
       return drafts.find((d) => d.mode === "create") ?? null;
     }
@@ -92,13 +121,39 @@ class DraftService {
     return null;
   }
 
-  // ── Synchronous localStorage write ───────────────────────────────────────
-
-  /** Persist a draft to localStorage immediately. */
-  saveDraft(draft: Omit<ProjectDraft, "lastSaved">): void {
+  /**
+   * Migrate any existing unencrypted drafts in localStorage on first load.
+   * Re-encrypts data using the user's Stellar public key hash (or default key).
+   *
+   * @param publicKey - Optional Stellar public key
+   */
+  migrateUnencryptedDrafts(publicKey?: string | null): void {
     if (typeof window === "undefined") return;
     try {
-      const drafts = this.getAllDrafts();
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (raw && !isEncrypted(raw)) {
+        const unencryptedDrafts = JSON.parse(raw) as ProjectDraft[];
+        setItemAndEncrypt(DRAFT_STORAGE_KEY, unencryptedDrafts, publicKey);
+        console.info("[DraftService] Successfully migrated legacy unencrypted drafts to encrypted storage.");
+      }
+    } catch (err) {
+      console.warn("[DraftService Warning] Could not migrate legacy unencrypted drafts:", err);
+    }
+  }
+
+  // ── Synchronous encrypted localStorage write ─────────────────────────────
+
+  /**
+   * Persist a draft to encrypted localStorage immediately.
+   * Encrypts the payload with user's Stellar public key hash.
+   *
+   * @param draft - Draft object to save
+   * @param publicKey - Optional Stellar public key
+   */
+  saveDraft(draft: Omit<ProjectDraft, "lastSaved">, publicKey?: string | null): void {
+    if (typeof window === "undefined") return;
+    try {
+      const drafts = this.getAllDrafts(publicKey);
       const idx = drafts.findIndex((d) => d.id === draft.id);
       const updated: ProjectDraft = {
         ...draft,
@@ -109,9 +164,9 @@ class DraftService {
       } else {
         drafts.push(updated);
       }
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts));
+      setItemAndEncrypt(DRAFT_STORAGE_KEY, drafts, publicKey);
     } catch (err) {
-      console.error("Failed to save draft to localStorage:", err);
+      console.error("Failed to save encrypted draft to localStorage:", err);
     }
   }
 
@@ -160,18 +215,25 @@ class DraftService {
     }
   }
 
-  // ── localStorage delete ───────────────────────────────────────────────────
+  // ── Encrypted localStorage delete ─────────────────────────────────────────
 
-  deleteDraft(draftId: string): void {
+  /**
+   * Delete a specific draft from encrypted localStorage.
+   *
+   * @param draftId - ID of draft to delete
+   * @param publicKey - Optional Stellar public key
+   */
+  deleteDraft(draftId: string, publicKey?: string | null): void {
     if (typeof window === "undefined") return;
     try {
-      const drafts = this.getAllDrafts().filter((d) => d.id !== draftId);
-      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(drafts));
+      const drafts = this.getAllDrafts(publicKey).filter((d) => d.id !== draftId);
+      setItemAndEncrypt(DRAFT_STORAGE_KEY, drafts, publicKey);
     } catch (err) {
-      console.error("Failed to delete draft:", err);
+      console.error("Failed to delete draft from encrypted localStorage:", err);
     }
   }
 
+  /** Clear all drafts from localStorage */
   clearAllDrafts(): void {
     if (typeof window === "undefined") return;
     try {
