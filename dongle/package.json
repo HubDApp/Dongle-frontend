@@ -13,6 +13,9 @@
     "lint": "eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish",
     "test": "vitest --run",
     "test:watch": "vitest",
+    "test:bundle": "node scripts/check-bundle-size.mjs",
+    "test:lighthouse": "npx --yes @lhci/cli autorun --config=lighthouserc.json",
+    "test:perf": "npm run test:bundle && npm run test:lighthouse",
     "typecheck": "tsc --noEmit",
     "audit": "node scripts/audit-check.js"
   },

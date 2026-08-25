@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/lhci-report
+/storybook-static
 
 # next.js
 /.next/

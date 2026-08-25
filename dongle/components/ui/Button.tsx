@@ -21,9 +21,15 @@ import { Loader2 } from "lucide-react";
  *   `<Button isLoading={loading} leftIcon={<Icon />} />`
  *   → shows spinner, screen reader announces "Loading..."
  */
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "outline" | "ghost" | "error";
-  size?: "sm" | "md" | "lg";
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "error";
+export type ButtonSize = "sm" | "md" | "lg";
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Visual style. Default: `primary`. */
+  variant?: ButtonVariant;
+  /** Padding and type size. Default: `md`. */
+  size?: ButtonSize;
+  /** Disables the button and shows a spinner. Sets `aria-busy`. */
   isLoading?: boolean;
   /** Optional text to show instead of children while loading */
   loadingText?: string;

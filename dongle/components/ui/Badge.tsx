@@ -1,8 +1,17 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
-interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: "primary" | "secondary" | "success" | "warning" | "error" | "outline";
+export type BadgeVariant =
+  | "primary"
+  | "secondary"
+  | "success"
+  | "warning"
+  | "error"
+  | "outline";
+
+export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Color treatment. Default: `primary`. */
+  variant?: BadgeVariant;
 }
 
 export const Badge = ({ className, variant = "primary", ...props }: BadgeProps) => {

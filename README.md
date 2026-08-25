@@ -79,6 +79,15 @@ Contract addresses are configured via environment variables to support multiple 
 
 The frontend is designed to be modular, allowing easy expansion to other chains in the future.
 
+## Documentation
+
+Developer docs live next to this file and in the Next.js app:
+
+- [Architecture Decision Records](./docs/adr/README.md) — Context vs Redux, IPFS vs API, contract layout, localStorage
+- [Hooks usage guide](./docs/hooks-guide.md)
+- [UI component props and examples](./docs/components.md) — also `/docs/components` in the running app
+- App README: [dongle/README.md](./dongle/README.md)
+
 ## Purpose and Vision
 
 The Dongle frontend makes on-chain discovery usable and intuitive. It bridges the gap between decentralized infrastructure and everyday users by presenting verifiable, transparent data in a familiar app-store experience.
