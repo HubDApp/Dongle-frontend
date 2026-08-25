@@ -11,17 +11,20 @@ import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { getPrefetchValue } from "@/lib/prefetch-config";
+import { highlightText } from "@/lib/utils";
 
 interface ProjectCardProps {
   project: Project;
   verificationStatus?: VerificationStatus;
   showCompareCheckbox?: boolean;
+  highlightTerm?: string;
 }
 
 export const ProjectCard = ({
   project,
   verificationStatus,
   showCompareCheckbox = true,
+  highlightTerm = "",
 }: ProjectCardProps) => {
   const { addProject, removeProject, isSelected, canAddMore } = useComparison();
   const { isProjectSaved, toggleSavedProject, canManageSavedProjects } = useSavedProjects();
@@ -120,10 +123,14 @@ export const ProjectCard = ({
           </div>
         </div>
         <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">
-          {project.name}
+          {highlightTerm
+            ? highlightText(project.name, highlightTerm)
+            : project.name}
         </h3>
         <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-4 line-clamp-2 grow">
-          {project.description}
+          {highlightTerm
+            ? highlightText(project.description, highlightTerm)
+            : project.description}
         </p>
         {project.tags && project.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-4 px-2">
@@ -132,7 +139,9 @@ export const ProjectCard = ({
                 key={tag}
                 className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full"
               >
-                {tag}
+                {highlightTerm
+                  ? highlightText(tag, highlightTerm)
+                  : tag}
               </span>
             ))}
           </div>

@@ -3,6 +3,7 @@ import { Project } from "@/types/project";
 import { projectOwnerService } from "./project-owner.service";
 import { projectSubmissionService } from "./project-submission.service";
 import { registry } from "@/services/data-access/registry";
+import { fuzzyMatch, levenshteinDistance } from "@/lib/utils";
 
 /**
  * Unified project service that provides a single source of truth
@@ -79,16 +80,65 @@ export const projectService = {
   },
 
   /**
-   * Search projects by name or description
+   * Search projects by name, description, or tags with fuzzy matching for names.
+   * Results are sorted by relevance score (highest first).
    */
   searchProjects(query: string): Project[] {
-    const q = query.toLowerCase();
-    return this.getDiscoverableProjects().filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.tags?.some(tag => tag.toLowerCase().includes(q))
-    );
+    const q = query.toLowerCase().trim();
+    if (!q) return this.getDiscoverableProjects();
+
+    const discoverable = this.getDiscoverableProjects();
+    const scored: { project: Project; score: number }[] = [];
+
+    for (const p of discoverable) {
+      const name = p.name.toLowerCase();
+      const description = p.description.toLowerCase();
+      const tags = (p.tags ?? []).map((t) => t.toLowerCase());
+
+      let score = 0;
+
+      if (name === q) {
+        score += 100;
+      }
+      if (name.startsWith(q)) {
+        score += 50;
+      }
+      if (name.includes(q)) {
+        score += 30;
+      }
+      if (fuzzyMatch(p.name, query, 0.4)) {
+        score += 20;
+        const maxLen = Math.max(name.length, q.length);
+        if (maxLen > 0) {
+          const distance = levenshteinDistance(name, q);
+          score += (1 - distance / maxLen) * 10;
+        }
+      }
+
+      if (description.includes(q)) {
+        score += 15;
+      }
+      if (fuzzyMatch(p.description, query, 0.5)) {
+        score += 5;
+      }
+
+      for (const tag of tags) {
+        if (tag === q) {
+          score += 40;
+        } else if (tag.includes(q) || q.includes(tag)) {
+          score += 20;
+        } else if (fuzzyMatch(tag, q, 0.5)) {
+          score += 10;
+        }
+      }
+
+      if (score > 0) {
+        scored.push({ project: p, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.project);
   },
 
   /**
