@@ -7,7 +7,7 @@
  * real backend is available.
  */
 
-import { IUpdateRepository } from "./IUpdateRepository";
+import { IUpdateRepository } from "./IUpdateRepository.service";
 import { ProjectUpdate } from "@/types/update";
 import { mockUpdates } from "@/data/mockUpdates";
 import { generateId } from "@/lib/id-generator";

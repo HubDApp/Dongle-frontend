@@ -9,6 +9,8 @@ import React, {
   useCallback,
 } from "react";
 import { walletService } from "@/services/wallet/wallet.service";
+import { redactWalletAddress } from "@/utils/stellar-address.util";
+import { logger } from "@/utils/logger.util";
 import { SOROBAN_CONFIG } from "@/constants/contracts";
 import { toast } from "sonner";
 import {
@@ -111,7 +113,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setIsConnected(true);
         setWalletNetwork(networkPassphrase);
       } catch (error) {
-        console.error("Failed to restore wallet state:", error);
+        logger.error("Failed to restore wallet state:", error);
         localStorage.removeItem(WALLET_STORAGE_KEY);
       }
     };
@@ -130,7 +132,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (currentKey !== publicKey) {
-          console.info("Account change detected:", currentKey);
+          logger.info("Account change detected:", redactWalletAddress(currentKey));
           setPublicKey(currentKey);
           localStorage.setItem(
             WALLET_STORAGE_KEY,
@@ -142,7 +144,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           setWalletNetwork(networkPassphrase);
         }
       } catch (error) {
-        console.error("Error polling wallet:", error);
+        logger.error("Error polling wallet:", error);
         disconnectWallet();
       }
     };
@@ -189,7 +191,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Wallet connection failed";
-      console.error("Wallet connection failed:", error);
+      logger.error("Wallet connection failed:", error);
       trackWalletConnect({
         success: false,
         errorCode: error instanceof Error ? error.name || "Error" : "unknown",

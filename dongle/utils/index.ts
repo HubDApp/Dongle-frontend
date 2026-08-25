@@ -9,7 +9,5 @@ export * from "./repository";
 export * from "./stellar-address";
 export * from "./transaction-progress";
 export * from "./url";
-export * from "../utils";
 export * from "./utils";
 export * from "./crypto-storage";
-

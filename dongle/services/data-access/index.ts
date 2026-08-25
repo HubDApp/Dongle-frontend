@@ -9,17 +9,17 @@
  * - Migration:    stamp, migrateRecord, migrateRecordArray, CURRENT_SCHEMA_VERSION
  */
 
-export type { IProjectRepository } from "./IProjectRepository";
-export type { IReviewRepository } from "./IReviewRepository";
-export type { IUpdateRepository } from "./IUpdateRepository";
-export { MockProjectRepository } from "./MockProjectRepository";
-export { MockReviewRepository } from "./MockReviewRepository";
-export { MockUpdateRepository } from "./MockUpdateRepository";
-export { registry } from "./registry";
+export type { IProjectRepository } from "./IProjectRepository.service";
+export type { IReviewRepository } from "./IReviewRepository.service";
+export type { IUpdateRepository } from "./IUpdateRepository.service";
+export { MockProjectRepository } from "./MockProjectRepository.service";
+export { MockReviewRepository } from "./MockReviewRepository.service";
+export { MockUpdateRepository } from "./MockUpdateRepository.service";
+export { registry } from "./registry.service";
 export {
   CURRENT_SCHEMA_VERSION,
   stamp,
   migrateRecord,
   migrateRecordArray,
-} from "./migration";
-export type { VersionedRecord, MigrationResult } from "./migration";
+} from "./migration.service";
+export type { VersionedRecord, MigrationResult } from "./migration.service";
