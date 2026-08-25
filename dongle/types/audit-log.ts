@@ -17,7 +17,12 @@ export type AuditAction =
   | "report_resolved"
   | "report_dismissed"
   | "report_assigned"
-  | "report_unassigned";
+  | "report_unassigned"
+  | "submission_moderated"
+  | "claim_submitted"
+  | "claim_approved"
+  | "claim_rejected"
+  | "ownership_transferred";
 
 /** Human-readable labels for each action. */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -32,6 +37,11 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   report_dismissed: "Report Dismissed",
   report_assigned: "Report Assigned",
   report_unassigned: "Report Unassigned",
+  submission_moderated: "Submission Moderated",
+  claim_submitted: "Claim Submitted",
+  claim_approved: "Claim Approved",
+  claim_rejected: "Claim Rejected",
+  ownership_transferred: "Ownership Transferred",
 };
 
 /**
