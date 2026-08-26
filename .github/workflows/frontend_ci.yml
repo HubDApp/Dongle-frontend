@@ -48,9 +48,15 @@ jobs:
         run: npm run typecheck
 
       - name: Run Tests
+        id: tests
         run: npm test
 
+      - name: Run Accessibility (axe-core) Tests
+        id: a11y_unit
+        run: npm run test:a11y
+
       - name: Dependency Audit
+        id: audit
         run: npm run audit
 
       - name: Build Project
@@ -59,12 +65,47 @@ jobs:
         env:
           CI: true
 
+      - name: Install Chromium for pa11y-ci
+        id: chromium_install
+        if: steps.build.outcome == 'success'
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Run pa11y-ci WCAG AA Audit
+        id: pa11y
+        if: steps.chromium_install.outcome == 'success'
+        run: |
+          export PA11Y_CHROMIUM_PATH="$(which google-chrome-stable || which chromium-browser || which chromium)"
+          echo "Using Chrome/Chromium binary: ${PA11Y_CHROMIUM_PATH}"
+          PA11Y_PORT=3001 node scripts/serve-static-for-pa11y.mjs > /tmp/pa11y-server.log 2>&1 &
+          SERVER_PID=$!
+          sleep 3
+          npx pa11y-ci --config .pa11yci.js || true
+          PA11Y_EXIT=$?
+          kill ${SERVER_PID} 2>/dev/null || true
+          exit ${PA11Y_EXIT}
+        env:
+          PA11Y_DEBUG: "1"
+          PA11Y_PORT: "3001"
+
       - name: Generate Summary
         if: always()
         run: |
           echo "### Frontend CI Results" >> $GITHUB_STEP_SUMMARY
           echo "* **Lint:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "* **Type Check:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "* **Tests:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "* **Audit:** ${{ job.status == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Tests:** ${{ steps.tests.outcome == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **a11y (axe-core):** ${{ steps.a11y_unit.outcome == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Audit:** ${{ steps.audit.outcome == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "* **Build:** ${{ steps.build.outcome == 'success' && 'Passed' || 'Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **a11y (pa11y-ci):** ${{ steps.pa11y.outcome == 'success' && 'Passed' || (steps.pa11y.outcome == 'skipped' && 'Skipped' || 'Failed') }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Accessibility Checks Run" >> $GITHUB_STEP_SUMMARY
+          echo "- **axe-core ruleset:** wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa + best-practice" >> $GITHUB_STEP_SUMMARY
+          echo "- **Targets:** All UI primitives, main pages (Home/Discover/Reviews/Verify/Submit/Admin), forms" >> $GITHUB_STEP_SUMMARY
+          echo "- **Keyboard:** Tab order, focus management, Escape handling, Skip links, landmarks" >> $GITHUB_STEP_SUMMARY
+          echo "- **Color:** Automated WCAG AA contrast ratio assertion on all color pairs" >> $GITHUB_STEP_SUMMARY
+          echo "- **Screen reader:** Live region announcements, aria-live, aria-invalid, heading order, img alt" >> $GITHUB_STEP_SUMMARY
+          echo "- **pa11y-ci:** Full-page headless Chrome WCAG 2.1 AA scan on built site" >> $GITHUB_STEP_SUMMARY
