@@ -176,14 +176,29 @@ The canonical template lives in [`.env.example`](./.env.example). Key variables:
 
 ### Environment Variable Reference
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT` | Production only | Placeholder in dev | Smart contract ID for project registry |
-| `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` | Production only | Placeholder in dev | Smart contract ID for review registry |
-| `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | Production only | Placeholder in dev | Smart contract ID for verification requests |
-| `NEXT_PUBLIC_SOROBAN_RPC_URL` | No | Testnet RPC | Soroban RPC endpoint URL |
-| `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | No | Testnet passphrase | Stellar network identifier |
-| `NEXT_PUBLIC_ADMIN_ALLOWLIST` | No | (empty) | Comma-separated admin wallet addresses |
+All environment variables are validated using Zod schemas defined in [`constants/env.schema.ts`](./constants/env.schema.ts). The schema provides:
+- **Type validation**: Ensures values match expected formats (contract IDs, URLs, etc.)
+- **Default values**: Development defaults for local testing
+- **Validation rules**: Custom rules for production deployments
+- **Documentation**: JSDoc comments for each variable
+
+For complete documentation of all environment variables, validation rules, and types, see [`constants/env.schema.ts`](./constants/env.schema.ts).
+
+#### Core Environment Variables
+
+| Variable | Required | Default (Dev) | Description |
+|----------|----------|---------------|-------------|
+| `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT` | Production only | `CAAAA...` (placeholder) | Smart contract ID for project registry |
+| `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` | Production only | `CAAAA...` (placeholder) | Smart contract ID for review registry |
+| `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | Production only | `CAAAA...` (placeholder) | Smart contract ID for verification requests |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL` | No | `https://soroban-testnet.stellar.org:443` | Soroban RPC endpoint URL |
+| `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | No | `Test SDF Network ; September 2015` | Stellar network identifier |
+| `NEXT_PUBLIC_REVIEW_PERSISTENCE` | No | (empty) | Storage mode: `"api"` for server, empty for localStorage |
+| `NEXT_PUBLIC_ADMIN_ALLOWLIST` | No | (empty) | Comma-separated admin wallet addresses (G...) |
+| `ADMIN_ALLOWLIST` | No | (empty) | Server-side admin allowlist (not exposed to client) |
+| `ADMIN_JWT_SECRET` | If admins enabled | (empty) | Secret key for signing admin JWT tokens (generate with `openssl rand -hex 32`) |
+| `NEXT_PUBLIC_ANALYTICS_ENABLED` | No | `"true"` | Enable/disable analytics event emission |
+| `NEXT_PUBLIC_ANALYTICS_INGEST_URL` | No | (empty) | Analytics ingest endpoint URL |
 
 ### Contract ID Format
 
@@ -204,15 +219,46 @@ To deploy Dongle to production:
 
 ### Validation & Error Handling
 
-- **Development** (`NODE_ENV=development`): Invalid env vars use safe defaults and log warnings
-- **Test** (`NODE_ENV=test`): Invalid env vars use safe defaults
-- **Production** (`NODE_ENV=production`): Invalid env vars cause build/startup failure with clear error messages
+Environment variables are validated at build time and runtime using Zod schemas ([`constants/env.schema.ts`](./constants/env.schema.ts)):
 
-Example error output:
+- **Development** (`NODE_ENV=development`): Missing values use safe defaults, validation warnings logged
+- **Test** (`NODE_ENV=test`): Missing values use safe defaults
+- **Production** (`NODE_ENV=production`): All required values must be explicitly set, invalid values cause startup failure
+
+**Validation Features:**
+- Contract ID format validation (56 chars: C + 55 base32)
+- URL validation for RPC endpoints
+- Stellar public key validation for admin allowlists
+- Production-specific checks (no placeholder contract IDs)
+- Admin JWT secret requirement when admin features are enabled
+
+Example validation error output:
 ```
-Environment Validation Error:
-- NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: Invalid Stellar Contract ID format
-- NEXT_PUBLIC_SOROBAN_RPC_URL: Invalid URL
+╔══════════════════════════════════════════════════════════════╗
+║          ENVIRONMENT CONFIGURATION ERROR                     ║
+╚══════════════════════════════════════════════════════════════╝
+
+Environment: PRODUCTION
+
+The following environment variables are invalid:
+  - NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: Development placeholder contract ID not allowed in production. Deploy contracts and set real contract IDs.
+  - NEXT_PUBLIC_SOROBAN_RPC_URL: Must be a valid HTTPS URL
+
+See:
+  - dongle/.env.example for configuration template
+  - dongle/DEPLOYMENT.md for production checklist
+  - dongle/constants/env.schema.ts for schema reference
+```
+
+**Programmatic Validation:**
+```typescript
+import { validateEnv, exportJsonSchema } from '@/constants/env.schema';
+
+// Validate environment
+const config = validateEnv(process.env, isDevelopment);
+
+// Export JSON Schema for external tools
+const jsonSchema = exportJsonSchema();
 ```
 
 ## Project Structure
