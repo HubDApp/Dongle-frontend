@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { Flag } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { cn } from "@/lib/utils";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+import { useModalForm } from "@/hooks/useModalForm";
 import { PROJECT_REPORT_REASONS, PROJECT_REPORT_CONSTRAINTS } from "@/types/project";
 
 interface ReportProjectModalProps {
@@ -22,38 +22,22 @@ export function ReportProjectModal({
   onClose,
   onSubmit,
 }: ReportProjectModalProps) {
-  const [reason, setReason] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [error, setError] = useState("");
-
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const initialFocusRef = useRef<HTMLSelectElement>(null);
-
-  // Reset state when opened
-  useEffect(() => {
-    if (!isOpen) return;
-    // Schedule resets as a microtask so they run after render,
-    // avoiding synchronous setState-in-effect lint violations.
-    const id = setTimeout(() => {
-      setReason("");
-      setExplanation("");
-      setError("");
-    }, 0);
-    return () => clearTimeout(id);
-  }, [isOpen]);
-
-  // Handle escape key
-  useModalFocusTrap(isOpen, dialogRef, initialFocusRef, onClose);
+  const { values, setField, error, setError, dialogRef, initialFocusRef } =
+    useModalForm({
+      isOpen,
+      onClose,
+      initialValues: { reason: "", explanation: "" },
+    });
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason) {
+    if (!values.reason) {
       setError("Please select a reason for reporting.");
       return;
     }
-    onSubmit({ reason, explanation });
+    onSubmit({ reason: values.reason, explanation: values.explanation });
   };
 
   return (
@@ -88,19 +72,16 @@ export function ReportProjectModal({
           <SelectField
             ref={initialFocusRef}
             label="Reason for reporting"
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              if (error) setError("");
-            }}
+            value={values.reason}
+            onChange={(e) => setField("reason", e.target.value)}
             options={PROJECT_REPORT_REASONS}
             error={error}
           />
 
           <TextAreaField
             label="Additional explanation (optional)"
-            value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
+            value={values.explanation}
+            onChange={(e) => setField("explanation", e.target.value)}
             placeholder="Provide any additional context or links..."
             maxLength={PROJECT_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH}
           />
