@@ -3,6 +3,7 @@ export { ClaimStatusBanner } from "./ClaimStatusBanner";
 export { ContractAddressList } from "./ContractAddressList";
 export { DraftIndicator } from "./DraftIndicator";
 export { ProjectCard } from "./ProjectCard";
+export { LazyProjectCard } from "./LazyProjectCard";
 export { default as ProjectForm } from "./ProjectForm";
 export { ProjectImage } from "./ProjectImage";
 export { ProjectStatusBanner } from "./ProjectStatusBanner";
