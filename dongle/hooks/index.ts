@@ -18,5 +18,7 @@ export { useWalletPageGate } from "./useWalletPageGate";
 export { useModalFocusTrap } from "./useModalFocusTrap";
 export { useWalletTransactions } from "./useWalletTransactions";
 export { useAdminSession } from "./useAdminSession";
+export { useDebounce, useDebouncedCallback } from "./useDebounce";
+export { useIntersectionObserver, useLazyLoad } from "./useIntersectionObserver";
 export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
 export type { WalletTransaction } from "./useWalletTransactions";
