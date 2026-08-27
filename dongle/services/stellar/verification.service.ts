@@ -4,6 +4,8 @@
  * Persists state via localStorage (development) or contract storage (production).
  */
 
+import { redactWalletAddress } from "@/utils/stellar-address.util";
+
 export type VerificationStatus = "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface VerificationRequest {
@@ -16,6 +18,8 @@ export interface VerificationRequest {
   statusUpdatedAt: string;
   statusUpdatedBy?: string;
   rejectionReason?: string;
+  assignedTo?: string;
+  assignedAt?: string;
 }
 
 const VERIFICATION_STORAGE_KEY = "dongle_verification_requests";
@@ -112,6 +116,22 @@ class VerificationService {
   }
 
   /**
+   * Gets all verification requests (for admin dashboard).
+   */
+  async getAllRequests(): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests.sort(
+        (a, b) =>
+          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+      );
+    } catch (error) {
+      console.error("[VerificationService] Error getting all requests:", error);
+      return [];
+    }
+  }
+
+  /**
    * Gets all pending verification requests (for admin dashboard).
    */
   async getPendingRequests(): Promise<VerificationRequest[]> {
@@ -122,6 +142,95 @@ class VerificationService {
       );
     } catch (error) {
       console.error("[VerificationService] Error getting pending requests:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Assigns a verification request to an admin.
+   */
+  async assignRequest(
+    projectId: string,
+    assignedBy: string,
+    assignedTo: string,
+  ): Promise<VerificationRequest> {
+    try {
+      const request = await this.getVerificationRequest(projectId);
+      
+      if (!request) {
+        throw new Error("Verification request not found");
+      }
+
+      // Update request assignment
+      request.assignedTo = assignedTo;
+      request.assignedAt = new Date().toISOString();
+
+      // Persist updated request
+      await this.persistRequest(request);
+
+      console.log(`[VerificationService] Request assigned: ${projectId} to ${redactWalletAddress(assignedTo)}`);
+      return request;
+    } catch (error) {
+      console.error("[VerificationService] Error assigning request:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unassigns a verification request (removes assignment).
+   */
+  async unassignRequest(
+    projectId: string,
+    unassignedBy: string,
+  ): Promise<VerificationRequest> {
+    try {
+      const request = await this.getVerificationRequest(projectId);
+      
+      if (!request) {
+        throw new Error("Verification request not found");
+      }
+
+      // Remove assignment
+      delete request.assignedTo;
+      delete request.assignedAt;
+
+      // Persist updated request
+      await this.persistRequest(request);
+
+      console.log(`[VerificationService] Request unassigned: ${projectId}`);
+      return request;
+    } catch (error) {
+      console.error("[VerificationService] Error unassigning request:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets verification requests assigned to a specific admin.
+   */
+  async getRequestsAssignedTo(adminAddress: string): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests
+        .filter((r) => r.assignedTo === adminAddress)
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    } catch (error) {
+      console.error("[VerificationService] Error getting assigned requests:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Gets unassigned verification requests.
+   */
+  async getUnassignedRequests(): Promise<VerificationRequest[]> {
+    try {
+      const requests = this.loadRequests();
+      return requests
+        .filter((r) => !r.assignedTo)
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    } catch (error) {
+      console.error("[VerificationService] Error getting unassigned requests:", error);
       return [];
     }
   }
@@ -249,10 +358,12 @@ class VerificationService {
     request: VerificationRequest | null;
   }> {
     try {
+      const { projectService } = await import("../project/project.service");
+      const projectExists = projectService.getProjectById(projectId) !== null;
       const request = await this.getVerificationRequest(projectId);
-      
+
       return {
-        projectExists: true, // Would check against project registry in real implementation
+        projectExists,
         requestExists: request !== null,
         request,
       };

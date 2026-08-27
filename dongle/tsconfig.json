@@ -25,7 +25,34 @@
     "paths": {
       "@/*": [
         "./*"
-      ]
+      ],
+      "@/lib/admin-auth": ["./utils/admin-auth.util"],
+      "@/lib/contract-validator": ["./utils/contract-validator.util"],
+      "@/lib/date": ["./utils/date.util"],
+      "@/lib/error-mapper": ["./utils/error-mapper.util"],
+      "@/lib/externalLinkWarning": ["./utils/external-link-warning.util"],
+      "@/lib/id-generator": ["./utils/id-generator.util"],
+      "@/lib/logger": ["./utils/logger.util"],
+      "@/lib/network-guard": ["./utils/network-guard.util"],
+      "@/lib/prefetch-config": ["./utils/prefetch-config.util"],
+      "@/lib/project-cache": ["./utils/project-cache.util"],
+      "@/lib/project-id": ["./utils/project-id.util"],
+      "@/lib/repository": ["./utils/repository.util"],
+      "@/lib/stellar-address": ["./utils/stellar-address.util"],
+      "@/lib/submission-quality": ["./utils/submission-quality.util"],
+      "@/lib/transaction-progress": ["./utils/transaction-progress.util"],
+      "@/lib/url": ["./utils/url.util"],
+      "@/lib/utils": ["./utils/utils.util"],
+      "@/services/data-access/migration": ["./services/data-access/migration.service"],
+      "@/services/data-access/MockUpdateRepository": ["./services/data-access/MockUpdateRepository.service"],
+      "@/services/data-access/IUpdateRepository": ["./services/data-access/IUpdateRepository.service"],
+      "@/services/data-access/IProjectRepository": ["./services/data-access/IProjectRepository.service"],
+      "@/services/data-access/MockReviewRepository": ["./services/data-access/MockReviewRepository.service"],
+      "@/services/data-access/registry": ["./services/data-access/registry.service"],
+      "@/services/data-access/IReviewRepository": ["./services/data-access/IReviewRepository.service"],
+      "@/services/data-access/MockProjectRepository": ["./services/data-access/MockProjectRepository.service"],
+      "@/services/project/batch-fetch": ["./services/project/batch-fetch.service"],
+      "@/services/stellar/batch-verification": ["./services/stellar/batch-verification.service"]
     }
   },
   "include": [

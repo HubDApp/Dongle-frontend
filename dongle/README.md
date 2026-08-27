@@ -33,6 +33,17 @@ All interactions are wallet-authenticated using Freighter, providing transparent
 - **State Management**: React Context + Custom Hooks
 - **Language**: TypeScript (strict mode)
 
+## File Structure and Naming
+
+Keep code organized by responsibility and use these filename conventions:
+
+- `services/`: service modules use `*.service.ts`; `index.ts` files are barrel exports.
+- `hooks/`: React hooks use `use*.ts`; `index.ts` files are barrel exports.
+- `utils/`: shared utilities use `*.util.ts`; `index.ts` is the utility barrel export.
+- `components/`: React components use descriptive PascalCase `.tsx` filenames.
+
+The filename convention is checked by ESLint and by the pre-commit hook. Run `node scripts/setup-git-hooks.mjs` once after cloning to configure Git to use `.githooks/`.
+
 ## Prerequisites
 
 Before getting started, ensure you have:
@@ -99,6 +110,9 @@ npm run test:watch
 # Security audit for vulnerable dependencies
 npm run audit
 ```
+
+See [DEPENDENCY_POLICY.md](./DEPENDENCY_POLICY.md) for the update cadence, wallet/Stellar SDK compatibility checks, and documented audit exceptions.
+
 
 ### Build & Production
 

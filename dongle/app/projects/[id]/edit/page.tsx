@@ -77,6 +77,7 @@ export default function EditProjectPage() {
                 publicKey={gate.publicKey}
                 onConnect={gate.connectWallet}
                 onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
               />
             )}
           </div>
@@ -157,6 +158,8 @@ export default function EditProjectPage() {
             githubUrl: project.githubUrl,
             logoUrl: project.logoUrl,
             docsUrl: project.docsUrl,
+            auditReportUrl: project.auditReportUrl,
+            bugBountyUrl: project.bugBountyUrl,
           }}
         />
       </div>

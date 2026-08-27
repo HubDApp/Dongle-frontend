@@ -3,6 +3,7 @@
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import NetworkMismatchBanner from "./NetworkMismatchBanner";
+import ProductionConfigBanner from "./ProductionConfigBanner";
 import { ComparisonFloatingButton } from "@/components/compare/ComparisonFloatingButton";
 
 interface LayoutWrapperProps {
@@ -13,6 +14,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
+      <ProductionConfigBanner />
       <NetworkMismatchBanner />
       <main className="grow pt-16">
         {children}

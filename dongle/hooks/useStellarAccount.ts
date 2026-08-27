@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { stellarService } from "@/services/stellar/stellar.service";
+import { lazyStellarService } from "@/services/stellar/lazy-stellar.service";
 import { useWallet } from "@/context/wallet.context";
 import type { Horizon } from "stellar-sdk";
 import { toast } from "sonner";
@@ -43,7 +43,7 @@ export function useStellarAccount(): UseStellarAccountReturn {
     setLoading(true);
     setError(null);
     try {
-      const accountData = await stellarService.getAccount(publicKey);
+      const accountData = await lazyStellarService.getAccount(publicKey);
       if (!isMountedRef.current) return;
       setAccount(accountData);
       setBalances(accountData.balances);

@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { ShieldCheck } from "lucide-react";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { toast } from "sonner";
+import { trackVerificationRequest } from "@/lib/analytics";
 
 const verificationSchema = z.object({
   projectId: z
@@ -47,11 +48,19 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
       success: () => {
         setIsSubmitting(false);
         reset();
+        trackVerificationRequest({
+          success: true,
+          projectRefLength: data.projectId.length,
+        });
         if (onSuccess) onSuccess(data.projectId);
         return `Verification requested successfully!`;
       },
       error: (err) => {
         setIsSubmitting(false);
+        trackVerificationRequest({
+          success: false,
+          errorCode: err instanceof Error ? err.name || "Error" : "unknown",
+        });
         return `Request failed: ${err.message}`;
       },
     });

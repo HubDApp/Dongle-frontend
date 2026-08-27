@@ -86,6 +86,8 @@ Previously, verification status was only shown in a standalone component on the 
 3. `dongle/app/discover/page.tsx`
 4. `dongle/app/projects/[id]/page.tsx`
 5. `dongle/components/landing/FeaturedProjects.tsx`
+6. `dongle/components/projects/RecentlyViewedProjects.tsx` (Updated)
+7. `dongle/app/profile/page.tsx` (Updated)
 
 ## Usage Example
 

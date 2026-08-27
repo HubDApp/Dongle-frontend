@@ -45,10 +45,12 @@ export function ComparisonFloatingButton() {
                 </span>
               </div>
               <button
+                type="button"
                 onClick={() => removeProject(project.id)}
                 className="absolute top-2 right-2 text-zinc-400 hover:text-red-500 transition-colors"
+                aria-label={`Remove ${project.name} from comparison`}
               >
-                <X className="w-3 h-3" />
+                <X className="w-3 h-3" aria-hidden="true" />
               </button>
             </div>
           ))}

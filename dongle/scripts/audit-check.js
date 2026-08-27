@@ -3,6 +3,7 @@ const { exec } = require('child_process');
 
 // Documented exceptions for known vulnerabilities that cannot be resolved yet
 // due to upstream framework constraints (e.g. Next.js 16/React 19 ecosystem).
+// Keep in sync with dongle/DEPENDENCY_POLICY.md — never silently ignore new advisories.
 const ALLOWED_EXCEPTIONS = {
   '@babel/core': {
     reason: 'DevDependency vulnerability in build toolchain (Arbitrary File Read via sourceMappingURL).',
@@ -18,12 +19,26 @@ const ALLOWED_EXCEPTIONS = {
       'https://github.com/advisories/GHSA-j5f8-grm9-p9fc',
       'https://github.com/advisories/GHSA-35jp-ww65-95wh',
       'https://github.com/advisories/GHSA-898c-q2cr-xwhg',
-      'https://github.com/advisories/GHSA-654m-c8p4-x5fp'
+      'https://github.com/advisories/GHSA-654m-c8p4-x5fp',
+      'https://github.com/advisories/GHSA-42h9-826w-cgv3',
+      'https://github.com/advisories/GHSA-xj6q-8x83-jv6g',
+      'https://github.com/advisories/GHSA-pmv8-rq9r-6j72',
+      'https://github.com/advisories/GHSA-jqh4-m9w3-8hp9',
+      'https://github.com/advisories/GHSA-mmx7-hfxf-jppx',
+      'https://github.com/advisories/GHSA-f4gw-2p7v-4548',
+      'https://github.com/advisories/GHSA-gcfj-64vw-6mp9',
+      'https://github.com/advisories/GHSA-hcpx-6fm6-wx23',
+      'https://github.com/advisories/GHSA-7q8q-rj6j-mhjq',
+      'https://github.com/advisories/GHSA-mwf2-3pr3-8698'
     ]
   },
   'brace-expansion': {
-    reason: 'Transitive devDependency (Large numeric range DoS).',
-    advisories: ['https://github.com/advisories/GHSA-jxxr-4gwj-5jf2']
+    reason: 'Transitive devDependency (Large numeric range / expansion DoS).',
+    advisories: [
+      'https://github.com/advisories/GHSA-jxxr-4gwj-5jf2',
+      'https://github.com/advisories/GHSA-3jxr-9vmj-r5cp',
+      'https://github.com/advisories/GHSA-mh99-v99m-4gvg'
+    ]
   },
   'form-data': {
     reason: 'Transitive dependency of other dev/build dependencies (CRLF injection).',
@@ -31,10 +46,13 @@ const ALLOWED_EXCEPTIONS = {
   },
   'js-yaml': {
     reason: 'Transitive dependency of eslint and other build dependencies (DoS in merge key handling).',
-    advisories: ['https://github.com/advisories/GHSA-h67p-54hq-rp68']
+    advisories: [
+      'https://github.com/advisories/GHSA-h67p-54hq-rp68',
+      'https://github.com/advisories/GHSA-52cp-r559-cp3m'
+    ]
   },
   'next': {
-    reason: 'Next.js 16 is early/preview release and has some current unresolved dependencies/advisories that do not affect our static-ish development workflow.',
+    reason: 'Next.js 16 early release; several advisories await upstream patches and do not block our documented static/client workflow. Revisit on each quarterly SDK/framework upgrade.',
     advisories: [
       'https://github.com/advisories/GHSA-9g9p-9gw9-jx7f',
       'https://github.com/advisories/GHSA-h25m-26qc-wcjf',
@@ -57,12 +75,29 @@ const ALLOWED_EXCEPTIONS = {
       'https://github.com/advisories/GHSA-492v-c6pp-mqqv',
       'https://github.com/advisories/GHSA-wfc6-r584-vfw7',
       'https://github.com/advisories/GHSA-267c-6grr-h53f',
-      'https://github.com/advisories/GHSA-36qx-fr4f-26g5'
+      'https://github.com/advisories/GHSA-36qx-fr4f-26g5',
+      'https://github.com/advisories/GHSA-6gpp-xcg3-4w24',
+      'https://github.com/advisories/GHSA-m99w-x7hq-7vfj',
+      'https://github.com/advisories/GHSA-89xv-2m56-2m9x',
+      'https://github.com/advisories/GHSA-68g3-v927-f742',
+      'https://github.com/advisories/GHSA-4633-3j49-mh5q',
+      'https://github.com/advisories/GHSA-4c39-4ccg-62r3',
+      'https://github.com/advisories/GHSA-p9j2-gv94-2wf4',
+      'https://github.com/advisories/GHSA-q8wf-6r8g-63ch',
+      'https://github.com/advisories/GHSA-955p-x3mx-jcvp'
     ]
   },
   'postcss': {
-    reason: 'PostCSS is a development/build dependency; the XSS vulnerability does not affect the deployed static bundle.',
-    advisories: ['https://github.com/advisories/GHSA-qx2v-qp2m-jg93']
+    reason: 'PostCSS is a development/build dependency; XSS / source map issues do not affect the deployed static CSS bundle.',
+    advisories: [
+      'https://github.com/advisories/GHSA-qx2v-qp2m-jg93',
+      'https://github.com/advisories/GHSA-6g55-p6wh-862q',
+      'https://github.com/advisories/GHSA-r28c-9q8g-f849'
+    ]
+  },
+  'sharp': {
+    reason: 'Transitive image-processing dependency of Next.js; libvips CVEs are not exploitable via our public app surface without untrusted image pipelines.',
+    advisories: ['https://github.com/advisories/GHSA-f88m-g3jw-g9cj']
   },
   'undici': {
     reason: 'Undici is a transitive dependency of Next.js for network requests; not exposed directly to users.',

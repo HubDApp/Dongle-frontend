@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import { fileNamingPlugin } from "./scripts/eslint-file-naming.mjs";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -16,7 +17,29 @@ const eslintConfig = defineConfig([
     "lhci-report/**",
   ]),
   {
+    plugins: {
+      naming: fileNamingPlugin,
+    },
     rules: {
+      "naming/file-naming": "error",
+      // Public module areas must be consumed through their root barrel exports.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "../components/*/**",
+                "../services/*/**",
+                "../hooks/*/**",
+                "../types/*/**",
+                "../lib/*/**",
+              ],
+              message: "Use the root barrel or '@/...' path alias instead of a deep relative import.",
+            },
+          ],
+        },
+      ],
       // Allow underscore-prefixed names as the conventional "intentionally unused" marker.
       "@typescript-eslint/no-unused-vars": [
         "warn",
