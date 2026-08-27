@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { formatDate, nowUTC, toUTCString, isValidDate } from "@/lib/date";
+import { formatDate, nowUTC, toUTCString, isValidDate } from "@/lib/dates";
 
 describe("Date Formatting Utility", () => {
   beforeEach(() => {

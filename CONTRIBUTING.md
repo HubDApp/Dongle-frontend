@@ -126,6 +126,7 @@ Closes #
 
 - Strict typing — avoid `any`; use `unknown` and narrow with type guards when needed.
 - Use the `@/` path alias for imports within `dongle/`.
+- Import public components, services, hooks, types, and library utilities from their root barrel (`@/components`, `@/services`, `@/hooks`, `@/types`, or `@/lib`). Avoid deep relative imports from those directories. Subdirectory barrels may be used when a root barrel would create an unnecessary public surface.
 - Prefer interfaces for object shapes; use `const` assertions for constant maps.
 - Colocate types in `dongle/types/` when shared across modules.
 

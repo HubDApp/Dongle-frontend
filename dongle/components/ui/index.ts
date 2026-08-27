@@ -13,6 +13,7 @@ export type { InputProps } from "./Input";
 export { default as OfflineBanner, OfflineWarning } from "./OfflineBanner";
 export { default as Pagination } from "./Pagination";
 export { RouteErrorFallback } from "./RouteErrorFallback";
+export { ErrorBoundary } from "./ErrorBoundary";
 export { SafeExternalLink } from "./SafeExternalLink";
 export type { SafeExternalLinkProps } from "./SafeExternalLink";
 export { SelectField } from "./SelectField";

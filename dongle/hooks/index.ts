@@ -15,4 +15,8 @@ export { useSavedProjects } from "./useSavedProjects";
 export { useStellarAccount } from "./useStellarAccount";
 export { useUnsavedChanges } from "./useUnsavedChanges";
 export { useWalletPageGate } from "./useWalletPageGate";
+export { useModalFocusTrap } from "./useModalFocusTrap";
+export { useWalletTransactions } from "./useWalletTransactions";
+export { useAdminSession } from "./useAdminSession";
 export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
+export type { WalletTransaction } from "./useWalletTransactions";
