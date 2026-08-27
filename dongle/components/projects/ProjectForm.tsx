@@ -36,6 +36,7 @@ import { isValidSorobanContractId } from "@/lib/stellar-address";
 import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
+import { ProjectFormContext } from "@/context/project-form.context";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -119,7 +120,7 @@ const projectSchema = z.object({
   contractAddresses: z.array(contractIdSchema).max(5, "You can add at most 5 contract addresses"),
 });
 
-type ProjectFormValues = z.infer<typeof projectSchema>;
+export type ProjectFormValues = z.infer<typeof projectSchema>;
 
 type ProjectFormProps = {
   mode?: "create" | "edit";
@@ -374,6 +375,15 @@ export default function ProjectForm({
   };
 
   return (
+    <ProjectFormContext.Provider
+      value={{
+        mode,
+        projectId,
+        isSubmitting,
+        watchField: (name) => watch(name),
+        formErrors: errors as Record<string, any>,
+      }}
+    >
     <ErrorBoundary
       operation={mode === "edit" ? "Project update form" : "Project registration form"}
       userAction={mode === "edit" ? "updating a project" : "registering a project"}
@@ -679,5 +689,6 @@ export default function ProjectForm({
       />
     </Card>
     </ErrorBoundary>
+    </ProjectFormContext.Provider>
   );
 }
