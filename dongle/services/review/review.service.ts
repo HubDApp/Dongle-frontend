@@ -1,6 +1,6 @@
 import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
-import { nowUTC, isValidDate } from "@/lib/date";
+import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
 
 const STORAGE_KEY = "dongle_reviews";

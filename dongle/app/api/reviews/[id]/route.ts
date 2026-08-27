@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hasMinLength } from "@/lib/validation";
 
 interface InMemoryReview {
   id: string;
@@ -22,7 +23,7 @@ function validateReviewInput(rating: unknown, comment: unknown): string | null {
   if (rating !== undefined && (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5)) {
     return "Rating must be an integer between 1 and 5";
   }
-  if (comment !== undefined && (typeof comment !== "string" || comment.trim().length < 10)) {
+  if (comment !== undefined && (typeof comment !== "string" || !hasMinLength(comment, 10))) {
     return "Comment must be at least 10 characters";
   }
   if (typeof comment === "string" && comment.length > 1000) {

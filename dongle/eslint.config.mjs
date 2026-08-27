@@ -20,6 +20,24 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "naming/file-naming": "error",
+      // Public module areas must be consumed through their root barrel exports.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "../components/*/**",
+                "../services/*/**",
+                "../hooks/*/**",
+                "../types/*/**",
+                "../lib/*/**",
+              ],
+              message: "Use the root barrel or '@/...' path alias instead of a deep relative import.",
+            },
+          ],
+        },
+      ],
       // Allow underscore-prefixed names as the conventional "intentionally unused" marker.
       "@typescript-eslint/no-unused-vars": [
         "warn",

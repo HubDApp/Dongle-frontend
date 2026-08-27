@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { UPDATE_TYPES, UpdateType, ProjectUpdate } from "@/types/update";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X } from "lucide-react";
+import { isBlank } from "@/lib/string";
 
 interface UpdateFormProps {
   projectId: string;
@@ -48,19 +49,19 @@ export default function UpdateForm({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!title.trim()) {
+    if (isBlank(title)) {
       newErrors.title = "Title is required";
     } else if (title.length > 100) {
       newErrors.title = "Title must be 100 characters or less";
     }
 
-    if (!content.trim()) {
+    if (isBlank(content)) {
       newErrors.content = "Content is required";
     } else if (content.length < 20) {
       newErrors.content = "Content must be at least 20 characters";
     }
 
-    if (type === UPDATE_TYPES.RELEASE && !version.trim()) {
+    if (type === UPDATE_TYPES.RELEASE && isBlank(version)) {
       newErrors.version = "Version is required for releases";
     }
 

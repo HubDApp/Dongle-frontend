@@ -33,6 +33,9 @@ import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
+import { isBlank } from "@/lib/string";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { logger } from "@/lib/logger";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -47,7 +50,7 @@ const urlSchema = z.string().transform((val, ctx) => {
 });
 
 const optionalUrlSchema = z.string().transform((val, ctx) => {
-  if (val.trim().length === 0) return "";
+  if (isBlank(val)) return "";
   try {
     return normalizeUrl(val);
   } catch {
@@ -60,7 +63,7 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
 });
 
 const repositoryUrlSchema = z.string().transform((val, ctx) => {
-  if (val.trim().length === 0) return "";
+  if (isBlank(val)) return "";
   
   const validation = validateRepositoryUrl(val);
   
@@ -80,7 +83,7 @@ const repositoryUrlSchema = z.string().transform((val, ctx) => {
  * Accepts an empty string (field left blank) or a valid 56-char C… address.
  */
 const contractIdSchema = z.string().transform((val, ctx) => {
-  if (val.trim().length === 0) return "";
+  if (isBlank(val)) return "";
   const normalized = val.trim().toUpperCase();
   if (!isValidSorobanContractId(normalized)) {
     ctx.addIssue({
@@ -287,6 +290,10 @@ export default function ProjectForm({
           });
         }
       } catch (error) {
+        logger.error("Soroban project operation failed", {
+          operation: mode === "edit" ? "updateProject" : "registerProject",
+          userAction: mode === "edit" ? "updating a project" : "registering a project",
+        }, error);
         trackProjectSubmit({
           success: false,
           mode,
@@ -367,6 +374,11 @@ export default function ProjectForm({
   };
 
   return (
+    <ErrorBoundary
+      operation={mode === "edit" ? "Project update form" : "Project registration form"}
+      userAction={mode === "edit" ? "updating a project" : "registering a project"}
+      onReset={() => reset()}
+    >
     <Card
       variant="glass"
       padding="lg"
@@ -666,5 +678,6 @@ export default function ProjectForm({
         onCancel={() => setDiscardDialogOpen(false)}
       />
     </Card>
+    </ErrorBoundary>
   );
 }

@@ -1,4 +1,7 @@
-export * from "./date";
+export * from "./dates";
+export * from "./string";
+export * from "./validation";
+export * from "./array";
 export * from "./error-mapper";
 export * from "./externalLinkWarning";
 export * from "./id-generator";
@@ -12,4 +15,7 @@ export * from "./url";
 export * from "../utils";
 export * from "./utils";
 export * from "./crypto-storage";
+export * from "./ipfs-gateway";
+export * from "./analytics";
+export * from "./i18n";
 

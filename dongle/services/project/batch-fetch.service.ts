@@ -13,6 +13,7 @@ import type { Project } from "@/types/project";
 import { registry } from "@/services/data-access/registry";
 import { projectMetaCache } from "@/lib/project-cache";
 import { logger } from "@/lib/logger";
+import { chunk } from "@/lib/array";
 
 /** Maximum project IDs to request in a single batch. */
 export const BATCH_SIZE = 100;
@@ -63,10 +64,7 @@ export async function batchFetchProjects(
   }
 
   // --- 2. Split remaining IDs into chunks of BATCH_SIZE ---
-  const chunks: string[][] = [];
-  for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
-    chunks.push(toFetch.slice(i, i + BATCH_SIZE));
-  }
+  const chunks = chunk(toFetch, BATCH_SIZE);
 
   logger.debug(
     `[BatchFetch] Fetching ${toFetch.length} projects in ${chunks.length} batch(es) of up to ${BATCH_SIZE}`,

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { ProjectUpdate, UpdateType, UPDATE_TYPES } from "@/types/update";
-import { formatDateUTC, formatRelative } from "@/lib/date";
+import { formatDateUTC, formatRelative } from "@/lib/dates";
 import { Badge } from "@/components/ui/Badge";
 import { Megaphone, Shield, Target, Bell, Edit2, Trash2, ArrowUpDown } from "lucide-react";
 

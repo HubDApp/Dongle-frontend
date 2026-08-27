@@ -6,6 +6,7 @@ import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface ReviewFormProps {
   projectId: string;
@@ -87,6 +88,15 @@ export default function ReviewForm({
   const commentError = errors.find((e) => e.field === "comment")?.message;
 
   return (
+    <ErrorBoundary
+      operation="Review form"
+      userAction={initialReview ? "updating a review" : "posting a review"}
+      onReset={() => {
+        setRating(initialReview?.rating || 5);
+        setComment(initialReview?.comment || "");
+        setErrors([]);
+      }}
+    >
     <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
       <div className="flex justify-between items-center">
         <div>
@@ -174,5 +184,6 @@ export default function ReviewForm({
         </button>
       </div>
     </form>
+    </ErrorBoundary>
   );
 }

@@ -4,6 +4,7 @@ import { projectOwnerService } from "./project-owner.service";
 import { projectSubmissionService } from "./project-submission.service";
 import { registry } from "@/services/data-access/registry";
 import { fuzzyMatch, levenshteinDistance } from "@/lib/utils";
+import { unique } from "@/lib/array";
 
 /**
  * Unified project service that provides a single source of truth
@@ -145,8 +146,8 @@ export const projectService = {
    * Get unique categories from all projects
    */
   getCategories(): string[] {
-    const categories = new Set(this.getAllProjects().map((p) => p.primaryCategory).filter(Boolean));
-    return ["All", ...Array.from(categories)];
+    const categories = unique(this.getAllProjects().map((p) => p.primaryCategory).filter(Boolean));
+    return ["All", ...categories];
   },
 
   /**
