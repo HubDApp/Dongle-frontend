@@ -16,56 +16,17 @@ import {
 import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
 import { validateStellarAddress } from "@/lib/stellar-address";
+import {
+  WalletNotConnectedError,
+  NetworkMismatchError,
+  TransactionFailedError,
+  ContractCallError,
+} from "@/lib/errors";
+import type { ISorobanService } from "./soroban.interface";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,
 });
-
-export type TransactionPhaseHandler = (
-  phase: TransactionPhase,
-  meta?: { txHash?: string; error?: Error },
-) => void;
-
-export interface SorobanTransactionOptions {
-  onPhaseChange?: TransactionPhaseHandler;
-  signal?: AbortSignal;
-  timeoutMs?: number;
-  intervalMs?: number;
-}
-
-// ─── Network mismatch error ──────────────────────────────────────────────────
-
-export class NetworkMismatchError extends Error {
-  readonly expectedNetwork: string;
-  readonly actualNetwork: string | null;
-
-  constructor(actual: string | null) {
-    const expectedLabel = EXPECTED_NETWORK_LABEL;
-    const actualLabel = getNetworkLabel(actual);
-    super(
-      `Wrong network: wallet is on ${actualLabel}, but this app requires ${expectedLabel}. ` +
-        `Please switch your Freighter wallet to ${expectedLabel} and try again.`,
-    );
-    this.name = "NetworkMismatchError";
-    this.expectedNetwork = EXPECTED_NETWORK_PASSPHRASE;
-    this.actualNetwork = actual;
-  }
-}
-
-// ─── Wallet not connected error ──────────────────────────────────────────────
-
-/**
- * Thrown when a transaction is attempted without a connected wallet.
- * Always surfaces as a real error — never silently falls back to mock data.
- */
-export class WalletNotConnectedError extends Error {
-  constructor() {
-    super(
-      "No wallet connected. Please connect your Freighter wallet and try again.",
-    );
-    this.name = "WalletNotConnectedError";
-  }
-}
 
 /**
  * Validates that the wallet is on the expected network before any transaction.
@@ -74,7 +35,11 @@ export class WalletNotConnectedError extends Error {
 async function assertCorrectNetwork(): Promise<void> {
   const passphrase = await walletService.getNetworkPassphrase();
   if (passphrase !== EXPECTED_NETWORK_PASSPHRASE) {
-    throw new NetworkMismatchError(passphrase);
+    throw new NetworkMismatchError(
+      passphrase,
+      EXPECTED_NETWORK_PASSPHRASE,
+      EXPECTED_NETWORK_LABEL,
+    );
   }
 }
 
@@ -173,8 +138,9 @@ async function pollTransaction(
   }
 
   if (last.status !== "SUCCESS") {
-    throw new Error(
-      `[SorobanService] Transaction ${hash} failed with status: ${last.status}`,
+    throw new TransactionFailedError(
+      `Transaction ${hash} failed with status: ${last.status}`,
+      hash,
     );
   }
 
@@ -218,8 +184,9 @@ async function executeContractTransaction(
   );
 
   if (sendResponse.status === "ERROR") {
-    throw new Error(
+    throw new TransactionFailedError(
       "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+      sendResponse.hash,
     );
   }
 
@@ -430,9 +397,9 @@ export const sorobanService = {
     }
 
     const project = await this.getProject(projectId);
-    if (!project) throw new Error("Project not found");
+    if (!project) throw new ContractCallError("Project not found");
     if (project.owner !== publicKey) {
-      throw new Error("Only project owner can update the project");
+      throw new ContractCallError("Only project owner can update the project");
     }
 
     const args = [
@@ -479,15 +446,15 @@ export const sorobanService = {
     }
 
     const project = await this.getProject(projectId);
-    if (!project) throw new Error("Project not found");
+    if (!project) throw new ContractCallError("Project not found");
     if (project.owner !== publicKey) {
-      throw new Error("Only the current project owner can transfer ownership");
+      throw new ContractCallError("Only the current project owner can transfer ownership");
     }
 
     // Validate new owner address
     const validation = validateStellarAddress(newOwnerAddress);
     if (!validation.valid) {
-      throw new Error(validation.error);
+      throw new ContractCallError(validation.error);
     }
 
     const args = [

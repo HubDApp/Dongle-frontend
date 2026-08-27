@@ -3,6 +3,24 @@
  * Converts technical errors into user-friendly messages while preserving developer diagnostics
  */
 
+import {
+  DomainError,
+  WalletError,
+  WalletNotConnectedError,
+  WalletLockedError,
+  WalletNotInstalledError,
+  NetworkError,
+  NetworkTimeoutError,
+  NetworkMismatchError,
+  SorobanError,
+  TransactionFailedError,
+  ContractCallError,
+  AccountError,
+  InsufficientBalanceError,
+  StorageError,
+  DataIntegrityError,
+} from "@/lib/errors";
+
 export interface MappedError {
   userMessage: string;
   technicalDetails?: string;
@@ -21,9 +39,60 @@ export type ErrorCategory =
   | "unknown";
 
 /**
- * Maps technical error messages to user-friendly messages
+ * Maps technical error messages to user-friendly messages.
+ *
+ * If the error is an instance of one of the custom error classes defined in
+ * `@/lib/errors`, the mapping is immediate — no string heuristics needed.
  */
 export function mapError(error: unknown, category?: ErrorCategory): MappedError {
+  // Fast-path: custom error classes carry their own user-friendly payload.
+  if (error instanceof WalletNotConnectedError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof WalletLockedError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof WalletNotInstalledError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof WalletError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof NetworkTimeoutError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof NetworkMismatchError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof NetworkError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof TransactionFailedError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof ContractCallError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof SorobanError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof InsufficientBalanceError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof AccountError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof StorageError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof DataIntegrityError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+  if (error instanceof DomainError) {
+    return { userMessage: error.message, code: error.code, actionable: error.actionable, technicalDetails: error.message };
+  }
+
+  // Legacy path: string-based heuristics for plain Error / unknown values.
   const errorMessage = getErrorMessage(error);
   const errorCode = getErrorCode(error);
 
