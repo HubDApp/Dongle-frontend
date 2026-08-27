@@ -1,9 +1,14 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: "default" | "glass" | "outline";
-  padding?: "none" | "sm" | "md" | "lg";
+export type CardVariant = "default" | "glass" | "outline";
+export type CardPadding = "none" | "sm" | "md" | "lg";
+
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Surface style. Default: `default`. */
+  variant?: CardVariant;
+  /** Inner padding. Default: `md`. */
+  padding?: CardPadding;
 }
 
 export const Card = ({ 

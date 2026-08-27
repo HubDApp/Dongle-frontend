@@ -98,6 +98,12 @@ npm run typecheck
 # Run all tests (unit and integration)
 npm run test
 
+# After a production build: gzipped JS per route (< 200 KB)
+npm run test:bundle
+
+# Lighthouse CI (Performance >= 90, a11y >= 95, FCP < 1.5s, CLS < 0.1)
+npm run test:lighthouse
+
 # Run tests in watch mode (development)
 npm run test:watch
 
@@ -325,6 +331,19 @@ dongle/
 **Component Composition**: UI built from small, reusable components with clear props
 
 **Type-Safe Forms**: react-hook-form with Zod schema validation for runtime type safety
+
+## Documentation
+
+| Doc | What it covers |
+|-----|----------------|
+| [Architecture Decision Records](../docs/adr/README.md) | Why Context+hooks, IPFS, contract split, and localStorage |
+| [Hooks usage guide](../docs/hooks-guide.md) | `useWallet`, `useStellarAccount`, `useDraft`, and the rest |
+| [UI components](../docs/components.md) | Button, Card, Badge, Input props, variants, and a11y |
+| [Performance budgets](./performance-budget.json) | Lighthouse + gzipped JS per route |
+
+Live component examples and an interactive playground: [http://localhost:3000/docs/components](http://localhost:3000/docs/components) after `npm run dev`.
+
+When an architectural choice changes, **update the matching ADR** (supersede or add an Amendment). See [docs/adr/README.md](../docs/adr/README.md).
 
 ## Development Limitations & Mock Data
 
