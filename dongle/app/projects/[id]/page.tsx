@@ -50,9 +50,9 @@ import {
   UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
+import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
-import { reviewReportService } from "@/services/review/review-report.service";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";

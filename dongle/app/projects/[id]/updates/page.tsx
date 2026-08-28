@@ -64,7 +64,7 @@ export default function ProjectUpdatesPage() {
       toast.success("Update edited successfully");
     } else {
       updateService.addUpdate(
-        { projectId: project.id, ...data, authorAddress: gate.publicKey },
+        { projectId: project.id, ...data },
         gate.publicKey,
       );
       toast.success("Update published successfully");

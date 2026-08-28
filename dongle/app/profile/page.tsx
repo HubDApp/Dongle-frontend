@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
@@ -43,7 +43,6 @@ import { sorobanService } from "@/services/stellar/soroban.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { savedSearchService } from "@/services/search/saved-search.service";
-import type { SavedSearch } from "@/types/search";
 import { getWatchlistNotifications } from "@/services/watchlist/watchlist-notification.service";
 
 interface StellarNonNativeBalance {
@@ -70,7 +69,13 @@ export default function ProfilePage() {
     trendingFromWatchlist,
   } = useWatchlist();
   const [watchlistCategory, setWatchlistCategory] = useState("All");
-  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const savedSearches = useMemo(
+    () =>
+      gate.publicKey
+        ? savedSearchService.getSavedSearches(gate.publicKey)
+        : [],
+    [gate.publicKey],
+  );
   const watchlistNotifications = getWatchlistNotifications();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
@@ -109,14 +114,6 @@ export default function ProfilePage() {
 
     void fetchStatuses();
   }, [savedProjectIds]);
-
-  useEffect(() => {
-    if (!gate.publicKey) {
-      setSavedSearches([]);
-      return;
-    }
-    setSavedSearches(savedSearchService.getSavedSearches(gate.publicKey));
-  }, [gate.publicKey]);
 
   const handleClearHistory = async () => {
     const ok = await confirm({
