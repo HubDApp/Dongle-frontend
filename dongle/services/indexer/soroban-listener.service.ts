@@ -1,5 +1,5 @@
-import { CircuitBreaker } from "./circuit-breaker";
-import { indexEvent } from "./event-store";
+import { CircuitBreaker } from "./circuit-breaker.service";
+import { indexEvent } from "./event-store.service";
 import type { SorobanEventType } from "@/types/indexer";
 
 export interface SorobanListenerConfig {

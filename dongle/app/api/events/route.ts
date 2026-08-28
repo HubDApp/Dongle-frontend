@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryEvents, seedDemoEvents } from "@/services/indexer/event-store";
+import { queryEvents, seedDemoEvents } from "@/services/indexer/event-store.service";
 import type { SorobanEventType } from "@/types/indexer";
 
 let seeded = false;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { replayHistoricalEvents } = await import("@/services/indexer/event-store");
+    const { replayHistoricalEvents } = await import("@/services/indexer/event-store.service");
     const replayed = replayHistoricalEvents(historical);
     return NextResponse.json({ success: true, count: replayed.length, data: replayed });
   } catch {

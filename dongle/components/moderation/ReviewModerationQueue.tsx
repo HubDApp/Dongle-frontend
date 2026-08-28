@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { FlaggedReview, SpamStatistics } from "@/types/moderation";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
@@ -21,8 +21,11 @@ export function ReviewModerationQueue({ moderatorAddress }: ReviewModerationQueu
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  const reload = useCallback(async (options?: { showLoading?: boolean }) => {
+    if (options?.showLoading) {
+      setLoading(true);
+    }
+
     const [pending, spamStats] = await Promise.all([
       reviewModerationService.getQueue("pending"),
       reviewModerationService.getStats(),
@@ -33,8 +36,24 @@ export function ReviewModerationQueue({ moderatorAddress }: ReviewModerationQueu
   }, []);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    let cancelled = false;
+
+    void (async () => {
+      const [pending, spamStats] = await Promise.all([
+        reviewModerationService.getQueue("pending"),
+        reviewModerationService.getStats(),
+      ]);
+
+      if (cancelled) return;
+      setQueue(pending);
+      setStats(spamStats);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -56,7 +75,7 @@ export function ReviewModerationQueue({ moderatorAddress }: ReviewModerationQueu
     setProcessing(false);
     toast.success(`${action}: ${result.succeeded.length} processed`);
     setSelected(new Set());
-    await reload();
+    await reload({ showLoading: true });
   };
 
   if (loading) {
@@ -120,41 +139,59 @@ export function ReviewModerationQueue({ moderatorAddress }: ReviewModerationQueu
       ) : (
         <div className="space-y-4">
           {queue.map((item) => (
-            <div
+            <FlaggedReviewRow
               key={item.id}
-              className="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 bg-white dark:bg-zinc-900"
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={selected.has(item.id)}
-                  onChange={() => toggleSelect(item.id)}
-                  aria-label={`Select review ${item.reviewId}`}
-                  className="mt-1"
-                />
-                <div className="flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="warning">Risk {item.riskScore}/100</Badge>
-                    {item.flags.map((flag) => (
-                      <Badge key={flag} variant="secondary">
-                        {flag}
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    {item.review.comment}
-                  </p>
-                  <div className="flex flex-wrap gap-4 text-xs text-zinc-500">
-                    <span>{item.review.projectName}</span>
-                    <AddressDisplay address={item.review.userAddress} truncated inline />
-                    <span>{formatDate(item.flaggedAt, "short")}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+              item={item}
+              selected={selected.has(item.id)}
+              onToggleSelect={toggleSelect}
+            />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function FlaggedReviewRow({
+  item,
+  selected,
+  onToggleSelect,
+}: {
+  item: FlaggedReview;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
+  const derivedRiskScore = useMemo(() => item.riskScore, [item.riskScore]);
+
+  return (
+    <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 bg-white dark:bg-zinc-900">
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(item.id)}
+          aria-label={`Select review ${item.reviewId}`}
+          className="mt-1"
+        />
+        <div className="flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warning">Risk {derivedRiskScore}/100</Badge>
+            {item.flags.map((flag) => (
+              <Badge key={flag} variant="secondary">
+                {flag}
+              </Badge>
+            ))}
+          </div>
+          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+            {item.review.comment}
+          </p>
+          <div className="flex flex-wrap gap-4 text-xs text-zinc-500">
+            <span>{item.review.projectName}</span>
+            <AddressDisplay address={item.review.userAddress} truncated inline />
+            <span>{formatDate(item.flaggedAt, "short")}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

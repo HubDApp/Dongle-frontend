@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { CircuitBreaker } from "@/services/indexer/circuit-breaker";
+import { CircuitBreaker } from "@/services/indexer/circuit-breaker.service";
 import {
   indexEvent,
   queryEvents,
   replayHistoricalEvents,
   resetEventStore,
-} from "@/services/indexer/event-store";
+} from "@/services/indexer/event-store.service";
 
 describe("indexer services", () => {
   beforeEach(() => {
