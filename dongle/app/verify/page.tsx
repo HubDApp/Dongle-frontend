@@ -60,6 +60,11 @@ export default function VerifyPage() {
                   gate={gate}
                   pagePurpose={VERIFY_PURPOSE}
                   loadingMessage="Preparing your wallet..."
+                  walletNetworkLabel={gate.walletNetworkLabel}
+                  publicKey={gate.publicKey}
+                  onConnect={gate.connectWallet}
+                  onDisconnect={gate.disconnectWallet}
+                  onRetry={gate.retryAccountLoad}
                 />
               </div>
             )

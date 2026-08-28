@@ -1,21 +1,82 @@
 import { z } from "zod";
 
+// ─── Contract existence validation ───────────────────────────────────────────
+
+/**
+ * Re-exported for consumer convenience so callers can import everything
+ * contract-related from a single module.
+ *
+ * @see lib/contract-validator for the full implementation.
+ */
+export {
+  ContractNotFoundError,
+  validateContractExists,
+} from "@/lib/contract-validator";
+
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
+/**
+ * Validates a Stellar contract ID: starts with "C" followed by exactly 55
+ * base-32 characters (A-Z, 2-7).  Total length: 56 chars.
+ */
 export const ContractIdSchema = z
   .string()
   .regex(/^C[A-Z2-7]{55}$/, "Invalid Stellar Contract ID format");
 
+/**
+ * Validates a Stellar public key: starts with "G" followed by exactly 55
+ * base-32 characters (A-Z, 2-7).  Total length: 56 chars.
+ */
+export const PublicKeySchema = z
+  .string()
+  .regex(/^G[A-Z2-7]{55}$/, "Invalid Stellar Public Key format");
+
+// ─── Safe dev defaults ────────────────────────────────────────────────────────
+
+/**
+ * The all-A contract placeholder is structurally valid (passes the regex) but
+ * will fail any real on-chain call.  It is only permitted in development and
+ * test environments.
+ */
+export const DEV_CONTRACT_PLACEHOLDER =
+  "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+export const DEV_RPC_URL = "https://soroban-testnet.stellar.org:443";
+export const DEV_NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
+
+// ─── Schema factory ───────────────────────────────────────────────────────────
+
+/**
+ * Returns a Zod schema for the full environment.
+ *
+ * @param isDev  When true, missing values fall back to safe development
+ *               defaults.  When false (production / build), every field is
+ *               required and must be explicitly set.
+ */
+/**
+ * Production contract IDs must be real deployments — the all-A placeholder
+ * is structurally valid but must never ship to users.
+ */
+export const ProductionContractIdSchema = ContractIdSchema.refine(
+  (id) => id !== DEV_CONTRACT_PLACEHOLDER,
+  {
+    message:
+      "Development placeholder contract ID is not allowed in production — set a real deployed contract ID",
+  },
+);
+
 export const getEnvSchema = (isDev: boolean) => {
-  const DEV_DEFAULT_CONTRACT =
-    "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   const contractField = isDev
-    ? ContractIdSchema.default(DEV_DEFAULT_CONTRACT)
-    : ContractIdSchema;
+    ? ContractIdSchema.default(DEV_CONTRACT_PLACEHOLDER)
+    : ProductionContractIdSchema;
+
   const urlField = isDev
-    ? z.string().url().default("https://soroban-testnet.stellar.org:443")
-    : z.string().url();
+    ? z.string().url("NEXT_PUBLIC_SOROBAN_RPC_URL must be a valid URL").default(DEV_RPC_URL)
+    : z.string().url("NEXT_PUBLIC_SOROBAN_RPC_URL must be a valid URL");
+
   const passphraseField = isDev
-    ? z.string().default("Test SDF Network ; September 2015")
-    : z.string().min(1);
+    ? z.string().default(DEV_NETWORK_PASSPHRASE)
+    : z.string().min(1, "NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE must not be empty");
 
   return z.object({
     NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: contractField,
@@ -26,35 +87,96 @@ export const getEnvSchema = (isDev: boolean) => {
   });
 };
 
+/**
+ * True when any configured contract ID is still the safe development placeholder.
+ * Used by the UI to fail clearly before users hit broken on-chain flows.
+ */
+export const hasPlaceholderContracts = (contracts: {
+  PROJECT_REGISTRY: string;
+  REVIEW_REGISTRY: string;
+  VERIFICATION_REGISTRY: string;
+}): boolean =>
+  contracts.PROJECT_REGISTRY === DEV_CONTRACT_PLACEHOLDER ||
+  contracts.REVIEW_REGISTRY === DEV_CONTRACT_PLACEHOLDER ||
+  contracts.VERIFICATION_REGISTRY === DEV_CONTRACT_PLACEHOLDER;
 
-interface ValidationError {
-  path: string[];
-  message: string;
-}
+// ─── Parser ───────────────────────────────────────────────────────────────────
 
-interface ZodError {
-  errors: ValidationError[];
-}
+/**
+ * Parses and validates raw environment variables.
+ *
+ * In development / test mode (`isDev = true`) missing values are replaced with
+ * safe defaults so local development works out of the box.
+ *
+ * In production mode (`isDev = false`) every variable must be explicitly set
+ * and valid.  A failure throws with a human-readable list of every invalid
+ * field so the problem is visible immediately in CI or server logs.
+ *
+ * @throws {Error} with a descriptive message listing all invalid fields.
+ */
+export const parseEnv = (
+  env: Record<string, string | undefined>,
+  isDev: boolean,
+) => {
+  const result = getEnvSchema(isDev).safeParse(env);
 
-export const parseEnv = (env: Record<string, string | undefined>, isDev: boolean) => {
-  try {
-    return getEnvSchema(isDev).parse(env);
-  } catch (error: unknown) {
-    if (error && typeof error === "object" && Array.isArray((error as ZodError).errors)) {
-      console.error("Environment Validation Error:");
-      ((error as ZodError).errors).forEach((err: ValidationError) => {
-        console.error(`- ${err.path.join(".")}: ${err.message}`);
-      });
-    }
-    throw new Error(
-      "Invalid environment configuration. Please check your .env file."
-    );
+  if (result.success) {
+    return result.data;
   }
+
+  // Format every field error on its own line for clear diagnosis.
+  const lines = result.error.issues.map(
+    (e) => `  - ${e.path.join(".") || "(root)"}: ${e.message}`,
+  );
+
+  console.error(
+    [
+      "",
+      "╔══════════════════════════════════════════════════════════════╗",
+      "║          ENVIRONMENT CONFIGURATION ERROR                     ║",
+      "╚══════════════════════════════════════════════════════════════╝",
+      "",
+      "The following environment variables are missing or invalid:",
+      ...lines,
+      "",
+      isDev
+        ? "In development, unset variables fall back to safe defaults."
+        : "In production ALL variables must be explicitly set (real contract",
+      isDev ? "" : "IDs — not the all-A placeholder) in your deployment environment.",
+      "",
+      "See dongle/DEPLOYMENT.md and dongle/.env.example.",
+      "",
+    ].join("\n"),
+  );
+
+  throw new Error(
+    `Invalid environment configuration (${result.error.issues.length} error${
+      result.error.issues.length === 1 ? "" : "s"
+    }). See console output above for details.`,
+  );
 };
 
+// ─── Module-level validation ──────────────────────────────────────────────────
+
+/**
+ * Determine strictness:
+ *
+ * - development / test         → permissive (dev defaults apply)
+ * - production build phase     → permissive (NEXT_PUBLIC_* vars may not be
+ *                                available in CI build environments; the build
+ *                                step validates compilation, not deployment
+ *                                config — actual values are supplied by the
+ *                                hosting platform at deploy/runtime)
+ * - production runtime         → strict (all variables must be explicitly set)
+ *
+ * To enforce contract IDs in a real production deploy, set the env vars in
+ * your hosting platform (Vercel, Netlify, etc.) and they will override the
+ * placeholder defaults at runtime.
+ */
 const isDev =
-  process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
-const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+  process.env.NODE_ENV === "development" ||
+  process.env.NODE_ENV === "test" ||
+  process.env.NEXT_PHASE === "phase-production-build";
 
 const parsedEnv = parseEnv(
   {
@@ -68,19 +190,32 @@ const parsedEnv = parseEnv(
     NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE:
       process.env.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE,
   },
-  isDev || isBuild
+  isDev,
 );
 
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
 /**
- * Contract IDs and network configuration for Dongle protocol.
+ * Validated Soroban contract IDs.
+ *
+ * In development these default to the all-A placeholder
+ * (`CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`).
+ * In production they are taken verbatim from `NEXT_PUBLIC_*` env vars.
+ *
+ * @see dongle/.env.example for setup instructions.
  */
 export const DONGLE_CONTRACTS = {
   PROJECT_REGISTRY: parsedEnv.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT,
   REVIEW_REGISTRY: parsedEnv.NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT,
   VERIFICATION_REGISTRY: parsedEnv.NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT,
-};
+} as const;
 
+/**
+ * Validated Soroban RPC / network configuration.
+ *
+ * @see dongle/.env.example for setup instructions.
+ */
 export const SOROBAN_CONFIG = {
   RPC_URL: parsedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL,
   NETWORK_PASSPHRASE: parsedEnv.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE,
-};
+} as const;

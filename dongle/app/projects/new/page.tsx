@@ -25,6 +25,19 @@ export default function NewProjectPage() {
               pagePurpose={SUBMIT_PURPOSE}
               loadingMessage="Preparing your wallet..."
             />
+            {gate.state === "account-loading" ? (
+              <WalletStateLoadingPanel message="Preparing your wallet..." />
+            ) : (
+              <WalletStatePanel
+                state={gate.state}
+                pagePurpose={SUBMIT_PURPOSE}
+                walletNetworkLabel={gate.walletNetworkLabel}
+                publicKey={gate.publicKey}
+                onConnect={gate.connectWallet}
+                onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
+              />
+            )}
 
             {gate.state === "disconnected" && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">

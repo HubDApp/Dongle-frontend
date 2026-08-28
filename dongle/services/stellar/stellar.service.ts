@@ -1,3 +1,5 @@
+import { redactWalletAddress } from "@/utils/stellar-address.util";
+import { logger } from "@/utils/logger.util";
 import { Horizon, Networks } from "stellar-sdk";
 
 /**
@@ -25,7 +27,7 @@ export const stellarService = {
       const account = await server.loadAccount(publicKey);
       return account;
     } catch (error) {
-      console.error(`[StellarService] Error fetching account ${publicKey}:`, error);
+      logger.error(`[StellarService] Error fetching account ${redactWalletAddress(publicKey)}:`, error);
       const err = error as { response?: { status?: number }; message?: string };
       if (err.response?.status === 404) {
         throw new Error("Account not found on Stellar Testnet. Please fund it using Friendbot.");
@@ -44,7 +46,7 @@ export const stellarService = {
       const account = await this.getAccount(publicKey);
       return account.balances;
     } catch (error) {
-      console.error(`[StellarService] Error fetching balances for ${publicKey}:`, error);
+      logger.error(`[StellarService] Error fetching balances for ${redactWalletAddress(publicKey)}:`, error);
       throw error;
     }
   },
@@ -65,7 +67,7 @@ export const stellarService = {
         .call();
       return transactions.records;
     } catch (error) {
-      console.error(`[StellarService] Error fetching transactions for ${publicKey}:`, error);
+      logger.error(`[StellarService] Error fetching transactions for ${redactWalletAddress(publicKey)}:`, error);
       const err = error as { message?: string };
       throw new Error(err.message || "Failed to fetch transactions from Stellar network.");
     }

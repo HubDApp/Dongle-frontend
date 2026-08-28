@@ -15,56 +15,18 @@ import {
 } from "@/context/wallet.context";
 import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
+import { validateStellarAddress } from "@/lib/stellar-address";
+import {
+  WalletNotConnectedError,
+  NetworkMismatchError,
+  TransactionFailedError,
+  ContractCallError,
+} from "@/lib/errors";
+import type { ISorobanService } from "./soroban.interface";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,
 });
-
-export type TransactionPhaseHandler = (
-  phase: TransactionPhase,
-  meta?: { txHash?: string; error?: Error },
-) => void;
-
-export interface SorobanTransactionOptions {
-  onPhaseChange?: TransactionPhaseHandler;
-  signal?: AbortSignal;
-  timeoutMs?: number;
-  intervalMs?: number;
-}
-
-// ─── Network mismatch error ──────────────────────────────────────────────────
-
-export class NetworkMismatchError extends Error {
-  readonly expectedNetwork: string;
-  readonly actualNetwork: string | null;
-
-  constructor(actual: string | null) {
-    const expectedLabel = EXPECTED_NETWORK_LABEL;
-    const actualLabel = getNetworkLabel(actual);
-    super(
-      `Wrong network: wallet is on ${actualLabel}, but this app requires ${expectedLabel}. ` +
-        `Please switch your Freighter wallet to ${expectedLabel} and try again.`,
-    );
-    this.name = "NetworkMismatchError";
-    this.expectedNetwork = EXPECTED_NETWORK_PASSPHRASE;
-    this.actualNetwork = actual;
-  }
-}
-
-// ─── Wallet not connected error ──────────────────────────────────────────────
-
-/**
- * Thrown when a transaction is attempted without a connected wallet.
- * Always surfaces as a real error — never silently falls back to mock data.
- */
-export class WalletNotConnectedError extends Error {
-  constructor() {
-    super(
-      "No wallet connected. Please connect your Freighter wallet and try again.",
-    );
-    this.name = "WalletNotConnectedError";
-  }
-}
 
 /**
  * Validates that the wallet is on the expected network before any transaction.
@@ -73,7 +35,11 @@ export class WalletNotConnectedError extends Error {
 async function assertCorrectNetwork(): Promise<void> {
   const passphrase = await walletService.getNetworkPassphrase();
   if (passphrase !== EXPECTED_NETWORK_PASSPHRASE) {
-    throw new NetworkMismatchError(passphrase);
+    throw new NetworkMismatchError(
+      passphrase,
+      EXPECTED_NETWORK_PASSPHRASE,
+      EXPECTED_NETWORK_LABEL,
+    );
   }
 }
 
@@ -86,6 +52,8 @@ export interface ProjectData {
   githubUrl?: string;
   logoUrl: string;
   docsUrl: string;
+  auditReportUrl?: string;
+  bugBountyUrl?: string;
   owner: string;
   createdAt: string;
 }
@@ -98,6 +66,12 @@ export interface ProjectRegistrationParams {
   githubUrl?: string;
   logoUrl?: string;
   docsUrl?: string;
+  /**
+   * Optional list of Soroban contract IDs associated with the project.
+   * Each entry must be a valid 56-character address starting with 'C'.
+   * Empty strings are ignored.
+   */
+  contractAddresses?: string[];
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
@@ -164,8 +138,9 @@ async function pollTransaction(
   }
 
   if (last.status !== "SUCCESS") {
-    throw new Error(
-      `[SorobanService] Transaction ${hash} failed with status: ${last.status}`,
+    throw new TransactionFailedError(
+      `Transaction ${hash} failed with status: ${last.status}`,
+      hash,
     );
   }
 
@@ -209,8 +184,9 @@ async function executeContractTransaction(
   );
 
   if (sendResponse.status === "ERROR") {
-    throw new Error(
+    throw new TransactionFailedError(
       "Transaction failed: " + JSON.stringify(sendResponse.errorResult),
+      sendResponse.hash,
     );
   }
 
@@ -247,6 +223,9 @@ export const sorobanService = {
       nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
+      nativeToScVal(
+        (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
+      ),
     ];
 
     const result = await executeContractTransaction(
@@ -296,21 +275,66 @@ export const sorobanService = {
    */
   async getVerificationStatus(
     projectId: string,
+    signal?: AbortSignal,
   ): Promise<"NONE" | "PENDING" | "VERIFIED" | "REJECTED"> {
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
     try {
       const { verificationService } = await import("./verification.service");
       const status = await verificationService.getVerificationStatus(projectId);
+
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
       console.log(
         `[SorobanService] Verification status for ${projectId}: ${status}`,
       );
       return status;
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw error;
+      }
       console.error(
         "[SorobanService] Error getting verification status:",
         error,
       );
       return "NONE";
     }
+  },
+
+  /**
+   * Returns verification status with project/request context for UI distinction.
+   */
+  async getVerificationRequestStatus(
+    projectId: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    projectExists: boolean;
+    requestExists: boolean;
+    status: "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
+    rejectionReason?: string;
+  }> {
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    const { verificationService } = await import("./verification.service");
+    const result = await verificationService.getRequestStatus(projectId);
+
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+
+    const status = result.request?.status ?? "NONE";
+    return {
+      projectExists: result.projectExists,
+      requestExists: result.requestExists,
+      status,
+      rejectionReason: result.request?.rejectionReason,
+    };
   },
 
   /**
@@ -331,6 +355,8 @@ export const sorobanService = {
           githubUrl: "https://github.com/example/soroban-swap",
           logoUrl: "https://example.com/logo1.png",
           docsUrl: "https://docs.soroban-swap.com",
+          auditReportUrl: "https://example.com/audit-soroban-swap.pdf",
+          bugBountyUrl: "https://example.com/bounty-soroban-swap",
           owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
           createdAt: "2024-11-10T00:00:00Z",
         },
@@ -371,9 +397,9 @@ export const sorobanService = {
     }
 
     const project = await this.getProject(projectId);
-    if (!project) throw new Error("Project not found");
+    if (!project) throw new ContractCallError("Project not found");
     if (project.owner !== publicKey) {
-      throw new Error("Only project owner can update the project");
+      throw new ContractCallError("Only project owner can update the project");
     }
 
     const args = [
@@ -385,6 +411,9 @@ export const sorobanService = {
       nativeToScVal(params.githubUrl),
       nativeToScVal(params.logoUrl),
       nativeToScVal(params.docsUrl),
+      nativeToScVal(
+        (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
+      ),
     ];
 
     const result = await executeContractTransaction(
@@ -394,6 +423,55 @@ export const sorobanService = {
     );
 
     console.log("[SorobanService] Update successful:", result.hash);
+    return result;
+  },
+
+  /**
+   * Transfer ownership of a project to a new Stellar address.
+   * Only the current owner can initiate this transfer.
+   * The new owner address is validated before submission.
+   *
+   * Note: This operation requires underlying contract support (`transfer_ownership`).
+   */
+  async transferOwnership(
+    projectId: string,
+    newOwnerAddress: string,
+    options: SorobanTransactionOptions = {},
+  ) {
+    let publicKey: string;
+    try {
+      publicKey = await walletService.getPublicKey();
+    } catch {
+      throw new WalletNotConnectedError();
+    }
+
+    const project = await this.getProject(projectId);
+    if (!project) throw new ContractCallError("Project not found");
+    if (project.owner !== publicKey) {
+      throw new ContractCallError("Only the current project owner can transfer ownership");
+    }
+
+    // Validate new owner address
+    const validation = validateStellarAddress(newOwnerAddress);
+    if (!validation.valid) {
+      throw new ContractCallError(validation.error);
+    }
+
+    const args = [
+      nativeToScVal(projectId),
+      nativeToScVal(newOwnerAddress),
+    ];
+
+    const result = await executeContractTransaction(
+      publicKey,
+      (contract) => contract.call("transfer_ownership", ...args),
+      options,
+    );
+
+    console.log(
+      "[SorobanService] Ownership transfer successful:",
+      result.hash,
+    );
     return result;
   },
 

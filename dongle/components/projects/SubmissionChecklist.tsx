@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import React, { useMemo } from "react";
-import { CheckCircle2, Circle, AlertCircle, Info } from "lucide-react";
+import { CheckCircle2, Circle, AlertCircle, Info, ShieldCheck, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 
 export interface ChecklistItem {
@@ -15,6 +16,7 @@ export interface ChecklistItem {
 interface SubmissionChecklistProps {
   formData: {
     name?: string;
+    primaryCategory?: string;
     websiteUrl?: string;
     githubUrl?: string;
     logoUrl?: string;
@@ -35,6 +37,13 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
         description: "Clear, unique name (minimum 3 characters)",
         required: true,
         completed: (formData.name?.trim().length ?? 0) >= 3,
+      },
+      {
+        id: "category",
+        label: "Category",
+        description: "The category that best fits your project",
+        required: true,
+        completed: (formData.primaryCategory?.trim().length ?? 0) > 0,
       },
       {
         id: "website",
@@ -241,6 +250,32 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Prepare for Verification */}
+        <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                Prepare for verification
+              </span>
+              <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                Verification isn&apos;t part of this form, but a strong listing
+                is easier to verify. Before you request it, have your{" "}
+                <strong>on-chain contract IDs</strong> ready to reference (in
+                your docs or description), along with any audit reports or
+                other evidence.
+              </p>
+              <Link
+                href="/verify"
+                className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 dark:text-purple-300 hover:underline mt-2"
+              >
+                Request verification after listing
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
         </div>
 
         {/* Submission Status */}

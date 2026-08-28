@@ -3,11 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { useComparison } from "@/context/comparison.context";
 import { useRouter } from "next/navigation";
-import { Star, ExternalLink, Github, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
+import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { Button } from "@/components/ui/Button";
+import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
 import { sorobanService } from "@/services/stellar/soroban.service";
+import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
+import type { Project } from "@/types/project";
 
 export default function ComparePage() {
   const { selectedProjects, removeProject, clearComparison } = useComparison();
@@ -32,11 +35,7 @@ export default function ComparePage() {
       setIsLoading(false);
     };
 
-    if (selectedProjects.length > 0) {
-      void fetchStatuses();
-    } else {
-      setIsLoading(false);
-    }
+    void fetchStatuses();
   }, [selectedProjects]);
 
   if (selectedProjects.length === 0) {
@@ -116,10 +115,12 @@ export default function ComparePage() {
                   {selectedProjects.map((project) => (
                     <th key={project.id} className="p-6 min-w-[250px] relative">
                       <button
+                        type="button"
                         onClick={() => removeProject(project.id)}
                         className="absolute top-4 right-4 text-zinc-400 hover:text-red-500 transition-colors"
+                        aria-label={`Remove ${project.name} from comparison`}
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <div className="flex flex-col items-center gap-3">
                         <ProjectImage
@@ -220,15 +221,15 @@ export default function ComparePage() {
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.websiteUrl ? (
-                        <a
+                        <CompareExternalLink
                           href={p.websiteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          project={p}
+                          status={verificationStatuses[p.id]}
                           className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1 justify-center"
                         >
                           Visit Site
                           <ExternalLink className="w-3 h-3" />
-                        </a>
+                        </CompareExternalLink>
                       ) : (
                         <span className="text-zinc-400 text-sm">N/A</span>
                       )}
@@ -238,19 +239,19 @@ export default function ComparePage() {
 
                 <ComparisonRow
                   label="GitHub"
-                  icon={<Github className="w-4 h-4" />}
+                  icon={<GitBranch className="w-4 h-4" />}
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.githubUrl ? (
-                        <a
+                        <CompareExternalLink
                           href={p.githubUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          project={p}
+                          status={verificationStatuses[p.id]}
                           className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1 justify-center"
                         >
                           View Repo
-                          <Github className="w-3 h-3" />
-                        </a>
+                          <GitBranch className="w-3 h-3" />
+                        </CompareExternalLink>
                       ) : (
                         <span className="text-zinc-400 text-sm">N/A</span>
                       )}
@@ -264,15 +265,15 @@ export default function ComparePage() {
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.docsUrl ? (
-                        <a
+                        <CompareExternalLink
                           href={p.docsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          project={p}
+                          status={verificationStatuses[p.id]}
                           className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1 justify-center"
                         >
                           Read Docs
                           <FileText className="w-3 h-3" />
-                        </a>
+                        </CompareExternalLink>
                       ) : (
                         <span className="text-zinc-400 text-sm">N/A</span>
                       )}
@@ -287,15 +288,15 @@ export default function ComparePage() {
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.auditReportUrl ? (
-                        <a
+                        <CompareExternalLink
                           href={p.auditReportUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          project={p}
+                          status={verificationStatuses[p.id]}
                           className="text-green-600 hover:text-green-700 text-sm flex items-center gap-1 justify-center font-medium"
                         >
                           View Report
                           <ExternalLink className="w-3 h-3" />
-                        </a>
+                        </CompareExternalLink>
                       ) : (
                         <span className="text-zinc-400 text-sm">Not available</span>
                       )}
@@ -309,15 +310,15 @@ export default function ComparePage() {
                   values={selectedProjects.map((p) => (
                     <div key={p.id}>
                       {p.bugBountyUrl ? (
-                        <a
+                        <CompareExternalLink
                           href={p.bugBountyUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          project={p}
+                          status={verificationStatuses[p.id]}
                           className="text-purple-600 hover:text-purple-700 text-sm flex items-center gap-1 justify-center font-medium"
                         >
                           View Program
                           <ExternalLink className="w-3 h-3" />
-                        </a>
+                        </CompareExternalLink>
                       ) : (
                         <span className="text-zinc-400 text-sm">Not available</span>
                       )}
@@ -346,10 +347,12 @@ export default function ComparePage() {
                   <h3 className="font-bold text-lg">{project.name}</h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => removeProject(project.id)}
                   className="text-zinc-400 hover:text-red-500 transition-colors"
+                  aria-label={`Remove ${project.name} from comparison`}
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5" aria-hidden="true" />
                 </button>
               </div>
 
@@ -406,15 +409,15 @@ export default function ComparePage() {
                   label="Website"
                   value={
                     project.websiteUrl ? (
-                      <a
+                      <CompareExternalLink
                         href={project.websiteUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        project={project}
+                        status={verificationStatuses[project.id]}
                         className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1"
                       >
                         Visit Site
                         <ExternalLink className="w-3 h-3" />
-                      </a>
+                      </CompareExternalLink>
                     ) : (
                       <span className="text-zinc-400">N/A</span>
                     )
@@ -424,15 +427,15 @@ export default function ComparePage() {
                   label="GitHub"
                   value={
                     project.githubUrl ? (
-                      <a
+                      <CompareExternalLink
                         href={project.githubUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        project={project}
+                        status={verificationStatuses[project.id]}
                         className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1"
                       >
                         View Repo
-                        <Github className="w-3 h-3" />
-                      </a>
+                        <GitBranch className="w-3 h-3" />
+                      </CompareExternalLink>
                     ) : (
                       <span className="text-zinc-400">N/A</span>
                     )
@@ -442,15 +445,15 @@ export default function ComparePage() {
                   label="Documentation"
                   value={
                     project.docsUrl ? (
-                      <a
+                      <CompareExternalLink
                         href={project.docsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        project={project}
+                        status={verificationStatuses[project.id]}
                         className="text-blue-500 hover:text-blue-600 text-sm flex items-center gap-1"
                       >
                         Read Docs
                         <FileText className="w-3 h-3" />
-                      </a>
+                      </CompareExternalLink>
                     ) : (
                       <span className="text-zinc-400">N/A</span>
                     )
@@ -460,15 +463,15 @@ export default function ComparePage() {
                   label="Audit Report"
                   value={
                     project.auditReportUrl ? (
-                      <a
+                      <CompareExternalLink
                         href={project.auditReportUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        project={project}
+                        status={verificationStatuses[project.id]}
                         className="text-green-600 hover:text-green-700 text-sm flex items-center gap-1 font-medium"
                       >
                         View Report
                         <ExternalLink className="w-3 h-3" />
-                      </a>
+                      </CompareExternalLink>
                     ) : (
                       <span className="text-zinc-400">Not available</span>
                     )
@@ -478,15 +481,15 @@ export default function ComparePage() {
                   label="Bug Bounty"
                   value={
                     project.bugBountyUrl ? (
-                      <a
+                      <CompareExternalLink
                         href={project.bugBountyUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        project={project}
+                        status={verificationStatuses[project.id]}
                         className="text-purple-600 hover:text-purple-700 text-sm flex items-center gap-1 font-medium"
                       >
                         View Program
                         <ExternalLink className="w-3 h-3" />
-                      </a>
+                      </CompareExternalLink>
                     ) : (
                       <span className="text-zinc-400">Not available</span>
                     )
@@ -535,5 +538,30 @@ function MobileComparisonItem({ label, value }: { label: string; value: React.Re
       </span>
       <div className="text-sm text-right flex-1">{value}</div>
     </div>
+  );
+}
+
+function CompareExternalLink({
+  href,
+  project,
+  status,
+  className,
+  children,
+}: {
+  href: string;
+  project: Project;
+  status?: VerificationStatus;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <SafeExternalLink
+      href={href}
+      verificationStatus={status ?? "NONE"}
+      approvedUrls={getApprovedProjectUrls(project)}
+      className={className}
+    >
+      {children}
+    </SafeExternalLink>
   );
 }

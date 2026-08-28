@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+// Bundle analyzer setup
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const nextConfig: NextConfig = {
   // Strict mode catches potential issues early
   reactStrictMode: true,
@@ -19,6 +24,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.ipfs.io" },
       { protocol: "https", hostname: "**.ipfs.dweb.link" },
       { protocol: "https", hostname: "ipfs.io" },
+      { protocol: "https", hostname: "cloudflare-ipfs.com" },
+      { protocol: "https", hostname: "gateway.pinata.cloud" },
+      { protocol: "https", hostname: "gateway.io" },
       { protocol: "https", hostname: "arweave.net" },
       { protocol: "https", hostname: "**.arweave.net" },
       // Code hosting / raw assets
@@ -53,4 +61,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

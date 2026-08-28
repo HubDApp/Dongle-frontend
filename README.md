@@ -1,86 +1,157 @@
-# Dongle-frontend
+# Dongle
 
-## Your Onchain App Store
+**Your Onchain App Store** — a discovery, review, and verification platform for decentralized applications built on Stellar.
 
-### Overview
+Dongle lets users browse and rate dApps, lets project owners list and verify their projects, and lets admins manage verification — all backed by on-chain Soroban smart contracts, with heavier content (images, written reviews, verification evidence) stored on IPFS.
 
-The Dongle frontend is the user-facing application that powers discovery, reviews, and verification of decentralized applications on Stellar. It provides an app-store-like experience while interacting directly with on-chain smart contracts for transparency, trust, and data integrity.
+## Table of Contents
 
-The frontend is responsible for presenting on-chain data in a usable interface and enabling users, developers, and admins to interact with the Dongle protocol through their wallets.
+- [What Dongle Does](#what-dongle-does)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Wallet & Network Setup](#wallet--network-setup)
+- [Available Scripts](#available-scripts)
+- [Production Deployment](#production-deployment)
+- [Known Limitations](#known-limitations)
 
-##  Core Features
+## What Dongle Does
 
-### dApp Discovery
-	•	Displays all registered dApps from the on-chain Project Registry
-	•	Supports browsing by category (DeFi, NFTs, Gaming, Tools, DAOs, etc.)
-	•	Enables sorting by highest-rated, trending, recently added, and verified projects
+Dongle is the frontend for an on-chain "app store." It reads project, review, and verification data directly from Stellar/Soroban smart contracts and presents it in a familiar, browsable UI.
 
-### Reviews and Ratings
-	•	Users can submit a star rating (1–5) for any listed dApp
-	•	Optional written reviews are supported and stored off-chain (IPFS), with references stored on-chain
-	•	Aggregated ratings (average score and total reviews) are computed from on-chain data
-	•	Each user can submit one review per project, with support for updates
+**Core features:**
 
-### Verification Flow
-	•	Project owners can request verification for their dApps
-	•	Verification requests require a fee paid in Stellar assets (e.g., XLM or USDC)
-	•	Evidence (audit reports, links, documentation) is uploaded off-chain and referenced on-chain
-	•	Verification status is clearly displayed on project pages
+- **dApp discovery** — browse all registered dApps by category (DeFi, NFTs, Gaming, Tools, DAOs, etc.), sorted by rating, trending, recency, or verification status.
+- **Reviews and ratings** — connected users can leave a 1–5 star rating plus an optional written review. Ratings are aggregated on-chain; long-form review text and evidence live on IPFS, referenced by CID. Each wallet can submit one review per project (with updates).
+- **Verification flow** — project owners can request verification for a fee (paid in a Stellar asset such as XLM or USDC), attaching off-chain evidence (audits, docs, links). Admins/verifiers approve, reject, suspend, or revoke verification, and status is shown on the project page.
+- **Wallet-gated writes** — reading listings and reviews works without a wallet. Any write action (submitting a review, requesting verification, admin decisions) requires a connected wallet and a signed transaction.
 
-### Wallet Integration
-	•	Users connect their Stellar wallet to interact with the platform
-	•	All write actions (reviews, verification requests, admin decisions) require wallet signatures
-	•	Read-only access is available without a wallet connection
+**Data flow, roughly:**
 
+1. The frontend reads on-chain state (projects, reviews, verification status) via Soroban RPC.
+2. Off-chain content (images, long reviews, verification evidence) is fetched from IPFS by CID.
+3. User actions are built as contract calls, signed via the connected wallet, and submitted to the network.
+4. The UI refreshes by re-reading on-chain state after a transaction confirms.
 
-## How the Frontend Works
+It talks to four contracts: a **Project Registry**, a **Review Registry**, a **Verification Registry**, and a **Fee Manager**, all configured via environment variables so the same build can point at testnet or mainnet.
 
-### Data Flow
-	1.	The frontend reads project data, reviews, and verification status directly from Stellar smart contracts via RPC calls.
-	2.	Off-chain data such as images, long reviews, and verification evidence are fetched from IPFS using stored CIDs.
-	3.	User actions trigger contract calls that are signed and submitted through the connected wallet.
-	4.	The UI updates by re-fetching on-chain state or listening to indexed contract events.
+## Tech Stack
 
-### Smart Contract Interaction
+- **Framework:** Next.js 16 (React 19)
+- **Blockchain:** `stellar-sdk` for Soroban RPC/contract calls, `@stellar/freighter-api` for wallet integration
+- **Forms/validation:** `react-hook-form` + `zod`
+- **Styling:** Tailwind CSS 4
+- **Testing:** Vitest + Testing Library
+- **Package manager:** pnpm (pinned via `packageManager` in `package.json`)
 
-The frontend interacts with multiple deployed contracts:
-	•	Project Registry for listing and managing dApps
-	•	Review Registry for ratings and reviews
-	•	Verification Registry for verification requests and status
-	•	Fee Manager for handling verification payments
+## Getting Started
 
-Contract addresses are configured via environment variables to support multiple networks (testnet and mainnet).
+### Prerequisites
 
+- Node.js ≥ 20
+- pnpm ≥ 10 (`corepack enable` will pick up the pinned version automatically)
+- A [Freighter](https://www.freighter.app/) wallet browser extension, set to **Testnet**, if you want to exercise wallet-gated flows locally
 
-## User Roles
+### Install
 
-### Users
-	•	Browse and search for dApps
-	•	Submit ratings and reviews
-	•	View verification status and community feedback
+```bash
+pnpm install
+```
 
-### Project Owners
-	•	Register and manage dApp listings
-	•	Request verification and pay verification fees
-	•	Monitor reviews and ratings for their projects
+### Configure environment variables
 
-### Admins / Verifiers
-	•	Review verification requests
-	•	Approve, reject, suspend, or revoke verification
-	•	Manage verification policies and fees (if enabled in the UI)
+```bash
+cp .env.example .env.local
+```
 
+Then edit `.env.local` as needed — see [Environment Variables](#environment-variables) below. For local development you can usually leave everything at its default; the app falls back to placeholder contract IDs and the public testnet RPC when values are unset.
 
-### Frontend Architecture
-	•	Framework: Modern React-based stack (e.g., Next.js or Vite)
-	•	State Management: Handles wallet state, contract data, and UI state
-	•	Blockchain Layer: Stellar RPC and smart contract SDK
-	•	Storage: IPFS for images, reviews, and verification evidence
-	•	Styling: Component-based UI system for consistency and scalability
+### Run the dev server
 
-The frontend is designed to be modular, allowing easy expansion to other chains in the future.
+```bash
+pnpm dev
+```
 
-## Purpose and Vision
+The app will be available at `http://localhost:3000`.
 
-The Dongle frontend makes on-chain discovery usable and intuitive. It bridges the gap between decentralized infrastructure and everyday users by presenting verifiable, transparent data in a familiar app-store experience.
+### Build for production
 
-Dongle aims to become the default discovery layer for decentralized applications, starting with Stellar and expanding across ecosystems.
+```bash
+pnpm build
+pnpm start
+```
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` in the project root and fill these in:
+
+```bash
+cp .env.example .env.local
+```
+
+| Variable                                     | Required   | Description                                                                                                                                 |
+| -------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT`      | Production | Soroban contract ID (56 chars, starts with `C`) for the Project Registry.                                                                   |
+| `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT`       | Production | Soroban contract ID for the Review Registry.                                                                                                |
+| `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | Production | Soroban contract ID for the Verification Registry.                                                                                          |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL`                | Optional   | Soroban RPC endpoint. Defaults to Stellar testnet (`https://soroban-testnet.stellar.org:443`).                                              |
+| `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`     | Optional   | Network passphrase; must match the network selected in Freighter. Defaults to the testnet passphrase (`Test SDF Network ; September 2015`). |
+| `NEXT_PUBLIC_ADMIN_ALLOWLIST`                | Optional   | Comma-separated list of Stellar public keys (`G...`) allowed to access the admin dashboard. Leave empty to disable admin routes.            |
+
+**Development builds use placeholder defaults for the contract IDs when they're unset** — see [Known Limitations](#known-limitations). To point the app at real deployed contracts (testnet or mainnet), set all three contract ID variables explicitly and make sure `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` matches the network those contracts are deployed on.
+
+`.env.local` is gitignored — never commit real values.
+
+## Wallet & Network Setup
+
+- Dongle uses [Freighter](https://www.freighter.app/) as its wallet integration (`@stellar/freighter-api`). Install the browser extension to connect a wallet.
+- Read-only browsing (listings, ratings, reviews) does **not** require a wallet.
+- Any write action — submitting a review, requesting verification, admin approvals — requires a connected wallet and will prompt a Freighter signature.
+- By default the app targets **Stellar testnet**. Make sure Freighter's active network matches `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`, or signed transactions will be rejected by the RPC.
+- Verification requests require paying a fee in a Stellar asset (e.g. XLM or USDC) — make sure your testnet account is funded (via [Friendbot](https://friendbot.stellar.org/)) before exercising that flow locally.
+
+## Available Scripts
+
+| Command              | Description                                                       |
+| -------------------- | ----------------------------------------------------------------- |
+| `pnpm dev`           | Start the Next.js dev server.                                     |
+| `pnpm build`         | Build the production bundle.                                      |
+| `pnpm start`         | Serve the production build.                                       |
+| `pnpm lint`          | Run ESLint (`--max-warnings 0`, so any warning fails the check).  |
+| `pnpm typecheck`     | Run `tsc --noEmit` to check types without emitting output.        |
+| `pnpm test`          | Run the Vitest suite once.                                        |
+| `pnpm test:watch`    | Run Vitest in watch mode.                                         |
+| `pnpm audit`         | Run the project's custom audit script (`scripts/audit-check.js`). |
+| `pnpm validate:env`  | Fail if production env vars are missing, invalid, or placeholders.|
+| `pnpm preview:smoke` | HTTP smoke-test main routes against `PREVIEW_URL`.                |
+
+Before pushing or opening a PR, it's worth running lint, typecheck, and test together:
+
+```bash
+pnpm lint && pnpm typecheck && pnpm test
+```
+
+## Production Deployment
+
+For Vercel (or similar) deploys — environment setup, wallet/network assumptions, preview route validation, and smoke tests — see **[`dongle/DEPLOYMENT.md`](./dongle/DEPLOYMENT.md)**.
+
+Quick checks before promoting a preview:
+
+```bash
+cd dongle
+npm run validate:env
+PREVIEW_URL=https://your-preview.vercel.app npm run preview:smoke
+```
+
+## Known Limitations
+
+- **Placeholder contract IDs in development.** If the three `NEXT_PUBLIC_*_CONTRACT` variables are left unset, the app falls back to placeholder contract addresses rather than real deployed contracts. On-chain reads/writes against these placeholders will not reflect real data — set real testnet or mainnet contract IDs to exercise actual contract behavior. Production builds reject the placeholder and surface a config banner if it was somehow inlined.
+- **Testnet-first.** Defaults (RPC URL, network passphrase) point at Stellar testnet. Mainnet use requires explicitly overriding all network-related env vars, and has not been the primary target during development.
+- **Off-chain evidence storage.** Written reviews and verification evidence are stored on IPFS and referenced on-chain by CID — the frontend depends on that off-chain content being pinned/available; it is not itself persisted on-chain.
+- **Admin access is allowlist-based.** Admin routes are gated purely by the `NEXT_PUBLIC_ADMIN_ALLOWLIST` public keys; leaving it empty disables the admin dashboard entirely rather than restricting it.
+
+## Prerequisites
+
+- Node.js >= 20.0.0
+- npm >= 10.0.0
+

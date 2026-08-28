@@ -33,6 +33,17 @@ All interactions are wallet-authenticated using Freighter, providing transparent
 - **State Management**: React Context + Custom Hooks
 - **Language**: TypeScript (strict mode)
 
+## File Structure and Naming
+
+Keep code organized by responsibility and use these filename conventions:
+
+- `services/`: service modules use `*.service.ts`; `index.ts` files are barrel exports.
+- `hooks/`: React hooks use `use*.ts`; `index.ts` files are barrel exports.
+- `utils/`: shared utilities use `*.util.ts`; `index.ts` is the utility barrel export.
+- `components/`: React components use descriptive PascalCase `.tsx` filenames.
+
+The filename convention is checked by ESLint and by the pre-commit hook. Run `node scripts/setup-git-hooks.mjs` once after cloning to configure Git to use `.githooks/`.
+
 ## Prerequisites
 
 Before getting started, ensure you have:
@@ -87,12 +98,21 @@ npm run typecheck
 # Run all tests (unit and integration)
 npm run test
 
+# After a production build: gzipped JS per route (< 200 KB)
+npm run test:bundle
+
+# Lighthouse CI (Performance >= 90, a11y >= 95, FCP < 1.5s, CLS < 0.1)
+npm run test:lighthouse
+
 # Run tests in watch mode (development)
 npm run test:watch
 
 # Security audit for vulnerable dependencies
 npm run audit
 ```
+
+See [DEPENDENCY_POLICY.md](./DEPENDENCY_POLICY.md) for the update cadence, wallet/Stellar SDK compatibility checks, and documented audit exceptions.
+
 
 ### Build & Production
 
@@ -311,6 +331,19 @@ dongle/
 **Component Composition**: UI built from small, reusable components with clear props
 
 **Type-Safe Forms**: react-hook-form with Zod schema validation for runtime type safety
+
+## Documentation
+
+| Doc | What it covers |
+|-----|----------------|
+| [Architecture Decision Records](../docs/adr/README.md) | Why Context+hooks, IPFS, contract split, and localStorage |
+| [Hooks usage guide](../docs/hooks-guide.md) | `useWallet`, `useStellarAccount`, `useDraft`, and the rest |
+| [UI components](../docs/components.md) | Button, Card, Badge, Input props, variants, and a11y |
+| [Performance budgets](./performance-budget.json) | Lighthouse + gzipped JS per route |
+
+Live component examples and an interactive playground: [http://localhost:3000/docs/components](http://localhost:3000/docs/components) after `npm run dev`.
+
+When an architectural choice changes, **update the matching ADR** (supersede or add an Amendment). See [docs/adr/README.md](../docs/adr/README.md).
 
 ## Development Limitations & Mock Data
 

@@ -4,14 +4,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
-import { reviewService } from "@/services/review/review.service";
+import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
+import { Review } from "@/types/review";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
+import { useWalletTransactions } from "@/hooks/useWalletTransactions";
+import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import {
   LogOut,
   Star,
@@ -23,6 +26,8 @@ import {
   XCircle,
   Package,
   Bookmark,
+  Activity,
+  Wallet,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
@@ -30,6 +35,8 @@ import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useConfirm } from "@/hooks/useConfirm";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { sorobanService } from "@/services/stellar/soroban.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
 
 interface StellarNonNativeBalance {
@@ -43,16 +50,15 @@ const PROFILE_PURPOSE =
 export default function ProfilePage() {
   const router = useRouter();
   const gate = useWalletPageGate({ requireFundedAccount: true });
-  const { balances } = useStellarAccount();
+  const { balances, loading: balancesLoading, error: balancesError } = useStellarAccount();
+  const { transactions, loading: txLoading, error: txError } = useWalletTransactions(8);
   const confirm = useConfirm();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const { savedProjectIds } = useSavedProjects();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
-
-  const userReviews = gate.publicKey
-    ? reviewService.getReviewsByUser(gate.publicKey)
-    : [];
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
+  const [savedProjectVerificationStatuses, setSavedProjectVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
 
   const displayedVerificationRequests = gate.publicKey ? verificationRequests : [];
   const loadingVerifications =
@@ -60,6 +66,31 @@ export default function ProfilePage() {
   const savedProjects = savedProjectIds
     .map((projectId) => projectService.getProjectById(projectId))
     .filter((project): project is NonNullable<typeof project> => Boolean(project));
+  const ownedProjects = gate.publicKey
+    ? projectService.getProjectsByOwner(gate.publicKey)
+    : [];
+
+  // Fetch verification statuses for saved projects
+  useEffect(() => {
+    if (savedProjects.length === 0) return;
+
+    const fetchStatuses = async () => {
+      const statuses: Record<string, VerificationStatus> = {};
+      await Promise.all(
+        savedProjects.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id);
+            statuses[project.id] = status;
+          } catch {
+            statuses[project.id] = "NONE";
+          }
+        }),
+      );
+      setSavedProjectVerificationStatuses(statuses);
+    };
+
+    void fetchStatuses();
+  }, [savedProjectIds]);
 
   const handleClearHistory = async () => {
     const ok = await confirm({
@@ -105,6 +136,26 @@ export default function ProfilePage() {
     };
   }, [gate.publicKey]);
 
+  useEffect(() => {
+    if (!gate.publicKey) {
+      const id = setTimeout(() => setUserReviews([]), 0);
+      return () => clearTimeout(id);
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const reviews = await reviewService.getReviewsByUser(gate.publicKey!);
+      if (!cancelled) {
+        setUserReviews(reviews);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gate.publicKey]);
+
   if (gate.state !== "ready") {
     return (
       <LayoutWrapper>
@@ -115,6 +166,19 @@ export default function ProfilePage() {
               pagePurpose={PROFILE_PURPOSE}
               loadingMessage="Loading your profile..."
             />
+            {gate.state === "account-loading" ? (
+              <WalletStateLoadingPanel message="Loading your profile..." />
+            ) : (
+              <WalletStatePanel
+                state={gate.state}
+                pagePurpose={PROFILE_PURPOSE}
+                walletNetworkLabel={gate.walletNetworkLabel}
+                publicKey={gate.publicKey}
+                onConnect={gate.connectWallet}
+                onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
+              />
+            )}
           </div>
         </main>
       </LayoutWrapper>
@@ -164,7 +228,38 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {balances && balances.length > 0 && (
+                <div className="mb-8">
+                  <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
+                    Network
+                  </label>
+                  <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl space-y-2">
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100">
+                      Connected to{" "}
+                      <span className="font-semibold font-mono">
+                        {gate.walletNetworkLabel}
+                      </span>
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Dongle requires Stellar{" "}
+                      <span className="font-semibold font-mono">
+                        {EXPECTED_NETWORK_LABEL}
+                      </span>{" "}
+                      (Soroban testnet). Before signing, confirm Freighter is on
+                      this network via Settings → Network. Wrong-network
+                      transactions are blocked automatically.
+                    </p>
+                  </div>
+                </div>
+
+                {balancesLoading ? (
+                  <div className="flex justify-center py-6">
+                    <Spinner size="md" />
+                  </div>
+                ) : balancesError ? (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                    {balancesError}
+                  </div>
+                ) : balances && balances.length > 0 ? (
                   <div>
                     <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 block">
                       Balances
@@ -203,6 +298,79 @@ export default function ProfilePage() {
                       })}
                     </div>
                   </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    No balances found for this account.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Activity className="w-6 h-6" />
+                    Recent Wallet Activity
+                  </h2>
+                  <Badge variant="secondary">{transactions.length}</Badge>
+                </div>
+
+                {txLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner size="md" />
+                  </div>
+                ) : txError ? (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                    {txError}
+                  </div>
+                ) : transactions.length > 0 ? (
+                  <div className="space-y-3">
+                    {transactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
+                      >
+                        <div>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100 capitalize">
+                            {tx.type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {formatDate(tx.createdAt, "relative")}
+                          </p>
+                        </div>
+                        <p className="text-xs font-mono text-zinc-500 truncate max-w-[120px]">
+                          {tx.hash.slice(0, 8)}…
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <Wallet className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No recent on-chain activity found.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Package className="w-6 h-6" />
+                    Your Projects
+                  </h2>
+                  <Badge variant="secondary">{ownedProjects.length}</Badge>
+                </div>
+
+                {ownedProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {ownedProjects.map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No owned projects found for this wallet.</p>
+                  </div>
                 )}
               </div>
 
@@ -211,6 +379,11 @@ export default function ProfilePage() {
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <MessageSquare className="w-6 h-6" />
                     Your Reviews
+                    {getReviewPersistenceLabel() !== "API" && (
+                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full">
+                        DEV-ONLY
+                      </span>
+                    )}
                   </h2>
                   <Badge variant="secondary">{userReviews.length}</Badge>
                 </div>
@@ -281,7 +454,11 @@ export default function ProfilePage() {
                 {savedProjects.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {savedProjects.map((project) => (
-                      <ProjectCard key={project.id} project={project} />
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        verificationStatus={savedProjectVerificationStatuses[project.id]}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -421,8 +598,29 @@ export default function ProfilePage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Bookmark className="w-4 h-4" />
+                      Saved
+                    </span>
+                    <span className="font-bold text-lg">{savedProjects.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      Submitted
+                      Owned
+                    </span>
+                    <span className="font-bold text-lg">{ownedProjects.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      Transactions
+                    </span>
+                    <span className="font-bold text-lg">{transactions.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Verifications
                     </span>
                     <span className="font-bold text-lg">{displayedVerificationRequests.length}</span>
                   </div>

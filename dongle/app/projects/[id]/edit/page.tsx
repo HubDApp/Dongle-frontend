@@ -70,6 +70,19 @@ export default function EditProjectPage() {
               pagePurpose={EDIT_PURPOSE}
               loadingMessage="Verifying your wallet..."
             />
+            {gate.state === "account-loading" ? (
+              <WalletStateLoadingPanel message="Verifying your wallet..." />
+            ) : (
+              <WalletStatePanel
+                state={gate.state}
+                pagePurpose={EDIT_PURPOSE}
+                walletNetworkLabel={gate.walletNetworkLabel}
+                publicKey={gate.publicKey}
+                onConnect={gate.connectWallet}
+                onDisconnect={gate.disconnectWallet}
+                onRetry={gate.retryAccountLoad}
+              />
+            )}
           </div>
         </div>
       </main>
@@ -148,6 +161,8 @@ export default function EditProjectPage() {
             githubUrl: project.githubUrl,
             logoUrl: project.logoUrl,
             docsUrl: project.docsUrl,
+            auditReportUrl: project.auditReportUrl,
+            bugBountyUrl: project.bugBountyUrl,
           }}
         />
       </div>
