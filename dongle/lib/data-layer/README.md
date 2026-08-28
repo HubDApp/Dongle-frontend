@@ -1,6 +1,9 @@
 # Data layer (offline cache, request deduplication, invalidation)
 
-Coordinated client data path for issues **#910**, **#913**, and **#911**.
+Coordinated client data path for:
+[ANYTECHS/clips-frontend#910](https://github.com/ANYTECHS/clips-frontend/issues/910) (offline),
+[ANYTECHS/clips-frontend#913](https://github.com/ANYTECHS/clips-frontend/issues/913) (dedup),
+and [ANYTECHS/clips-frontend#911](https://github.com/ANYTECHS/clips-frontend/issues/911) (invalidation).
 
 ```
 GET:      Request → Deduplication → Cache → Network
