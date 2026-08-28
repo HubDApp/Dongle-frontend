@@ -400,6 +400,20 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
+
+  sync: {
+    offline: "You're offline",
+    offlineHint: "Some features may not work. Please check your internet connection.",
+    reconnecting: "Reconnecting…",
+    syncing: "Syncing queued changes…",
+    synced: "All changes synced",
+    failed: "Sync failed",
+    failedHint: "Some changes could not be synchronized. They will retry automatically.",
+    retry: "Retry",
+    backOnline: "You're back online!",
+    pendingCount: "{count} waiting to sync",
+    requiresConnection: "Please connect to the internet to continue.",
+  },
 } as const;
 
 export type Messages = typeof en;

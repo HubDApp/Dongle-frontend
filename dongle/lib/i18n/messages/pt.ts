@@ -419,4 +419,18 @@ export const pt: Messages = {
     walletLinked: "Carteira vinculada",
     account: "Conta",
   },
+
+  sync: {
+    offline: "Você está offline",
+    offlineHint: "Alguns recursos podem não funcionar. Verifique sua conexão com a internet.",
+    reconnecting: "Reconectando…",
+    syncing: "Sincronizando alterações na fila…",
+    synced: "Todas as alterações foram sincronizadas",
+    failed: "Falha na sincronização",
+    failedHint: "Algumas alterações não puderam ser sincronizadas. Elas serão tentadas novamente automaticamente.",
+    retry: "Tentar novamente",
+    backOnline: "Você está online novamente!",
+    pendingCount: "{count} aguardando sincronização",
+    requiresConnection: "Conecte-se à internet para continuar.",
+  },
 };

@@ -5,6 +5,7 @@
 
 import { RepositoryMetadata } from "@/types/repository";
 import { parseRepositoryUrl } from "@/lib/repository";
+import { getJson } from "@/lib/data-layer";
 
 /**
  * Fetch repository metadata from GitHub
@@ -14,34 +15,44 @@ async function fetchGitHubMetadata(
   repo: string
 ): Promise<RepositoryMetadata | null> {
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}`,
-      {
-        headers: {
-          Accept: "application/vnd.github.v3+json",
-        },
-      }
-    );
+    const data = await getJson<{
+      html_url: string;
+      stargazers_count: number;
+      forks_count: number;
+      license?: { spdx_id?: string; name?: string };
+      updated_at: string;
+      description: string;
+      language: string;
+      topics?: string[];
+    }>({
+      method: "GET",
+      url: `https://api.github.com/repos/${owner}/${repo}`,
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+      },
+      tags: ["repository"],
+      persist: true,
+    });
 
-    if (!response.ok) {
-      console.error(`GitHub API error: ${response.status}`);
+    if (!data.ok || !data.data) {
+      console.error(`GitHub API error: ${data.status}`);
       return null;
     }
 
-    const data = await response.json();
+    const payload = data.data;
 
     return {
-      url: data.html_url,
+      url: payload.html_url,
       host: "github",
       owner,
       repo,
-      stars: data.stargazers_count,
-      forks: data.forks_count,
-      license: data.license?.spdx_id || data.license?.name,
-      lastUpdate: data.updated_at,
-      description: data.description,
-      language: data.language,
-      topics: data.topics || [],
+      stars: payload.stargazers_count,
+      forks: payload.forks_count,
+      license: payload.license?.spdx_id || payload.license?.name,
+      lastUpdate: payload.updated_at,
+      description: payload.description,
+      language: payload.language,
+      topics: payload.topics || [],
     };
   } catch (error) {
     console.error("Failed to fetch GitHub metadata:", error);
@@ -58,32 +69,41 @@ async function fetchGitLabMetadata(
 ): Promise<RepositoryMetadata | null> {
   try {
     const projectPath = encodeURIComponent(`${owner}/${repo}`);
-    const response = await fetch(
-      `https://gitlab.com/api/v4/projects/${projectPath}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      }
-    );
+    const data = await getJson<{
+      web_url: string;
+      star_count: number;
+      forks_count: number;
+      last_activity_at: string;
+      description: string;
+      topics?: string[];
+      tag_list?: string[];
+    }>({
+      method: "GET",
+      url: `https://gitlab.com/api/v4/projects/${projectPath}`,
+      headers: {
+        Accept: "application/json",
+      },
+      tags: ["repository"],
+      persist: true,
+    });
 
-    if (!response.ok) {
-      console.error(`GitLab API error: ${response.status}`);
+    if (!data.ok || !data.data) {
+      console.error(`GitLab API error: ${data.status}`);
       return null;
     }
 
-    const data = await response.json();
+    const payload = data.data;
 
     return {
-      url: data.web_url,
+      url: payload.web_url,
       host: "gitlab",
       owner,
       repo,
-      stars: data.star_count,
-      forks: data.forks_count,
-      lastUpdate: data.last_activity_at,
-      description: data.description,
-      topics: data.topics || data.tag_list || [],
+      stars: payload.star_count,
+      forks: payload.forks_count,
+      lastUpdate: payload.last_activity_at,
+      description: payload.description,
+      topics: payload.topics || payload.tag_list || [],
     };
   } catch (error) {
     console.error("Failed to fetch GitLab metadata:", error);
@@ -99,30 +119,36 @@ async function fetchBitbucketMetadata(
   repo: string
 ): Promise<RepositoryMetadata | null> {
   try {
-    const response = await fetch(
-      `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      }
-    );
+    const data = await getJson<{
+      links?: { html?: { href?: string } };
+      updated_on: string;
+      description: string;
+      language: string;
+    }>({
+      method: "GET",
+      url: `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}`,
+      headers: {
+        Accept: "application/json",
+      },
+      tags: ["repository"],
+      persist: true,
+    });
 
-    if (!response.ok) {
-      console.error(`Bitbucket API error: ${response.status}`);
+    if (!data.ok || !data.data) {
+      console.error(`Bitbucket API error: ${data.status}`);
       return null;
     }
 
-    const data = await response.json();
+    const payload = data.data;
 
     return {
-      url: data.links?.html?.href,
+      url: payload.links?.html?.href,
       host: "bitbucket",
       owner,
       repo,
-      lastUpdate: data.updated_on,
-      description: data.description,
-      language: data.language,
+      lastUpdate: payload.updated_on,
+      description: payload.description,
+      language: payload.language,
     };
   } catch (error) {
     console.error("Failed to fetch Bitbucket metadata:", error);

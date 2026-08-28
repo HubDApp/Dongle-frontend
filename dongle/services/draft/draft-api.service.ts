@@ -10,6 +10,8 @@
  */
 
 import type { ProjectDraft } from "@/services/draft/draft.service";
+import { getJson, mutate } from "@/lib/data-layer";
+import { nowUTC } from "@/lib/dates";
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -56,22 +58,23 @@ class DraftApiService {
     draftId: string
   ): Promise<ApiResult<ProjectDraft>> {
     try {
-      const res = await fetch(this.url(walletAddress, draftId), {
+      const result = await getJson<ProjectDraft>({
         method: "GET",
+        url: this.url(walletAddress, draftId),
         headers: { "Content-Type": "application/json" },
+        tags: ["drafts"],
+        persist: true,
       });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
+      if (!result.ok) {
         return {
           ok: false,
-          error: (body as { error?: string }).error ?? res.statusText,
-          status: res.status,
+          error: result.error ?? "Request failed",
+          status: result.status,
         };
       }
 
-      const data = (await res.json()) as ProjectDraft;
-      return { ok: true, data };
+      return { ok: true, data: result.data as ProjectDraft };
     } catch (err) {
       return {
         ok: false,
@@ -83,6 +86,7 @@ class DraftApiService {
   /**
    * Create or update a draft on the API.
    * Returns the persisted draft (with server-assigned lastSaved timestamp).
+   * When offline, the write is queued and replayed after reconnect.
    */
   async saveDraft(
     walletAddress: string,
@@ -90,23 +94,34 @@ class DraftApiService {
   ): Promise<ApiResult<ProjectDraft>> {
     try {
       const { id, ...body } = draft;
-      const res = await fetch(this.url(walletAddress, id), {
+      const result = await mutate<ProjectDraft>({
         method: "PUT",
+        url: this.url(walletAddress, id),
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body,
+        invalidateTags: ["drafts"],
+        invalidatePrefixes: [`GET:${this.baseUrl()}`],
+        queueWhenOffline: true,
+        mutationType: "drafts.save",
+        idempotencyKey: `drafts.save|${walletAddress}|${id}`,
       });
 
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
+      if (result.queued) {
         return {
-          ok: false,
-          error: (errBody as { error?: string }).error ?? res.statusText,
-          status: res.status,
+          ok: true,
+          data: { ...draft, lastSaved: nowUTC() },
         };
       }
 
-      const data = (await res.json()) as ProjectDraft;
-      return { ok: true, data };
+      if (!result.ok) {
+        return {
+          ok: false,
+          error: result.error ?? "Request failed",
+          status: result.status,
+        };
+      }
+
+      return { ok: true, data: result.data as ProjectDraft };
     } catch (err) {
       return {
         ok: false,
@@ -123,21 +138,29 @@ class DraftApiService {
     draftId: string
   ): Promise<ApiResult<{ success: boolean }>> {
     try {
-      const res = await fetch(this.url(walletAddress, draftId), {
+      const result = await mutate<{ success: boolean }>({
         method: "DELETE",
+        url: this.url(walletAddress, draftId),
+        invalidateTags: ["drafts"],
+        invalidatePrefixes: [`GET:${this.baseUrl()}`],
+        queueWhenOffline: true,
+        mutationType: "drafts.delete",
+        idempotencyKey: `drafts.delete|${walletAddress}|${draftId}`,
       });
 
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
+      if (result.queued) {
+        return { ok: true, data: { success: true } };
+      }
+
+      if (!result.ok) {
         return {
           ok: false,
-          error: (errBody as { error?: string }).error ?? res.statusText,
-          status: res.status,
+          error: result.error ?? "Request failed",
+          status: result.status,
         };
       }
 
-      const data = (await res.json()) as { success: boolean };
-      return { ok: true, data };
+      return { ok: true, data: result.data ?? { success: true } };
     } catch (err) {
       return {
         ok: false,

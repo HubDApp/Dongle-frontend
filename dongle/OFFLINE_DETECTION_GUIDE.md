@@ -431,20 +431,23 @@ const fetchData = async () => {
 
 1. **navigator.onLine is not always accurate**
    - May report "online" even with no internet
-   - Use periodic checks for critical operations
+   - Use periodic checks (`pingUrl`) for critical operations
 
 2. **Offline detection is best-effort**
    - Can't detect degraded connections
    - Can't detect firewall/proxy issues
 
-3. **No background sync**
-   - Offline changes aren't automatically synced
-   - Consider implementing a sync queue
+3. **On-chain writes are not queued**
+   - Freighter/Soroban transactions require a live wallet signature and are blocked while offline (see `NETWORK_ACTIONS`)
+   - REST mutations (reviews API, drafts) are queued in `dongle_mutation_queue` and replayed by `@/lib/data-layer` after reconnect
 
 ## Next Steps
 
-1. Add to all network-dependent components
-2. Implement offline data caching
-3. Add background sync for form submissions
-4. Create offline-first experience for browsing
-5. Monitor real-world offline scenarios
+The data layer now covers:
+
+1. App-wide `OnlineStatusProvider` (wired in `LayoutWrapper`)
+2. GET caching for reviews, drafts, repository metadata, and analytics
+3. Offline mutation queue + reconnect sync for reviews/drafts APIs
+4. Request deduplication and centralized invalidation
+
+See [`lib/data-layer/README.md`](./lib/data-layer/README.md) for keys, configuration, and tests.

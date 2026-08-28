@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom";
-import { vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
+import { resetDataLayerForTests } from "@/lib/data-layer";
 
 // Test setup for Vitest - mocks Next.js navigation and browser APIs
 vi.mock("next/navigation", () => ({
@@ -39,3 +40,11 @@ if (typeof window.matchMedia !== "function") {
     })),
   });
 }
+
+beforeEach(() => {
+  resetDataLayerForTests();
+});
+
+afterEach(() => {
+  resetDataLayerForTests();
+});

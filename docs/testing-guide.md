@@ -83,8 +83,18 @@ The setup file provides shared mocks used across tests:
 - `@testing-library/jest-dom` matchers (`toBeInTheDocument`, etc.)
 - `next/navigation` stubs (`useRouter`, `usePathname`, `useSearchParams`)
 - `navigator.clipboard.writeText` mock
+- `resetDataLayerForTests()` so cache, dedup, and the mutation queue do not leak across files
 
 Do **not** add test-specific mocks here. Keep global setup limited to framework-level stubs.
+
+### Data layer (#910, #913, #911)
+
+```bash
+cd dongle
+pnpm test __tests__/lib/data-layer __tests__/components/OfflineBanner.test.tsx
+```
+
+Tests live under `__tests__/lib/data-layer/` (offline queue, dedup, invalidation, end-to-end flow) plus `OfflineBanner` status UI.
 
 ---
 

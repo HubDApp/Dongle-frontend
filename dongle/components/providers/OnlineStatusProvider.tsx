@@ -1,9 +1,12 @@
 "use client";
 
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useEffect } from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useDataSyncStatus } from "@/hooks/useDataSyncStatus";
 import OfflineBanner from "@/components/ui/OfflineBanner";
 import { toast } from "sonner";
+import type { SyncUiStatus } from "@/lib/data-layer";
+import { startAutomaticSync } from "@/lib/data-layer";
 
 interface OnlineStatusContextValue {
   isOnline: boolean;
@@ -11,6 +14,10 @@ interface OnlineStatusContextValue {
   lastCheck: Date | null;
   wasOffline: boolean;
   checkConnectivity: () => Promise<void>;
+  syncStatus: SyncUiStatus;
+  pendingCount: number;
+  lastSyncError: string | null;
+  retrySync: () => void;
 }
 
 const OnlineStatusContext = createContext<OnlineStatusContextValue | undefined>(undefined);
@@ -49,12 +56,34 @@ export function OnlineStatusProvider({
     },
   });
 
+  const sync = useDataSyncStatus();
+
+  useEffect(() => {
+    return startAutomaticSync();
+  }, []);
+
+  const value: OnlineStatusContextValue = {
+    isOnline: status.isOnline,
+    isChecking: status.isChecking,
+    lastCheck: status.lastCheck,
+    wasOffline: status.wasOffline,
+    checkConnectivity: status.checkConnectivity,
+    syncStatus: sync.syncStatus,
+    pendingCount: sync.pendingCount,
+    lastSyncError: sync.lastError,
+    retrySync: sync.retrySync,
+  };
+
   return (
-    <OnlineStatusContext.Provider value={status}>
+    <OnlineStatusContext.Provider value={value}>
       {showBanner && (
         <OfflineBanner
           isOnline={status.isOnline}
           wasOffline={status.wasOffline}
+          isChecking={status.isChecking}
+          syncStatus={sync.syncStatus}
+          pendingCount={sync.pendingCount}
+          onRetry={sync.retrySync}
           position="top"
         />
       )}
@@ -65,11 +94,11 @@ export function OnlineStatusProvider({
 
 /**
  * Hook to access online status from any component
- * 
+ *
  * @example
  * ```tsx
  * const { isOnline, checkConnectivity } = useOnlineStatusContext();
- * 
+ *
  * if (!isOnline) {
  *   return <div>Offline mode</div>;
  * }

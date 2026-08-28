@@ -104,6 +104,8 @@ cp .env.example .env.local
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`  | OAuth      | Google OAuth. Secrets must never use a `NEXT_PUBLIC_` prefix.                                                                               |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`  | OAuth      | GitHub OAuth. Secrets must never use a `NEXT_PUBLIC_` prefix.                                                                               |
 | `CRON_SECRET`                                | Optional   | Bearer token for `GET /api/cron/analytics` (00:00 UTC).                                                                                     |
+| `NEXT_PUBLIC_DATA_CACHE_TTL_MS`              | Optional   | Fresh GET cache lifetime (ms). Default `60000`. See [`dongle/lib/data-layer/README.md`](dongle/lib/data-layer/README.md).                   |
+| `NEXT_PUBLIC_DATA_DEDUPE_WINDOW_MS`          | Optional   | Dedup reuse window after a GET settles (ms). Default `0` (in-flight sharing only).                                                          |
 
 **Development builds use placeholder defaults for the contract IDs when they're unset** — see [Known Limitations](#known-limitations). To point the app at real deployed contracts (testnet or mainnet), set all three contract ID variables explicitly and make sure `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` matches the network those contracts are deployed on.
 
@@ -114,7 +116,7 @@ cp .env.example .env.local
 - Dongle uses [Freighter](https://www.freighter.app/) as its wallet integration (`@stellar/freighter-api`). Install the browser extension to connect a wallet.
 - Read-only browsing (listings, ratings, reviews) does **not** require a wallet. Google/GitHub OAuth is an optional identity for that mode.
 - Any write action — submitting a review, requesting verification, admin approvals — requires a connected wallet and will prompt a Freighter signature. OAuth login is not a Stellar account.
-- Feature architecture (i18n, SSE notifications, analytics cache, OAuth): **[`docs/FEATURES.md`](./docs/FEATURES.md)**.
+- Feature architecture (i18n, SSE notifications, analytics cache, OAuth, data layer): **[`docs/FEATURES.md`](./docs/FEATURES.md)** and **[`dongle/lib/data-layer/README.md`](./dongle/lib/data-layer/README.md)**.
 - By default the app targets **Stellar testnet**. Make sure Freighter's active network matches `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`, or signed transactions will be rejected by the RPC.
 - Verification requests require paying a fee in a Stellar asset (e.g. XLM or USDC) — make sure your testnet account is funded (via [Friendbot](https://friendbot.stellar.org/)) before exercising that flow locally.
 

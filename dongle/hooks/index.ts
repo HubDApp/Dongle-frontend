@@ -7,6 +7,7 @@ export { useDraft } from "./useDraft";
 export { useErrorMapper } from "./useErrorMapper";
 export { useOnChainTransaction } from "./useOnChainTransaction";
 export { useOnlineStatus } from "./useOnlineStatus";
+export { useDataSyncStatus } from "./useDataSyncStatus";
 export { usePagination } from "./usePagination";
 export { useProjectFilters } from "./useProjectFilters";
 export type { SortOption, ProjectFiltersState } from "./useProjectFilters";

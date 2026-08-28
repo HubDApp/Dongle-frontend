@@ -7,6 +7,7 @@ import { downloadCsv, toCsv } from "@/lib/analytics-dashboard/csv";
 import type { AnalyticsRange, AnalyticsResult, VerificationFilter } from "@/lib/analytics-dashboard/metrics";
 import { ALL_CATEGORIES } from "@/types/project";
 import { Button } from "@/components/ui/Button";
+import { getJson } from "@/lib/data-layer";
 
 interface Payload {
   result: AnalyticsResult;
@@ -37,11 +38,15 @@ export default function AnalyticsDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ range, category, status });
-      const res = await fetch(`/api/analytics?${params.toString()}`);
-      if (!res.ok) throw new Error("fail");
-      const body = (await res.json()) as Payload;
-      setData(body);
+      const result = await getJson<Payload>({
+        method: "GET",
+        url: "/api/analytics",
+        params: { range, category, status },
+        tags: ["analytics"],
+        persist: true,
+      });
+      if (!result.ok || !result.data) throw new Error("fail");
+      setData(result.data);
     } catch {
       setError(t("analytics.loadFailed"));
       setData(null);

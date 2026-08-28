@@ -1,44 +1,36 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  setOnline,
+  startConnectivityMonitor,
+  subscribeConnectivity,
+} from "@/lib/data-layer";
 
 interface UseOnlineStatusOptions {
   onOnline?: () => void;
   onOffline?: () => void;
-  checkInterval?: number; // ms between connectivity checks
-  pingUrl?: string; // URL to ping for connectivity check
+  checkInterval?: number;
+  pingUrl?: string;
 }
 
 interface OnlineStatus {
   isOnline: boolean;
   isChecking: boolean;
   lastCheck: Date | null;
-  wasOffline: boolean; // True if we were offline and just came back
+  wasOffline: boolean;
 }
 
 /**
- * Hook to detect and monitor online/offline status
- * 
- * Uses multiple detection methods:
- * 1. Browser navigator.onLine API
- * 2. Online/offline event listeners
- * 3. Optional periodic connectivity checks
- * 
- * @example
- * ```tsx
- * const { isOnline, isChecking } = useOnlineStatus({
- *   onOffline: () => toast.error("You're offline"),
- *   onOnline: () => toast.success("You're back online"),
- * });
- * ```
+ * Hook to detect and monitor online/offline status.
+ *
+ * Uses the shared connectivity monitor (navigator.onLine + events) plus
+ * optional periodic HTTP ping checks.
  */
 export function useOnlineStatus(options: UseOnlineStatusOptions = {}) {
-  const {
-    onOnline,
-    onOffline,
-    checkInterval,
-    pingUrl,
-  } = options;
+  const { onOnline, onOffline, checkInterval, pingUrl } = options;
+  const onOnlineRef = useRef(onOnline);
+  const onOfflineRef = useRef(onOffline);
 
   const [status, setStatus] = useState<OnlineStatus>({
     isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -47,11 +39,10 @@ export function useOnlineStatus(options: UseOnlineStatusOptions = {}) {
     wasOffline: false,
   });
 
-  // Active connectivity check via fetch
   const checkConnectivity = useCallback(async () => {
     if (!pingUrl) return;
 
-    setStatus(prev => ({ ...prev, isChecking: true }));
+    setStatus((prev) => ({ ...prev, isChecking: true }));
 
     try {
       const controller = new AbortController();
@@ -64,70 +55,59 @@ export function useOnlineStatus(options: UseOnlineStatusOptions = {}) {
       });
 
       clearTimeout(timeoutId);
-
-      setStatus(prev => ({
+      setOnline(true);
+      setStatus((prev) => ({
         isOnline: true,
         isChecking: false,
         lastCheck: new Date(),
         wasOffline: !prev.isOnline,
       }));
-    } catch (error) {
-      setStatus(prev => ({
-        isOnline: false,
-        isChecking: false,
-        lastCheck: new Date(),
-        wasOffline: false,
-      }));
-    }
-  }, [pingUrl]);
-
-  useEffect(() => {
-    // Initialize
-    setStatus({
-      isOnline: navigator.onLine,
-      isChecking: false,
-      lastCheck: null,
-      wasOffline: false,
-    });
-
-    // Handle online event
-    const handleOnline = () => {
-      setStatus(prev => ({
-        isOnline: true,
-        isChecking: false,
-        lastCheck: new Date(),
-        wasOffline: !prev.isOnline,
-      }));
-      onOnline?.();
-    };
-
-    // Handle offline event
-    const handleOffline = () => {
+    } catch {
+      setOnline(false);
       setStatus({
         isOnline: false,
         isChecking: false,
         lastCheck: new Date(),
         wasOffline: false,
       });
-      onOffline?.();
-    };
+    }
+  }, [pingUrl]);
 
-    // Listen to browser events
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+  useEffect(() => {
+    onOnlineRef.current = onOnline;
+    onOfflineRef.current = onOffline;
+  }, [onOnline, onOffline]);
 
-    // Optional: periodic connectivity check
-    let intervalId: NodeJS.Timeout | undefined;
+  useEffect(() => {
+    startConnectivityMonitor();
+
+    const unsubscribe = subscribeConnectivity((online) => {
+      setStatus((prev) => {
+        const comingOnline = online && !prev.isOnline;
+        const goingOffline = !online && prev.isOnline;
+        if (comingOnline) onOnlineRef.current?.();
+        if (goingOffline) onOfflineRef.current?.();
+        return {
+          isOnline: online,
+          isChecking: false,
+          lastCheck: new Date(),
+          wasOffline: comingOnline,
+        };
+      });
+    });
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
     if (checkInterval && pingUrl) {
-      intervalId = setInterval(checkConnectivity, checkInterval);
+      intervalId = setInterval(() => {
+        void checkConnectivity();
+      }, checkInterval);
     }
 
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      unsubscribe();
       if (intervalId) clearInterval(intervalId);
     };
-  }, [onOnline, onOffline, checkInterval, checkConnectivity, pingUrl]);
+  }, [checkInterval, checkConnectivity, pingUrl]);
 
   return {
     ...status,

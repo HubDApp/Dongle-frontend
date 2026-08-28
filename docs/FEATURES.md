@@ -112,6 +112,16 @@ OAuth users may discover, browse, search, and read reviews. Publishing (reviews,
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | No | GitHub OAuth |
 | `CRON_SECRET` | No | Protects `/api/cron/analytics` |
 
+## 5. Data layer (offline, dedup, invalidation)
+
+Issues **#910**, **#913**, and **#911** share one client path in `dongle/lib/data-layer/`:
+
+- GET: request key → in-flight dedup → TTL cache → network, with cache fallback while offline
+- Mutations: execute online, or queue to `localStorage` and replay on reconnect (reviews API + drafts). On-chain Freighter writes are not queued.
+- Successful mutations invalidate tagged cache entries; `invalidateKey` / `invalidatePrefix` / `invalidateTag` / `invalidateAll` / `invalidateStale` are the manual API
+
+See [`dongle/lib/data-layer/README.md`](../dongle/lib/data-layer/README.md).
+
 ## Production notes
 
 - Replace in-memory users, notification bus, and analytics cache with Redis/Postgres before multi-instance production.
