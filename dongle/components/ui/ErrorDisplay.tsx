@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { AlertCircle, AlertTriangle, Info, XCircle } from "lucide-react";
+import { AlertTriangle, Info, XCircle } from "lucide-react";
 import { MappedError } from "@/lib/error-mapper";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
