@@ -9,8 +9,14 @@ import React, {
   useCallback,
 } from "react";
 import { walletService } from "@/services/wallet/wallet.service";
+import { redactWalletAddress } from "@/utils/stellar-address.util";
+import { logger } from "@/utils/logger.util";
 import { SOROBAN_CONFIG } from "@/constants/contracts";
 import { toast } from "sonner";
+import {
+  trackWalletConnect,
+  trackWalletDisconnect,
+} from "@/lib/analytics";
 
 // ─── Network helpers ────────────────────────────────────────────────────────
 
@@ -72,6 +78,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setIsConnected(false);
     setWalletNetwork(null);
     localStorage.removeItem(WALLET_STORAGE_KEY);
+    trackWalletDisconnect();
     toast.success("Wallet disconnected");
   }, []);
 
@@ -106,7 +113,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setIsConnected(true);
         setWalletNetwork(networkPassphrase);
       } catch (error) {
-        console.error("Failed to restore wallet state:", error);
+        logger.error("Failed to restore wallet state:", error);
         localStorage.removeItem(WALLET_STORAGE_KEY);
       }
     };
@@ -125,7 +132,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (currentKey !== publicKey) {
-          console.info("Account change detected:", currentKey);
+          logger.info("Account change detected:", redactWalletAddress(currentKey));
           setPublicKey(currentKey);
           localStorage.setItem(
             WALLET_STORAGE_KEY,
@@ -137,7 +144,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           setWalletNetwork(networkPassphrase);
         }
       } catch (error) {
-        console.error("Error polling wallet:", error);
+        logger.error("Error polling wallet:", error);
         disconnectWallet();
       }
     };
@@ -169,6 +176,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const onExpectedNetwork =
         networkPassphrase === EXPECTED_NETWORK_PASSPHRASE;
 
+      trackWalletConnect({
+        success: true,
+        networkLabel: getNetworkLabel(networkPassphrase),
+        walletAddress: address,
+      });
+
       toast.success(
         onExpectedNetwork
           ? "Wallet connected successfully"
@@ -178,7 +191,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Wallet connection failed";
-      console.error("Wallet connection failed:", error);
+      logger.error("Wallet connection failed:", error);
+      trackWalletConnect({
+        success: false,
+        errorCode: error instanceof Error ? error.name || "Error" : "unknown",
+      });
       toast.error(msg, { id: toastId });
     } finally {
       setIsConnecting(false);

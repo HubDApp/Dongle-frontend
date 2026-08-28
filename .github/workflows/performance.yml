@@ -1,0 +1,65 @@
+name: Performance budgets
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "dongle/**"
+      - ".github/workflows/performance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "dongle/**"
+      - ".github/workflows/performance.yml"
+
+concurrency:
+  group: performance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse-and-bundles:
+    name: Lighthouse CI and bundle size
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - name: Install Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Check gzipped JS per route (< 200 KB)
+        run: npm run test:bundle
+
+      - name: Run Lighthouse CI
+        run: npm run test:lighthouse
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: dongle/lhci-report
+          if-no-files-found: ignore

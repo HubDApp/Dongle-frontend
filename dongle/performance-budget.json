@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/GoogleChrome/lighthouse-ci/main/packages/utils/src/budget.d.ts",
+  "description": "Dongle frontend performance budgets. Enforced by scripts/check-bundle-size.mjs and Lighthouse CI.",
+  "routes": {
+    "/": { "maxGzippedJsKb": 200 },
+    "/discover": { "maxGzippedJsKb": 200 },
+    "/projects/new": { "maxGzippedJsKb": 200 }
+  },
+  "lighthouse": {
+    "performance": 90,
+    "accessibility": 95,
+    "firstContentfulPaintMs": 1500,
+    "cumulativeLayoutShift": 0.1
+  }
+}

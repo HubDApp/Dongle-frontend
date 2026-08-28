@@ -50,7 +50,10 @@ export function useSavedProjects() {
   );
 
   useEffect(() => {
-    setSavedProjectIds(readSavedProjectIds(publicKey));
+    const id = setTimeout(() => {
+      setSavedProjectIds(readSavedProjectIds(publicKey));
+    }, 0);
+    return () => clearTimeout(id);
   }, [publicKey]);
 
   useEffect(() => {

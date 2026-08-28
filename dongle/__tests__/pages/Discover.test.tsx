@@ -6,6 +6,18 @@ import { mockProjects } from "@/data/mockProjects";
 import { projectService } from "@/services/project/project.service";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 
+// Mock soroban so verification fetches resolve immediately
+vi.mock("@/services/stellar/soroban.service", () => ({
+  sorobanService: {
+    getVerificationStatus: vi.fn().mockResolvedValue("NONE"),
+  },
+}));
+
+// Mock the batch verification module so it resolves immediately in tests
+vi.mock("@/services/stellar/batch-verification", () => ({
+  batchFetchVerificationStatuses: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("@/hooks/useDiscoverParams", () => ({
   useDiscoverParams: () => {
     const [searchInput, setSearchInputState] = React.useState("");
@@ -66,6 +78,18 @@ vi.mock("@/hooks/useRecentViews", () => ({
     trackView: vi.fn(),
     clearHistory: vi.fn(),
     hasHistory: false,
+vi.mock("@/hooks/useAdminAccess", () => ({
+  useAdminAccess: () => ({
+    isAdmin: false,
+    isAdminChecking: false,
+    gate: {
+      state: "ready",
+      publicKey: null,
+      walletNetworkLabel: "Testnet",
+      connectWallet: vi.fn(),
+      disconnectWallet: vi.fn(),
+      isConnecting: false,
+    },
   }),
 }));
 
@@ -95,6 +119,22 @@ vi.mock("@/context/wallet.context", () => ({
     disconnectWallet: vi.fn(),
   }),
   WalletProvider: ({ children }: { children: React.ReactNode }) => children,
+    isSelected: vi.fn(() => false),
+    canAddMore: true,
+    clearComparison: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    isProjectSaved: vi.fn(() => false),
+    toggleSavedProject: vi.fn(),
+    canManageSavedProjects: false,
+    savedProjectIds: [],
+    walletAddress: null,
+    isConnected: false,
+    clearSavedProjects: vi.fn(),
+  }),
 }));
 
 vi.mock("next/link", () => ({
@@ -114,8 +154,11 @@ vi.mock("next/link", () => ({
 }));
 
 async function finishInitialLoad() {
+  // Flush all pending timers and promises so the async verification
+  // fetch completes and setIsInitialLoading(false) is called.
   await act(async () => {
-    vi.advanceTimersByTime(800);
+    vi.runAllTimers();
+    await Promise.resolve();
   });
   // Flush microtasks and pending React state updates
   await act(async () => {
@@ -133,18 +176,19 @@ describe("Discover Page - High Risk Flows", () => {
   });
 
   describe("Loading State", () => {
-    it("displays loading spinner on initial render", () => {
+    it("displays loading skeleton on initial render", () => {
       render(<DiscoverPage />);
-      expect(screen.getByText("Loading projects...")).toBeInTheDocument();
+      // The skeleton grid uses aria-busy="true" and aria-label during loading
+      expect(screen.getByLabelText("Loading projects")).toBeInTheDocument();
     });
 
-    it("hides loading state after timeout", async () => {
+    it("hides loading skeleton after fetch completes", async () => {
       render(<DiscoverPage />);
-      expect(screen.getByText("Loading projects...")).toBeInTheDocument();
+      expect(screen.getByLabelText("Loading projects")).toBeInTheDocument();
 
       await finishInitialLoad();
 
-      expect(screen.queryByText("Loading projects...")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Loading projects")).not.toBeInTheDocument();
     });
   });
 
@@ -259,6 +303,9 @@ describe("Discover Page - High Risk Flows", () => {
       // Sort select is the last one (second) 
       const sortSelect = comboboxes[comboboxes.length - 1] as HTMLSelectElement;
       expect(sortSelect.disabled).toBe(true);
+      const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+      // Both the verification-status and sort selects should be disabled during loading
+      expect(selects.every((s) => s.disabled)).toBe(true);
     });
   });
 
@@ -305,6 +352,11 @@ describe("Discover Page - High Risk Flows", () => {
       // There are two select elements: verification filter and sort; pick the sort one
       const comboboxes = screen.getAllByRole("combobox");
       const sortSelect = comboboxes[comboboxes.length - 1] as HTMLSelectElement;
+      // The sort select has "Highest Rated" / "Most Popular" / "Newest" options
+      const sortSelect = screen
+        .getAllByRole("combobox")
+        .find((el) => (el as HTMLSelectElement).value === "rating") as HTMLSelectElement;
+      expect(sortSelect).toBeTruthy();
       expect(sortSelect.value).toBe("rating");
     });
 
@@ -314,6 +366,9 @@ describe("Discover Page - High Risk Flows", () => {
 
       const comboboxes = screen.getAllByRole("combobox");
       const sortSelect = comboboxes[comboboxes.length - 1] as HTMLSelectElement;
+      const sortSelect = screen
+        .getAllByRole("combobox")
+        .find((el) => (el as HTMLSelectElement).value === "rating") as HTMLSelectElement;
       fireEvent.change(sortSelect, { target: { value: "newest" } });
 
       expect(sortSelect.value).toBe("newest");

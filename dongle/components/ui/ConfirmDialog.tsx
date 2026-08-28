@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { AlertTriangle, Trash2, Info } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 export type ConfirmDialogVariant = "danger" | "warning" | "info";
 
@@ -13,6 +14,10 @@ export interface ConfirmDialogOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: ConfirmDialogVariant;
+  /** Hostname shown in the destination preview (external-link interstitial). */
+  destinationDomain?: string;
+  /** Full destination URL shown before leaving the app. */
+  destinationUrl?: string;
 }
 
 interface ConfirmDialogProps extends ConfirmDialogOptions {
@@ -59,6 +64,8 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "danger",
+  destinationDomain,
+  destinationUrl,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -66,65 +73,25 @@ export function ConfirmDialog({
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
   const config = VARIANT_CONFIG[variant];
 
-  // Move focus into the dialog when it opens
-  useEffect(() => {
-    if (isOpen) {
-      cancelBtnRef.current?.focus();
-    }
-  }, [isOpen]);
-
-  // Close on Escape; trap Tab focus inside the dialog
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onCancel();
-        return;
-      }
-
-      if (e.key === "Tab" && dialogRef.current) {
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last?.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first?.focus();
-          }
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onCancel]);
+  useModalFocusTrap(isOpen, dialogRef, cancelBtnRef, onCancel);
 
   if (!isOpen) return null;
 
   return (
-    // Backdrop
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
-      onClick={onCancel}
-      aria-hidden="true"
-    >
-      {/* Dialog panel — stop click propagation so backdrop click doesn't fire inside */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop is decorative; dialog is a sibling so it stays accessible */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
+        onClick={onCancel}
+        aria-hidden="true"
+      />
+
       <div
         ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-description"
-        onClick={(e) => e.stopPropagation()}
         className={cn(
           "relative w-full max-w-md bg-white dark:bg-zinc-900",
           "border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl",
@@ -151,9 +118,30 @@ export function ConfirmDialog({
         <div
           id="confirm-dialog-description"
           className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8 whitespace-pre-line"
+          className={`text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed whitespace-pre-line ${
+            destinationDomain || destinationUrl ? "mb-6" : "mb-8"
+          }`}
         >
           {description}
         </div>
+
+        {(destinationDomain || destinationUrl) && (
+          <div className="mb-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 mb-1">
+              Destination
+            </p>
+            {destinationDomain && (
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 break-all">
+                {destinationDomain}
+              </p>
+            )}
+            {destinationUrl && (
+              <p className="mt-1 text-xs font-mono text-zinc-600 dark:text-zinc-300 break-all">
+                {destinationUrl}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">
