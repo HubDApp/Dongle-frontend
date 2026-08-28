@@ -262,6 +262,14 @@ class VerificationService {
       // Persist updated request
       await this.persistRequest(request);
 
+      const { emitNotificationEvent } = await import("@/lib/notifications/emit");
+      void emitNotificationEvent({
+        type: "project_verified",
+        recipientId: request.submittedBy,
+        projectId: request.projectId,
+        projectName: request.projectName,
+      });
+
       console.log(`[VerificationService] Request approved: ${projectId}`);
       return request;
     } catch (error) {
@@ -298,12 +306,43 @@ class VerificationService {
       // Persist updated request
       await this.persistRequest(request);
 
+      const { emitNotificationEvent } = await import("@/lib/notifications/emit");
+      void emitNotificationEvent({
+        type: "project_rejected",
+        recipientId: request.submittedBy,
+        projectId: request.projectId,
+        projectName: request.projectName,
+      });
+
       console.log(`[VerificationService] Request rejected: ${projectId}`);
       return request;
     } catch (error) {
       console.error("[VerificationService] Error rejecting request:", error);
       throw error;
     }
+  }
+
+  /**
+   * Asks the submitter for additional verification evidence and notifies them.
+   */
+  async requestEvidence(projectId: string, requestedBy: string): Promise<VerificationRequest> {
+    const request = await this.getVerificationRequest(projectId);
+    if (!request) {
+      throw new Error("Verification request not found");
+    }
+    request.statusUpdatedAt = new Date().toISOString();
+    request.statusUpdatedBy = requestedBy;
+    await this.persistRequest(request);
+
+    const { emitNotificationEvent } = await import("@/lib/notifications/emit");
+    void emitNotificationEvent({
+      type: "verification_evidence_requested",
+      recipientId: request.submittedBy,
+      projectId: request.projectId,
+      projectName: request.projectName,
+    });
+
+    return request;
   }
 
   /**

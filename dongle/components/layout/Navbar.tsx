@@ -3,29 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
-import { Button } from "@/components/ui/Button";
 import { getPrefetchValue } from "@/lib/prefetch-config";
 
-import AddressDisplay from "@/components/ui/AddressDisplay";
 import { IconButton } from "@/components/ui/IconButton";
 import { Menu, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import LanguageSelector from "@/components/i18n/LanguageSelector";
+import NotificationBell from "@/components/notifications/NotificationBell";
+import LoginMenu from "@/components/auth/LoginMenu";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { t } = useTranslation();
-  const {
-    isConnected,
-    isConnecting,
-    publicKey,
-    isCorrectNetwork,
-    walletNetworkLabel,
-    connectWallet,
-    disconnectWallet,
-  } = useWallet();
 
   const { isAdmin } = useAdminAccess();
 
@@ -37,6 +28,7 @@ export default function Navbar() {
     { href: "/discover", label: t("nav.discover") },
     { href: "/reviews", label: t("nav.reviews") },
     { href: "/verify", label: t("nav.verify") },
+    { href: "/analytics", label: t("nav.analytics") },
     { href: "/projects/new", label: t("nav.submitProject") },
     { href: "/profile", label: t("nav.profile") },
   ];
@@ -141,62 +133,16 @@ export default function Navbar() {
                     : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
-                Admin
+                {t("nav.admin")}
               </Link>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {isConnected ? (
-            <div className="flex items-center gap-2">
-              {/* Network badge — always visible when connected */}
-              <span
-                title={`Expected: ${EXPECTED_NETWORK_LABEL}`}
-                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                  isCorrectNetwork
-                    ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
-                    : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 animate-pulse"
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isCorrectNetwork ? "bg-emerald-500" : "bg-red-500"
-                  }`}
-                />
-                {isCorrectNetwork ? EXPECTED_NETWORK_LABEL : walletNetworkLabel}
-              </span>
-
-              {/* Wallet address pill */}
-              <div className="flex items-center gap-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1.5 pl-3 rounded-2xl shadow-sm">
-                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-                {publicKey ? (
-                  <AddressDisplay address={publicKey} copyable={true} truncated={true} inline={true} />
-                ) : (
-                  <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400">
-                    {t("wallet.connected")}
-                  </span>
-                )}
-                <Button
-                  onClick={disconnectWallet}
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full text-xs py-1 px-3 border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                >
-                  {t("wallet.disconnect")}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              onClick={connectWallet}
-              isLoading={isConnecting}
-              size="sm"
-              className="rounded-full"
-            >
-              {isConnecting ? t("wallet.connecting") : t("wallet.connect")}
-            </Button>
-          )}
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <LanguageSelector />
+          <NotificationBell />
+          <LoginMenu />
 
           {/* Mobile menu button */}
           <IconButton

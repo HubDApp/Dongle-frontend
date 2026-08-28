@@ -1,24 +1,19 @@
 /**
  * Notification Service
  *
- * Persists lightweight in-app notifications for wallet users.
- * Currently used exclusively by the project-claim flow:
- *   - claimant receives a confirmation when they submit a claim
- *   - claimant receives an outcome notification when an admin approves/rejects
- *
- * All data is stored in localStorage under a single key, keyed by recipient
- * wallet address so that reads are always scoped to the connected wallet.
+ * Client-side history cache (localStorage) merged with SSE events.
+ * Toast auto-dismiss must not delete rows from this history.
  */
 
 import { generateId } from "@/lib/id-generator";
 import {
   AppNotification,
   CreateNotificationParams,
+  NOTIFICATION_HISTORY_LIMIT,
+  isKnownNotificationType,
 } from "@/types/notification";
 
 export const NOTIFICATION_STORAGE_KEY = "dongle_notifications";
-
-// ── Private helpers ──────────────────────────────────────────────────────────
 
 function loadAll(): AppNotification[] {
   if (typeof window === "undefined") return [];
@@ -47,24 +42,23 @@ function loadAll(): AppNotification[] {
 
     if (typeof r.id !== "string" || !r.id) continue;
     if (typeof r.recipientAddress !== "string" || !r.recipientAddress) continue;
-    if (typeof r.type !== "string") continue;
+    if (!isKnownNotificationType(r.type)) continue;
     if (typeof r.title !== "string") continue;
     if (typeof r.createdAt !== "string" || !r.createdAt) continue;
-    if (typeof r.claimRequestId !== "string") continue;
-    if (typeof r.projectId !== "string") continue;
-    if (typeof r.projectName !== "string") continue;
 
     valid.push({
       id: r.id,
       recipientAddress: r.recipientAddress,
-      type: r.type as AppNotification["type"],
+      type: r.type,
       title: r.title,
       message: typeof r.message === "string" ? r.message : undefined,
       createdAt: r.createdAt,
       read: r.read === true,
-      claimRequestId: r.claimRequestId,
-      projectId: r.projectId,
-      projectName: r.projectName,
+      claimRequestId: typeof r.claimRequestId === "string" ? r.claimRequestId : undefined,
+      projectId: typeof r.projectId === "string" ? r.projectId : undefined,
+      projectName: typeof r.projectName === "string" ? r.projectName : undefined,
+      reviewId: typeof r.reviewId === "string" ? r.reviewId : undefined,
+      eventId: typeof r.eventId === "string" ? r.eventId : undefined,
     });
   }
 
@@ -80,54 +74,62 @@ function saveAll(notifications: AppNotification[]): void {
   }
 }
 
-// ── Public service ───────────────────────────────────────────────────────────
+function cap(items: AppNotification[]): AppNotification[] {
+  return [...items]
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, NOTIFICATION_HISTORY_LIMIT);
+}
 
 export const notificationService = {
-  /**
-   * Create and persist a new notification.
-   * Returns the created notification.
-   */
   create(params: CreateNotificationParams): AppNotification {
     const notification: AppNotification = {
-      id: generateId(),
+      id: params.id ?? generateId(),
+      eventId: params.eventId ?? params.id,
       recipientAddress: params.recipientAddress,
       type: params.type,
       title: params.title,
       message: params.message?.trim() || undefined,
-      createdAt: new Date().toISOString(),
+      createdAt: params.createdAt ?? new Date().toISOString(),
       read: false,
       claimRequestId: params.claimRequestId,
       projectId: params.projectId,
       projectName: params.projectName,
+      reviewId: params.reviewId,
     };
 
+    const all = this.upsert(notification);
+    return all.find((n) => n.id === notification.id) ?? notification;
+  },
+
+  upsert(notification: AppNotification): AppNotification[] {
     const all = loadAll();
-    saveAll([notification, ...all]);
-    return notification;
+    const eventKey = notification.eventId ?? notification.id;
+    const duplicate = all.find(
+      (n) =>
+        n.id === notification.id ||
+        (eventKey && (n.eventId === eventKey || n.id === eventKey)),
+    );
+    if (duplicate) {
+      return cap(all);
+    }
+    const next = cap([notification, ...all]);
+    saveAll(next);
+    return next;
   },
 
-  /**
-   * Return all notifications for a given wallet address, newest first.
-   */
   getForUser(recipientAddress: string): AppNotification[] {
-    return loadAll()
-      .filter((n) => n.recipientAddress === recipientAddress)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    return cap(
+      loadAll().filter((n) => n.recipientAddress === recipientAddress),
+    );
   },
 
-  /**
-   * Return unread notifications for a given wallet address.
-   */
   getUnreadForUser(recipientAddress: string): AppNotification[] {
     return this.getForUser(recipientAddress).filter((n) => !n.read);
   },
 
-  /**
-   * Mark a single notification as read. No-ops gracefully if not found.
-   */
   markRead(notificationId: string): void {
     const all = loadAll();
     const idx = all.findIndex((n) => n.id === notificationId);
@@ -136,9 +138,6 @@ export const notificationService = {
     saveAll(all);
   },
 
-  /**
-   * Mark all notifications for a given user as read.
-   */
   markAllReadForUser(recipientAddress: string): void {
     const all = loadAll().map((n) =>
       n.recipientAddress === recipientAddress ? { ...n, read: true } : n,
@@ -146,16 +145,10 @@ export const notificationService = {
     saveAll(all);
   },
 
-  /**
-   * Return the count of unread notifications for a given wallet address.
-   */
   unreadCount(recipientAddress: string): number {
-    return this.getUnreadForUser(recipientAddress).length;
+    return Math.max(0, this.getUnreadForUser(recipientAddress).length);
   },
 
-  // ── Test helpers ───────────────────────────────────────────────────────────
-
-  /** Wipe all notifications from storage. Only intended for test environments. */
   _clearForTesting(): void {
     if (typeof window !== "undefined") {
       try {
