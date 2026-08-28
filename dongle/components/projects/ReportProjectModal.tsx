@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { Flag } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { cn } from "@/lib/utils";
+import { useModalForm } from "@/hooks/useModalForm";
+import { PROJECT_REPORT_REASONS, PROJECT_REPORT_CONSTRAINTS } from "@/types/project";
 
 interface ReportProjectModalProps {
   isOpen: boolean;
@@ -14,63 +16,34 @@ interface ReportProjectModalProps {
   onSubmit: (data: { reason: string; explanation: string }) => void;
 }
 
-const REPORT_REASONS = [
-  { value: "phishing", label: "Phishing or Scam" },
-  { value: "impersonation", label: "Impersonation" },
-  { value: "broken_links", label: "Broken Links" },
-  { value: "fraud", label: "Fraud" },
-  { value: "inappropriate", label: "Inappropriate Content" },
-];
-
 export function ReportProjectModal({
   isOpen,
   projectName,
   onClose,
   onSubmit,
 }: ReportProjectModalProps) {
-  const [reason, setReason] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [error, setError] = useState("");
-
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const initialFocusRef = useRef<HTMLSelectElement>(null);
-
-  // Reset state when opened
-  useEffect(() => {
-    if (isOpen) {
-      setReason("");
-      setExplanation("");
-      setError("");
-      setTimeout(() => initialFocusRef.current?.focus(), 50);
-    }
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  const { values, setField, error, setError, dialogRef, initialFocusRef } =
+    useModalForm({
+      isOpen,
+      onClose,
+      initialValues: { reason: "", explanation: "" },
+    });
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason) {
+    if (!values.reason) {
       setError("Please select a reason for reporting.");
       return;
     }
-    onSubmit({ reason, explanation });
+    onSubmit({ reason: values.reason, explanation: values.explanation });
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onClose}
-      aria-hidden="true"
     >
       <div
         ref={dialogRef}
@@ -99,20 +72,18 @@ export function ReportProjectModal({
           <SelectField
             ref={initialFocusRef}
             label="Reason for reporting"
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              if (error) setError("");
-            }}
-            options={REPORT_REASONS}
+            value={values.reason}
+            onChange={(e) => setField("reason", e.target.value)}
+            options={PROJECT_REPORT_REASONS}
             error={error}
           />
 
           <TextAreaField
             label="Additional explanation (optional)"
-            value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
+            value={values.explanation}
+            onChange={(e) => setField("explanation", e.target.value)}
             placeholder="Provide any additional context or links..."
+            maxLength={PROJECT_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH}
           />
 
           <div className="flex gap-3 justify-end pt-4">

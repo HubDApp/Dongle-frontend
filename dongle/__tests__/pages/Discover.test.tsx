@@ -6,6 +6,18 @@ import { mockProjects } from "@/data/mockProjects";
 import { projectService } from "@/services/project/project.service";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 
+// Mock soroban so verification fetches resolve immediately
+vi.mock("@/services/stellar/soroban.service", () => ({
+  sorobanService: {
+    getVerificationStatus: vi.fn().mockResolvedValue("NONE"),
+  },
+}));
+
+// Mock the batch verification module so it resolves immediately in tests
+vi.mock("@/services/stellar/batch-verification", () => ({
+  batchFetchVerificationStatuses: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("@/hooks/useDiscoverParams", () => ({
   useDiscoverParams: () => {
     const [searchInput, setSearchInputState] = React.useState("");
@@ -48,6 +60,55 @@ vi.mock("@/hooks/useDiscoverParams", () => ({
   },
 }));
 
+vi.mock("@/hooks/useWalletPageGate", () => ({
+  useWalletPageGate: () => ({
+    state: "ready",
+    publicKey: null,
+    walletNetworkLabel: "Testnet",
+    connectWallet: vi.fn(),
+    disconnectWallet: vi.fn(),
+    isConnecting: false,
+  }),
+}));
+
+vi.mock("@/hooks/useAdminAccess", () => ({
+  useAdminAccess: () => ({
+    isAdmin: false,
+    isAdminChecking: false,
+    gate: {
+      state: "ready",
+      publicKey: null,
+      walletNetworkLabel: "Testnet",
+      connectWallet: vi.fn(),
+      disconnectWallet: vi.fn(),
+      isConnecting: false,
+    },
+  }),
+}));
+
+vi.mock("@/context/comparison.context", () => ({
+  useComparison: () => ({
+    selectedProjects: [],
+    addProject: vi.fn(),
+    removeProject: vi.fn(),
+    isSelected: vi.fn(() => false),
+    canAddMore: true,
+    clearComparison: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    isProjectSaved: vi.fn(() => false),
+    toggleSavedProject: vi.fn(),
+    canManageSavedProjects: false,
+    savedProjectIds: [],
+    walletAddress: null,
+    isConnected: false,
+    clearSavedProjects: vi.fn(),
+  }),
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -65,8 +126,11 @@ vi.mock("next/link", () => ({
 }));
 
 async function finishInitialLoad() {
+  // Flush all pending timers and promises so the async verification
+  // fetch completes and setIsInitialLoading(false) is called.
   await act(async () => {
-    vi.advanceTimersByTime(800);
+    vi.runAllTimers();
+    await Promise.resolve();
   });
 }
 
@@ -80,18 +144,19 @@ describe("Discover Page - High Risk Flows", () => {
   });
 
   describe("Loading State", () => {
-    it("displays loading spinner on initial render", () => {
+    it("displays loading skeleton on initial render", () => {
       render(<DiscoverPage />);
-      expect(screen.getByText("Loading projects...")).toBeInTheDocument();
+      // The skeleton grid uses aria-busy="true" and aria-label during loading
+      expect(screen.getByLabelText("Loading projects")).toBeInTheDocument();
     });
 
-    it("hides loading state after timeout", async () => {
+    it("hides loading skeleton after fetch completes", async () => {
       render(<DiscoverPage />);
-      expect(screen.getByText("Loading projects...")).toBeInTheDocument();
+      expect(screen.getByLabelText("Loading projects")).toBeInTheDocument();
 
       await finishInitialLoad();
 
-      expect(screen.queryByText("Loading projects...")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Loading projects")).not.toBeInTheDocument();
     });
   });
 
@@ -201,8 +266,9 @@ describe("Discover Page - High Risk Flows", () => {
     it("disables sort control during loading", () => {
       render(<DiscoverPage />);
 
-      const sortSelect = screen.getByRole("combobox") as HTMLSelectElement;
-      expect(sortSelect.disabled).toBe(true);
+      const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+      // Both the verification-status and sort selects should be disabled during loading
+      expect(selects.every((s) => s.disabled)).toBe(true);
     });
   });
 
@@ -246,7 +312,11 @@ describe("Discover Page - High Risk Flows", () => {
       render(<DiscoverPage />);
       await finishInitialLoad();
 
-      const sortSelect = screen.getByRole("combobox") as HTMLSelectElement;
+      // The sort select has "Highest Rated" / "Most Popular" / "Newest" options
+      const sortSelect = screen
+        .getAllByRole("combobox")
+        .find((el) => (el as HTMLSelectElement).value === "rating") as HTMLSelectElement;
+      expect(sortSelect).toBeTruthy();
       expect(sortSelect.value).toBe("rating");
     });
 
@@ -254,7 +324,9 @@ describe("Discover Page - High Risk Flows", () => {
       render(<DiscoverPage />);
       await finishInitialLoad();
 
-      const sortSelect = screen.getByRole("combobox") as HTMLSelectElement;
+      const sortSelect = screen
+        .getAllByRole("combobox")
+        .find((el) => (el as HTMLSelectElement).value === "rating") as HTMLSelectElement;
       fireEvent.change(sortSelect, { target: { value: "newest" } });
 
       expect(sortSelect.value).toBe("newest");

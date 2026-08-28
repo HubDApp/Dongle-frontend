@@ -1,5 +1,9 @@
 import { Project } from "@/types/project";
 import { projectService } from "@/services/project/project.service";
+import {
+  getItemAndDecrypt,
+  setItemAndEncrypt,
+} from "@/lib/crypto-storage";
 
 const STORAGE_KEY = "dongle_recent_views";
 const MAX_RECENT_ITEMS = 10;
@@ -12,20 +16,26 @@ export interface RecentView {
 
 /**
  * Service for tracking recently viewed projects
- * Stores data in localStorage with optional wallet-scoped tracking
+ * Stores sensitive recent view history encrypted in localStorage using AES
+ * with user's Stellar public key hash (or fallback key).
  */
 export const recentViewsService = {
   /**
-   * Get all recent views from storage
+   * Get all recent views from encrypted storage.
+   * Automatically migrates legacy unencrypted views on read.
+   *
+   * @param walletAddress - Optional user's Stellar public key address
    */
-  getAllViews(): RecentView[] {
+  getAllViews(walletAddress?: string): RecentView[] {
     if (typeof window === "undefined") return [];
     
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
+      const views = getItemAndDecrypt<RecentView[]>(STORAGE_KEY, walletAddress, {
+        showConsoleWarning: true,
+      });
+      return views ?? [];
     } catch (error) {
-      console.error("Error reading recent views:", error);
+      console.warn("[RecentViewsService Warning] Error reading encrypted recent views:", error);
       return [];
     }
   },
@@ -34,7 +44,7 @@ export const recentViewsService = {
    * Get recent views for a specific wallet (or all if no wallet specified)
    */
   getRecentViews(walletAddress?: string): RecentView[] {
-    const allViews = this.getAllViews();
+    const allViews = this.getAllViews(walletAddress);
     
     if (!walletAddress) {
       return allViews;
@@ -59,13 +69,13 @@ export const recentViewsService = {
 
   /**
    * Add a project view to recent history
-   * Automatically deduplicates and maintains order
+   * Encrypts and persists updated history in localStorage.
    */
   addView(projectId: string, walletAddress?: string): void {
     if (typeof window === "undefined") return;
     
     try {
-      let views = this.getAllViews();
+      let views = this.getAllViews(walletAddress);
       
       // Remove any existing views of this project by this wallet (or globally if no wallet)
       views = views.filter(view => {
@@ -90,9 +100,9 @@ export const recentViewsService = {
       // Keep only the most recent MAX_RECENT_ITEMS
       views = views.slice(0, MAX_RECENT_ITEMS);
       
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
+      setItemAndEncrypt(STORAGE_KEY, views, walletAddress);
     } catch (error) {
-      console.error("Error saving recent view:", error);
+      console.error("Error saving encrypted recent view:", error);
     }
   },
 
@@ -108,12 +118,12 @@ export const recentViewsService = {
         localStorage.removeItem(STORAGE_KEY);
       } else {
         // Clear only for specific wallet
-        let views = this.getAllViews();
+        let views = this.getAllViews(walletAddress);
         views = views.filter(view => view.walletAddress !== walletAddress);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(views));
+        setItemAndEncrypt(STORAGE_KEY, views, walletAddress);
       }
     } catch (error) {
-      console.error("Error clearing recent views:", error);
+      console.error("Error clearing encrypted recent views:", error);
     }
   },
 

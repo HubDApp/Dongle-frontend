@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function DocsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black pt-32 pb-16">
@@ -23,6 +25,18 @@ export default function DocsPage() {
               <li>On-chain verification for developer identity</li>
               <li>Transparent, decentralized governance</li>
             </ul>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold mb-4">UI components</h2>
+            <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+              Button, Card, Badge, and Input variants, accessibility props, and an
+              interactive playground are documented at{" "}
+              <Link className="underline" href="/docs/components">
+                /docs/components
+              </Link>
+              .
+            </p>
           </section>
 
           <section>
