@@ -12,6 +12,7 @@ import AddressDisplay from "@/components/ui/AddressDisplay";
 import { IconButton } from "@/components/ui/IconButton";
 import { Menu, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { useWatchlist } from "@/hooks/useWatchlist";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -28,6 +29,7 @@ export default function Navbar() {
   } = useWallet();
 
   const { isAdmin } = useAdminAccess();
+  const { watchlistCount, canManageWatchlist } = useWatchlist();
 
   const menuRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
@@ -122,13 +124,18 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 prefetch={getPrefetchValue("navigation")}
-                className={`py-2 px-1 transition-all border-b-2 ${
+                className={`py-2 px-1 transition-all border-b-2 relative ${
                   isActive(link.href)
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
                     : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent hover:border-zinc-300 dark:hover:border-zinc-700"
                 }`}
               >
                 {link.label}
+                {link.href === "/profile" && canManageWatchlist && watchlistCount > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                    {watchlistCount}
+                  </span>
+                )}
               </Link>
             ))}
             {isAdmin && (

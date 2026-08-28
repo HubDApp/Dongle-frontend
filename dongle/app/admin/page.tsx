@@ -41,6 +41,7 @@ import {
 } from "@/services/stellar/verification.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
+import { ReviewModerationQueue } from "@/components/moderation/ReviewModerationQueue";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 
@@ -153,7 +154,7 @@ export default function AdminDashboard() {
   });
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<
-    "verification" | "submissions" | "reports" | "claims" | "audit-log"
+    "verification" | "submissions" | "reports" | "claims" | "audit-log" | "spam-queue"
   >("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -690,6 +691,20 @@ export default function AdminDashboard() {
               </span>
             )}
             {activeTab === "claims" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("spam-queue")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "spam-queue"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Spam Queue
+            {activeTab === "spam-queue" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -1538,6 +1553,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-6">
@@ -1852,6 +1869,10 @@ export default function AdminDashboard() {
 
         {activeTab === "audit-log" && (
           <AuditLogViewer entries={auditLogService.list()} />
+        )}
+
+        {activeTab === "spam-queue" && gate.publicKey && (
+          <ReviewModerationQueue moderatorAddress={gate.publicKey} />
         )}
       </div>
     </div>

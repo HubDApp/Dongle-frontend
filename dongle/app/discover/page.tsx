@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useEffect, useState, useRef, Suspense } from "react";
+import { useMemo, useEffect, useState, useRef, Suspense, useCallback } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
 import { LazyProjectCard } from "@/components/projects/LazyProjectCard";
 import { Button } from "@/components/ui/Button";
@@ -18,17 +19,73 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import { AdvancedSearchPanel } from "@/components/search/AdvancedSearchPanel";
+import {
+  applyAdvancedFilters,
+  decodeSearchFiltersFromParams,
+  encodeSearchFiltersToParams,
+  getPresetById,
+} from "@/utils/advanced-search.util";
+import type { AdvancedSearchFilters } from "@/types/search";
 
 const ITEMS_PER_PAGE = 9;
 
 // ─── Inner component (uses useSearchParams via useDiscoverParams) ──────────────
 
 function DiscoverContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlSearchParams = useSearchParams();
+  const gate = useWalletPageGate();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
-  const gate = useWalletPageGate();
+  const advancedFilters = useMemo(
+    () => decodeSearchFiltersFromParams(new URLSearchParams(urlSearchParams.toString())),
+    [urlSearchParams],
+  );
+
+  const updateAdvancedFilters = useCallback(
+    (updates: Partial<AdvancedSearchFilters>) => {
+      const next = { ...advancedFilters, ...updates, page: 1 };
+      const params = new URLSearchParams(urlSearchParams.toString());
+      const encoded = encodeSearchFiltersToParams(next);
+      for (const key of [
+        "q",
+        "categories",
+        "tags",
+        "ratingMin",
+        "ratingMax",
+        "verification",
+        "owner",
+        "createdFrom",
+        "createdTo",
+        "preset",
+        "sort",
+        "page",
+      ]) {
+        params.delete(key);
+      }
+      for (const [key, value] of Object.entries(encoded)) {
+        params.set(key, value);
+      }
+      const qs = params.toString();
+      router.push(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [advancedFilters, urlSearchParams, router, pathname],
+  );
+
+  const handleApplyPreset = useCallback(
+    (presetId: AdvancedSearchFilters["preset"]) => {
+      if (!presetId) return;
+      const preset = getPresetById(presetId);
+      if (!preset) return;
+      updateAdvancedFilters({ ...preset.filters, preset: presetId });
+    },
+    [updateAdvancedFilters],
+  );
+
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
 
@@ -76,25 +133,34 @@ function DiscoverContent() {
   const categories = projectService.getCategories();
 
   const filteredAndSortedProjects = useMemo(() => {
-    let result = searchQuery
-      ? projectService.searchProjects(searchQuery)
-      : projectService.getDiscoverableProjects();
+    const mergedFilters: AdvancedSearchFilters = {
+      ...advancedFilters,
+      query: searchQuery,
+      categories: selectedCategories,
+      tags,
+      sortBy,
+      page,
+      verification:
+        advancedFilters.verification !== "ALL"
+          ? advancedFilters.verification
+          : verificationFilter,
+    };
 
-    if (selectedCategories.length > 0) {
-      result = result.filter((p) => selectedCategories.includes(p.primaryCategory));
-    }
-    
-    if (tags && tags.length > 0) {
-      result = result.filter((p) => tags.every((t) => p.tags?.includes(t))));
-    }
-
-    if (verificationFilter !== "ALL") {
-      result = result.filter((p) => verificationStatuses[p.id] === verificationFilter);
-    }
-
-    result = projectService.sortProjects(result, sortBy);
-    return result;
-  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationStatuses]);
+    return applyAdvancedFilters(
+      projectService.getDiscoverableProjects(),
+      mergedFilters,
+      verificationStatuses,
+    );
+  }, [
+    searchQuery,
+    selectedCategories,
+    tags,
+    sortBy,
+    verificationFilter,
+    verificationStatuses,
+    advancedFilters,
+    page,
+  ]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -269,6 +335,27 @@ function DiscoverContent() {
                onChange={handleTagsChange}
                placeholder="Add tags to filter..."
              />
+          </div>
+
+          <div className="mt-4">
+            <AdvancedSearchPanel
+              filters={{
+                ...advancedFilters,
+                query: searchQuery,
+                categories: selectedCategories,
+                tags,
+                sortBy,
+                page,
+                verification:
+                  advancedFilters.verification !== "ALL"
+                    ? advancedFilters.verification
+                    : verificationFilter,
+              }}
+              verificationStatuses={verificationStatuses}
+              walletAddress={gate.publicKey}
+              onFiltersChange={updateAdvancedFilters}
+              onApplyPreset={handleApplyPreset}
+            />
           </div>
         </div>
 

@@ -4,17 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { Project } from "@/types/project";
 
-const { comparisonMocks, savedMocks } = vi.hoisted(() => ({
+const { comparisonMocks, watchlistMocks } = vi.hoisted(() => ({
   comparisonMocks: {
     addProject: vi.fn(),
     removeProject: vi.fn(),
     isSelected: vi.fn(() => false),
     canAddMore: true,
   },
-  savedMocks: {
-    isProjectSaved: vi.fn(() => false),
-    toggleSavedProject: vi.fn(),
-    canManageSavedProjects: true,
+  watchlistMocks: {
+    isOnWatchlist: vi.fn(() => false),
+    toggleWatchlist: vi.fn(),
+    canManageWatchlist: true,
   },
 }));
 
@@ -36,8 +36,8 @@ vi.mock("@/context/comparison.context", () => ({
   useComparison: () => comparisonMocks,
 }));
 
-vi.mock("@/hooks/useSavedProjects", () => ({
-  useSavedProjects: () => savedMocks,
+vi.mock("@/hooks/useWatchlist", () => ({
+  useWatchlist: () => watchlistMocks,
 }));
 
 const baseProject: Project = {
@@ -62,8 +62,8 @@ describe("ProjectCard component", () => {
     vi.clearAllMocks();
     comparisonMocks.isSelected.mockReturnValue(false);
     comparisonMocks.canAddMore = true;
-    savedMocks.isProjectSaved.mockReturnValue(false);
-    savedMocks.canManageSavedProjects = true;
+    watchlistMocks.isOnWatchlist.mockReturnValue(false);
+    watchlistMocks.canManageWatchlist = true;
   });
 
   // ── Data rendering ────────────────────────────────────────────────────────
@@ -203,29 +203,29 @@ describe("ProjectCard component", () => {
 
   // ── Save button ───────────────────────────────────────────────────────────
 
-  it("toggles the saved state from the bookmark button", async () => {
+  it("toggles the watchlist state from the bookmark button", async () => {
     const user = userEvent.setup();
     renderCard();
 
-    await user.click(screen.getByRole("button", { name: /save stellar lend/i }));
+    await user.click(screen.getByRole("button", { name: /add stellar lend to watchlist/i }));
 
-    expect(savedMocks.toggleSavedProject).toHaveBeenCalledWith("proj-1");
+    expect(watchlistMocks.toggleWatchlist).toHaveBeenCalledWith("proj-1");
   });
 
-  it("marks the save button as pressed when the project is saved", () => {
-    savedMocks.isProjectSaved.mockReturnValue(true);
+  it("marks the watchlist button as pressed when the project is on the watchlist", () => {
+    watchlistMocks.isOnWatchlist.mockReturnValue(true);
     renderCard();
 
     expect(
-      screen.getByRole("button", { name: /remove stellar lend from saved projects/i }),
+      screen.getByRole("button", { name: /remove stellar lend from watchlist/i }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("disables the save button when the wallet cannot manage saved projects", () => {
-    savedMocks.canManageSavedProjects = false;
+  it("disables the watchlist button when the wallet cannot manage watchlist", () => {
+    watchlistMocks.canManageWatchlist = false;
     renderCard();
 
-    expect(screen.getByRole("button", { name: /save stellar lend/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /add stellar lend to watchlist/i })).toBeDisabled();
   });
 
   // ── Keyboard navigation & focus states ────────────────────────────────────
@@ -245,7 +245,7 @@ describe("ProjectCard component", () => {
     renderCard();
 
     await user.tab();
-    expect(screen.getByRole("button", { name: /save stellar lend/i })).toHaveFocus();
+    expect(screen.getByRole("button", { name: /add stellar lend to watchlist/i })).toHaveFocus();
 
     await user.tab();
     expect(screen.getByRole("button", { name: /add stellar lend to comparison/i })).toHaveFocus();

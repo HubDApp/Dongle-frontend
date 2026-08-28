@@ -49,3 +49,21 @@ export const DEFAULT_TRANSACTION_LIMIT = 10;
 
 /** Maximum comparison projects allowed in the compare view. */
 export const MAX_COMPARISON_PROJECTS = 4;
+
+// ─── Watchlist ───────────────────────────────────────────────────────────────
+
+/** Maximum projects a user can add to their watchlist. */
+export const MAX_WATCHLIST_SIZE = 20;
+
+// ─── Saved searches ────────────────────────────────────────────────────────────
+
+/** Maximum saved search filters per wallet. */
+export const MAX_SAVED_SEARCHES = 10;
+
+// ─── Review moderation / spam ────────────────────────────────────────────────
+
+/** Reviews per wallet per day before velocity flagging and CAPTCHA. */
+export const REVIEW_VELOCITY_DAILY_LIMIT = 10;
+
+/** Minimum comment length before low-quality heuristic applies. */
+export const REVIEW_SPAM_MIN_QUALITY_LENGTH = 20;

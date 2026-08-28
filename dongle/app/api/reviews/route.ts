@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Review } from "@/types/review";
 import { hasMinLength } from "@/lib/validation";
+import {
+  flagReviewForModeration,
+  isReviewerBanned,
+  recordReviewSubmission,
+} from "@/lib/moderation-store";
+import { assessReviewSpam } from "@/utils/review-spam.util";
 
 interface InMemoryReview extends Review {
   helpfulVotes: string[];
@@ -65,6 +71,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isReviewerBanned(userAddress)) {
+      return NextResponse.json(
+        { success: false, errors: [{ field: "comment", message: "Your account is banned from submitting reviews" }] },
+        { status: 403 },
+      );
+    }
+
     const existing = Array.from(store.values()).find(
       (r) => r.userAddress === userAddress && r.projectId === projectId,
     );
@@ -72,6 +85,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, errors: [{ field: "comment", message: "You have already reviewed this project" }] },
         { status: 409 },
+      );
+    }
+
+    const { captchaToken } = body as { captchaToken?: string };
+    const dailyCount = recordReviewSubmission(userAddress, new Date().toISOString());
+    const spamAssessment = assessReviewSpam(comment, dailyCount);
+    if (spamAssessment.requiresCaptcha && !captchaToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          errors: [{ field: "comment", message: "CAPTCHA required due to high review velocity" }],
+          requiresCaptcha: true,
+          riskScore: spamAssessment.riskScore,
+        },
+        { status: 429 },
       );
     }
 
@@ -88,7 +116,17 @@ export async function POST(request: NextRequest) {
     };
 
     store.set(newReview.id, newReview);
-    return NextResponse.json({ success: true, data: newReview }, { status: 201 });
+    const flagged = flagReviewForModeration(newReview, dailyCount);
+    return NextResponse.json(
+      {
+        success: true,
+        data: newReview,
+        moderation: flagged
+          ? { flagged: true, riskScore: flagged.riskScore, flags: flagged.flags }
+          : { flagged: false, riskScore: spamAssessment.riskScore },
+      },
+      { status: 201 },
+    );
   } catch {
     return NextResponse.json(
       { success: false, errors: [{ field: "comment", message: "Invalid request body" }] },

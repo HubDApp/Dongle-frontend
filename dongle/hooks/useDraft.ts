@@ -90,6 +90,7 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
     return () => clearTimeout(id);
   }, [mode, projectId, walletAddress]);
 
+  useEffect(() => {
     const channel = new BroadcastChannel(CHANNEL_NAME);
     channelRef.current = channel;
 

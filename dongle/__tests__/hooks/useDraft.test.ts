@@ -299,6 +299,7 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
         "Invalid Date"
       );
     });
+  });
 
   describe("Acceptance Criteria: Users can clear saved drafts", () => {
     it("should delete draft when clearDraft is called", async () => {
@@ -338,8 +339,6 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
       expect(deleteDraftRemoteMock).toHaveBeenCalledWith(WALLET, DRAFT_ID_CREATE);
       expect(result.current.hasDraft).toBe(false);
     });
-  });
-});
 
     it("should delete draft when deleteDraft is called", async () => {
       const draftData = {

@@ -7,24 +7,34 @@ import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { ReviewSpamWarning } from "@/components/reviews/ReviewSpamWarning";
+import {
+  ReviewCaptchaField,
+  isCaptchaValid,
+} from "@/components/reviews/ReviewCaptchaField";
 
 interface ReviewFormProps {
   projectId: string;
   projectName: string;
   userAddress: string;
   initialReview?: Review;
-  onSubmit: (review: Omit<Review, "id" | "createdAt" | "userAddress" | "projectId" | "projectName">) => void;
+  dailyReviewCount?: number;
+  requiresCaptcha?: boolean;
+  onSubmit: (review: Omit<Review, "id" | "createdAt" | "userAddress" | "projectId" | "projectName"> & { captchaToken?: string }) => void;
   onCancel: () => void;
 }
 
 export default function ReviewForm({
   projectName,
   initialReview,
+  dailyReviewCount = 0,
+  requiresCaptcha = false,
   onSubmit,
   onCancel,
 }: ReviewFormProps) {
   const [rating, setRating] = useState(initialReview?.rating || 5);
   const [comment, setComment] = useState(initialReview?.comment || "");
+  const [captchaToken, setCaptchaToken] = useState("");
   const [errors, setErrors] = useState<ReviewValidationError[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const ratingLabelId = useId();
@@ -58,6 +68,13 @@ export default function ReviewForm({
       });
     }
 
+    if (requiresCaptcha && !isCaptchaValid(captchaToken)) {
+      newErrors.push({
+        field: "comment",
+        message: "Complete the CAPTCHA to submit your review",
+      });
+    }
+
     setErrors(newErrors);
     return newErrors.length === 0;
   };
@@ -81,7 +98,11 @@ export default function ReviewForm({
     e.preventDefault();
     if (validateForm()) {
       setIsSubmitting(true);
-      onSubmit({ rating, comment });
+      onSubmit({
+        rating,
+        comment,
+        captchaToken: requiresCaptcha ? captchaToken : undefined,
+      });
     }
   };
 
@@ -166,6 +187,13 @@ export default function ReviewForm({
             )}
           </div>
         </div>
+
+        <ReviewSpamWarning comment={comment} dailyReviewCount={dailyReviewCount} />
+        <ReviewCaptchaField
+          value={captchaToken}
+          onChange={setCaptchaToken}
+          required={requiresCaptcha}
+        />
       </div>
 
       <div className="flex gap-3">

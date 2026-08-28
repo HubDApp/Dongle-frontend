@@ -30,6 +30,7 @@ import {
   Bookmark,
   Activity,
   Wallet,
+  Search,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
@@ -40,6 +41,10 @@ import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { savedSearchService } from "@/services/search/saved-search.service";
+import type { SavedSearch } from "@/types/search";
+import { getWatchlistNotifications } from "@/services/watchlist/watchlist-notification.service";
 
 interface StellarNonNativeBalance {
   asset_code?: string;
@@ -57,6 +62,16 @@ export default function ProfilePage() {
   const confirm = useConfirm();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const { savedProjectIds } = useSavedProjects();
+  const {
+    watchlistProjects,
+    watchlistCount,
+    maxWatchlistSize,
+    filterByCategory,
+    trendingFromWatchlist,
+  } = useWatchlist();
+  const [watchlistCategory, setWatchlistCategory] = useState("All");
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const watchlistNotifications = getWatchlistNotifications();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
   const [userReviews, setUserReviews] = useState<Review[]>([]);
@@ -68,6 +83,7 @@ export default function ProfilePage() {
   const savedProjects = savedProjectIds
     .map((projectId) => projectService.getProjectById(projectId))
     .filter((project): project is NonNullable<typeof project> => Boolean(project));
+  const filteredWatchlist = filterByCategory(watchlistCategory);
   const ownedProjects = gate.publicKey
     ? projectService.getProjectsByOwner(gate.publicKey)
     : [];
@@ -93,6 +109,14 @@ export default function ProfilePage() {
 
     void fetchStatuses();
   }, [savedProjectIds]);
+
+  useEffect(() => {
+    if (!gate.publicKey) {
+      setSavedSearches([]);
+      return;
+    }
+    setSavedSearches(savedSearchService.getSavedSearches(gate.publicKey));
+  }, [gate.publicKey]);
 
   const handleClearHistory = async () => {
     const ok = await confirm({
@@ -443,14 +467,35 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <Bookmark className="w-6 h-6" />
-                    Saved Projects
+                    Watchlist
                   </h2>
-                  <Badge variant="secondary">{savedProjects.length}</Badge>
+                  <Badge variant="secondary">
+                    {watchlistCount}/{maxWatchlistSize}
+                  </Badge>
                 </div>
 
-                {savedProjects.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {["All", ...projectService.getCategories().filter((c) => c !== "All")].map(
+                    (cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setWatchlistCategory(cat)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          watchlistCategory === cat
+                            ? "bg-blue-500 text-white"
+                            : "bg-zinc-100 dark:bg-zinc-800"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                {filteredWatchlist.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {savedProjects.map((project) => (
+                    {filteredWatchlist.map((project) => (
                       <ProjectCard
                         key={project.id}
                         project={project}
@@ -461,7 +506,7 @@ export default function ProfilePage() {
                 ) : (
                   <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
                     <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No saved projects yet. Bookmark projects to revisit them later.</p>
+                    <p>No projects on your watchlist yet.</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -471,6 +516,74 @@ export default function ProfilePage() {
                       Browse Projects
                     </Button>
                   </div>
+                )}
+
+                {trendingFromWatchlist.length > 0 && (
+                  <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                    <h3 className="font-semibold mb-4">Trending from your watchlist</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {trendingFromWatchlist.map((project) => (
+                        <ProjectCard key={project.id} project={project} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {watchlistNotifications.length > 0 && (
+                  <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                    <h3 className="font-semibold mb-3">Recent notifications</h3>
+                    <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {watchlistNotifications.slice(0, 5).map((n) => (
+                        <li key={n.id}>{n.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Search className="w-6 h-6" />
+                    Saved Searches
+                  </h2>
+                  <Badge variant="secondary">{savedSearches.length}</Badge>
+                </div>
+                {savedSearches.length > 0 ? (
+                  <ul className="space-y-3">
+                    {savedSearches.map((search) => (
+                      <li
+                        key={search.id}
+                        className="flex items-center justify-between rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4"
+                      >
+                        <div>
+                          <p className="font-medium">{search.name}</p>
+                          <p className="text-xs text-zinc-500">
+                            {search.filters.query || "All projects"}
+                            {search.filters.preset ? ` · ${search.filters.preset}` : ""}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const params = new URLSearchParams();
+                            if (search.filters.query) params.set("q", search.filters.query);
+                            if (search.filters.categories?.length) {
+                              params.set("categories", search.filters.categories.join(","));
+                            }
+                            router.push(`/discover?${params.toString()}`);
+                          }}
+                        >
+                          Run
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-zinc-500 text-sm">
+                    Save custom filters from Discover (max 10 per wallet).
+                  </p>
                 )}
               </div>
 

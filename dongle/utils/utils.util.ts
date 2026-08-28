@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -92,9 +92,7 @@ export function highlightText(text: string, query: string, className = "bg-yello
       segments.push(text.slice(lastIndex, match.index));
     }
     segments.push(
-      <mark key={`hl-${match.index}-${match[0]}`} className={className}>
-        {match[0]}
-      </mark>,
+      createElement("mark", { key: `hl-${match.index}-${match[0]}`, className }, match[0]),
     );
     lastIndex = re.lastIndex;
   }

@@ -14,6 +14,7 @@ export { useProjectFilters } from "./useProjectFilters";
 export type { SortOption, ProjectFiltersState } from "./useProjectFilters";
 export { useRecentViews } from "./useRecentViews";
 export { useSavedProjects } from "./useSavedProjects";
+export { useWatchlist } from "./useWatchlist";
 export { useStellarAccount } from "./useStellarAccount";
 export { useUnsavedChanges } from "./useUnsavedChanges";
 export { useVerificationStatuses } from "./useVerificationStatuses";

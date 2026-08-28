@@ -47,13 +47,23 @@ vi.mock("@/hooks/useWalletPageGate", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useSavedProjects", () => ({
-  useSavedProjects: () => ({
-    isProjectSaved: () => false,
-    toggleSavedProject: vi.fn(),
-    canManageSavedProjects: true,
-    savedProjectIds: [],
+vi.mock("@/hooks/useWatchlist", () => ({
+  useWatchlist: () => ({
+    isOnWatchlist: vi.fn(() => false),
+    toggleWatchlist: vi.fn(),
+    canManageWatchlist: true,
+    watchlistIds: [],
+    watchlistCount: 0,
+    addToWatchlist: vi.fn(() => ({ success: true })),
   }),
+}));
+
+vi.mock("@/services/review/review-moderation.service", () => ({
+  reviewModerationService: {
+    checkVelocity: vi.fn(() =>
+      Promise.resolve({ dailyCount: 0, requiresCaptcha: false, banned: false }),
+    ),
+  },
 }));
 
 vi.mock("@/hooks/useConfirm", () => ({

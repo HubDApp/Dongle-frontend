@@ -97,15 +97,16 @@ vi.mock("@/context/comparison.context", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useSavedProjects", () => ({
-  useSavedProjects: () => ({
-    isProjectSaved: vi.fn(() => false),
-    toggleSavedProject: vi.fn(),
-    canManageSavedProjects: false,
-    savedProjectIds: [],
+vi.mock("@/hooks/useWatchlist", () => ({
+  useWatchlist: () => ({
+    isOnWatchlist: vi.fn(() => false),
+    toggleWatchlist: vi.fn(),
+    canManageWatchlist: false,
+    watchlistIds: [],
+    watchlistCount: 0,
     walletAddress: null,
     isConnected: false,
-    clearSavedProjects: vi.fn(),
+    addToWatchlist: vi.fn(() => ({ success: true })),
   }),
 }));
 
