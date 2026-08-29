@@ -9,6 +9,8 @@ import {
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
+import WalletGate from "@/components/wallet/WalletGate";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import WalletStatePanel, {
   WalletStateLoadingPanel,
 } from "@/components/wallet/WalletStatePanel";
@@ -574,6 +576,11 @@ export default function AdminDashboard() {
   if (gate.state !== "ready") {
     return (
       <div className="container mx-auto px-4 py-32 min-h-screen max-w-2xl">
+        <WalletGate
+          gate={gate}
+          pagePurpose={ADMIN_PURPOSE}
+          loadingMessage="Verifying wallet access..."
+        />
         {isAdminChecking || gate.state === "account-loading" ? (
           <WalletStateLoadingPanel message="Verifying admin access..." />
         ) : (
