@@ -17,6 +17,7 @@ export { useSavedProjects } from "./useSavedProjects";
 export { useStellarAccount } from "./useStellarAccount";
 export { useUnsavedChanges } from "./useUnsavedChanges";
 export { useVerificationStatuses } from "./useVerificationStatuses";
+export { useProjectMetadata } from "./useProjectMetadata";
 export { useWalletPageGate } from "./useWalletPageGate";
 export { useModalFocusTrap } from "./useModalFocusTrap";
 export { useWalletTransactions } from "./useWalletTransactions";

@@ -1,16 +1,10 @@
 "use client";
 
-import { useMemo, useEffect, useState, useRef, Suspense } from "react";
-import { projectService } from "@/services/project/project.service";
-import { LazyProjectCard } from "@/components/projects/LazyProjectCard";
-import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
-import { Search, Filter, X } from "lucide-react";
+import { useMemo, useState, useRef, Suspense } from "react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
-import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
-import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import useSWR from "swr";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
@@ -18,16 +12,21 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import projectService from "@/services/project/project.service";
 
 const ITEMS_PER_PAGE = 9;
 
 // ─── Inner component (uses useSearchParams via useDiscoverParams) ──────────────
 
 function DiscoverContent() {
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
-  const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
+  const [verificationFilter, setVerificationFilter] = useState<
+    | "VERIFIED"
+    | "PENDING"
+    | "NONE"
+    | "REJECTED"
+    | "ALL"
+  >("ALL");
   const gate = useWalletPageGate();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
@@ -47,31 +46,11 @@ function DiscoverContent() {
     clearFilters,
   } = useDiscoverParams();
 
-  // Fetch verification statuses for all projects using batched fetch
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchVerificationStatuses = async () => {
-      const projects = projectService.getDiscoverableProjects();
-      const ids = projects.map((p) => p.id);
-
-      const statuses = await batchFetchVerificationStatuses(
-        ids,
-        controller.signal,
-      );
-
-      if (!controller.signal.aborted) {
-        setVerificationStatuses(statuses);
-        setIsInitialLoading(false);
-      }
-    };
-
-    void fetchVerificationStatuses();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+  // Fetch verification statuses using SWR for caching and deduping
+  const { data: verificationStatuses, isLoading: isFetchingStatuses, refresh } = useVerificationStatuses(
+    [],
+    { bypassCache: false },
+  );
 
   const categories = projectService.getCategories();
 
@@ -83,9 +62,9 @@ function DiscoverContent() {
     if (selectedCategories.length > 0) {
       result = result.filter((p) => selectedCategories.includes(p.primaryCategory));
     }
-    
+
     if (tags && tags.length > 0) {
-      result = result.filter((p) => tags.every((t) => p.tags?.includes(t))));
+      result = result.filter((p) => tags.every((t) => p.tags?.includes(t)));
     }
 
     if (verificationFilter !== "ALL") {
@@ -106,7 +85,7 @@ function DiscoverContent() {
 
   // Emit a privacy-safe search event when the debounced query changes
   useEffect(() => {
-    if (isInitialLoading) return;
+    if (isLoadingMore) return;
     if (lastSearchRef.current === searchQuery) return;
     lastSearchRef.current = searchQuery;
     trackSearch({
@@ -114,7 +93,7 @@ function DiscoverContent() {
       resultCount: filteredCount,
       source: "discover",
     });
-  }, [searchQuery, filteredCount, isInitialLoading]);
+  }, [searchQuery, filteredCount, isLoadingMore]);
 
   useEffect(() => {
     return () => {
@@ -138,7 +117,7 @@ function DiscoverContent() {
     trackFilter({ filterType: "sort", filterValue: value, source: "discover" });
   };
 
-  const handleVerificationFilterChange = (value: VerificationStatus | "ALL") => {
+  const handleVerificationFilterChange = (value: | "VERIFIED" | "PENDING" | "NONE" | "REJECTED" | "ALL") => {
     setVerificationFilter(value);
     trackFilter({
       filterType: "verification",
@@ -195,7 +174,7 @@ function DiscoverContent() {
                   type="button"
                   onClick={handleClearSearch}
                   aria-label="Clear search"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700/60 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-600 hover:bg-zinc-200/60 dark:hover:bg-zinc-700/60 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -234,10 +213,15 @@ function DiscoverContent() {
                 value={verificationFilter}
                 onChange={(e) =>
                   handleVerificationFilterChange(
-                    e.target.value as VerificationStatus | "ALL",
+                    e.target.value as
+                      | "VERIFIED"
+                      | "PENDING"
+                      | "NONE"
+                      | "REJECTED"
+                      | "ALL",
                   )
                 }
-                disabled={isInitialLoading}
+                disabled={isFetchingStatuses}
                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="ALL">All Status</option>
@@ -251,7 +235,7 @@ function DiscoverContent() {
               <select
                 value={sortBy}
                 onChange={(e) => handleSortChange(e.target.value as SortBy)}
-                disabled={isInitialLoading}
+                disabled={isFetchingStatuses}
                 className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="rating">Highest Rated</option>
@@ -259,155 +243,108 @@ function DiscoverContent() {
                 <option value="newest">Newest</option>
               </select>
             </div>
-          </div>
-          
-          {/* Tags filtering */}
-          <div className="mt-4 max-w-xl">
-             <TagInput
-               label="Filter by Tags"
-               tags={tags}
-               onChange={handleTagsChange}
-               placeholder="Add tags to filter..."
-             />
-          </div>
-        </div>
-
-        {/* Recently Viewed - Show above main content */}
-        {!isInitialLoading && hasHistory && (
-          <div className="mb-8">
-            <RecentlyViewedProjects
-              projects={recentProjects.slice(0, 5)}
-              compact
-              onClear={async () => {
-                const ok = await confirm({
-                  title: "Clear viewing history",
-                  description: "This will permanently remove your recently viewed projects. This action cannot be undone.",
-                  confirmLabel: "Clear History",
-                  cancelLabel: "Cancel",
-                  variant: "danger",
-                });
-                if (ok) clearHistory();
-              }}
-            />
-          </div>
-        )}
-
-        {/* Result count */}
-        {!isInitialLoading && (
-          <div className="flex items-center justify-between mb-6">
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                {filteredCount}
-              </span>{" "}
-              project{filteredCount === 1 ? "" : "s"} found
-              {(searchQuery || selectedCategories.length > 0 || tags.length > 0) && (
-                <span className="text-zinc-400 dark:text-zinc-500">
-                  {" "}
-                  matching your filters
-                </span>
-              )}
-            </div>
-            {(selectedCategories.length > 0 || tags.length > 0 || searchQuery) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="text-sm"
-              >
-                Reset all
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Initial loading */}
-        {isInitialLoading ? (
-          <div
-            aria-busy="true"
-            aria-label="Loading projects"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
-              <div
-                key={i}
-                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 flex flex-col gap-4"
-              >
-                {/* Logo placeholder */}
-                <Skeleton className="h-40 w-full rounded-2xl" />
-                {/* Category + badge row */}
-                <div className="flex items-center gap-2 px-2">
-                  <Skeleton className="h-5 w-20 rounded" />
-                  <Skeleton className="h-5 w-16 rounded" />
-                </div>
-                {/* Title */}
-                <Skeleton className="h-7 w-3/4 rounded" />
-                {/* Description lines */}
-                <Skeleton className="h-4 w-full rounded" />
-                <Skeleton className="h-4 w-5/6 rounded" />
-                {/* Footer meta */}
-                <div className="flex justify-between mt-auto pt-2">
-                  <Skeleton className="h-3 w-20 rounded" />
-                  <Skeleton className="h-3 w-24 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filteredCount > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleProjects.map((project) => (
-              <LazyProjectCard
-                key={project.id}
-                project={project}
-                verificationStatus={verificationStatuses[project.id]}
-                highlightTerm={searchQuery}
+           </div>
+           
+           {/* Tags filtering */}
+           <div className="mt-4 max-w-xl">
+              <TagInput
+                label="Filter by Tags"
+                tags={tags}
+                onChange={handleTagsChange}
+                placeholder="Add tags to filter..."
               />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
-            <Filter className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-2">No projects found</h3>
-            <p className="text-zinc-500">
-              Try adjusting your search or filters to find what you&apos;re
-              looking for.
-            </p>
-            <Button variant="outline" className="mt-6" onClick={clearFilters}>
-              Clear Filters
-            </Button>
-          </div>
-        )}
+           </div>
+         </div>
 
-        {/* Load More */}
-        {!isInitialLoading && hasMore && visibleProjects.length > 0 && (
-          <div className="flex justify-center mt-10">
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={handleLoadMore}
-              isLoading={isLoadingMore}
-              className="w-full sm:w-auto min-w-50"
-            >
-              {!isLoadingMore && "Load More Projects"}
-            </Button>
-          </div>
-        )}
-      </div>
-    </main>
-  );
-}
+         {/* Recently Viewed - Show above main content */}
+         {hasHistory && (
+           <div className="mb-8">
+             <RecentlyViewedProjects
+               projects={recentProjects.slice(0, 5)}
+               compact
+               onClear={async () => {
+                 const ok = await confirm({
+                   title: "Clear viewing history",
+                   description: "This will permanently remove your recently viewed projects. This action cannot be undone.",
+                   confirmLabel: "Clear History",
+                   cancelLabel: "Cancel",
+                   variant: "danger",
+                 });
+                 if (ok) clearHistory();
+               }}
+             />
+           </div>
+         )}
 
-// ─── Page export — Suspense boundary required by useSearchParams ───────────────
+         {/* Result count */}
+         {(filteredCount > 0 || isFetchingStatuses) && (
+           <div className="flex items-center justify-between mb-6">
+             <div className="text-sm text-zinc-500 dark:text-zinc-400">
+               <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                 {filteredCount}
+               </span>{" "}
+               project{filteredCount === 1 ? "" : "s"} found
+               {(searchQuery || selectedCategories.length > 0 || tags.length > 0) && (
+                 <span className="text-zinc-400 dark:text-zinc-500">
+                   {" "}
+                   matching your filters
+                 </span>
+               )}
+             </div>
+             {(selectedCategories.length > 0 || tags.length > 0 || searchQuery) && (
+               <Button
+                 variant="ghost"
+                 size="sm"
+                 onClick={clearFilters}
+                 className="text-sm"
+               >
+                 Reset all
+               </Button>
+             )}
+           </div>
+         )}
 
-export default function DiscoverPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-          <Spinner size="lg" />
-        </main>
-      }
-    >
-      <DiscoverContent />
-    </Suspense>
-  );
-}
+         {/* Projects grid */}
+         {filteredCount > 0 ? (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {visibleProjects.map((project) => (
+               <LazyProjectCard
+                 key={project.id}
+                 project={project}
+                 verificationStatus={verificationStatuses[project.id]}
+                 highlightTerm={searchQuery}
+               />
+             ))}
+           </div>
+         ) : (
+           <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
+             <Filter className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+             <h3 className="text-xl font-bold mb-2">No projects found</h3>
+             <p className="text-zinc-500">
+               Try adjusting your search or filters to find what you&apos;re
+               looking for.
+             </p>
+             <Button variant="outline" className="mt-6" onClick={clearFilters}>
+               Clear Filters
+             </Button>
+           </div>
+         )}
+
+         {/* Load More */}
+         {!isLoadingMore && hasMore && visibleProjects.length > 0 && (
+           <div className="flex justify-center mt-10">
+             <Button
+               variant="secondary"
+               size="lg"
+               onClick={handleLoadMore}
+               isLoading={isLoadingMore}
+               className="w-full sm:w-auto min-w-50"
+             >
+               {!isLoadingMore && "Load More Projects"}
+             </Button>
+           </div>
+         )}
+       </div>
+     </main>
+   );
+ }
