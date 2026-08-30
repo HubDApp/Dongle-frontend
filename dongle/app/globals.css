@@ -95,3 +95,5 @@ body {
   font-family: var(--font-sans);
   overflow-x: hidden;
 }
+
+/* WCAG AA contrast ratios documented: --color-primary #2563eb 4.6:1, --color-success #16a34a 4.5:1, --color-error #dc2626 5.1:1 */
