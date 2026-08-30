@@ -190,6 +190,11 @@ The canonical template lives in [`.env.example`](./.env.example). Key variables:
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | No | Testnet RPC | Soroban RPC endpoint URL |
 | `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | No | Testnet passphrase | Stellar network identifier |
 | `NEXT_PUBLIC_ADMIN_ALLOWLIST` | No | (empty) | Comma-separated admin wallet addresses |
+| `AUTH_APP_URL` | OAuth | `http://localhost:3000` | Canonical origin for OAuth callbacks |
+| `AUTH_SESSION_SECRET` | OAuth | (dev default) | Server-only session JWT secret |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth | (empty) | Google OAuth. Secrets are never `NEXT_PUBLIC_*` |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | OAuth | (empty) | GitHub OAuth. Secrets are never `NEXT_PUBLIC_*` |
+| `CRON_SECRET` | Optional | (empty) | Protects daily analytics cron |
 
 ### Contract ID Format
 
@@ -371,7 +376,7 @@ This is a development prototype with the following known limitations. These are 
 
 - **Testnet Only**: Application is hardcoded for Stellar testnet by default
 - **No Mainnet Support**: Production deployment requires network configuration changes
-- **Freighter Required**: No alternative wallet support or key-import flows
+- **Freighter Required for writes**: Google/GitHub OAuth is optional read-only identity. On-chain publishing still needs Freighter.
 
 **Impact**: Cannot connect to mainnet accounts or use hardware wallets directly.
 

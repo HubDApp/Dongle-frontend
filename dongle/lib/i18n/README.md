@@ -107,10 +107,14 @@ export default function ServerPage() {
 ```
 lib/i18n/
 ├── index.ts              # Core i18n functions (t, getLocale, etc.)
+├── locales.ts            # Supported locales, RTL list, ?lang= resolution
+├── LocaleProvider.tsx    # React provider (URL + localStorage)
 ├── format.ts             # Locale-aware formatting utilities
 ├── useTranslation.ts     # React hook for components
 ├── messages/
-│   └── en.ts            # English messages (default locale)
+│   ├── en.ts            # English messages (source locale)
+│   ├── es.ts            # Spanish
+│   └── pt.ts            # Portuguese
 └── README.md            # This file
 ```
 
@@ -208,5 +212,6 @@ The existing English copy is preserved in `messages/en.ts`, so no visual changes
 - **Maintainability**: All text in one place
 - **Consistency**: Uniform formatting across the app
 - **Type Safety**: Catch missing keys at compile time
-- **Future-Proof**: Easy to add new languages later
+- **Languages**: English, Spanish, Portuguese with `?lang=` and localStorage persistence
+- **RTL-ready**: `document.dir` switches for `ar`/`he` when those catalogs are added
 - **Testing**: Locale-independent date/number formatting prevents test flakiness
