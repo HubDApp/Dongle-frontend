@@ -5,9 +5,7 @@ import VerificationForm from "@/components/verify/VerificationForm";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import { ShieldCheck, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
+import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 
 const VERIFY_PURPOSE =
@@ -56,16 +54,12 @@ export default function VerifyPage() {
           {activeTab === "request" ? (
             gate.state === "ready" ? (
               <VerificationForm onSuccess={handleVerificationRequested} />
-            ) : gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel
-                message="Preparing your wallet..."
-                className="max-w-lg mx-auto"
-              />
             ) : (
               <div className="max-w-lg mx-auto animate-fade-in">
-                <WalletStatePanel
-                  state={gate.state}
+                <WalletGate
+                  gate={gate}
                   pagePurpose={VERIFY_PURPOSE}
+                  loadingMessage="Preparing your wallet..."
                   walletNetworkLabel={gate.walletNetworkLabel}
                   publicKey={gate.publicKey}
                   onConnect={gate.connectWallet}
