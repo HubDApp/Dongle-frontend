@@ -25,7 +25,10 @@
     "test:a11y:watch": "vitest __tests__/a11y/",
     "test:notifications:load": "node scripts/notification-load-test.mjs",
     "a11y:audit": "cross-env PA11Y_PORT=3000 node -e \"(async () => { const { serveStaticForPa11y } = await import('./scripts/serve-static-for-pa11y.mjs'); const srv = await serveStaticForPa11y(); const pa11y = require('pa11y-ci'); const config = require('./.pa11yci.js'); const results = await pa11y(config.urls, { defaults: config.defaults, numberOfWorkers: config.numberOfWorkers || 2 }); let pass = 0, fail = 0; for (const r of results) { if (r.errors && r.errors.length) { fail += r.errors.length; console.error('FAIL ' + r.url + ' → ' + r.errors.length + ' error(s)'); r.errors.forEach(e => console.error('  • [' + e.code + '] ' + e.message + ' (' + e.context + ')')); } else { pass++; console.log('OK   ' + r.url); } } srv.close(() => process.exit(fail > 0 ? 1 : 0)); })();\"",
-    "a11y:serve": "node scripts/serve-static-for-pa11y.mjs"
+    "a11y:serve": "node scripts/serve-static-for-pa11y.mjs",
+    "load:review": "k6 run --vus 100 --duration 30s __tests__/load/review-submission.load.js",
+    "load:soroban": "k6 run --vus 50 --duration 30s __tests__/load/soroban-rpc-batch.load.js",
+    "load:test": "k6 run __tests__/load/review-submission.load.js && k6 run __tests__/load/soroban-rpc-batch.load.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
