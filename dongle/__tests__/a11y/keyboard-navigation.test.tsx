@@ -239,7 +239,7 @@ describe("Keyboard Navigation - Interactive Components", () => {
       );
 
       const link = screen.getByRole("link");
-      expect(link).not.toHaveAccessibleName(/\b("");
+      expect(link).toHaveAccessibleName("View project website (opens in a new tab)");
     });
   });
 

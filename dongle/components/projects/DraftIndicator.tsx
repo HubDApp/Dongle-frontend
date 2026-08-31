@@ -60,19 +60,19 @@ export function DraftIndicator({
           <Clock className="w-3.5 h-3.5" />
           <span>{formatDate(lastSaved, "relative")}</span>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onDiscard}
-          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-          leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-        >
-          Discard Draft
-        </Button>
       </div>
-    );
-  }
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onDiscard}
+        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+        leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+      >
+        Discard Draft
+      </Button>
+    </div>
+  );
 
   // Draft exists but no timestamp yet (edge case)
   if (hasDraft) {

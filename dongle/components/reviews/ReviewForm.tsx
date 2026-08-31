@@ -16,13 +16,17 @@ interface ReviewFormProps {
   projectName: string;
   userAddress: string;
   initialReview?: Review;
-  onSubmit: (review: Omit<Review, "id" | "createdAt" | "userAddress" | "projectId" | "projectName">) => void;
+  dailyReviewCount?: number;
+  requiresCaptcha?: boolean;
+  onSubmit: (review: Omit<Review, "id" | "createdAt" | "userAddress" | "projectId" | "projectName"> & { captchaToken?: string }) => void;
   onCancel: () => void;
 }
 
 export default function ReviewForm({
   projectName,
   initialReview,
+  dailyReviewCount = 0,
+  requiresCaptcha = false,
   onSubmit,
   onCancel,
 }: ReviewFormProps) {

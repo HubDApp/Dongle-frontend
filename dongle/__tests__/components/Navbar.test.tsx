@@ -26,6 +26,13 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("@/hooks/useWatchlist", () => ({
+  useWatchlist: () => ({
+    watchlistCount: 0,
+    canManageWatchlist: false,
+  }),
+}));
+
 describe("Navbar active navigation", () => {
   beforeEach(() => {
     mockPathname.mockReturnValue("/");

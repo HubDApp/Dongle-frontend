@@ -19,16 +19,20 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
 import {
   AlertCircle,
-  Flag,
-  Shield,
+  Archive,
+  CheckCheck,
   CheckCircle,
-  XCircle,
   Clock,
+  Flag,
   MessageSquare,
+  Package,
   ScrollText,
+  Shield,
   User,
   UserMinus,
-  Package,
+  UserPlus,
+  X,
+  XCircle,
 } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
@@ -43,6 +47,7 @@ import {
 } from "@/services/stellar/verification.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
+import { ReviewModerationQueue } from "@/components/moderation/ReviewModerationQueue";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 
@@ -155,7 +160,7 @@ export default function AdminDashboard() {
   });
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<
-    "verification" | "submissions" | "reports" | "claims" | "audit-log"
+    "verification" | "submissions" | "reports" | "claims" | "audit-log" | "spam-queue"
   >("verification");
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -173,6 +178,8 @@ export default function AdminDashboard() {
   const [submissionReason, setSubmissionReason] = useState<Record<string, string>>({});
   const [verificationFilter, setVerificationFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
   const [reportFilter, setReportFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const reloadVerificationRequests = useCallback(async () => {
     const [allRequests, stats] = await Promise.all([
@@ -294,7 +301,7 @@ export default function AdminDashboard() {
   const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
       const allSelectable = requests
-        .filter((r) => r.status === "pending")
+        .filter((r) => r.status === "PENDING")
         .map((r) => r.id);
       if (allSelectable.every((id) => prev.has(id))) {
         return new Set();
@@ -323,53 +330,58 @@ export default function AdminDashboard() {
         : "Assign All",
     });
 
-    if (!confirmed) return;
+    if (!confirmed || !gate.publicKey) return;
 
     setIsBulkProcessing(true);
 
     const succeeded: string[] = [];
     const failed: { id: string; reason: string }[] = [];
 
-    setRequests((prev) => {
-      const updated = prev.map((req) => {
-        if (!selectedIds.has(req.id)) return req;
+    for (const id of selectedIds) {
+      const request = requests.find((req) => req.id === id);
+      if (!request) {
+        failed.push({ id, reason: "Request not found" });
+        continue;
+      }
 
-        if (req.status !== "pending") {
-          failed.push({ id: req.id, reason: `Cannot ${action} request with status "${req.status}"` });
-          return req;
+      try {
+        if (request.status !== "PENDING") {
+          failed.push({
+            id,
+            reason: `Cannot ${action} request with status "${request.status}"`,
+          });
+          continue;
         }
 
-        let newStatus: RequestStatus;
-        switch (action) {
-          case "approve":
-            newStatus = "approved";
-            break;
-          case "reject":
-            newStatus = "rejected";
-            break;
-          case "archive":
-            newStatus = "archived";
-            break;
-          case "assign":
-            newStatus = req.status;
-            break;
-          default:
-            return req;
+        if (action === "approve") {
+          await verificationService.approveRequest(request.projectId, gate.publicKey);
+        } else if (action === "reject" || action === "archive") {
+          await verificationService.rejectRequest(
+            request.projectId,
+            gate.publicKey,
+            action === "archive" ? "Archived by admin" : "Rejected by admin",
+          );
+        } else {
+          await verificationService.assignRequest(
+            request.projectId,
+            gate.publicKey,
+            gate.publicKey,
+          );
         }
+        succeeded.push(id);
+      } catch (error) {
+        failed.push({
+          id,
+          reason: error instanceof Error ? error.message : `Failed to ${action} request`,
+        });
+      }
+    }
 
-        succeeded.push(req.id);
-        return { ...req, status: newStatus };
-      });
-
-      return updated;
-    });
-
-    setTimeout(() => {
-      setIsBulkProcessing(false);
-      setSelectedIds(new Set());
-      reportBulkActionResult({ action, succeeded, failed });
-    }, 0);
-  }, [selectedIds, confirm]);
+    await reloadVerificationRequests();
+    setIsBulkProcessing(false);
+    setSelectedIds(new Set());
+    reportBulkActionResult({ action, succeeded, failed });
+  }, [selectedIds, confirm, gate.publicKey, requests, reloadVerificationRequests]);
 
   const handleSaveFee = () => {
     if (gate.publicKey) {
@@ -425,6 +437,62 @@ export default function AdminDashboard() {
       setModerationReason((prev) => ({ ...prev, [reportId]: "" }));
     } else {
       toast.error(result.error || "Failed to dismiss report");
+    }
+  };
+
+  const handleResolveProjectReport = (reportId: string) => {
+    const reason =
+      projectReportReason[reportId]?.trim() ||
+      "Project content complies with guidelines";
+    if (!gate.publicKey) return;
+
+    const result = projectReportService.resolveReport(
+      reportId,
+      gate.publicKey,
+      reason,
+    );
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_resolved",
+        targetId: reportId,
+        targetLabel: `Project report ${reportId}`,
+        reason,
+      });
+      toast.success("Project report resolved successfully");
+      setProjectReports(projectReportService.getReports());
+      setProjectModerationLog(projectReportService.getModerationLog());
+      setProjectReportReason((prev) => ({ ...prev, [reportId]: "" }));
+    } else {
+      toast.error(result.error || "Failed to resolve project report");
+    }
+  };
+
+  const handleDismissProjectReport = (reportId: string) => {
+    const reason =
+      projectReportReason[reportId]?.trim() ||
+      "Report does not violate guidelines";
+    if (!gate.publicKey) return;
+
+    const result = projectReportService.dismissReport(
+      reportId,
+      gate.publicKey,
+      reason,
+    );
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "report_dismissed",
+        targetId: reportId,
+        targetLabel: `Project report ${reportId}`,
+        reason,
+      });
+      toast.success("Project report dismissed");
+      setProjectReports(projectReportService.getReports());
+      setProjectModerationLog(projectReportService.getModerationLog());
+      setProjectReportReason((prev) => ({ ...prev, [reportId]: "" }));
+    } else {
+      toast.error(result.error || "Failed to dismiss project report");
     }
   };
 
@@ -697,6 +765,20 @@ export default function AdminDashboard() {
               </span>
             )}
             {activeTab === "claims" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("spam-queue")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "spam-queue"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Spam Queue
+            {activeTab === "spam-queue" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -1204,13 +1286,13 @@ export default function AdminDashboard() {
               ) : (
                 <div className="space-y-4">
                   {pendingReports
-                    .filter((report: any) => {
+                    .filter((report: ReviewReport) => {
                       if (reportFilter === "all") return true;
                       if (reportFilter === "assigned-to-me") return report.assignedTo === gate.publicKey;
                       if (reportFilter === "unassigned") return !report.assignedTo;
                       return true;
                     })
-                    .map((report: any) => {
+                    .map((report: ReviewReport) => {
                     const review = getReviewForReport(report.reviewId);
                     return (
                       <div
@@ -1288,7 +1370,7 @@ export default function AdminDashboard() {
 
                         {report.explanation && (
                           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter's explanation:</p>
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
                           </div>
                         )}
@@ -1369,7 +1451,7 @@ export default function AdminDashboard() {
 
                         {report.explanation && (
                           <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter's explanation:</p>
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Reporter&apos;s explanation:</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">{report.explanation}</p>
                           </div>
                         )}
@@ -1543,6 +1625,8 @@ export default function AdminDashboard() {
                       );
                     })}
                   </div>
+                </div>
+              )}
                 </div>
               )}
             </div>
@@ -1859,6 +1943,10 @@ export default function AdminDashboard() {
 
         {activeTab === "audit-log" && (
           <AuditLogViewer entries={auditLogService.list()} />
+        )}
+
+        {activeTab === "spam-queue" && gate.publicKey && (
+          <ReviewModerationQueue moderatorAddress={gate.publicKey} />
         )}
       </div>
     </div>

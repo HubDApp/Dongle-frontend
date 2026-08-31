@@ -4,7 +4,7 @@ export function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
 }
 
-export function compact<T>(values: Array<T | null | undefined | false | ""): T[] {
+export function compact<T>(values: Array<T | null | undefined | false | ''>): T[] {
   return values.filter(Boolean) as T[];
 }
 

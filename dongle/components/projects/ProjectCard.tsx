@@ -9,7 +9,7 @@ import { Star, Plus, Check, Bookmark, BookmarkCheck } from "lucide-react";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
 import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
-import { useSavedProjects } from "@/hooks/useSavedProjects";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import { getPrefetchValue } from "@/lib/prefetch-config";
 import { highlightText } from "@/lib/utils";
 
@@ -27,10 +27,10 @@ export const ProjectCard = ({
   highlightTerm = "",
 }: ProjectCardProps) => {
   const { addProject, removeProject, isSelected, canAddMore } = useComparison();
-  const { isProjectSaved, toggleSavedProject, canManageSavedProjects } = useSavedProjects();
+  const { isOnWatchlist, toggleWatchlist, canManageWatchlist } = useWatchlist();
 
   const selected = isSelected(project.id);
-  const isSaved = isProjectSaved(project.id);
+  const isSaved = isOnWatchlist(project.id);
 
   const handleCompareToggle = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -51,7 +51,7 @@ export const ProjectCard = ({
   const handleToggleSaved = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    toggleSavedProject(project.id);
+    toggleWatchlist(project.id);
   };
 
   return (
@@ -60,12 +60,12 @@ export const ProjectCard = ({
       <IconButton
         type="button"
         onClick={handleToggleSaved}
-        disabled={!canManageSavedProjects}
+        disabled={!canManageWatchlist}
         aria-pressed={isSaved}
         aria-label={
           isSaved
-            ? `Remove ${project.name} from saved projects`
-            : `Save ${project.name}`
+            ? `Remove ${project.name} from watchlist`
+            : `Add ${project.name} to watchlist`
         }
         size="md"
         className="absolute right-4 top-4 z-10 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-2 text-zinc-500 shadow-sm transition-colors hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-40"

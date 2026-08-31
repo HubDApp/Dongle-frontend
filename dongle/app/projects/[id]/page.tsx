@@ -50,10 +50,11 @@ import {
   UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
+import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
-import { reviewReportService } from "@/services/review/review-report.service";
-import { useSavedProjects } from "@/hooks/useSavedProjects";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
 import { ContractAddressList } from "@/components/projects/ContractAddressList";
@@ -76,7 +77,14 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const gate = useWalletPageGate();
   const confirm = useConfirm();
-  const { isProjectSaved, toggleSavedProject, canManageSavedProjects } = useSavedProjects();
+  const {
+    isOnWatchlist,
+    toggleWatchlist,
+    canManageWatchlist,
+    addToWatchlist,
+  } = useWatchlist();
+  const [reviewRequiresCaptcha, setReviewRequiresCaptcha] = useState(false);
+  const [dailyReviewCount, setDailyReviewCount] = useState(0);
   const projectId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
@@ -181,17 +189,39 @@ export default function ProjectDetailPage() {
   const actualReviewCount = reviews.length || project?.reviews || 0;
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
-  const isSaved = project ? isProjectSaved(project.id) : false;
+  const isOnList = project ? isOnWatchlist(project.id) : false;
 
-  const handleToggleSaved = () => {
+  useEffect(() => {
+    if (!gate.publicKey) {
+      setReviewRequiresCaptcha(false);
+      setDailyReviewCount(0);
+      return;
+    }
+    void reviewModerationService.checkVelocity(gate.publicKey).then((result) => {
+      setReviewRequiresCaptcha(result.requiresCaptcha);
+      setDailyReviewCount(result.dailyCount);
+    });
+  }, [gate.publicKey]);
+
+  const handleToggleWatchlist = () => {
     if (!project) return;
-    if (!canManageSavedProjects) {
+    if (!canManageWatchlist) {
       setShowWalletGate(true);
       return;
     }
 
-    const nextSaved = toggleSavedProject(project.id);
-    toast.success(nextSaved ? "Saved project" : "Removed from saved projects");
+    if (isOnList) {
+      toggleWatchlist(project.id);
+      toast.success("Removed from watchlist");
+      return;
+    }
+
+    const result = addToWatchlist(project.id);
+    if (result.success) {
+      toast.success("Added to watchlist");
+    } else {
+      toast.error(result.error ?? "Could not add to watchlist");
+    }
   };
 
   const handleAddReview = () => {
@@ -347,7 +377,11 @@ export default function ProjectDetailPage() {
     setReviews(await reviewService.getReviewsByProject(projectId));
   };
 
-  const handleSubmitReview = async (data: { rating: number; comment: string }) => {
+  const handleSubmitReview = async (data: {
+    rating: number;
+    comment: string;
+    captchaToken?: string;
+  }) => {
     if (!gate.publicKey || !project) return;
 
     const action = editingReview ? "update" : "create";
@@ -582,13 +616,13 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
                   <Button
-                    variant={isSaved ? "secondary" : "outline"}
-                    onClick={handleToggleSaved}
+                    variant={isOnList ? "secondary" : "outline"}
+                    onClick={handleToggleWatchlist}
                     disabled={!project}
-                    leftIcon={isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                    leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                     className="shrink-0"
                   >
-                    {isSaved ? "Saved" : "Save"}
+                    {isOnList ? "On Watchlist" : "Add to Watchlist"}
                   </Button>
                 </div>
 
@@ -841,6 +875,8 @@ export default function ProjectDetailPage() {
                       projectName={project.name}
                       userAddress={gate.publicKey || ""}
                       initialReview={editingReview || undefined}
+                      dailyReviewCount={dailyReviewCount}
+                      requiresCaptcha={reviewRequiresCaptcha}
                       onSubmit={handleSubmitReview}
                       onCancel={handleCancelReview}
                     />

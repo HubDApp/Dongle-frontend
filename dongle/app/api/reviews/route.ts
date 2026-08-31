@@ -79,6 +79,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isReviewerBanned(userAddress)) {
+      return NextResponse.json(
+        { success: false, errors: [{ field: "comment", message: "Your account is banned from submitting reviews" }] },
+        { status: 403 },
+      );
+    }
+
     const existing = Array.from(store.values()).find(
       (r) => r.userAddress === userAddress && r.projectId === projectId,
     );
@@ -90,6 +97,21 @@ export async function POST(request: NextRequest) {
           409
         ),
         { status: 409 }
+      );
+    }
+
+    const { captchaToken } = body as { captchaToken?: string };
+    const dailyCount = recordReviewSubmission(userAddress, new Date().toISOString());
+    const spamAssessment = assessReviewSpam(comment, dailyCount);
+    if (spamAssessment.requiresCaptcha && !captchaToken) {
+      return NextResponse.json(
+        {
+          success: false,
+          errors: [{ field: "comment", message: "CAPTCHA required due to high review velocity" }],
+          requiresCaptcha: true,
+          riskScore: spamAssessment.riskScore,
+        },
+        { status: 429 },
       );
     }
 
