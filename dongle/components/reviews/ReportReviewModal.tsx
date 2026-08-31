@@ -1,13 +1,13 @@
 "use client";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { Flag } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { cn } from "@/lib/utils";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+import { useModalForm } from "@/hooks/useModalForm";
 import { Review, REVIEW_REPORT_REASONS, REVIEW_REPORT_CONSTRAINTS } from "@/types/review";
 
 interface ReportReviewModalProps {
@@ -23,38 +23,22 @@ export function ReportReviewModal({
   onClose,
   onSubmit,
 }: ReportReviewModalProps) {
-  const [reason, setReason] = useState("");
-  const [explanation, setExplanation] = useState("");
-  const [error, setError] = useState("");
-
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const initialFocusRef = useRef<HTMLSelectElement>(null);
-
-  // Reset state when opened
-  useEffect(() => {
-    if (!isOpen) return;
-    // Schedule resets as a microtask so they run after render,
-    // avoiding synchronous setState-in-effect lint violations.
-    const id = setTimeout(() => {
-      setReason("");
-      setExplanation("");
-      setError("");
-    }, 0);
-    return () => clearTimeout(id);
-  }, [isOpen]);
-
-  // Handle escape key
-  useModalFocusTrap(isOpen, dialogRef, initialFocusRef, onClose);
+  const { values, setField, error, setError, dialogRef, initialFocusRef } =
+    useModalForm({
+      isOpen,
+      onClose,
+      initialValues: { reason: "", explanation: "" },
+    });
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reason) {
+    if (!values.reason) {
       setError("Please select a reason for reporting.");
       return;
     }
-    onSubmit({ reason, explanation });
+    onSubmit({ reason: values.reason, explanation: values.explanation });
   };
 
   return (
@@ -92,7 +76,7 @@ export function ReportReviewModal({
         <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-yellow-500 font-bold">{review.rating}/5</span>
-            <span className="text-xs text-zinc-500">â€¢</span>
+            <span className="text-xs text-zinc-500">•</span>
             <span className="text-xs text-zinc-500">{review.projectName}</span>
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3">
@@ -104,19 +88,16 @@ export function ReportReviewModal({
           <SelectField
             ref={initialFocusRef}
             label="Reason for reporting"
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              if (error) setError("");
-            }}
+            value={values.reason}
+            onChange={(e) => setField("reason", e.target.value)}
             options={REVIEW_REPORT_REASONS}
             error={error}
           />
 
           <TextAreaField
             label="Additional explanation (optional)"
-            value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
+            value={values.explanation}
+            onChange={(e) => setField("explanation", e.target.value)}
             placeholder="Provide any additional context..."
             maxLength={REVIEW_REPORT_CONSTRAINTS.EXPLANATION_MAX_LENGTH}
           />

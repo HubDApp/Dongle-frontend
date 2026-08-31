@@ -98,6 +98,12 @@ npm run typecheck
 # Run all tests (unit and integration)
 npm run test
 
+# After a production build: gzipped JS per route (< 200 KB)
+npm run test:bundle
+
+# Lighthouse CI (Performance >= 90, a11y >= 95, FCP < 1.5s, CLS < 0.1)
+npm run test:lighthouse
+
 # Run tests in watch mode (development)
 npm run test:watch
 
@@ -184,6 +190,11 @@ The canonical template lives in [`.env.example`](./.env.example). Key variables:
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | No | Testnet RPC | Soroban RPC endpoint URL |
 | `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | No | Testnet passphrase | Stellar network identifier |
 | `NEXT_PUBLIC_ADMIN_ALLOWLIST` | No | (empty) | Comma-separated admin wallet addresses |
+| `AUTH_APP_URL` | OAuth | `http://localhost:3000` | Canonical origin for OAuth callbacks |
+| `AUTH_SESSION_SECRET` | OAuth | (dev default) | Server-only session JWT secret |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth | (empty) | Google OAuth. Secrets are never `NEXT_PUBLIC_*` |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | OAuth | (empty) | GitHub OAuth. Secrets are never `NEXT_PUBLIC_*` |
+| `CRON_SECRET` | Optional | (empty) | Protects daily analytics cron |
 
 ### Contract ID Format
 
@@ -326,6 +337,19 @@ dongle/
 
 **Type-Safe Forms**: react-hook-form with Zod schema validation for runtime type safety
 
+## Documentation
+
+| Doc | What it covers |
+|-----|----------------|
+| [Architecture Decision Records](../docs/adr/README.md) | Why Context+hooks, IPFS, contract split, and localStorage |
+| [Hooks usage guide](../docs/hooks-guide.md) | `useWallet`, `useStellarAccount`, `useDraft`, and the rest |
+| [UI components](../docs/components.md) | Button, Card, Badge, Input props, variants, and a11y |
+| [Performance budgets](./performance-budget.json) | Lighthouse + gzipped JS per route |
+
+Live component examples and an interactive playground: [http://localhost:3000/docs/components](http://localhost:3000/docs/components) after `npm run dev`.
+
+When an architectural choice changes, **update the matching ADR** (supersede or add an Amendment). See [docs/adr/README.md](../docs/adr/README.md).
+
 ## Development Limitations & Mock Data
 
 This is a development prototype with the following known limitations. These are intentional design decisions for MVP development and will be addressed in production versions.
@@ -352,7 +376,7 @@ This is a development prototype with the following known limitations. These are 
 
 - **Testnet Only**: Application is hardcoded for Stellar testnet by default
 - **No Mainnet Support**: Production deployment requires network configuration changes
-- **Freighter Required**: No alternative wallet support or key-import flows
+- **Freighter Required for writes**: Google/GitHub OAuth is optional read-only identity. On-chain publishing still needs Freighter.
 
 **Impact**: Cannot connect to mainnet accounts or use hardware wallets directly.
 

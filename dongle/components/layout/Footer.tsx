@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 export default function Footer() {
+  const { t } = useTranslation();
   return (
     <footer className="bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 py-12">
       <div className="container mx-auto px-4">
@@ -13,72 +17,55 @@ export default function Footer() {
               DONGLE
             </Link>
             <p className="text-zinc-500 dark:text-zinc-400 max-w-sm text-sm">
-              The decentralized app store for Stellar. Discovery, reviews, and
-              verification powered by on-chain transparency.
+              {t("footer.tagline")}
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Platform</h4>
+            <h4 className="font-semibold text-sm mb-4">{t("footer.platform")}</h4>
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
               <li>
-                <Link
-                  href="/discover"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Discover
+                <Link href="/discover" className="hover:text-black dark:hover:text-white">
+                  {t("nav.discover")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/reviews"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Reviews
+                <Link href="/reviews" className="hover:text-black dark:hover:text-white">
+                  {t("nav.reviews")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/verify"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Verify
+                <Link href="/verify" className="hover:text-black dark:hover:text-white">
+                  {t("nav.verify")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/projects/new"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Submit Project
+                <Link href="/analytics" className="hover:text-black dark:hover:text-white">
+                  {t("nav.analytics")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/profile"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Profile
+                <Link href="/projects/new" className="hover:text-black dark:hover:text-white">
+                  {t("nav.submitProject")}
+                </Link>
+              </li>
+              <li>
+                <Link href="/profile" className="hover:text-black dark:hover:text-white">
+                  {t("nav.profile")}
                 </Link>
               </li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-sm mb-4">Resources</h4>
+            <h4 className="font-semibold text-sm mb-4">{t("footer.resources")}</h4>
             <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
               <li>
-                <Link
-                  href="/docs"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  Documentation
+                <Link href="/docs" className="hover:text-black dark:hover:text-white">
+                  {t("nav.documentation")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="https://github.com"
-                  className="hover:text-black dark:hover:text-white"
-                >
-                  GitHub
+                <Link href="https://github.com" className="hover:text-black dark:hover:text-white">
+                  {t("footer.github")}
                 </Link>
               </li>
             </ul>
@@ -86,20 +73,14 @@ export default function Footer() {
         </div>
         <div className="pt-8 border-t border-zinc-200 dark:border-zinc-900 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            © {new Date().getFullYear()} Dongle Protocol. All rights reserved.
+            {t("footer.copyright", { year: new Date().getFullYear() })}
           </p>
           <div className="flex gap-6 text-xs text-zinc-500 dark:text-zinc-400">
-            <Link
-              href="/privacy"
-              className="hover:text-black dark:hover:text-white"
-            >
-              Privacy Policy
+            <Link href="/privacy" className="hover:text-black dark:hover:text-white">
+              {t("footer.privacyPolicy")}
             </Link>
-            <Link
-              href="/terms"
-              className="hover:text-black dark:hover:text-white"
-            >
-              Terms of Service
+            <Link href="/terms" className="hover:text-black dark:hover:text-white">
+              {t("footer.termsOfService")}
             </Link>
           </div>
         </div>

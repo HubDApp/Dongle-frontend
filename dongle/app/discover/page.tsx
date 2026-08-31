@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState, useRef, Suspense } from "react";
 import { projectService } from "@/services/project/project.service";
-import { ProjectCard } from "@/components/projects/ProjectCard";
+import { LazyProjectCard } from "@/components/projects/LazyProjectCard";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Search, Filter, X } from "lucide-react";
@@ -355,8 +355,8 @@ function DiscoverContent() {
         ) : filteredCount > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleProjects.map((project) => (
-              <ProjectCard 
-                key={project.id} 
+              <LazyProjectCard
+                key={project.id}
                 project={project}
                 verificationStatus={verificationStatuses[project.id]}
                 highlightTerm={searchQuery}

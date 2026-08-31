@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAdminAllowed, createAdminToken, setAdminTokenCookie } from "@/lib/admin-auth";
+import { ADMIN_TOKEN_MAX_AGE_SECONDS } from "@/constants/timeouts";
 
 export async function POST(request: Request) {
   try {
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      expiresInSeconds: 900, // 15 minutes
+      expiresInSeconds: ADMIN_TOKEN_MAX_AGE_SECONDS,
     });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

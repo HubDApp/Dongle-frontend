@@ -5,6 +5,7 @@ import {
   setAdminTokenCookie,
   clearAdminTokenCookie,
 } from "@/lib/admin-auth";
+import { ADMIN_TOKEN_MAX_AGE_SECONDS } from "@/constants/timeouts";
 
 export async function POST() {
   try {
@@ -25,7 +26,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      expiresInSeconds: 900,
+      expiresInSeconds: ADMIN_TOKEN_MAX_AGE_SECONDS,
     });
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

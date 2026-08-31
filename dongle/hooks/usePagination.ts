@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { DEFAULT_PAGE_SIZE } from "@/constants/limits";
 
 interface UsePaginationProps<T> {
   items: T[];
@@ -20,7 +21,7 @@ interface UsePaginationResult<T> {
 
 export function usePagination<T>({
   items,
-  itemsPerPage = 10,
+  itemsPerPage = DEFAULT_PAGE_SIZE,
 }: UsePaginationProps<T>): UsePaginationResult<T> {
   const [currentPage, setCurrentPage] = useState(1);
 
