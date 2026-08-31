@@ -115,14 +115,15 @@ export function ConfirmDialog({
         >
           {title}
         </h2>
-        <p
+        <div
           id="confirm-dialog-description"
+          className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed mb-8 whitespace-pre-line"
           className={`text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed whitespace-pre-line ${
             destinationDomain || destinationUrl ? "mb-6" : "mb-8"
           }`}
         >
           {description}
-        </p>
+        </div>
 
         {(destinationDomain || destinationUrl) && (
           <div className="mb-8 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/60 p-4">

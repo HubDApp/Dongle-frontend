@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasMinLength } from "@/lib/validation";
+import {
+  createSuccessResponse,
+  createErrorResponse,
+  ErrorCode,
+} from "@/services/error/error.service";
 
 interface InMemoryReview {
   id: string;
@@ -36,50 +41,61 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const review = getStore().get(id);
+  try {
+    const { id } = await params;
+    const review = getStore().get(id);
 
-  if (!review) {
+    if (!review) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.NOT_FOUND, "Review not found", 404),
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(createSuccessResponse(review));
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: "Review not found" },
-      { status: 404 },
+      createErrorResponse(ErrorCode.INTERNAL_ERROR, "Failed to fetch review", 500),
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({ success: true, data: review });
 }
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const reviews = getStore();
-  const review = reviews.get(id);
-
-  if (!review) {
-    return NextResponse.json(
-      { success: false, errors: [{ field: "comment", message: "Review not found" }] },
-      { status: 404 },
-    );
-  }
-
   try {
+    const { id } = await params;
+    const reviews = getStore();
+    const review = reviews.get(id);
+
+    if (!review) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.NOT_FOUND, "Review not found", 404),
+        { status: 404 }
+      );
+    }
+
     const body = await request.json();
     const { userAddress, rating, comment } = body;
 
     if (review.userAddress !== userAddress) {
       return NextResponse.json(
-        { success: false, errors: [{ field: "comment", message: "You do not have permission to edit this review" }] },
-        { status: 403 },
+        createErrorResponse(
+          ErrorCode.AUTHORIZATION_ERROR,
+          "You do not have permission to edit this review",
+          403
+        ),
+        { status: 403 }
       );
     }
 
     const validationError = validateReviewInput(rating, comment);
     if (validationError) {
       return NextResponse.json(
-        { success: false, errors: [{ field: "comment", message: validationError }] },
-        { status: 400 },
+        createErrorResponse(ErrorCode.VALIDATION_ERROR, validationError, 400),
+        { status: 400 }
       );
     }
 
@@ -90,11 +106,11 @@ export async function PUT(
     };
 
     reviews.set(id, updated);
-    return NextResponse.json({ success: true, data: updated });
-  } catch {
+    return NextResponse.json(createSuccessResponse(updated));
+  } catch (error) {
     return NextResponse.json(
-      { success: false, errors: [{ field: "comment", message: "Invalid request body" }] },
-      { status: 400 },
+      createErrorResponse(ErrorCode.INVALID_REQUEST, "Invalid request body", 400),
+      { status: 400 }
     );
   }
 }
@@ -103,37 +119,48 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const reviews = getStore();
-  const review = reviews.get(id);
+  try {
+    const { id } = await params;
+    const reviews = getStore();
+    const review = reviews.get(id);
 
-  if (!review) {
-    return NextResponse.json(
-      { success: false, error: "Review not found" },
-      { status: 404 },
-    );
-  }
-
-  const { searchParams } = new URL(request.url);
-  const queryUserAddress = searchParams.get("userAddress");
-
-  let userAddress: string | null = queryUserAddress;
-  if (!userAddress) {
-    try {
-      const body = await request.json();
-      userAddress = body.userAddress ?? null;
-    } catch {
-      userAddress = null;
+    if (!review) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.NOT_FOUND, "Review not found", 404),
+        { status: 404 }
+      );
     }
-  }
 
-  if (!userAddress || review.userAddress !== userAddress) {
+    const { searchParams } = new URL(request.url);
+    const queryUserAddress = searchParams.get("userAddress");
+
+    let userAddress: string | null = queryUserAddress;
+    if (!userAddress) {
+      try {
+        const body = await request.json();
+        userAddress = body.userAddress ?? null;
+      } catch {
+        userAddress = null;
+      }
+    }
+
+    if (!userAddress || review.userAddress !== userAddress) {
+      return NextResponse.json(
+        createErrorResponse(
+          ErrorCode.AUTHORIZATION_ERROR,
+          "You do not have permission to delete this review",
+          403
+        ),
+        { status: 403 }
+      );
+    }
+
+    reviews.delete(id);
+    return NextResponse.json(createSuccessResponse({ success: true }));
+  } catch (error) {
     return NextResponse.json(
-      { success: false, error: "You do not have permission to delete this review" },
-      { status: 403 },
+      createErrorResponse(ErrorCode.INTERNAL_ERROR, "Failed to delete review", 500),
+      { status: 500 }
     );
   }
-
-  reviews.delete(id);
-  return NextResponse.json({ success: true });
 }

@@ -116,6 +116,7 @@ describe("useDraft – localStorage-only (no walletAddress)", () => {
 describe("useDraft hook", () => {
   beforeEach(() => {
     localStorageMock.clear();
+    vi.clearAllTimers();
     vi.useFakeTimers();
   });
 
@@ -130,6 +131,9 @@ describe("useDraft hook", () => {
       expect(result.current.hasDraft).toBe(false);
     });
 
+    it("should save draft when user types in fields", () => {
+      vi.useFakeTimers();
+      
     it("sets isSaving=false after async save completes", async () => {
       const { result } = renderHook(() => useDraft({ mode: "create" }));
       act(() => { result.current.saveDraft(filledData); });
@@ -167,12 +171,18 @@ describe("useDraft hook", () => {
       getDraftRemoteMock.mockResolvedValue(null);
     });
 
+      // Wait for debounce
+      act(() => {
+        vi.advanceTimersByTime(1000);
       // Flush autosave debounce
       await act(async () => {
         vi.runAllTimers();
       });
     });
 
+      expect(result.current.hasDraft).toBe(true);
+      expect(result.current.lastSaved).toBeTruthy();
+      
     it("clears draft state after deleteDraft", async () => {
       draftService.saveDraft({ id: DRAFT_ID_CREATE, mode: "create", data: filledData });
       const { result } = renderHook(() => useDraft({ mode: "create" }));

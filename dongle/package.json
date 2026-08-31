@@ -14,6 +14,7 @@
     "lint": "eslint . --max-warnings 0 --ext .js,.jsx,.ts,.tsx --format stylish",
     "test": "vitest --run",
     "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
@@ -22,11 +23,16 @@
     "analyze:deps": "node scripts/analyze-dependencies.js",
     "test:a11y": "vitest --run __tests__/a11y/",
     "test:a11y:watch": "vitest __tests__/a11y/",
+    "test:notifications:load": "node scripts/notification-load-test.mjs",
     "a11y:audit": "cross-env PA11Y_PORT=3000 node -e \"(async () => { const { serveStaticForPa11y } = await import('./scripts/serve-static-for-pa11y.mjs'); const srv = await serveStaticForPa11y(); const pa11y = require('pa11y-ci'); const config = require('./.pa11yci.js'); const results = await pa11y(config.urls, { defaults: config.defaults, numberOfWorkers: config.numberOfWorkers || 2 }); let pass = 0, fail = 0; for (const r of results) { if (r.errors && r.errors.length) { fail += r.errors.length; console.error('FAIL ' + r.url + ' → ' + r.errors.length + ' error(s)'); r.errors.forEach(e => console.error('  • [' + e.code + '] ' + e.message + ' (' + e.context + ')')); } else { pass++; console.log('OK   ' + r.url); } } srv.close(() => process.exit(fail > 0 ? 1 : 0)); })();\"",
-    "a11y:serve": "node scripts/serve-static-for-pa11y.mjs"
+    "a11y:serve": "node scripts/serve-static-for-pa11y.mjs",
+    "load:review": "k6 run --vus 100 --duration 30s __tests__/load/review-submission.load.js",
+    "load:soroban": "k6 run --vus 50 --duration 30s __tests__/load/soroban-rpc-batch.load.js",
+    "load:test": "k6 run __tests__/load/review-submission.load.js && k6 run __tests__/load/soroban-rpc-batch.load.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@next/bundle-analyzer": "^16.3.3",
     "@stellar/freighter-api": "^6.0.1",
     "clsx": "^2.1.1",
     "crypto-js": "^4.2.0",
@@ -40,6 +46,7 @@
     "react-hook-form": "^7.74.0",
     "sonner": "^2.0.7",
     "stellar-sdk": "^13.3.0",
+    "swr": "^2.5.1",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
   },

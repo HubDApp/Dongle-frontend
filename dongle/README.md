@@ -190,6 +190,11 @@ The canonical template lives in [`.env.example`](./.env.example). Key variables:
 | `NEXT_PUBLIC_SOROBAN_RPC_URL` | No | Testnet RPC | Soroban RPC endpoint URL |
 | `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | No | Testnet passphrase | Stellar network identifier |
 | `NEXT_PUBLIC_ADMIN_ALLOWLIST` | No | (empty) | Comma-separated admin wallet addresses |
+| `AUTH_APP_URL` | OAuth | `http://localhost:3000` | Canonical origin for OAuth callbacks |
+| `AUTH_SESSION_SECRET` | OAuth | (dev default) | Server-only session JWT secret |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth | (empty) | Google OAuth. Secrets are never `NEXT_PUBLIC_*` |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | OAuth | (empty) | GitHub OAuth. Secrets are never `NEXT_PUBLIC_*` |
+| `CRON_SECRET` | Optional | (empty) | Protects daily analytics cron |
 
 ### Contract ID Format
 
@@ -210,15 +215,46 @@ To deploy Dongle to production:
 
 ### Validation & Error Handling
 
-- **Development** (`NODE_ENV=development`): Invalid env vars use safe defaults and log warnings
-- **Test** (`NODE_ENV=test`): Invalid env vars use safe defaults
-- **Production** (`NODE_ENV=production`): Invalid env vars cause build/startup failure with clear error messages
+Environment variables are validated at build time and runtime using Zod schemas ([`constants/env.schema.ts`](./constants/env.schema.ts)):
 
-Example error output:
+- **Development** (`NODE_ENV=development`): Missing values use safe defaults, validation warnings logged
+- **Test** (`NODE_ENV=test`): Missing values use safe defaults
+- **Production** (`NODE_ENV=production`): All required values must be explicitly set, invalid values cause startup failure
+
+**Validation Features:**
+- Contract ID format validation (56 chars: C + 55 base32)
+- URL validation for RPC endpoints
+- Stellar public key validation for admin allowlists
+- Production-specific checks (no placeholder contract IDs)
+- Admin JWT secret requirement when admin features are enabled
+
+Example validation error output:
 ```
-Environment Validation Error:
-- NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: Invalid Stellar Contract ID format
-- NEXT_PUBLIC_SOROBAN_RPC_URL: Invalid URL
+╔══════════════════════════════════════════════════════════════╗
+║          ENVIRONMENT CONFIGURATION ERROR                     ║
+╚══════════════════════════════════════════════════════════════╝
+
+Environment: PRODUCTION
+
+The following environment variables are invalid:
+  - NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: Development placeholder contract ID not allowed in production. Deploy contracts and set real contract IDs.
+  - NEXT_PUBLIC_SOROBAN_RPC_URL: Must be a valid HTTPS URL
+
+See:
+  - dongle/.env.example for configuration template
+  - dongle/DEPLOYMENT.md for production checklist
+  - dongle/constants/env.schema.ts for schema reference
+```
+
+**Programmatic Validation:**
+```typescript
+import { validateEnv, exportJsonSchema } from '@/constants/env.schema';
+
+// Validate environment
+const config = validateEnv(process.env, isDevelopment);
+
+// Export JSON Schema for external tools
+const jsonSchema = exportJsonSchema();
 ```
 
 ## Project Structure
@@ -371,7 +407,7 @@ This is a development prototype with the following known limitations. These are 
 
 - **Testnet Only**: Application is hardcoded for Stellar testnet by default
 - **No Mainnet Support**: Production deployment requires network configuration changes
-- **Freighter Required**: No alternative wallet support or key-import flows
+- **Freighter Required for writes**: Google/GitHub OAuth is optional read-only identity. On-chain publishing still needs Freighter.
 
 **Impact**: Cannot connect to mainnet accounts or use hardware wallets directly.
 
@@ -644,6 +680,51 @@ const result = await confirm({
 ```
 
 ## Troubleshooting
+
+### Error Code Reference
+
+Dongle uses standardized error codes to help diagnose issues. When you encounter an error, check the error code against this reference for specific solutions.
+
+**Error Code Format**: All error codes follow the pattern `CATEGORY_DESCRIPTION` (e.g., `WALLET_NOT_INSTALLED`, `NETWORK_TIMEOUT`).
+
+**Common Error Categories**:
+
+| Category | Code Range | Examples |
+|----------|------------|----------|
+| Wallet | `WALLET_*` | `WALLET_NOT_INSTALLED`, `WALLET_LOCKED`, `WALLET_USER_REJECTED` |
+| Network | `NETWORK_*` | `NETWORK_TIMEOUT`, `NETWORK_OFFLINE`, `NETWORK_CONNECTION_REFUSED` |
+| Account | `ACCOUNT_*` | `ACCOUNT_NOT_FOUND`, `ACCOUNT_UNFUNDED`, `ACCOUNT_INSUFFICIENT_BALANCE` |
+| Transaction | `TRANSACTION_*` | `TRANSACTION_FAILED`, `TRANSACTION_BAD_SEQUENCE`, `TRANSACTION_TIMEOUT` |
+| Stellar/Soroban | `STELLAR_*`, `SOROBAN_*` | `STELLAR_HORIZON_ERROR`, `SOROBAN_CONTRACT_ERROR` |
+| Storage | `STORAGE_*` | `STORAGE_QUOTA_EXCEEDED`, `STORAGE_WRITE_FAILED` |
+| Validation | `VALIDATION_*` | `VALIDATION_INVALID_URL`, `VALIDATION_REQUIRED_FIELD` |
+| API | `API_*` | `API_NOT_FOUND`, `API_SERVER_ERROR`, `API_RATE_LIMITED` |
+| Draft | `DRAFT_*` | `DRAFT_SAVE_FAILED`, `DRAFT_NOT_FOUND`, `DRAFT_EXPIRED` |
+| Project | `PROJECT_*`, `CONTRACT_*` | `PROJECT_NOT_FOUND`, `CONTRACT_NOT_DEPLOYED` |
+
+**Finding Error Codes**:
+1. Check browser console (F12 → Console tab) - error codes appear in brackets: `[WALLET_LOCKED]`
+2. Look for toast notifications - they include error codes in the message
+3. API responses include `code` field in JSON error responses
+
+**Full Error Code Documentation**: See [`constants/error-codes.ts`](./constants/error-codes.ts) for the complete list with:
+- User-friendly messages
+- Technical descriptions
+- Resolution steps for each code
+- HTTP status codes (for API errors)
+
+**Example Error Investigation**:
+```
+Console output:
+[WALLET_NOT_INSTALLED] Freighter wallet extension is not installed.
+Resolution: Install Freighter from Chrome Web Store or Firefox Add-ons.
+
+Solution:
+1. Visit https://freighter.app/
+2. Install extension for your browser
+3. Refresh Dongle page
+4. Click "Connect Wallet"
+```
 
 ### "Wallet connection failed"
 

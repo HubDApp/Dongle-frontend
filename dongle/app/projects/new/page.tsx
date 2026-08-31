@@ -2,9 +2,7 @@
 
 import React from "react";
 import ProjectForm from "@/components/projects/ProjectForm";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
+import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { ShieldCheck, Zap, Rocket } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -22,6 +20,11 @@ export default function NewProjectPage() {
           <ProjectForm />
         ) : (
           <div className="max-w-xl mx-auto animate-fade-in">
+            <WalletGate
+              gate={gate}
+              pagePurpose={SUBMIT_PURPOSE}
+              loadingMessage="Preparing your wallet..."
+            />
             {gate.state === "account-loading" ? (
               <WalletStateLoadingPanel message="Preparing your wallet..." />
             ) : (

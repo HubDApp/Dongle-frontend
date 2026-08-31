@@ -7,6 +7,10 @@ import { ComparisonProvider } from "@/context/comparison.context";
 import { Toaster } from "sonner";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import AnalyticsRoot from "@/components/analytics/AnalyticsRoot";
+import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
+import { AuthProvider } from "@/context/auth.context";
+import { NotificationProvider } from "@/context/notification.context";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,21 +56,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" dir="ltr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <WalletProvider>
-          <ConfirmDialogProvider>
-            <ComparisonProvider>
-              <AnalyticsRoot>
-                <LayoutWrapper>{children}</LayoutWrapper>
-              </AnalyticsRoot>
-            </ComparisonProvider>
-          </ConfirmDialogProvider>
-        </WalletProvider>
-        <Toaster position="top-right" richColors />
+        <ThemeProvider defaultTheme="system" storageKey="dongle-theme">
+          <WalletProvider>
+            <LocaleProvider>
+              <AuthProvider>
+                <NotificationProvider>
+                  <ConfirmDialogProvider>
+                    <ComparisonProvider>
+                      <AnalyticsRoot>
+                        <LayoutWrapper>{children}</LayoutWrapper>
+                      </AnalyticsRoot>
+                    </ComparisonProvider>
+                  </ConfirmDialogProvider>
+                </NotificationProvider>
+              </AuthProvider>
+            </LocaleProvider>
+          </WalletProvider>
+          <Toaster position="top-right" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );
