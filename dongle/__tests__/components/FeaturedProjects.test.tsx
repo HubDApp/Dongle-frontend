@@ -12,11 +12,29 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Mock the comparison context used by ProjectCard
 vi.mock("@/context/comparison.context", () => ({
   useComparison: () => ({
     selectedProjects: [],
     addProject: vi.fn(),
     removeProject: vi.fn(),
+    clearComparison: vi.fn(),
+    isSelected: () => false,
+    canAddMore: true,
+    maxSelections: 4,
+  }),
+}));
+
+// Mock the saved projects hook used by ProjectCard (which depends on useWallet)
+vi.mock("@/hooks/useSavedProjects", () => ({
+  useSavedProjects: () => ({
+    walletAddress: null,
+    isConnected: false,
+    savedProjectIds: [],
+    isProjectSaved: () => false,
+    toggleSavedProject: vi.fn(),
+    clearSavedProjects: vi.fn(),
+    canManageSavedProjects: false,
     isSelected: vi.fn(() => false),
     canAddMore: true,
     clearComparison: vi.fn(),

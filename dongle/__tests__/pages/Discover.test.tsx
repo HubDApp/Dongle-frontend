@@ -71,6 +71,13 @@ vi.mock("@/hooks/useWalletPageGate", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useRecentViews", () => ({
+  useRecentViews: () => ({
+    recentProjects: [],
+    isLoading: false,
+    trackView: vi.fn(),
+    clearHistory: vi.fn(),
+    hasHistory: false,
 vi.mock("@/hooks/useAdminAccess", () => ({
   useAdminAccess: () => ({
     isAdmin: false,
@@ -91,6 +98,27 @@ vi.mock("@/context/comparison.context", () => ({
     selectedProjects: [],
     addProject: vi.fn(),
     removeProject: vi.fn(),
+    clearComparison: vi.fn(),
+    isSelected: () => false,
+    canAddMore: true,
+    maxSelections: 4,
+  }),
+  ComparisonProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock("@/context/wallet.context", () => ({
+  useWallet: () => ({
+    isConnected: false,
+    isConnecting: false,
+    isFreighterAvailable: false,
+    publicKey: null,
+    walletNetwork: null,
+    isCorrectNetwork: false,
+    walletNetworkLabel: "Unknown",
+    connectWallet: vi.fn(),
+    disconnectWallet: vi.fn(),
+  }),
+  WalletProvider: ({ children }: { children: React.ReactNode }) => children,
     isSelected: vi.fn(() => false),
     canAddMore: true,
     clearComparison: vi.fn(),
@@ -131,6 +159,10 @@ async function finishInitialLoad() {
   await act(async () => {
     vi.runAllTimers();
     await Promise.resolve();
+  });
+  // Flush microtasks and pending React state updates
+  await act(async () => {
+    vi.advanceTimersByTime(2000);
   });
 }
 
@@ -266,6 +298,11 @@ describe("Discover Page - High Risk Flows", () => {
     it("disables sort control during loading", () => {
       render(<DiscoverPage />);
 
+      // There are two select elements: verification filter and sort; pick the sort one
+      const comboboxes = screen.getAllByRole("combobox");
+      // Sort select is the last one (second) 
+      const sortSelect = comboboxes[comboboxes.length - 1] as HTMLSelectElement;
+      expect(sortSelect.disabled).toBe(true);
       const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
       // Both the verification-status and sort selects should be disabled during loading
       expect(selects.every((s) => s.disabled)).toBe(true);
@@ -312,6 +349,9 @@ describe("Discover Page - High Risk Flows", () => {
       render(<DiscoverPage />);
       await finishInitialLoad();
 
+      // There are two select elements: verification filter and sort; pick the sort one
+      const comboboxes = screen.getAllByRole("combobox");
+      const sortSelect = comboboxes[comboboxes.length - 1] as HTMLSelectElement;
       // The sort select has "Highest Rated" / "Most Popular" / "Newest" options
       const sortSelect = screen
         .getAllByRole("combobox")
@@ -324,6 +364,8 @@ describe("Discover Page - High Risk Flows", () => {
       render(<DiscoverPage />);
       await finishInitialLoad();
 
+      const comboboxes = screen.getAllByRole("combobox");
+      const sortSelect = comboboxes[comboboxes.length - 1] as HTMLSelectElement;
       const sortSelect = screen
         .getAllByRole("combobox")
         .find((el) => (el as HTMLSelectElement).value === "rating") as HTMLSelectElement;

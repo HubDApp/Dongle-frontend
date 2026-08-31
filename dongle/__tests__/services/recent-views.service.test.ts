@@ -151,6 +151,7 @@ describe("recentViewsService", () => {
 
       const projects = recentViewsService.getRecentProjects();
       expect(projects).toHaveLength(2);
+      // Views are returned newest-first, so projects[0] is the last one added
       // Newest view (proj[1]) is first
       expect(projects[0].id).toBe(mockProjects[1].id);
       expect(projects[1].id).toBe(mockProjects[0].id);
@@ -240,6 +241,10 @@ describe("recentViewsService", () => {
       const timestamp = recentViewsService.getLastViewedAt(projectId, wallet1);
       expect(timestamp).toBeTruthy();
 
+      // When no wallet is specified, getLastViewedAt returns the most recent view
+      // regardless of wallet scope (views are not segregated)
+      const noWalletTimestamp = recentViewsService.getLastViewedAt(projectId);
+      expect(noWalletTimestamp).toBeTruthy();
       // Without wallet arg, getRecentViews returns ALL views (including wallet-scoped),
       // so the view is still found — verify it returns a timestamp, not null
       const anyWalletTimestamp = recentViewsService.getLastViewedAt(projectId);
