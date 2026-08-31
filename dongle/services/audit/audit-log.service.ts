@@ -9,6 +9,12 @@
  * - append() is the only write path; no update/delete methods are exposed.
  * - list() / getById() are read-only.
  * - Corrupt or partial records are skipped during hydration (never throw).
+ *
+ * Compliance features (#452):
+ * - exportCsv() — generates a CSV string for external audits.
+ * - redactedList() — returns entries with PII (wallet addresses) partially
+ *   redacted (first 5 + last 5 chars).
+ * - Retention: entries older than 1 year can be pruned via pruneOldEntries().
  */
 
 import {
@@ -20,6 +26,9 @@ import {
 import { generateId } from "@/lib/id-generator";
 
 export const AUDIT_LOG_STORAGE_KEY = "dongle_audit_log";
+
+/** Retention period: 1 year in milliseconds. */
+const RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 
 const VALID_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "admin_login",
@@ -106,6 +115,26 @@ function saveEntries(entries: AuditLogEntry[]): void {
   }
 }
 
+/**
+ * Redact a Stellar public key: show first 5 and last 5 characters only.
+ * Addresses shorter than 11 chars are returned as-is.
+ */
+function redactAddress(address: string): string {
+  if (address.length <= 10) return address;
+  return `${address.slice(0, 5)}...${address.slice(-5)}`;
+}
+
+/**
+ * Escape a value for CSV output.  Wraps in double-quotes if the value
+ * contains a comma, double-quote, or newline.
+ */
+function csvEscape(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
 export const auditLogService = {
   // ── Write ────────────────────────────────────────────────────────────────
 
@@ -174,6 +203,59 @@ export const auditLogService = {
   /** Total count of stored entries (unfiltered). */
   count(): number {
     return loadEntries().length;
+  },
+
+  // ── Compliance (#452) ────────────────────────────────────────────────────
+
+  /**
+   * Return entries with wallet addresses partially redacted (first 5 + last 5 chars).
+   * Safe for display in compliance dashboards and external sharing.
+   */
+  redactedList(filter?: AuditLogFilter): AuditLogEntry[] {
+    return this.list(filter).map((entry) => ({
+      ...entry,
+      actor: redactAddress(entry.actor),
+      targetId: redactAddress(entry.targetId),
+    }));
+  },
+
+  /**
+   * Export filtered entries as a CSV string for external audit tools.
+   * Columns: id, actor, action, targetId, targetLabel, timestamp, reason.
+   */
+  exportCsv(filter?: AuditLogFilter): string {
+    const entries = this.list(filter);
+    const header = "id,actor,action,targetId,targetLabel,timestamp,reason";
+    const rows = entries.map(
+      (e) =>
+        [
+          csvEscape(e.id),
+          csvEscape(e.actor),
+          csvEscape(e.action),
+          csvEscape(e.targetId),
+          csvEscape(e.targetLabel),
+          csvEscape(e.timestamp),
+          csvEscape(e.reason ?? ""),
+        ].join(","),
+    );
+    return [header, ...rows].join("\n");
+  },
+
+  /**
+   * Remove entries older than the retention period (1 year).
+   * Returns the number of entries pruned.
+   */
+  pruneOldEntries(): number {
+    const entries = loadEntries();
+    const cutoff = Date.now() - RETENTION_MS;
+    const kept = entries.filter(
+      (e) => new Date(e.timestamp).getTime() >= cutoff,
+    );
+    const pruned = entries.length - kept.length;
+    if (pruned > 0) {
+      saveEntries(kept);
+    }
+    return pruned;
   },
 
   // ── Test helpers ─────────────────────────────────────────────────────────
