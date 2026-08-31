@@ -1,54 +1,50 @@
 /**
- * React hook for using translations in components
+ * React hook for using translations in components.
+ * Subscribes to locale changes so switching language re-renders consumers.
  */
 
 "use client";
 
-import { useCallback } from "react";
-import { t, getMessages, type Messages } from "./index";
+import { useCallback, useSyncExternalStore } from "react";
+import {
+  t,
+  getMessages,
+  getLocale,
+  subscribeLocale,
+  type Messages,
+  type MessageKey,
+} from "./index";
 import * as format from "./format";
+import type { LocaleCode } from "./locales";
 
 interface UseTranslationReturn {
-  /**
-   * Translate a message key
-   */
   t: typeof t;
-  
-  /**
-   * Get all messages for the current locale
-   */
   messages: Messages;
-  
-  /**
-   * Formatting utilities
-   */
   format: typeof format;
+  locale: LocaleCode;
 }
 
-/**
- * Hook for using translations in React components
- * 
- * @example
- * function MyComponent() {
- *   const { t, format } = useTranslation();
- *   
- *   return (
- *     <div>
- *       <h1>{t("nav.discover")}</h1>
- *       <p>{format.formatDate(new Date())}</p>
- *     </div>
- *   );
- * }
- */
+function subscribe(onStoreChange: () => void) {
+  return subscribeLocale(onStoreChange);
+}
+
+function getSnapshot(): LocaleCode {
+  return getLocale();
+}
+
 export function useTranslation(): UseTranslationReturn {
+  const locale = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const messages = getMessages();
 
-  // Memoize t function to prevent unnecessary re-renders
-  const translate = useCallback(t, []);
+  const translate = useCallback(
+    (key: MessageKey, params?: Record<string, string | number>) => t(key, params),
+    [locale],
+  );
 
   return {
     t: translate,
     messages,
     format,
+    locale,
   };
 }

@@ -1,35 +1,55 @@
 /**
  * In-app notification types for the Dongle frontend.
  *
- * Notifications are scoped to a recipient wallet address and stored in
- * localStorage (same pattern as other services).  They are currently
- * read-only once written — only the claim flow creates them.
+ * Real-time events arrive over SSE. History is capped at 50 per recipient.
+ * Toast auto-dismiss is a presentation concern and must not delete history.
  */
 
-export type NotificationType =
-  | "claim_received"   // claimant receives this after submitting
-  | "claim_approved"   // claimant receives this after admin approves
-  | "claim_rejected";  // claimant receives this after admin rejects
+export const REALTIME_NOTIFICATION_TYPES = [
+  "project_verified",
+  "project_rejected",
+  "review_approved",
+  "review_rejected",
+  "verification_evidence_requested",
+] as const;
+
+export const LEGACY_NOTIFICATION_TYPES = [
+  "claim_received",
+  "claim_approved",
+  "claim_rejected",
+] as const;
+
+export const NOTIFICATION_TYPES = [
+  ...REALTIME_NOTIFICATION_TYPES,
+  ...LEGACY_NOTIFICATION_TYPES,
+] as const;
+
+export type RealtimeNotificationType = (typeof REALTIME_NOTIFICATION_TYPES)[number];
+export type LegacyNotificationType = (typeof LEGACY_NOTIFICATION_TYPES)[number];
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+export const NOTIFICATION_HISTORY_LIMIT = 50;
+export const NOTIFICATION_TOAST_MS = 5000;
+
+export function isKnownNotificationType(value: unknown): value is NotificationType {
+  return typeof value === "string" && (NOTIFICATION_TYPES as readonly string[]).includes(value);
+}
 
 export interface AppNotification {
   id: string;
-  /** Stellar G… address of the recipient wallet. */
+  /** Wallet address (G…) or OAuth subject used as the stream recipient. */
   recipientAddress: string;
   type: NotificationType;
-  /** Short subject line shown in the banner. */
   title: string;
-  /** Optional longer body text (e.g. rejection reason). */
   message?: string;
-  /** ISO 8601 creation timestamp. */
   createdAt: string;
-  /** Whether the user has dismissed/read this notification. */
   read: boolean;
-  /** The claim request ID this notification is about. */
-  claimRequestId: string;
-  /** The project ID this notification is about. */
-  projectId: string;
-  /** Human-readable project name at time of notification. */
-  projectName: string;
+  claimRequestId?: string;
+  projectId?: string;
+  projectName?: string;
+  reviewId?: string;
+  /** Provider event id used for deduplication when present. */
+  eventId?: string;
 }
 
 export interface CreateNotificationParams {
@@ -37,7 +57,23 @@ export interface CreateNotificationParams {
   type: NotificationType;
   title: string;
   message?: string;
-  claimRequestId: string;
-  projectId: string;
-  projectName: string;
+  claimRequestId?: string;
+  projectId?: string;
+  projectName?: string;
+  reviewId?: string;
+  eventId?: string;
+  id?: string;
+  createdAt?: string;
+}
+
+export interface NotificationStreamEvent {
+  id: string;
+  type: string;
+  recipientId: string;
+  projectId?: string;
+  projectName?: string;
+  reviewId?: string;
+  createdAt: string;
+  messageKey?: string;
+  messageParams?: Record<string, string>;
 }

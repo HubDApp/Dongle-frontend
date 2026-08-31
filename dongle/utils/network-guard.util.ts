@@ -1,8 +1,15 @@
 /**
  * Network Guard Utilities
- * 
+ *
  * Helpers to prevent network-dependent actions when offline
  */
+
+import {
+  MAX_RETRIES,
+  INITIAL_BACKOFF_MS,
+  MAX_BACKOFF_MS,
+  BACKOFF_MULTIPLIER,
+} from "@/constants/limits";
 
 export interface NetworkAction {
   name: string;
@@ -139,10 +146,10 @@ export async function retryWithBackoff<T>(
   } = {}
 ): Promise<T> {
   const {
-    maxRetries = 3,
-    initialDelay = 1000,
-    maxDelay = 10000,
-    backoffMultiplier = 2,
+    maxRetries = MAX_RETRIES,
+    initialDelay = INITIAL_BACKOFF_MS,
+    maxDelay = MAX_BACKOFF_MS,
+    backoffMultiplier = BACKOFF_MULTIPLIER,
   } = options;
 
   let lastError: unknown;
