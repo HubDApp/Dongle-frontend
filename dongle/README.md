@@ -215,15 +215,46 @@ To deploy Dongle to production:
 
 ### Validation & Error Handling
 
-- **Development** (`NODE_ENV=development`): Invalid env vars use safe defaults and log warnings
-- **Test** (`NODE_ENV=test`): Invalid env vars use safe defaults
-- **Production** (`NODE_ENV=production`): Invalid env vars cause build/startup failure with clear error messages
+Environment variables are validated at build time and runtime using Zod schemas ([`constants/env.schema.ts`](./constants/env.schema.ts)):
 
-Example error output:
+- **Development** (`NODE_ENV=development`): Missing values use safe defaults, validation warnings logged
+- **Test** (`NODE_ENV=test`): Missing values use safe defaults
+- **Production** (`NODE_ENV=production`): All required values must be explicitly set, invalid values cause startup failure
+
+**Validation Features:**
+- Contract ID format validation (56 chars: C + 55 base32)
+- URL validation for RPC endpoints
+- Stellar public key validation for admin allowlists
+- Production-specific checks (no placeholder contract IDs)
+- Admin JWT secret requirement when admin features are enabled
+
+Example validation error output:
 ```
-Environment Validation Error:
-- NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: Invalid Stellar Contract ID format
-- NEXT_PUBLIC_SOROBAN_RPC_URL: Invalid URL
+╔══════════════════════════════════════════════════════════════╗
+║          ENVIRONMENT CONFIGURATION ERROR                     ║
+╚══════════════════════════════════════════════════════════════╝
+
+Environment: PRODUCTION
+
+The following environment variables are invalid:
+  - NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: Development placeholder contract ID not allowed in production. Deploy contracts and set real contract IDs.
+  - NEXT_PUBLIC_SOROBAN_RPC_URL: Must be a valid HTTPS URL
+
+See:
+  - dongle/.env.example for configuration template
+  - dongle/DEPLOYMENT.md for production checklist
+  - dongle/constants/env.schema.ts for schema reference
+```
+
+**Programmatic Validation:**
+```typescript
+import { validateEnv, exportJsonSchema } from '@/constants/env.schema';
+
+// Validate environment
+const config = validateEnv(process.env, isDevelopment);
+
+// Export JSON Schema for external tools
+const jsonSchema = exportJsonSchema();
 ```
 
 ## Project Structure
