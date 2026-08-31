@@ -681,6 +681,51 @@ const result = await confirm({
 
 ## Troubleshooting
 
+### Error Code Reference
+
+Dongle uses standardized error codes to help diagnose issues. When you encounter an error, check the error code against this reference for specific solutions.
+
+**Error Code Format**: All error codes follow the pattern `CATEGORY_DESCRIPTION` (e.g., `WALLET_NOT_INSTALLED`, `NETWORK_TIMEOUT`).
+
+**Common Error Categories**:
+
+| Category | Code Range | Examples |
+|----------|------------|----------|
+| Wallet | `WALLET_*` | `WALLET_NOT_INSTALLED`, `WALLET_LOCKED`, `WALLET_USER_REJECTED` |
+| Network | `NETWORK_*` | `NETWORK_TIMEOUT`, `NETWORK_OFFLINE`, `NETWORK_CONNECTION_REFUSED` |
+| Account | `ACCOUNT_*` | `ACCOUNT_NOT_FOUND`, `ACCOUNT_UNFUNDED`, `ACCOUNT_INSUFFICIENT_BALANCE` |
+| Transaction | `TRANSACTION_*` | `TRANSACTION_FAILED`, `TRANSACTION_BAD_SEQUENCE`, `TRANSACTION_TIMEOUT` |
+| Stellar/Soroban | `STELLAR_*`, `SOROBAN_*` | `STELLAR_HORIZON_ERROR`, `SOROBAN_CONTRACT_ERROR` |
+| Storage | `STORAGE_*` | `STORAGE_QUOTA_EXCEEDED`, `STORAGE_WRITE_FAILED` |
+| Validation | `VALIDATION_*` | `VALIDATION_INVALID_URL`, `VALIDATION_REQUIRED_FIELD` |
+| API | `API_*` | `API_NOT_FOUND`, `API_SERVER_ERROR`, `API_RATE_LIMITED` |
+| Draft | `DRAFT_*` | `DRAFT_SAVE_FAILED`, `DRAFT_NOT_FOUND`, `DRAFT_EXPIRED` |
+| Project | `PROJECT_*`, `CONTRACT_*` | `PROJECT_NOT_FOUND`, `CONTRACT_NOT_DEPLOYED` |
+
+**Finding Error Codes**:
+1. Check browser console (F12 → Console tab) - error codes appear in brackets: `[WALLET_LOCKED]`
+2. Look for toast notifications - they include error codes in the message
+3. API responses include `code` field in JSON error responses
+
+**Full Error Code Documentation**: See [`constants/error-codes.ts`](./constants/error-codes.ts) for the complete list with:
+- User-friendly messages
+- Technical descriptions
+- Resolution steps for each code
+- HTTP status codes (for API errors)
+
+**Example Error Investigation**:
+```
+Console output:
+[WALLET_NOT_INSTALLED] Freighter wallet extension is not installed.
+Resolution: Install Freighter from Chrome Web Store or Firefox Add-ons.
+
+Solution:
+1. Visit https://freighter.app/
+2. Install extension for your browser
+3. Refresh Dongle page
+4. Click "Connect Wallet"
+```
+
 ### "Wallet connection failed"
 
 **Causes & Solutions**:

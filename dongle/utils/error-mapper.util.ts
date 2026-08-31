@@ -1,6 +1,8 @@
 /**
  * Error Mapper for Stellar, Soroban, Wallet, and Storage Operations
  * Converts technical errors into user-friendly messages while preserving developer diagnostics
+ * 
+ * Now integrated with centralized error code system from @/constants/error-codes
  */
 
 import {
@@ -24,8 +26,10 @@ import {
 export interface MappedError {
   userMessage: string;
   technicalDetails?: string;
-  code?: string;
+  code: ErrorCode;
   actionable?: string;
+  /** Whether this error should be reported to Sentry/monitoring */
+  shouldReport?: boolean;
 }
 
 export type ErrorCategory =
@@ -94,44 +98,59 @@ export function mapError(error: unknown, category?: ErrorCategory): MappedError 
 
   // Legacy path: string-based heuristics for plain Error / unknown values.
   const errorMessage = getErrorMessage(error);
-  const errorCode = getErrorCode(error);
+  const extractedCode = extractErrorCode(error);
+  
+  // If error already has a valid ErrorCode, use it directly
+  if (extractedCode) {
+    const info = getErrorInfo(extractedCode);
+    return {
+      userMessage: info.userMessage,
+      technicalDetails: errorMessage,
+      code: extractedCode,
+      actionable: info.resolution,
+      shouldReport: info.shouldReport,
+    };
+  }
+
+  // Otherwise, detect category and map to appropriate error code
+  let detectedCode: ErrorCode;
 
   // Wallet errors
-  if (category === "wallet" || isWalletError(errorMessage, errorCode)) {
-    return mapWalletError(errorMessage, errorCode, error);
+  if (category === "wallet" || isWalletError(errorMessage)) {
+    detectedCode = mapWalletErrorToCode(errorMessage);
   }
-
   // Network errors
-  if (category === "network" || isNetworkError(errorMessage, errorCode)) {
-    return mapNetworkError(errorMessage, errorCode, error);
+  else if (category === "network" || isNetworkError(errorMessage)) {
+    detectedCode = mapNetworkErrorToCode(errorMessage);
   }
-
   // Account errors
-  if (category === "account" || isAccountError(errorMessage, errorCode)) {
-    return mapAccountError(errorMessage, errorCode, error);
+  else if (category === "account" || isAccountError(errorMessage)) {
+    detectedCode = mapAccountErrorToCode(errorMessage);
   }
-
   // Transaction errors
-  if (category === "transaction" || isTransactionError(errorMessage, errorCode)) {
-    return mapTransactionError(errorMessage, errorCode, error);
+  else if (category === "transaction" || isTransactionError(errorMessage)) {
+    detectedCode = mapTransactionErrorToCode(errorMessage);
   }
-
-  // Stellar/Soroban specific errors
-  if (category === "stellar" || category === "soroban" || isStellarError(errorMessage, errorCode)) {
-    return mapStellarError(errorMessage, errorCode, error);
+  // Stellar/Soroban errors
+  else if (category === "stellar" || category === "soroban" || isStellarError(errorMessage)) {
+    detectedCode = mapStellarErrorToCode(errorMessage);
   }
-
   // Storage errors
-  if (category === "storage" || isStorageError(errorMessage, errorCode)) {
-    return mapStorageError(errorMessage, errorCode, error);
+  else if (category === "storage" || isStorageError(errorMessage)) {
+    detectedCode = mapStorageErrorToCode(errorMessage);
+  }
+  // Fallback to unknown
+  else {
+    detectedCode = ErrorCode.UNKNOWN_ERROR;
   }
 
-  // Fallback for unknown errors
+  const info = getErrorInfo(detectedCode);
   return {
-    userMessage: "An unexpected error occurred. Please try again.",
+    userMessage: info.userMessage,
     technicalDetails: errorMessage,
-    code: errorCode,
-    actionable: "If the problem persists, please contact support with the error details.",
+    code: detectedCode,
+    actionable: info.resolution,
+    shouldReport: info.shouldReport,
   };
 }
 
@@ -157,10 +176,10 @@ function getErrorCode(error: unknown): string | undefined {
 }
 
 // ============================================================================
-// Category Detection
+// Category Detection (legacy - kept for backward compatibility)
 // ============================================================================
 
-function isWalletError(message: string, code?: string): boolean {
+function isWalletError(message: string): boolean {
   const walletKeywords = [
     "freighter",
     "extension",
@@ -176,7 +195,7 @@ function isWalletError(message: string, code?: string): boolean {
   );
 }
 
-function isNetworkError(message: string, code?: string): boolean {
+function isNetworkError(message: string): boolean {
   const networkKeywords = [
     "network",
     "timeout",
@@ -185,15 +204,14 @@ function isNetworkError(message: string, code?: string): boolean {
     "offline",
     "ECONNREFUSED",
     "ERR_NETWORK",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "ECONNRESET",
   ];
-  const networkCodes = ["ETIMEDOUT", "ENOTFOUND", "ECONNRESET"];
-  return (
-    networkKeywords.some((keyword) => message.toLowerCase().includes(keyword)) ||
-    (code ? networkCodes.includes(code) : false)
-  );
+  return networkKeywords.some((keyword) => message.toLowerCase().includes(keyword));
 }
 
-function isAccountError(message: string, code?: string): boolean {
+function isAccountError(message: string): boolean {
   const accountKeywords = [
     "account not found",
     "account does not exist",
@@ -207,7 +225,7 @@ function isAccountError(message: string, code?: string): boolean {
   );
 }
 
-function isTransactionError(message: string, code?: string): boolean {
+function isTransactionError(message: string): boolean {
   const txKeywords = [
     "transaction",
     "tx_failed",
@@ -218,7 +236,7 @@ function isTransactionError(message: string, code?: string): boolean {
   return txKeywords.some((keyword) => message.toLowerCase().includes(keyword));
 }
 
-function isStellarError(message: string, code?: string): boolean {
+function isStellarError(message: string): boolean {
   const stellarKeywords = [
     "stellar",
     "horizon",
@@ -233,7 +251,7 @@ function isStellarError(message: string, code?: string): boolean {
   );
 }
 
-function isStorageError(message: string, code?: string): boolean {
+function isStorageError(message: string): boolean {
   const storageKeywords = [
     "storage",
     "localstorage",
@@ -248,246 +266,124 @@ function isStorageError(message: string, code?: string): boolean {
 }
 
 // ============================================================================
-// Category-Specific Mappers
+// Category-to-ErrorCode Mappers
 // ============================================================================
 
-function mapWalletError(
-  message: string,
-  code: string | undefined,
-  originalError: unknown
-): MappedError {
+function mapWalletErrorToCode(message: string): ErrorCode {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes("user rejected") || lowerMessage.includes("user denied")) {
-    return {
-      userMessage: "Transaction was cancelled. No action was taken.",
-      technicalDetails: message,
-      code,
-    };
+    return ErrorCode.WALLET_USER_REJECTED;
   }
-
   if (lowerMessage.includes("not installed") || lowerMessage.includes("not found")) {
-    return {
-      userMessage: "Freighter wallet extension is not installed.",
-      technicalDetails: message,
-      code,
-      actionable: "Please install Freighter from the Chrome Web Store or Firefox Add-ons.",
-    };
+    return ErrorCode.WALLET_NOT_INSTALLED;
   }
-
   if (lowerMessage.includes("locked")) {
-    return {
-      userMessage: "Your wallet is locked.",
-      technicalDetails: message,
-      code,
-      actionable: "Please unlock Freighter and try again.",
-    };
+    return ErrorCode.WALLET_LOCKED;
   }
-
   if (lowerMessage.includes("extension")) {
-    return {
-      userMessage: "There was a problem connecting to your wallet.",
-      technicalDetails: message,
-      code,
-      actionable: "Please check that Freighter is installed and enabled.",
-    };
+    return ErrorCode.WALLET_EXTENSION_ERROR;
+  }
+  if (lowerMessage.includes("network") && lowerMessage.includes("mismatch")) {
+    return ErrorCode.WALLET_NETWORK_MISMATCH;
   }
 
-  return {
-    userMessage: "Wallet connection failed.",
-    technicalDetails: message,
-    code,
-    actionable: "Please check your wallet extension and try again.",
-  };
+  return ErrorCode.WALLET_CONNECTION_FAILED;
 }
 
-function mapNetworkError(
-  message: string,
-  code: string | undefined,
-  originalError: unknown
-): MappedError {
+function mapNetworkErrorToCode(message: string): ErrorCode {
   const lowerMessage = message.toLowerCase();
 
-  if (lowerMessage.includes("timeout") || code === "ETIMEDOUT") {
-    return {
-      userMessage: "The request timed out. The network may be slow or unavailable.",
-      technicalDetails: message,
-      code,
-      actionable: "Please check your internet connection and try again.",
-    };
+  if (lowerMessage.includes("timeout") || lowerMessage.includes("etimedout")) {
+    return ErrorCode.NETWORK_TIMEOUT;
   }
-
   if (lowerMessage.includes("offline") || lowerMessage.includes("not connected")) {
-    return {
-      userMessage: "You appear to be offline.",
-      technicalDetails: message,
-      code,
-      actionable: "Please check your internet connection.",
-    };
+    return ErrorCode.NETWORK_OFFLINE;
+  }
+  if (lowerMessage.includes("econnrefused") || lowerMessage.includes("connection refused")) {
+    return ErrorCode.NETWORK_CONNECTION_REFUSED;
   }
 
-  if (code === "ECONNREFUSED" || lowerMessage.includes("connection refused")) {
-    return {
-      userMessage: "Unable to connect to the Stellar network.",
-      technicalDetails: message,
-      code,
-      actionable: "The service may be temporarily unavailable. Please try again later.",
-    };
-  }
-
-  return {
-    userMessage: "A network error occurred.",
-    technicalDetails: message,
-    code,
-    actionable: "Please check your internet connection and try again.",
-  };
+  return ErrorCode.NETWORK_REQUEST_FAILED;
 }
 
-function mapAccountError(
-  message: string,
-  code: string | undefined,
-  originalError: unknown
-): MappedError {
+function mapAccountErrorToCode(message: string): ErrorCode {
   const lowerMessage = message.toLowerCase();
 
-  if (
-    lowerMessage.includes("account not found") ||
-    lowerMessage.includes("does not exist")
-  ) {
-    return {
-      userMessage: "This account does not exist on the Stellar network.",
-      technicalDetails: message,
-      code,
-      actionable: "The account may need to be funded with at least 1 XLM to activate it.",
-    };
+  if (lowerMessage.includes("account not found") || lowerMessage.includes("does not exist")) {
+    return ErrorCode.ACCOUNT_NOT_FOUND;
   }
-
   if (lowerMessage.includes("unfunded") || lowerMessage.includes("not funded")) {
-    return {
-      userMessage: "This account has not been funded yet.",
-      technicalDetails: message,
-      code,
-      actionable: "Send at least 1 XLM to this account to activate it.",
-    };
+    return ErrorCode.ACCOUNT_UNFUNDED;
+  }
+  if (lowerMessage.includes("insufficient balance") || lowerMessage.includes("op_underfunded")) {
+    return ErrorCode.ACCOUNT_INSUFFICIENT_BALANCE;
+  }
+  if (lowerMessage.includes("invalid") && lowerMessage.includes("address")) {
+    return ErrorCode.ACCOUNT_INVALID_ADDRESS;
   }
 
-  if (
-    lowerMessage.includes("insufficient balance") ||
-    lowerMessage.includes("op_underfunded")
-  ) {
-    return {
-      userMessage: "Insufficient balance to complete this transaction.",
-      technicalDetails: message,
-      code,
-      actionable: "Please add more XLM to your account.",
-    };
-  }
-
-  return {
-    userMessage: "There was a problem with your account.",
-    technicalDetails: message,
-    code,
-    actionable: "Please verify your account details and try again.",
-  };
+  return ErrorCode.ACCOUNT_NOT_FOUND;
 }
 
-function mapTransactionError(
-  message: string,
-  code: string | undefined,
-  originalError: unknown
-): MappedError {
+function mapTransactionErrorToCode(message: string): ErrorCode {
   const lowerMessage = message.toLowerCase();
 
-  if (lowerMessage.includes("tx_bad_seq")) {
-    return {
-      userMessage: "Transaction sequence number is incorrect.",
-      technicalDetails: message,
-      code,
-      actionable: "Please refresh the page and try again.",
-    };
+  if (lowerMessage.includes("tx_bad_seq") || lowerMessage.includes("bad sequence")) {
+    return ErrorCode.TRANSACTION_BAD_SEQUENCE;
+  }
+  if (lowerMessage.includes("tx_insufficient_fee") || lowerMessage.includes("fee too low")) {
+    return ErrorCode.TRANSACTION_INSUFFICIENT_FEE;
+  }
+  if (lowerMessage.includes("timeout")) {
+    return ErrorCode.TRANSACTION_TIMEOUT;
+  }
+  if (lowerMessage.includes("invalid")) {
+    return ErrorCode.TRANSACTION_INVALID;
   }
 
-  if (lowerMessage.includes("tx_insufficient_fee")) {
-    return {
-      userMessage: "Transaction fee is too low.",
-      technicalDetails: message,
-      code,
-      actionable: "Please try again with a higher fee.",
-    };
-  }
-
-  if (lowerMessage.includes("tx_failed") || lowerMessage.includes("op_failed")) {
-    return {
-      userMessage: "Transaction failed to process.",
-      technicalDetails: message,
-      code,
-      actionable: "Please check the transaction details and try again.",
-    };
-  }
-
-  return {
-    userMessage: "Transaction could not be completed.",
-    technicalDetails: message,
-    code,
-    actionable: "Please try again or contact support if the issue persists.",
-  };
+  return ErrorCode.TRANSACTION_FAILED;
 }
 
-function mapStellarError(
-  message: string,
-  code: string | undefined,
-  originalError: unknown
-): MappedError {
+function mapStellarErrorToCode(message: string): ErrorCode {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes("horizon")) {
-    return {
-      userMessage: "Unable to connect to the Stellar network.",
-      technicalDetails: message,
-      code,
-      actionable: "The Stellar Horizon server may be experiencing issues. Please try again later.",
-    };
+    return ErrorCode.STELLAR_HORIZON_ERROR;
+  }
+  if (lowerMessage.includes("rpc")) {
+    return ErrorCode.STELLAR_RPC_ERROR;
+  }
+  if (lowerMessage.includes("soroban") || lowerMessage.includes("contract")) {
+    return ErrorCode.SOROBAN_CONTRACT_ERROR;
+  }
+  if (lowerMessage.includes("invocation") || lowerMessage.includes("invoke")) {
+    return ErrorCode.SOROBAN_INVOCATION_FAILED;
   }
 
-  if (lowerMessage.includes("soroban")) {
-    return {
-      userMessage: "Smart contract operation failed.",
-      technicalDetails: message,
-      code,
-      actionable: "There was an issue with the smart contract. Please try again.",
-    };
-  }
-
-  return {
-    userMessage: "A Stellar network error occurred.",
-    technicalDetails: message,
-    code,
-    actionable: "Please try again later.",
-  };
+  return ErrorCode.STELLAR_NETWORK_ERROR;
 }
 
-function mapStorageError(
-  message: string,
-  code: string | undefined,
-  originalError: unknown
-): MappedError {
+function mapStorageErrorToCode(message: string): ErrorCode {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes("quota") || lowerMessage.includes("exceeded")) {
-    return {
-      userMessage: "Browser storage limit reached.",
-      technicalDetails: message,
-      code,
-      actionable: "Please clear some browser data or use a different browser.",
-    };
+    return ErrorCode.STORAGE_QUOTA_EXCEEDED;
+  }
+  if (lowerMessage.includes("decrypt")) {
+    return ErrorCode.STORAGE_DECRYPTION_FAILED;
+  }
+  if (lowerMessage.includes("read")) {
+    return ErrorCode.STORAGE_READ_FAILED;
+  }
+  if (lowerMessage.includes("write") || lowerMessage.includes("save")) {
+    return ErrorCode.STORAGE_WRITE_FAILED;
+  }
+  if (lowerMessage.includes("unavailable") || lowerMessage.includes("disabled")) {
+    return ErrorCode.STORAGE_UNAVAILABLE;
   }
 
-  return {
-    userMessage: "Failed to save data locally.",
-    technicalDetails: message,
-    code,
-    actionable: "Please check your browser settings and available storage.",
-  };
+  return ErrorCode.STORAGE_WRITE_FAILED;
 }
 
 /**
@@ -510,5 +406,23 @@ export function shouldDisplayError(error: MappedError): boolean {
  */
 export function formatErrorForLogging(error: unknown): string {
   const mapped = mapError(error);
-  return `User Message: ${mapped.userMessage}\nTechnical: ${mapped.technicalDetails || "N/A"}\nCode: ${mapped.code || "N/A"}`;
+  return `[${mapped.code}] ${mapped.userMessage}\nTechnical: ${mapped.technicalDetails || "N/A"}\nResolution: ${mapped.actionable || "N/A"}`;
 }
+
+/**
+ * Create an Error object with an ErrorCode attached.
+ * Useful for throwing typed errors that will be properly mapped.
+ * 
+ * @example
+ * throw createErrorWithCode(ErrorCode.WALLET_NOT_INSTALLED, "Freighter not detected");
+ */
+export function createErrorWithCode(code: ErrorCode, message?: string): Error {
+  const info = getErrorInfo(code);
+  const error = new Error(message || info.userMessage);
+  (error as any).code = code;
+  return error;
+}
+
+// Re-export error code types and utilities for convenience
+export { ErrorCode, ERROR_CODE_REGISTRY, getErrorInfo, extractErrorCode } from "@/constants/error-codes";
+export type { ErrorCodeInfo } from "@/constants/error-codes";
