@@ -1,15 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useLazyLoad } from "@/hooks/useIntersectionObserver";
-import { ProjectCard } from "./ProjectCard";
 import type { Project } from "@/types/project";
 import type { VerificationStatus } from "./VerificationBadge";
 
-interface LazyProjectCardProps {
-  project: Project;
-  verificationStatus?: VerificationStatus;
-  highlightTerm?: string;
-}
+const ProjectCardDynamic = dynamic(
+  () => import("./ProjectCard").then((mod) => mod.ProjectCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 h-[320px] animate-pulse" />
+    ),
+  },
+);
 
 /**
  * Defers rendering of ProjectCard until it enters the viewport.
@@ -27,12 +31,14 @@ export function LazyProjectCard({
   return (
     <div ref={ref} className="min-h-[320px]">
       {isIntersecting ? (
-        <ProjectCard
-          project={project}
-          verificationStatus={verificationStatus}
-          highlightTerm={highlightTerm}
-          showCompareCheckbox={false}
-        />
+        <Suspense fallback={null}>
+          <ProjectCardDynamic
+            project={project}
+            verificationStatus={verificationStatus}
+            highlightTerm={highlightTerm}
+            showCompareCheckbox={false}
+          />
+        </Suspense>
       ) : (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 h-[320px] animate-pulse" />
       )}
