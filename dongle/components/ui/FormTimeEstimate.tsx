@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Clock3 } from "lucide-react";
 
 interface FormTimeEstimateProps {
@@ -18,12 +19,17 @@ export function FormTimeEstimate({
   const minutes = Math.max(1, Math.ceil((remaining * secondsPerField) / 60));
   const progressMessage =
     remaining === 0
-      ? "Everything's filled in. Ready to submit."
+      ? "All the details are in. Nice work, you're ready to submit."
       : completed === 0
-        ? "A few details to get started."
+        ? "Every project starts with an idea. Add your first details when you're ready."
         : percent >= 75
-          ? "Almost there."
-          : "You're making progress.";
+          ? "Three quarters done. You're close to sharing your project."
+          : percent >= 50
+            ? "Halfway there. The core details are taking shape."
+            : percent >= 25
+              ? "Great start. You're building a clear picture of your project."
+              : "Nice start. Every detail brings your project to life.";
+  const [showEncouragement, setShowEncouragement] = useState(true);
 
   return (
     <div
@@ -55,9 +61,22 @@ export function FormTimeEstimate({
           style={{ width: `${percent}%` }}
         />
       </div>
-      <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-        {progressMessage}
-      </p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {showEncouragement && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {progressMessage}
+          </p>
+        )}
+        <label className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <input
+            type="checkbox"
+            checked={showEncouragement}
+            onChange={(event) => setShowEncouragement(event.target.checked)}
+            className="accent-emerald-600"
+          />
+          Show encouragement
+        </label>
+      </div>
     </div>
   );
 }

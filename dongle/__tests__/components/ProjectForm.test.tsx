@@ -122,15 +122,31 @@ describe("ProjectForm component", () => {
 
     expect(screen.getByText("About 5 minutes remaining")).toBeInTheDocument();
     expect(screen.getByText("0 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/every project starts with an idea/i)).toBeInTheDocument();
 
-    await fillRequiredFields();
+    const user = await fillRequiredFields();
 
     expect(screen.getByText("About 3 minutes remaining")).toBeInTheDocument();
     expect(screen.getByText("4 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/great start/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/repository url/i), "https://github.com/stellar/lend");
+    await user.type(screen.getByLabelText(/logo url/i), "https://stellarlend.example/logo.png");
+    expect(screen.getByText("6 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/halfway there/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/documentation url/i), "https://docs.stellarlend.example");
+    await user.type(screen.getByLabelText(/audit report url/i), "https://stellarlend.example/audit");
+    expect(screen.getByText("8 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/three quarters done/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /show encouragement/i }));
+    expect(screen.queryByText(/three quarters done/i)).not.toBeInTheDocument();
+    expect(screen.getByText("8 of 10 fields complete")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
 
-    expect(screen.getByText("4 of 11 fields complete")).toBeInTheDocument();
+    expect(screen.getByText("8 of 11 fields complete")).toBeInTheDocument();
   });
 
   it("shows validation errors for invalid inputs", async () => {
