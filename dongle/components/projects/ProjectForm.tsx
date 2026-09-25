@@ -38,6 +38,8 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
+import { GamificationPanel } from "@/components/gamification/GamificationPanel";
+import { awardSubmission } from "@/services/gamification/gamification.service";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -212,6 +214,23 @@ export default function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues)]);
 
+  const trackedFieldCount = 10 + (watchedValues.contractAddresses?.length ?? 0);
+  const completedFieldCount = [
+    watchedValues.name,
+    watchedValues.primaryCategory,
+    watchedValues.tags?.length,
+    watchedValues.description,
+    watchedValues.websiteUrl,
+    watchedValues.githubUrl,
+    watchedValues.logoUrl,
+    watchedValues.docsUrl,
+    watchedValues.auditReportUrl,
+    watchedValues.bugBountyUrl,
+    ...(watchedValues.contractAddresses ?? []),
+  ].filter((value) =>
+    typeof value === "string" ? value.trim().length > 0 : Boolean(value),
+  ).length;
+
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
       if (customOnSubmit) {
@@ -243,6 +262,7 @@ export default function ProjectForm({
 
         if (result) {
           if (mode !== "edit") {
+            const qualityScore = computeQualityScore(cleanedPayload);
             try {
               let submittedBy = "unknown";
               try {
@@ -251,7 +271,6 @@ export default function ProjectForm({
                 // wallet may disconnect after tx
               }
 
-              const qualityScore = computeQualityScore(cleanedPayload);
               const existingNames = projectService
                 .getAllProjects()
                 .map((p) => p.name);
@@ -282,6 +301,21 @@ export default function ProjectForm({
           // Clear draft after successful submission
           draft.clearDraft();
           reset();
+          if (mode !== "edit") {
+            try {
+              awardSubmission(
+                publicKey,
+                `${generateProjectIdFromName(cleanedPayload.name)}:${Date.now()}`,
+                computeQualityScore(cleanedPayload),
+              );
+            } catch (gamificationError) {
+              logger.error(
+                "Failed to record submission rewards",
+                { operation: "awardSubmission", userAction: "tracking submission rewards" },
+                gamificationError,
+              );
+            }
+          }
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
           setTimeout(() => router.push(redirectPath), 1500);
@@ -306,7 +340,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, publicKey, reset, router, run, draft],
   );
 
   const onPreSubmit = useCallback(
@@ -411,24 +445,18 @@ export default function ProjectForm({
         />
 
         <FormTimeEstimate
-          fieldCount={10 + (watchedValues.contractAddresses?.length ?? 0)}
-          completedFields={[
-            watchedValues.name,
-            watchedValues.primaryCategory,
-            watchedValues.tags?.length,
-            watchedValues.description,
-            watchedValues.websiteUrl,
-            watchedValues.githubUrl,
-            watchedValues.logoUrl,
-            watchedValues.docsUrl,
-            watchedValues.auditReportUrl,
-            watchedValues.bugBountyUrl,
-            ...(watchedValues.contractAddresses ?? []),
-          ].filter((value) =>
-            typeof value === "string" ? value.trim().length > 0 : Boolean(value),
-          ).length}
+          fieldCount={trackedFieldCount}
+          completedFields={completedFieldCount}
           secondsPerField={30}
         />
+
+        {mode === "create" && (
+          <GamificationPanel
+            walletAddress={publicKey}
+            completionPercent={Math.round((completedFieldCount / trackedFieldCount) * 100)}
+            qualityScore={computeQualityScore(watchedValues)}
+          />
+        )}
 
         {/* Quality Checklist */}
         <SubmissionChecklist
