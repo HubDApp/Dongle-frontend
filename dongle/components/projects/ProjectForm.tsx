@@ -5,6 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { TagInput } from "@/components/ui/TagInput";
@@ -407,6 +408,26 @@ export default function ProjectForm({
           isSaving={draft.isSaving}
           saveError={draft.saveError}
           onDiscard={handleDiscardDraft}
+        />
+
+        <FormTimeEstimate
+          fieldCount={10 + (watchedValues.contractAddresses?.length ?? 0)}
+          completedFields={[
+            watchedValues.name,
+            watchedValues.primaryCategory,
+            watchedValues.tags?.length,
+            watchedValues.description,
+            watchedValues.websiteUrl,
+            watchedValues.githubUrl,
+            watchedValues.logoUrl,
+            watchedValues.docsUrl,
+            watchedValues.auditReportUrl,
+            watchedValues.bugBountyUrl,
+            ...(watchedValues.contractAddresses ?? []),
+          ].filter((value) =>
+            typeof value === "string" ? value.trim().length > 0 : Boolean(value),
+          ).length}
+          secondsPerField={30}
         />
 
         {/* Quality Checklist */}

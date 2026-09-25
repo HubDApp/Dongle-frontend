@@ -117,6 +117,22 @@ describe("ProjectForm component", () => {
     expect(screen.getByRole("button", { name: /submit registration/i })).toBeInTheDocument();
   });
 
+  it("updates the time estimate as fields are filled and added", async () => {
+    renderForm();
+
+    expect(screen.getByText("About 5 minutes remaining")).toBeInTheDocument();
+    expect(screen.getByText("0 of 10 fields complete")).toBeInTheDocument();
+
+    await fillRequiredFields();
+
+    expect(screen.getByText("About 3 minutes remaining")).toBeInTheDocument();
+    expect(screen.getByText("4 of 10 fields complete")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
+
+    expect(screen.getByText("4 of 11 fields complete")).toBeInTheDocument();
+  });
+
   it("shows validation errors for invalid inputs", async () => {
     const user = userEvent.setup();
     renderForm();
