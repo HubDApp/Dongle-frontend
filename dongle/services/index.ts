@@ -1,6 +1,7 @@
 export * from "./audit";
 export * from "./data-access";
 export * from "./draft";
+export * from "./gdpr";
 export * from "./project";
 export * from "./recent-views";
 export * from "./repository";
