@@ -8,3 +8,4 @@ export * from "./review";
 export * from "./stellar";
 export * from "./update";
 export * from "./wallet";
+export * from "./twofa";
