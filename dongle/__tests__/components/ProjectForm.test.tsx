@@ -117,6 +117,39 @@ describe("ProjectForm component", () => {
     expect(screen.getByRole("button", { name: /submit registration/i })).toBeInTheDocument();
   });
 
+  it("searches existing projects and pre-fills related fields when selected", async () => {
+    const user = userEvent.setup();
+    projectServiceMock.getAllProjects.mockReturnValue([{
+      id: "existing-project",
+      name: "Stellar Wallet",
+      primaryCategory: "Payments",
+      tags: ["wallet", "payments"],
+      description: "A wallet for Stellar payments.",
+      rating: 4.5,
+      reviews: 12,
+      createdAt: "2024-01-01T00:00:00.000Z",
+      websiteUrl: "https://stellarwallet.example",
+      githubUrl: "https://github.com/stellar/wallet",
+      logoUrl: "https://stellarwallet.example/logo.png",
+      docsUrl: "https://docs.stellarwallet.example",
+    }]);
+    renderForm();
+
+    const nameField = await screen.findByLabelText(/project name/i);
+    await user.type(nameField, "stellar wal");
+    await user.click(screen.getByRole("button", { name: /use existing project stellar wallet/i }));
+
+    expect(nameField).toHaveValue("Stellar Wallet");
+    expect(screen.getByLabelText(/^category$/i)).toHaveValue("payments");
+    expect(screen.getByLabelText(/tags/i)).toHaveTextContent("wallet");
+    expect(screen.getByLabelText(/description/i)).toHaveValue("A wallet for Stellar payments.");
+    expect(screen.getByLabelText(/project website/i)).toHaveValue("https://stellarwallet.example");
+    expect(screen.getByLabelText(/repository url/i)).toHaveValue("https://github.com/stellar/wallet");
+    expect(screen.getByLabelText(/logo url/i)).toHaveValue("https://stellarwallet.example/logo.png");
+    expect(screen.getByLabelText(/documentation url/i)).toHaveValue("https://docs.stellarwallet.example");
+    expect(screen.queryByRole("list", { name: /matching existing projects/i })).not.toBeInTheDocument();
+  });
+
   it("shows validation errors for invalid inputs", async () => {
     const user = userEvent.setup();
     renderForm();
@@ -243,13 +276,27 @@ describe("ProjectForm component", () => {
   });
 
   it("mocks the Soroban service and verifies the submit call carries normalized form data", async () => {
-    renderForm();
+    renderForm({ initialData: { tags: [" DeFi ", "defi", "payments"] } });
     const user = await fillRequiredFields();
+
+    fireEvent.change(screen.getByLabelText(/project name/i), {
+      target: { value: "  Stellar Lend  " },
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "  A lending protocol for Stellar.  " },
+    });
+    fireEvent.change(screen.getByLabelText(/project website/i), {
+      target: { value: "  stellarlend.example  " },
+    });
 
     // Add one contract address slot and fill it.
     fireEvent.click(await screen.findByRole("button", { name: /add a contract address/i }));
     fireEvent.change(screen.getByLabelText(/^contract address 1$/i), {
       target: { value: VALID_CONTRACT_ID.toLowerCase() },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
+    fireEvent.change(screen.getByLabelText(/^contract address 2$/i), {
+      target: { value: ` ${VALID_CONTRACT_ID.toLowerCase()} ` },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /submit registration/i }));
@@ -260,8 +307,10 @@ describe("ProjectForm component", () => {
 
     const payload = sorobanMocks.registerProject.mock.calls[0][0];
     expect(payload.name).toBe("Stellar Lend");
+    expect(payload.description).toBe("A lending protocol for Stellar.");
     expect(payload.category).toBe("DeFi / DEX"); // "defi" mapped to display label
-    expect(payload.websiteUrl).toContain("stellarlend.example");
+    expect(payload.websiteUrl).toBe("https://stellarlend.example");
+    expect(payload.tags).toEqual(["defi", "payments"]);
     expect(payload.contractAddresses).toEqual([VALID_CONTRACT_ID]);
     expect(draftHookMocks.clearDraft).toHaveBeenCalled();
   });

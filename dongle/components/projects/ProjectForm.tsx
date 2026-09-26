@@ -29,7 +29,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
-import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
+import {
+  CATEGORY_DISPLAY_TO_FORM,
+  CATEGORY_FORM_OPTIONS,
+  CATEGORY_FORM_MAP,
+} from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
@@ -98,11 +102,14 @@ const contractIdSchema = z.string().transform((val, ctx) => {
 });
 
 const projectSchema = z.object({
-  name: z.string().min(3, "Project name must be at least 3 characters"),
-  primaryCategory: z.string().min(1, "Please select a category"),
-  tags: z.array(z.string()),
+  name: z.string().trim().min(3, "Project name must be at least 3 characters"),
+  primaryCategory: z.string().trim().toLowerCase().min(1, "Please select a category"),
+  tags: z.array(z.string()).transform((tags) =>
+    [...new Set(tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))],
+  ),
   description: z
     .string()
+    .trim()
     .min(10, "Description must be at least 10 characters")
     .max(500, "Description cannot exceed 500 characters"),
   websiteUrl: urlSchema,
@@ -117,10 +124,31 @@ const projectSchema = z.object({
    * contract ID.  The array itself is always present; individual slots can be
    * left blank.
    */
-  contractAddresses: z.array(contractIdSchema).max(5, "You can add at most 5 contract addresses"),
+  contractAddresses: z
+    .array(contractIdSchema)
+    .max(5, "You can add at most 5 contract addresses")
+    .transform((addresses) => [...new Set(addresses.filter(Boolean))]),
 });
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
+
+const formSections = [
+  {
+    title: "Project basics",
+    description: "Tell the community what your project is.",
+    fields: ["name", "primaryCategory", "tags", "description"] as const,
+  },
+  {
+    title: "Online presence",
+    description: "Add links so people can learn more.",
+    fields: ["websiteUrl", "githubUrl", "logoUrl", "docsUrl", "auditReportUrl", "bugBountyUrl"] as const,
+  },
+  {
+    title: "Smart contracts",
+    description: "Connect the contracts associated with your project.",
+    fields: ["contractAddresses"] as const,
+  },
+] as const;
 
 type ProjectFormProps = {
   mode?: "create" | "edit";
@@ -143,6 +171,8 @@ export default function ProjectForm({
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [activeSection, setActiveSection] = useState(0);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -163,6 +193,7 @@ export default function ProjectForm({
     control,
     formState: { errors, isDirty },
     reset,
+    trigger,
     watch,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -182,6 +213,32 @@ export default function ProjectForm({
         : [],
     },
   });
+
+  const nameField = register("name");
+  const matchingProjects = projectSearchQuery.trim().length >= 2
+    ? projectService.getAllProjects().filter((project) => {
+        const query = projectSearchQuery.trim().toLowerCase();
+        return [project.name, project.websiteUrl, project.githubUrl]
+          .some((value) => value?.toLowerCase().includes(query));
+      }).slice(0, 5)
+    : [];
+
+  const selectExistingProject = (project: Project) => {
+    reset({
+      name: project.name,
+      primaryCategory: CATEGORY_DISPLAY_TO_FORM[project.primaryCategory] ?? "",
+      tags: project.tags ?? [],
+      description: project.description ?? "",
+      websiteUrl: project.websiteUrl ?? "",
+      githubUrl: project.githubUrl ?? "",
+      logoUrl: project.logoUrl ?? "",
+      docsUrl: project.docsUrl ?? "",
+      auditReportUrl: project.auditReportUrl ?? "",
+      bugBountyUrl: project.bugBountyUrl ?? "",
+      contractAddresses: project.contractAddresses?.slice(0, 5) ?? [],
+    });
+    setProjectSearchQuery("");
+  };
 
 
 
@@ -357,6 +414,31 @@ export default function ProjectForm({
     setDiscardDialogOpen(false);
   };
 
+  const goToSection = async (sectionIndex: number) => {
+    if (sectionIndex <= activeSection) {
+      setActiveSection(sectionIndex);
+      return;
+    }
+
+    for (let index = activeSection; index < sectionIndex; index += 1) {
+      const isValid = await trigger([...formSections[index].fields]);
+      if (!isValid) {
+        setActiveSection(index);
+        return;
+      }
+    }
+
+    setActiveSection(sectionIndex);
+  };
+
+  const goToNextSection = () => {
+    void goToSection(Math.min(activeSection + 1, formSections.length - 1));
+  };
+
+  const goToPreviousSection = () => {
+    setActiveSection((section) => Math.max(section - 1, 0));
+  };
+
   return (
     <ProjectFormContext.Provider
       value={{
@@ -424,14 +506,81 @@ export default function ProjectForm({
           }}
         />
 
+        <nav aria-label="Project form progress" className="mb-8">
+          <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+            {formSections.map((section, index) => {
+              const isCurrent = activeSection === index;
+              const isComplete = index < activeSection;
+
+              return (
+                <li key={section.title}>
+                  <button
+                    type="button"
+                    onClick={() => void goToSection(index)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={`w-full border-t-2 pt-3 text-left transition-colors ${
+                      isCurrent
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : isComplete
+                        ? "border-green-500 text-green-600 dark:text-green-400"
+                        : "border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold uppercase tracking-wide">
+                      Step {index + 1}
+                    </span>
+                    <span className="mt-1 block text-sm font-medium sm:text-base">
+                      {section.title}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            {formSections[activeSection].description}
+          </p>
+        </nav>
+
+        {activeSection === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            label="Project Name"
-            placeholder="e.g. Soroban Swap"
-            maxLength={50}
-            {...register("name")}
-            error={errors.name?.message}
-          />
+          <div className="relative">
+            <FormField
+              label="Project Name"
+              placeholder="Search existing projects or enter a name"
+              maxLength={50}
+              {...nameField}
+              onChange={(event) => {
+                nameField.onChange(event);
+                setProjectSearchQuery(event.target.value);
+              }}
+              error={errors.name?.message}
+            />
+            {mode === "create" && matchingProjects.length > 0 && (
+              <ul
+                aria-label="Matching existing projects"
+                className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                {matchingProjects.map((project) => (
+                  <li key={project.id}>
+                    <button
+                      type="button"
+                      aria-label={`Use existing project ${project.name}`}
+                      onClick={() => selectExistingProject(project)}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-zinc-800"
+                    >
+                      <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {project.name}
+                      </span>
+                      <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                        {project.primaryCategory}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <SelectField
             label="Category"
             options={CATEGORY_FORM_OPTIONS}
@@ -461,7 +610,9 @@ export default function ProjectForm({
           {...register("description")}
           error={errors.description?.message}
         />
+        </>}
 
+        {activeSection === 1 && <>
         <FormField
           label="Project Website"
           placeholder="https://yourproject.com"
@@ -505,7 +656,9 @@ export default function ProjectForm({
             error={errors.bugBountyUrl?.message}
           />
         </div>
+        </>}
 
+        {activeSection === 2 && <>
         {/* Contract Addresses */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -608,20 +761,38 @@ export default function ProjectForm({
             }}
           />
         </div>
+        </>}
 
-        <Button
-          type="submit"
-          isLoading={isSubmitting || isInProgress}
-          className="w-full"
-          size="lg"
-          rightIcon={<CheckCircle2 className="w-5 h-5" />}
-        >
-          {isSubmitting || isInProgress
-            ? "Processing Transaction..."
-            : mode === "edit"
-            ? "Update Project"
-            : "Submit Registration"}
-        </Button>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={goToPreviousSection}
+            disabled={activeSection === 0 || isSubmitting || isInProgress}
+            className="sm:w-auto"
+          >
+            Previous
+          </Button>
+          {activeSection < formSections.length - 1 ? (
+            <Button type="button" onClick={goToNextSection} className="sm:ml-auto">
+              Continue
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              isLoading={isSubmitting || isInProgress}
+              className="sm:ml-auto"
+              size="lg"
+              rightIcon={<CheckCircle2 className="w-5 h-5" />}
+            >
+              {isSubmitting || isInProgress
+                ? "Processing Transaction..."
+                : mode === "edit"
+                ? "Update Project"
+                : "Submit Registration"}
+            </Button>
+          )}
+        </div>
 
         {progress.phase !== "idle" && (
           <TransactionProgressPanel

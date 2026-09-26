@@ -4,6 +4,7 @@
 
 export { AnomalyDetector } from "./detector";
 export { AnomalyManager } from "./manager";
+export { ContextAwareValidator } from "./context-validator";
 export {
   DEFAULT_CONFIG,
   STRICT_CONFIG,
@@ -28,3 +29,7 @@ export type {
   LearningFeedback,
   AnomalyDetectionResult,
 } from "./types";
+export type {
+  ContextFieldInput,
+  ContextValidationResult,
+} from "./context-validator";
