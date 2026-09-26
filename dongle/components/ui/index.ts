@@ -10,6 +10,8 @@ export { IconButton } from "./IconButton";
 export type { IconButtonProps } from "./IconButton";
 export { Input } from "./Input";
 export type { InputProps } from "./Input";
+export { MaskedInput } from "./MaskedInput";
+export type { MaskedInputProps } from "./MaskedInput";
 export { default as OfflineBanner, OfflineWarning } from "./OfflineBanner";
 export { default as Pagination } from "./Pagination";
 export { RouteErrorFallback } from "./RouteErrorFallback";
