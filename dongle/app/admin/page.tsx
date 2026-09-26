@@ -178,6 +178,7 @@ export default function AdminDashboard() {
   const [submissionReason, setSubmissionReason] = useState<Record<string, string>>({});
   const [verificationFilter, setVerificationFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
   const [reportFilter, setReportFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
+  const [submissionFilter, setSubmissionFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
@@ -618,6 +619,43 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAssignSubmission = (projectId: string, assignedTo: string) => {
+    if (!gate.publicKey) return;
+
+    const result = projectSubmissionService.assignSubmission(projectId, gate.publicKey, assignedTo);
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "submission_assigned",
+        targetId: projectId,
+        targetLabel: result.submission?.projectName ?? projectId,
+        metadata: { assignedTo },
+      });
+      toast.success("Submission assigned");
+      reloadSubmissions();
+    } else {
+      toast.error(result.error || "Failed to assign submission");
+    }
+  };
+
+  const handleUnassignSubmission = (projectId: string) => {
+    if (!gate.publicKey) return;
+
+    const result = projectSubmissionService.unassignSubmission(projectId, gate.publicKey);
+    if (result.success) {
+      auditLogService.append({
+        actor: gate.publicKey,
+        action: "submission_unassigned",
+        targetId: projectId,
+        targetLabel: `Submission ${projectId}`,
+      });
+      toast.success("Submission unassigned");
+      reloadSubmissions();
+    } else {
+      toast.error(result.error || "Failed to unassign submission");
+    }
+  };
+
   const getReviewForReport = (reviewId: string): Review | undefined => {
     return reviews.find((r) => r.id === reviewId);
   };
@@ -629,6 +667,15 @@ export default function AdminDashboard() {
   const pendingSubmissions = submissions.filter(
     (s) => s.status === "pending" || s.status === "flagged",
   );
+  const filteredSubmissions = submissions.filter((s) => {
+    if (submissionFilter === "assigned-to-me") {
+      return gate.publicKey && s.assignedTo === gate.publicKey;
+    }
+    if (submissionFilter === "unassigned") {
+      return !s.assignedTo && (s.status === "pending" || s.status === "flagged");
+    }
+    return true;
+  });
   const pendingReports = reports.filter((r) => r.status === "pending");
   const resolvedReports = reports.filter((r) => r.status !== "pending");
   const pendingProjectReports = projectReports.filter((report) => report.status === "pending");
@@ -1024,7 +1071,7 @@ export default function AdminDashboard() {
 
         {activeTab === "submissions" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <span className="w-2 h-8 bg-orange-500 rounded-full" />
                 Project Submission Moderation
@@ -1034,111 +1081,246 @@ export default function AdminDashboard() {
                   </span>
                 )}
               </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSubmissionFilter("all")}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-xl transition-colors ${
+                    submissionFilter === "all"
+                      ? "bg-orange-500 text-white"
+                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setSubmissionFilter("assigned-to-me")}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-xl transition-colors ${
+                    submissionFilter === "assigned-to-me"
+                      ? "bg-blue-500 text-white"
+                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                >
+                  Assigned to Me
+                </button>
+                <button
+                  onClick={() => setSubmissionFilter("unassigned")}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-xl transition-colors ${
+                    submissionFilter === "unassigned"
+                      ? "bg-zinc-500 text-white"
+                      : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                  }`}
+                >
+                  Unassigned
+                </button>
+              </div>
             </div>
 
-            {submissions.length === 0 ? (
+            {filteredSubmissions.length === 0 ? (
               <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
                 <Package className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                <p className="text-zinc-500">No project submissions to review yet.</p>
+                <p className="text-zinc-500">
+                  {submissionFilter === "unassigned"
+                    ? "No unassigned submissions."
+                    : submissionFilter === "assigned-to-me"
+                    ? "No submissions assigned to you."
+                    : "No project submissions to review yet."}
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {submissions.map((submission) => (
-                  <div
-                    key={submission.id}
-                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl"
-                  >
-                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-lg mb-1">{submission.projectName}</h3>
-                        <p className="text-xs text-zinc-400 font-mono mb-2">{submission.projectId}</p>
-                        <div className="text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap mb-3">
-                          <span>Submitted by:</span>
-                          <AddressDisplay
-                            address={submission.submittedBy}
-                            copyable={true}
-                            truncated={true}
-                            inline={true}
-                          />
-                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                          <span>{formatDate(submission.submittedAt, "short")}</span>
-                          <span className="text-zinc-300 dark:text-zinc-700">•</span>
-                          <span>Quality: {submission.qualityScore}%</span>
-                        </div>
-                        <span
-                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${SUBMISSION_STATUS_STYLES[submission.status]}`}
-                        >
-                          {submission.status}
-                        </span>
-                        {submission.flagReasons.length > 0 && (
-                          <ul className="mt-3 text-xs text-orange-600 dark:text-orange-400 space-y-1">
-                            {submission.flagReasons.map((flag) => (
-                              <li key={flag}>• {flag}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {submission.rejectionReason && (
-                          <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                            Reason: {submission.rejectionReason}
-                          </p>
-                        )}
-                      </div>
+                {filteredSubmissions.map((submission) => {
+                  const assignmentHistory = projectSubmissionService.getModerationLog().filter(
+                    (log) => log.submissionId === submission.id && ["assigned", "reassigned", "unassigned"].includes(log.action),
+                  );
+                  const isAssignedToMe = gate.publicKey && submission.assignedTo === gate.publicKey;
+                  const isAssigned = !!submission.assignedTo;
 
-                      {(submission.status === "pending" || submission.status === "flagged") && (
-                        <div className="flex flex-col gap-2 w-full md:w-64">
-                          <input
-                            type="text"
-                            placeholder="Reason (required for reject/flag)"
-                            value={submissionReason[submission.projectId] || ""}
-                            onChange={(e) =>
-                              setSubmissionReason((prev) => ({
-                                ...prev,
-                                [submission.projectId]: e.target.value,
-                              }))
-                            }
-                            className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() =>
-                                handleSubmissionAction(submission.projectId, "approved")
+                  return (
+                    <div
+                      key={submission.id}
+                      className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl"
+                    >
+                      <div className="flex flex-col md:flex-row justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-bold text-lg">{submission.projectName}</h3>
+                            {isAssigned && (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded-full text-xs font-medium">
+                                <User className="w-3 h-3" />
+                                Assigned to {submission.assignedTo ? (
+                                  <AddressDisplay address={submission.assignedTo} truncated={true} inline={true} />
+                                ) : (
+                                  "Unknown"
+                                )}
+                                {submission.assignedAt && (
+                                  <>
+                                    <span className="text-zinc-400">•</span>
+                                    {formatDate(submission.assignedAt, "short")}
+                                  </>
+                                )}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-zinc-400 font-mono mb-2">{submission.projectId}</p>
+                          <div className="text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap mb-3">
+                            <span>Submitted by:</span>
+                            <AddressDisplay
+                              address={submission.submittedBy}
+                              copyable={true}
+                              truncated={true}
+                              inline={true}
+                            />
+                            <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                            <span>{formatDate(submission.submittedAt, "short")}</span>
+                            <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                            <span>Quality: {submission.qualityScore}%</span>
+                          </div>
+                          <span
+                            className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${SUBMISSION_STATUS_STYLES[submission.status]}`}
+                          >
+                            {submission.status}
+                          </span>
+                          {submission.flagReasons.length > 0 && (
+                            <ul className="mt-3 text-xs text-orange-600 dark:text-orange-400 space-y-1">
+                              {submission.flagReasons.map((flag) => (
+                                <li key={flag}>• {flag}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {submission.rejectionReason && (
+                            <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                              Reason: {submission.rejectionReason}
+                            </p>
+                          )}
+
+                          {/* Assignment History */}
+                          {assignmentHistory.length > 0 && (
+                            <details className="mt-4">
+                              <summary className="text-xs text-zinc-500 cursor-pointer hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1.5">
+                                <Clock className="w-3 h-3" />
+                                Assignment History ({assignmentHistory.length})
+                              </summary>
+                              <ul className="mt-2 text-xs text-zinc-500 space-y-1 border-l-2 border-zinc-200 dark:border-zinc-700 pl-3">
+                                {assignmentHistory.map((entry) => (
+                                  <li key={entry.id} className="relative">
+                                    <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                                      {entry.action === "assigned"
+                                        ? "Assigned"
+                                        : entry.action === "reassigned"
+                                        ? "Reassigned"
+                                        : "Unassigned"}
+                                    </span>
+                                    {entry.assignedTo && (
+                                      <span className="text-zinc-500 ml-1">to</span>
+                                    )}
+                                    {entry.assignedTo && (
+                                      <span className="ml-1">
+                                        <AddressDisplay address={entry.assignedTo} truncated={true} inline={true} />
+                                      </span>
+                                    )}
+                                    <span className="text-zinc-400 ml-1">by</span>
+                                    <span className="ml-1">
+                                      <AddressDisplay address={entry.moderatorAddress} truncated={true} inline={true} />
+                                    </span>
+                                    <span className="text-zinc-400 ml-1">•</span>
+                                    <span className="ml-1">{formatDate(entry.timestamp, "short")}</span>
+                                    {entry.reason && (
+                                      <span className="ml-2 text-zinc-500">- {entry.reason}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                        </div>
+
+                        {(submission.status === "pending" || submission.status === "flagged") && (
+                          <div className="flex flex-col gap-2 w-full md:w-72">
+                            {/* Assignment Actions */}
+                            <div className="flex gap-2">
+                              {isAssigned ? (
+                                <>
+                                  {isAssignedToMe ? (
+                                    <button
+                                      onClick={() => handleUnassignSubmission(submission.projectId)}
+                                      className="flex-1 px-3 py-2 bg-zinc-500/10 text-zinc-600 hover:bg-zinc-500 hover:text-white rounded-xl text-sm font-bold"
+                                    >
+                                      Unassign
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleAssignSubmission(submission.projectId, gate.publicKey!)}
+                                      className="flex-1 px-3 py-2 bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white rounded-xl text-sm font-bold"
+                                    >
+                                      Reassign to Me
+                                    </button>
+                                  )}
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => handleAssignSubmission(submission.projectId, gate.publicKey!)}
+                                  className="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-bold"
+                                >
+                                  <UserPlus className="w-4 h-4 inline mr-1" />
+                                  Assign to Me
+                                </button>
+                              )}
+                            </div>
+
+                            <input
+                              type="text"
+                              placeholder="Reason (required for reject/flag)"
+                              value={submissionReason[submission.projectId] || ""}
+                              onChange={(e) =>
+                                setSubmissionReason((prev) => ({
+                                  ...prev,
+                                  [submission.projectId]: e.target.value,
+                                }))
                               }
-                              className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleSubmissionAction(
-                                  submission.projectId,
-                                  "rejected",
-                                  submissionReason[submission.projectId],
-                                )
-                              }
-                              className="flex-1 px-3 py-2 bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold"
-                            >
-                              Reject
-                            </button>
-                            {submission.status !== "flagged" && (
+                              className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() =>
+                                  handleSubmissionAction(submission.projectId, "approved")
+                                }
+                                className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold"
+                              >
+                                Approve
+                              </button>
                               <button
                                 onClick={() =>
                                   handleSubmissionAction(
                                     submission.projectId,
-                                    "flagged",
+                                    "rejected",
                                     submissionReason[submission.projectId],
                                   )
                                 }
-                                className="flex-1 px-3 py-2 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white rounded-xl text-sm font-bold"
+                                className="flex-1 px-3 py-2 bg-red-500/10 text-red-600 hover:bg-red-500 hover:text-white rounded-xl text-sm font-bold"
                               >
-                                Flag
+                                Reject
                               </button>
-                            )}
+                              {submission.status !== "flagged" && (
+                                <button
+                                  onClick={() =>
+                                    handleSubmissionAction(
+                                      submission.projectId,
+                                      "flagged",
+                                      submissionReason[submission.projectId],
+                                    )
+                                  }
+                                  className="flex-1 px-3 py-2 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white rounded-xl text-sm font-bold"
+                                >
+                                  Flag
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,9 +1,12 @@
 import { generateId } from "@/lib/id-generator";
 import { nowUTC } from "@/lib/date";
+import { notificationService } from "@/services/notification/notification.service";
+import { redactWalletAddress } from "@/utils/stellar-address.util";
 import {
   ProjectSubmission,
   ProjectSubmissionModerationAction,
   ProjectSubmissionModerationStatus,
+  ProjectSubmissionAssignmentAction,
 } from "@/types/project";
 
 const STORAGE_KEY = "dongle_project_submissions";
@@ -57,6 +60,22 @@ function deriveInitialStatus(
   if (flagReasons.length >= 2) return "flagged";
   if (flagReasons.length === 1) return "pending";
   return "approved";
+}
+
+function createAssignmentNotification(
+  submission: ProjectSubmission,
+  assignedBy: string,
+  assignedTo: string,
+  action: "assigned" | "reassigned",
+): void {
+  notificationService.create({
+    recipientAddress: assignedTo,
+    type: "submission_assigned",
+    title: `Submission ${action === "assigned" ? "Assigned" : "Reassigned"}: ${submission.projectName}`,
+    message: `Form submission for ${submission.projectName} has been ${action} to you by ${redactWalletAddress(assignedBy)} for follow-up.`,
+    projectId: submission.projectId,
+    projectName: submission.projectName,
+  });
 }
 
 export const projectSubmissionService = {
@@ -164,6 +183,102 @@ export const projectSubmissionService = {
     saveModerationLog(log);
 
     return { success: true, submission };
+  },
+
+  assignSubmission(
+    projectId: string,
+    assignedBy: string,
+    assignedTo: string,
+    reason?: string,
+  ): { success: boolean; error?: string; submission?: ProjectSubmission } {
+    const submissions = loadSubmissions();
+    const index = submissions.findIndex((s) => s.projectId === projectId);
+    if (index < 0) {
+      return { success: false, error: "Submission not found" };
+    }
+
+    const submission = submissions[index];
+    const isReassignment = !!submission.assignedTo;
+    submission.assignedTo = assignedTo;
+    submission.assignedAt = nowUTC();
+
+    submissions[index] = submission;
+    saveSubmissions(submissions);
+
+    const log = loadModerationLog();
+    log.unshift({
+      id: generateId(),
+      submissionId: submission.id,
+      projectId,
+      moderatorAddress: assignedBy,
+      action: isReassignment ? "reassigned" : "assigned",
+      reason: reason ?? (isReassignment ? `Reassigned to ${assignedTo}` : `Assigned to ${assignedTo}`),
+      timestamp: nowUTC(),
+      assignedTo,
+    });
+    saveModerationLog(log);
+
+    // Send notification to assignee
+    createAssignmentNotification(submission, assignedBy, assignedTo, isReassignment ? "reassigned" : "assigned");
+
+    return { success: true, submission };
+  },
+
+  unassignSubmission(
+    projectId: string,
+    unassignedBy: string,
+    reason?: string,
+  ): { success: boolean; error?: string; submission?: ProjectSubmission } {
+    const submissions = loadSubmissions();
+    const index = submissions.findIndex((s) => s.projectId === projectId);
+    if (index < 0) {
+      return { success: false, error: "Submission not found" };
+    }
+
+    const submission = submissions[index];
+    if (!submission.assignedTo) {
+      return { success: false, error: "Submission is not assigned" };
+    }
+
+    const previousAssignee = submission.assignedTo;
+    delete submission.assignedTo;
+    delete submission.assignedAt;
+
+    submissions[index] = submission;
+    saveSubmissions(submissions);
+
+    const log = loadModerationLog();
+    log.unshift({
+      id: generateId(),
+      submissionId: submission.id,
+      projectId,
+      moderatorAddress: unassignedBy,
+      action: "unassigned",
+      reason: reason ?? `Unassigned from ${previousAssignee}`,
+      timestamp: nowUTC(),
+      assignedTo: undefined,
+    });
+    saveModerationLog(log);
+
+    return { success: true, submission };
+  },
+
+  getSubmissionsAssignedTo(adminAddress: string): ProjectSubmission[] {
+    return loadSubmissions()
+      .filter((s) => s.assignedTo === adminAddress)
+      .sort(
+        (a, b) =>
+          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+      );
+  },
+
+  getUnassignedSubmissions(): ProjectSubmission[] {
+    return loadSubmissions()
+      .filter((s) => !s.assignedTo && (s.status === "pending" || s.status === "flagged"))
+      .sort(
+        (a, b) =>
+          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+      );
   },
 
   getModerationLog(): ProjectSubmissionModerationAction[] {
