@@ -41,6 +41,7 @@ import { ProjectHistoryModal } from "@/components/history/ProjectHistoryModal";
 import { projectHistoryService } from "@/services/project/project-history.service";
 import { History as HistoryIcon } from "lucide-react";
 import { ProjectVersion } from "@/types/history";
+import { formEventsService } from "@/services/events/form-events.service";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -205,6 +206,11 @@ export default function ProjectForm({
     }
   }, [mode, projectId, isHistoryModalOpen]);
 
+  useEffect(() => {
+    void formEventsService.emit("FORM_INIT", { mode, projectId }, projectId);
+    formEventsService.connectWebSocket();
+  }, [mode, projectId]);
+
   useUnsavedChanges(isDirty, isSubmitting);
 
   // Watch form values for checklist and auto-save.
@@ -229,6 +235,7 @@ export default function ProjectForm({
       }
 
       setIsSubmitting(true);
+      void formEventsService.emit("FORM_SUBMIT_START", { payload }, projectId);
       try {
         // Strip any blank entries left in the contractAddresses list
         const cleanedPayload = {
@@ -301,6 +308,8 @@ export default function ProjectForm({
             category: CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ?? cleanedPayload.primaryCategory,
             projectId: mode === "edit" ? projectId : undefined,
           });
+          void formEventsService.emit("FORM_SUBMIT_SUCCESS", { payload: cleanedPayload, txHash: result?.hash }, projectId);
+
           // Clear draft after successful submission
           draft.clearDraft();
           reset();
@@ -315,6 +324,7 @@ export default function ProjectForm({
           });
         }
       } catch (error) {
+        void formEventsService.emit("FORM_SUBMIT_ERROR", { error: String(error) }, projectId);
         logger.error("Soroban project operation failed", {
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
@@ -427,7 +437,25 @@ export default function ProjectForm({
         )}
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <form 
+        onSubmit={handleFormSubmit} 
+        className="space-y-6"
+        onBlur={(e) => {
+          if ((e.target as HTMLInputElement).name) {
+            void formEventsService.emit("FIELD_BLUR", { field: (e.target as HTMLInputElement).name, value: (e.target as HTMLInputElement).value }, projectId);
+          }
+        }}
+        onFocus={(e) => {
+          if ((e.target as HTMLInputElement).name) {
+            void formEventsService.emit("FIELD_FOCUS", { field: (e.target as HTMLInputElement).name }, projectId);
+          }
+        }}
+        onChange={(e) => {
+          if ((e.target as HTMLInputElement).name) {
+            void formEventsService.emit("FIELD_CHANGE", { field: (e.target as HTMLInputElement).name, value: (e.target as HTMLInputElement).value }, projectId);
+          }
+        }}
+      >
         {draftRestored && (
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
