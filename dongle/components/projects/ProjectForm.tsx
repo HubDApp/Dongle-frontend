@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
@@ -148,6 +149,14 @@ export default function ProjectForm({
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
   const { publicKey } = useWallet();
 
+  // Form audit logging — records every field change with a timestamp, the
+  // acting wallet identity, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "project-form",
+    formType: mode === "edit" ? "project-edit" : "project-create",
+    actor: publicKey,
+  });
+
   // Draft management – passes wallet address so drafts sync to the server
   const draft = useDraft({
     mode,
@@ -202,6 +211,12 @@ export default function ProjectForm({
   // and the draft autosave effect below.
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
+
+  // Audit each field change (baseline is captured on the first render).
+  useEffect(() => {
+    trackAuditValues(watchedValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(watchedValues), trackAuditValues]);
 
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
@@ -296,6 +311,12 @@ export default function ProjectForm({
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
         }, error);
+        logAuditAction("form_submit_failed", {
+          metadata: {
+            mode,
+            error: error instanceof Error ? error.name || "Error" : "unknown",
+          },
+        });
         trackProjectSubmit({
           success: false,
           mode,
@@ -305,7 +326,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, logAuditAction],
   );
 
   const onPreSubmit = useCallback(
@@ -333,6 +354,7 @@ export default function ProjectForm({
   );
 
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    logAuditAction("form_submit", { metadata: { mode } });
     void handleSubmit(onPreSubmit)(event);
   };
 
@@ -393,7 +415,7 @@ export default function ProjectForm({
         </div>
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <form id="project-form" onSubmit={handleFormSubmit} className="space-y-6">
         {draftRestored && (
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
