@@ -10,4 +10,5 @@ export * from "./stellar-address";
 export * from "./transaction-progress";
 export * from "./url";
 export * from "./utils";
+export * from "./mask";
 export * from "./crypto-storage";
