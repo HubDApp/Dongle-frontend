@@ -12,10 +12,16 @@ function isEnabled(level: LogLevel): boolean {
 }
 
 function redactMessage(message: string): string {
+  // Redact password-like values in query strings or JSON
+  const PASSWORD_VALUE_RE = /([?"&]password[=:]\s*)([^&\s"]+)/gi;
+  const PASSWORD_FIELD_RE = /("password"\s*:\s*")[^"]+(")/gi;
+
   return message
     .replace(WALLET_ADDRESS_RE, (address) => redactWalletAddress(address))
     .replace(CONTRACT_ID_RE, "[contract]")
-    .replace(HASH_RE, (m) => `${m.slice(0, 6)}…${m.slice(-4)}`);
+    .replace(HASH_RE, (m) => `${m.slice(0, 6)}…${m.slice(-4)}`)
+    .replace(PASSWORD_VALUE_RE, "$1[REDACTED]")
+    .replace(PASSWORD_FIELD_RE, "$1[REDACTED]$2");
 }
 
 function formatArg(arg: unknown): unknown {
@@ -32,8 +38,10 @@ function formatArg(arg: unknown): unknown {
     return Object.fromEntries(
       Object.entries(arg).map(([key, value]) => [
         key,
-        /address|publickey|wallet|recipient|submittedby|assignedto/i.test(key) && typeof value === "string"
-          ? redactWalletAddress(value)
+        /address|publickey|wallet|recipient|submittedby|assignedto|password|secret|token|key/i.test(key) && typeof value === "string"
+          ? /^G[A-Z2-7]{55}$/.test(value)
+            ? redactWalletAddress(value)
+            : "[REDACTED]"
           : formatArg(value),
       ]),
     );
