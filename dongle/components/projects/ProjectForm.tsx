@@ -212,7 +212,6 @@ export default function ProjectForm({
   // The React Compiler flags it as non-memoizable, but this component does not
   // rely on memoization of watchedValues — it's read-only for the checklist
   // and the draft autosave effect below.
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
 
   // Auto-save draft when form changes — derive from watchedValues instead of
@@ -329,7 +328,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, publicKey, reset, router, run, draft],
   );
 
   const onPreSubmit = useCallback(
@@ -387,8 +386,9 @@ export default function ProjectForm({
         mode,
         projectId,
         isSubmitting,
+        // eslint-disable-next-line react-hooks/incompatible-library
         watchField: (name) => watch(name),
-        formErrors: errors as Record<string, any>,
+        formErrors: errors as Record<string, unknown>,
       }}
     >
     <ErrorBoundary
@@ -552,7 +552,7 @@ export default function ProjectForm({
               </label>
               <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                 Soroban contract IDs associated with this project — 56 characters
-                starting with&nbsp;'C' using A–Z and 2–7.
+                starting with&nbsp;&apos;C&apos; using A–Z and 2–7.
               </p>
             </div>
           </div>

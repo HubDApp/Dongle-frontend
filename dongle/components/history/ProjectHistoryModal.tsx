@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { ProjectVersion, FieldChange } from "@/types/history";
+import { ProjectVersion } from "@/types/history";
 import { formatDistanceToNow } from "date-fns";
-import { Clock, Check, History, ArrowLeft, RotateCcw } from "lucide-react";
+import { Clock, History, ArrowLeft, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 interface ProjectHistoryModalProps {
