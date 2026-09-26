@@ -29,7 +29,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
-import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
+import {
+  CATEGORY_DISPLAY_TO_FORM,
+  CATEGORY_FORM_OPTIONS,
+  CATEGORY_FORM_MAP,
+} from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
@@ -143,6 +147,7 @@ export default function ProjectForm({
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -182,6 +187,32 @@ export default function ProjectForm({
         : [],
     },
   });
+
+  const nameField = register("name");
+  const matchingProjects = projectSearchQuery.trim().length >= 2
+    ? projectService.getAllProjects().filter((project) => {
+        const query = projectSearchQuery.trim().toLowerCase();
+        return [project.name, project.websiteUrl, project.githubUrl]
+          .some((value) => value?.toLowerCase().includes(query));
+      }).slice(0, 5)
+    : [];
+
+  const selectExistingProject = (project: Project) => {
+    reset({
+      name: project.name,
+      primaryCategory: CATEGORY_DISPLAY_TO_FORM[project.primaryCategory] ?? "",
+      tags: project.tags ?? [],
+      description: project.description ?? "",
+      websiteUrl: project.websiteUrl ?? "",
+      githubUrl: project.githubUrl ?? "",
+      logoUrl: project.logoUrl ?? "",
+      docsUrl: project.docsUrl ?? "",
+      auditReportUrl: project.auditReportUrl ?? "",
+      bugBountyUrl: project.bugBountyUrl ?? "",
+      contractAddresses: project.contractAddresses?.slice(0, 5) ?? [],
+    });
+    setProjectSearchQuery("");
+  };
 
 
 
@@ -425,13 +456,43 @@ export default function ProjectForm({
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            label="Project Name"
-            placeholder="e.g. Soroban Swap"
-            maxLength={50}
-            {...register("name")}
-            error={errors.name?.message}
-          />
+          <div className="relative">
+            <FormField
+              label="Project Name"
+              placeholder="Search existing projects or enter a name"
+              maxLength={50}
+              {...nameField}
+              onChange={(event) => {
+                nameField.onChange(event);
+                setProjectSearchQuery(event.target.value);
+              }}
+              error={errors.name?.message}
+            />
+            {mode === "create" && matchingProjects.length > 0 && (
+              <ul
+                aria-label="Matching existing projects"
+                className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                {matchingProjects.map((project) => (
+                  <li key={project.id}>
+                    <button
+                      type="button"
+                      aria-label={`Use existing project ${project.name}`}
+                      onClick={() => selectExistingProject(project)}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 dark:hover:bg-zinc-800"
+                    >
+                      <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {project.name}
+                      </span>
+                      <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
+                        {project.primaryCategory}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <SelectField
             label="Category"
             options={CATEGORY_FORM_OPTIONS}

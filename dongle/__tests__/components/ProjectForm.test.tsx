@@ -117,6 +117,39 @@ describe("ProjectForm component", () => {
     expect(screen.getByRole("button", { name: /submit registration/i })).toBeInTheDocument();
   });
 
+  it("searches existing projects and pre-fills related fields when selected", async () => {
+    const user = userEvent.setup();
+    projectServiceMock.getAllProjects.mockReturnValue([{
+      id: "existing-project",
+      name: "Stellar Wallet",
+      primaryCategory: "Payments",
+      tags: ["wallet", "payments"],
+      description: "A wallet for Stellar payments.",
+      rating: 4.5,
+      reviews: 12,
+      createdAt: "2024-01-01T00:00:00.000Z",
+      websiteUrl: "https://stellarwallet.example",
+      githubUrl: "https://github.com/stellar/wallet",
+      logoUrl: "https://stellarwallet.example/logo.png",
+      docsUrl: "https://docs.stellarwallet.example",
+    }]);
+    renderForm();
+
+    const nameField = await screen.findByLabelText(/project name/i);
+    await user.type(nameField, "stellar wal");
+    await user.click(screen.getByRole("button", { name: /use existing project stellar wallet/i }));
+
+    expect(nameField).toHaveValue("Stellar Wallet");
+    expect(screen.getByLabelText(/^category$/i)).toHaveValue("payments");
+    expect(screen.getByLabelText(/tags/i)).toHaveTextContent("wallet");
+    expect(screen.getByLabelText(/description/i)).toHaveValue("A wallet for Stellar payments.");
+    expect(screen.getByLabelText(/project website/i)).toHaveValue("https://stellarwallet.example");
+    expect(screen.getByLabelText(/repository url/i)).toHaveValue("https://github.com/stellar/wallet");
+    expect(screen.getByLabelText(/logo url/i)).toHaveValue("https://stellarwallet.example/logo.png");
+    expect(screen.getByLabelText(/documentation url/i)).toHaveValue("https://docs.stellarwallet.example");
+    expect(screen.queryByRole("list", { name: /matching existing projects/i })).not.toBeInTheDocument();
+  });
+
   it("shows validation errors for invalid inputs", async () => {
     const user = userEvent.setup();
     renderForm();
