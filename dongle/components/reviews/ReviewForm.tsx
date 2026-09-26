@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useId } from "react";
+import React, { useEffect, useId } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
@@ -24,6 +25,7 @@ interface ReviewFormProps {
 
 export default function ReviewForm({
   projectName,
+  userAddress,
   initialReview,
   dailyReviewCount = 0,
   requiresCaptcha = false,
@@ -53,7 +55,20 @@ export default function ReviewForm({
   const rating = watch("rating");
   const comment = watch("comment");
 
+  // Form audit logging — records field changes with a timestamp, the acting
+  // review author, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "review-form",
+    formType: initialReview ? "review-edit" : "review-create",
+    actor: userAddress,
+  });
+
+  useEffect(() => {
+    trackAuditValues({ rating, comment });
+  }, [trackAuditValues, rating, comment]);
+
   const onSubmitForm = async (data: ReviewFormData) => {
+    logAuditAction("form_submit", { metadata: { mode: initialReview ? "edit" : "create" } });
     onSubmit(data);
   };
 
@@ -65,7 +80,7 @@ export default function ReviewForm({
         reset();
       }}
     >
-      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
+      <form id="review-form" onSubmit={handleSubmit(onSubmitForm)} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
         <div className="flex justify-between items-center">
           <div>
             <h3 className="text-xl font-bold">{initialReview ? "Edit Review" : "Add Review"}</h3>
