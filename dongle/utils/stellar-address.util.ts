@@ -84,6 +84,29 @@ export function redactWalletAddress(address: string | null | undefined): string 
 // ─── Soroban Contract ID ─────────────────────────────────────────────────────
 
 /**
+ * Validates an array of Soroban contract IDs and returns any invalid entries.
+ * Empty strings are silently ignored (treated as "not filled in").
+ *
+ * @returns An array of error objects — empty array means all entries are valid.
+ */
+export function validateContractAddresses(
+  addresses: string[],
+): Array<{ index: number; value: string; error: string }> {
+  const errors: Array<{ index: number; value: string; error: string }> = [];
+
+  for (let i = 0; i < addresses.length; i++) {
+    const raw = addresses[i];
+    if (!raw || !raw.trim()) continue; // blank — skip
+    const result = validateSorobanContractId(raw);
+    if (!result.valid) {
+      errors.push({ index: i, value: raw, error: result.error });
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Returns true when the given string is a structurally valid Soroban contract
  * ID: starts with 'C', followed by exactly 55 base-32 characters (A–Z, 2–7),
  * total length 56.

@@ -14,7 +14,7 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 import { walletService } from "@/services/wallet/wallet.service";
 import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
-import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
+import { Rocket, CheckCircle2, Plus, X, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
@@ -37,6 +37,11 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
+import { ProjectHistoryModal } from "@/components/history/ProjectHistoryModal";
+import { projectHistoryService } from "@/services/project/project-history.service";
+import { History as HistoryIcon } from "lucide-react";
+import { ProjectVersion } from "@/types/history";
+import { formEventsService } from "@/services/events/form-events.service";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -143,6 +148,8 @@ export default function ProjectForm({
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [projectHistory, setProjectHistory] = useState<ProjectVersion[]>([]);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -193,6 +200,17 @@ export default function ProjectForm({
     }
   }, [draft.loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (mode === "edit" && projectId) {
+      setProjectHistory(projectHistoryService.getProjectHistory(projectId));
+    }
+  }, [mode, projectId, isHistoryModalOpen]);
+
+  useEffect(() => {
+    void formEventsService.emit("FORM_INIT", { mode, projectId }, projectId);
+    formEventsService.connectWebSocket();
+  }, [mode, projectId]);
+
   useUnsavedChanges(isDirty, isSubmitting);
 
   // Watch form values for checklist and auto-save.
@@ -200,7 +218,6 @@ export default function ProjectForm({
   // The React Compiler flags it as non-memoizable, but this component does not
   // rely on memoization of watchedValues — it's read-only for the checklist
   // and the draft autosave effect below.
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
 
   // Auto-save draft when form changes — derive from watchedValues instead of
@@ -218,6 +235,7 @@ export default function ProjectForm({
       }
 
       setIsSubmitting(true);
+      void formEventsService.emit("FORM_SUBMIT_START", { payload }, projectId);
       try {
         // Strip any blank entries left in the contractAddresses list
         const cleanedPayload = {
@@ -241,6 +259,18 @@ export default function ProjectForm({
         });
 
         if (result) {
+          try {
+            const resolvedProjectId = mode === "edit" && projectId ? projectId : generateProjectIdFromName(cleanedPayload.name);
+            projectHistoryService.recordVersion(
+              resolvedProjectId,
+              cleanedPayload,
+              publicKey || "unknown",
+              mode
+            );
+          } catch (historyError) {
+             console.error("[ProjectForm] Failed to record version history:", historyError);
+          }
+
           if (mode !== "edit") {
             try {
               let submittedBy = "unknown";
@@ -278,6 +308,8 @@ export default function ProjectForm({
             category: CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ?? cleanedPayload.primaryCategory,
             projectId: mode === "edit" ? projectId : undefined,
           });
+          void formEventsService.emit("FORM_SUBMIT_SUCCESS", { payload: cleanedPayload, txHash: result?.hash }, projectId);
+
           // Clear draft after successful submission
           draft.clearDraft();
           reset();
@@ -292,6 +324,7 @@ export default function ProjectForm({
           });
         }
       } catch (error) {
+        void formEventsService.emit("FORM_SUBMIT_ERROR", { error: String(error) }, projectId);
         logger.error("Soroban project operation failed", {
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
@@ -305,7 +338,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, publicKey, reset, router, run, draft],
   );
 
   const onPreSubmit = useCallback(
@@ -363,8 +396,9 @@ export default function ProjectForm({
         mode,
         projectId,
         isSubmitting,
+        // eslint-disable-next-line react-hooks/incompatible-library
         watchField: (name) => watch(name),
-        formErrors: errors as Record<string, any>,
+        formErrors: errors as Record<string, unknown>,
       }}
     >
     <ErrorBoundary
@@ -381,7 +415,7 @@ export default function ProjectForm({
         <div className="p-3 bg-blue-500 rounded-2xl text-white">
           <Rocket className="w-6 h-6" />
         </div>
-        <div>
+        <div className="flex-1">
           <h2 className="text-2xl font-bold tracking-tight">
             {mode === "edit" ? "Edit Project" : "Register Project"}
           </h2>
@@ -391,9 +425,37 @@ export default function ProjectForm({
               : "Onboard your dApp to the Dongle ecosystem."}
           </p>
         </div>
+        {mode === "edit" && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsHistoryModalOpen(true)}
+            leftIcon={<HistoryIcon className="w-4 h-4" />}
+          >
+            View History
+          </Button>
+        )}
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <form 
+        onSubmit={handleFormSubmit} 
+        className="space-y-6"
+        onBlur={(e) => {
+          if ((e.target as HTMLInputElement).name) {
+            void formEventsService.emit("FIELD_BLUR", { field: (e.target as HTMLInputElement).name, value: (e.target as HTMLInputElement).value }, projectId);
+          }
+        }}
+        onFocus={(e) => {
+          if ((e.target as HTMLInputElement).name) {
+            void formEventsService.emit("FIELD_FOCUS", { field: (e.target as HTMLInputElement).name }, projectId);
+          }
+        }}
+        onChange={(e) => {
+          if ((e.target as HTMLInputElement).name) {
+            void formEventsService.emit("FIELD_CHANGE", { field: (e.target as HTMLInputElement).name, value: (e.target as HTMLInputElement).value }, projectId);
+          }
+        }}
+      >
         {draftRestored && (
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
@@ -518,7 +580,7 @@ export default function ProjectForm({
               </label>
               <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                 Soroban contract IDs associated with this project — 56 characters
-                starting with&nbsp;'C'.
+                starting with&nbsp;&apos;C&apos; using A–Z and 2–7.
               </p>
             </div>
           </div>
@@ -540,6 +602,17 @@ export default function ProjectForm({
                 field.onChange(next);
               };
 
+              /** Uppercase + trim on blur for a clean UX */
+              const handleBlur = (index: number) => {
+                const current = addresses[index];
+                if (current && current.trim()) {
+                  const next = addresses.map((a, i) =>
+                    i === index ? a.trim().toUpperCase() : a,
+                  );
+                  field.onChange(next);
+                }
+              };
+
               const handleRemove = (index: number) => {
                 field.onChange(addresses.filter((_, i) => i !== index));
               };
@@ -557,33 +630,98 @@ export default function ProjectForm({
                     </button>
                   ) : (
                     <>
-                      {addresses.map((addr, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              value={addr}
-                              onChange={(e) => handleChange(index, e.target.value)}
-                              placeholder="CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                              aria-label={`Contract address ${index + 1}`}
-                              className="w-full font-mono text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors"
-                            />
-                            {errors.contractAddresses?.[index]?.message && (
-                              <p className="mt-1 text-sm text-red-500 dark:text-red-400">
-                                {errors.contractAddresses[index].message}
+                      {addresses.map((addr, index) => {
+                        const fieldError = errors.contractAddresses?.[index]?.message;
+                        const charCount = addr.length;
+                        const isComplete = charCount === 56;
+                        const hasValue = charCount > 0;
+
+                        // Inline validity: only show green when all 56 chars entered and no error
+                        const showValid = isComplete && !fieldError;
+                        const showInvalid = hasValue && fieldError;
+
+                        return (
+                          <div key={index} className="flex items-start gap-2">
+                            <div className="flex-1 space-y-1">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={addr}
+                                  onChange={(e) => handleChange(index, e.target.value)}
+                                  onBlur={() => handleBlur(index)}
+                                  placeholder="CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                                  aria-label={`Contract address ${index + 1}`}
+                                  aria-invalid={!!fieldError}
+                                  aria-describedby={
+                                    fieldError
+                                      ? `contract-error-${index}`
+                                      : `contract-counter-${index}`
+                                  }
+                                  maxLength={56}
+                                  spellCheck={false}
+                                  autoComplete="off"
+                                  className={`w-full font-mono text-sm bg-zinc-50 dark:bg-zinc-900 border rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors ${
+                                    showInvalid
+                                      ? "border-red-400 dark:border-red-600 focus:ring-red-500/20"
+                                      : showValid
+                                      ? "border-green-400 dark:border-green-600 focus:ring-green-500/20"
+                                      : "border-zinc-200 dark:border-zinc-800 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400"
+                                  }`}
+                                />
+
+                                {/* Inline validity indicator */}
+                                {hasValue && (
+                                  <span
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold"
+                                    aria-hidden="true"
+                                  >
+                                    {showValid ? (
+                                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    ) : showInvalid ? (
+                                      <AlertCircle className="w-4 h-4 text-red-500" />
+                                    ) : (
+                                      <span className="text-zinc-400 tabular-nums">
+                                        {charCount}/56
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Char counter (assistive text) */}
+                              <p
+                                id={`contract-counter-${index}`}
+                                className="text-xs text-zinc-400 dark:text-zinc-500 tabular-nums"
+                                aria-live="polite"
+                              >
+                                {charCount === 0
+                                  ? "56 characters required"
+                                  : `${charCount} / 56`}
                               </p>
-                            )}
+
+                              {/* Field error */}
+                              {fieldError && (
+                                <p
+                                  id={`contract-error-${index}`}
+                                  role="alert"
+                                  className="text-xs text-red-500 dark:text-red-400"
+                                >
+                                  {fieldError}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(index)}
+                              aria-label={`Remove contract address ${index + 1}`}
+                              className="mt-2 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(index)}
-                            aria-label={`Remove contract address ${index + 1}`}
-                            className="mt-1 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       {addresses.length < 5 && (
                         <button
@@ -668,6 +806,16 @@ export default function ProjectForm({
         variant="danger"
         onConfirm={() => void confirmDiscardDraft()}
         onCancel={() => setDiscardDialogOpen(false)}
+      />
+
+      <ProjectHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        history={projectHistory}
+        onRestore={(version) => {
+          reset(version.snapshot as ProjectFormValues);
+          setIsHistoryModalOpen(false);
+        }}
       />
     </Card>
     </ErrorBoundary>

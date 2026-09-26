@@ -46,11 +46,13 @@ import {
   Megaphone,
   MessageSquare,
   Shield,
+  ShieldCheck,
   Star,
   UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
+import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBanner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useWatchlist } from "@/hooks/useWatchlist";
@@ -107,6 +109,8 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
   const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  // Track the most recent claim for this wallet + project (for the status banner)
+  const [latestClaim, setLatestClaim] = useState<ReturnType<typeof projectClaimService.getLatestRequestForUser>>(null);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -164,6 +168,16 @@ export default function ProjectDetailPage() {
       abortController.abort();
     };
   }, [projectId, gate.publicKey]);
+
+  useEffect(() => {
+    if (!gate.publicKey || !project) {
+      setLatestClaim(null);
+      return;
+    }
+    setLatestClaim(
+      projectClaimService.getLatestRequestForUser(project.id, gate.publicKey),
+    );
+  }, [gate.publicKey, project]);
 
   const retryVerification = React.useCallback(() => {
     setVerificationError(null);
@@ -274,6 +288,10 @@ export default function ProjectDetailPage() {
 
     if (result.success) {
       toast.success("Claim request submitted successfully");
+      // Refresh the status banner
+      setLatestClaim(
+        projectClaimService.getLatestRequestForUser(project.id, gate.publicKey),
+      );
     } else {
       const errorMsg = result.errors?.[0]?.message || "Failed to submit claim request";
       toast.error(errorMsg);
@@ -573,6 +591,27 @@ export default function ProjectDetailPage() {
 
           {/* Verification Status Banner */}
           <ProjectStatusBanner status={verificationStatus} />
+
+          {/* Unclaimed project notice — shown when no owner is registered */}
+          {!project.ownerAddress && !isOwner && (
+            <UnclaimedProjectBanner
+              projectName={project.name}
+              onClaim={() => {
+                if (gate.state !== "ready") {
+                  // Go to the full claim page — it handles wallet gating
+                  router.push(`/projects/${projectId}/claim`);
+                  return;
+                }
+                setIsClaiming(true);
+              }}
+              className="mb-2"
+            />
+          )}
+
+          {/* Claim status banner — shown only to the wallet that submitted a claim */}
+          {latestClaim && (
+            <ClaimStatusBanner claim={latestClaim} className="mb-2" />
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
@@ -959,19 +998,35 @@ export default function ProjectDetailPage() {
                   >
                     Request Verification
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      if (gate.state !== "ready") {
-                        setShowWalletGate(true);
-                        return;
-                      }
-                      setIsClaiming(true);
-                    }}
-                  >
-                    Claim Ownership
-                  </Button>
+                  {/* Claim button — hidden for project owners; shows pending state if already submitted */}
+                  {!isOwner && (
+                    latestClaim?.status === "pending" ? (
+                      <Button
+                        variant="outline"
+                        className="w-full text-yellow-600 border-yellow-300 dark:border-yellow-800 dark:text-yellow-400 cursor-default opacity-80"
+                        disabled
+                      >
+                        <ShieldCheck className="w-4 h-4 mr-2" aria-hidden="true" />
+                        Claim Pending Review
+                      </Button>
+                    ) : latestClaim?.status === "approved" ? null : (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          if (gate.state !== "ready") {
+                            // Navigate to dedicated claim page — it handles the wallet gate
+                            router.push(`/projects/${projectId}/claim`);
+                            return;
+                          }
+                          setIsClaiming(true);
+                        }}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" aria-hidden="true" />
+                        Claim Ownership
+                      </Button>
+                    )
+                  )}
                   <Button
                     variant="outline"
                     className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
