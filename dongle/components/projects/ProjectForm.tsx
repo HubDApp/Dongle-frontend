@@ -132,6 +132,24 @@ const projectSchema = z.object({
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 
+const formSections = [
+  {
+    title: "Project basics",
+    description: "Tell the community what your project is.",
+    fields: ["name", "primaryCategory", "tags", "description"] as const,
+  },
+  {
+    title: "Online presence",
+    description: "Add links so people can learn more.",
+    fields: ["websiteUrl", "githubUrl", "logoUrl", "docsUrl", "auditReportUrl", "bugBountyUrl"] as const,
+  },
+  {
+    title: "Smart contracts",
+    description: "Connect the contracts associated with your project.",
+    fields: ["contractAddresses"] as const,
+  },
+] as const;
+
 type ProjectFormProps = {
   mode?: "create" | "edit";
   initialData?: Partial<ProjectFormValues> & { category?: string };
@@ -154,6 +172,7 @@ export default function ProjectForm({
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [activeSection, setActiveSection] = useState(0);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -174,6 +193,7 @@ export default function ProjectForm({
     control,
     formState: { errors, isDirty },
     reset,
+    trigger,
     watch,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -394,6 +414,31 @@ export default function ProjectForm({
     setDiscardDialogOpen(false);
   };
 
+  const goToSection = async (sectionIndex: number) => {
+    if (sectionIndex <= activeSection) {
+      setActiveSection(sectionIndex);
+      return;
+    }
+
+    for (let index = activeSection; index < sectionIndex; index += 1) {
+      const isValid = await trigger([...formSections[index].fields]);
+      if (!isValid) {
+        setActiveSection(index);
+        return;
+      }
+    }
+
+    setActiveSection(sectionIndex);
+  };
+
+  const goToNextSection = () => {
+    void goToSection(Math.min(activeSection + 1, formSections.length - 1));
+  };
+
+  const goToPreviousSection = () => {
+    setActiveSection((section) => Math.max(section - 1, 0));
+  };
+
   return (
     <ProjectFormContext.Provider
       value={{
@@ -461,6 +506,43 @@ export default function ProjectForm({
           }}
         />
 
+        <nav aria-label="Project form progress" className="mb-8">
+          <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+            {formSections.map((section, index) => {
+              const isCurrent = activeSection === index;
+              const isComplete = index < activeSection;
+
+              return (
+                <li key={section.title}>
+                  <button
+                    type="button"
+                    onClick={() => void goToSection(index)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={`w-full border-t-2 pt-3 text-left transition-colors ${
+                      isCurrent
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : isComplete
+                        ? "border-green-500 text-green-600 dark:text-green-400"
+                        : "border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold uppercase tracking-wide">
+                      Step {index + 1}
+                    </span>
+                    <span className="mt-1 block text-sm font-medium sm:text-base">
+                      {section.title}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            {formSections[activeSection].description}
+          </p>
+        </nav>
+
+        {activeSection === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="relative">
             <FormField
@@ -528,7 +610,9 @@ export default function ProjectForm({
           {...register("description")}
           error={errors.description?.message}
         />
+        </>}
 
+        {activeSection === 1 && <>
         <FormField
           label="Project Website"
           placeholder="https://yourproject.com"
@@ -572,7 +656,9 @@ export default function ProjectForm({
             error={errors.bugBountyUrl?.message}
           />
         </div>
+        </>}
 
+        {activeSection === 2 && <>
         {/* Contract Addresses */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -675,20 +761,38 @@ export default function ProjectForm({
             }}
           />
         </div>
+        </>}
 
-        <Button
-          type="submit"
-          isLoading={isSubmitting || isInProgress}
-          className="w-full"
-          size="lg"
-          rightIcon={<CheckCircle2 className="w-5 h-5" />}
-        >
-          {isSubmitting || isInProgress
-            ? "Processing Transaction..."
-            : mode === "edit"
-            ? "Update Project"
-            : "Submit Registration"}
-        </Button>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={goToPreviousSection}
+            disabled={activeSection === 0 || isSubmitting || isInProgress}
+            className="sm:w-auto"
+          >
+            Previous
+          </Button>
+          {activeSection < formSections.length - 1 ? (
+            <Button type="button" onClick={goToNextSection} className="sm:ml-auto">
+              Continue
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              isLoading={isSubmitting || isInProgress}
+              className="sm:ml-auto"
+              size="lg"
+              rightIcon={<CheckCircle2 className="w-5 h-5" />}
+            >
+              {isSubmitting || isInProgress
+                ? "Processing Transaction..."
+                : mode === "edit"
+                ? "Update Project"
+                : "Submit Registration"}
+            </Button>
+          )}
+        </div>
 
         {progress.phase !== "idle" && (
           <TransactionProgressPanel
