@@ -7,7 +7,7 @@ interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaEl
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, rows = 4, ...props }, ref) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
@@ -88,7 +88,7 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           {...props}
           ref={setRef}
           id={textareaId}
-          rows={4}
+          rows={rows}
           maxLength={maxLength}
           onChange={handleChange}
           value={value}
