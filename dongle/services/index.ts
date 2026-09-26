@@ -6,5 +6,6 @@ export * from "./recent-views";
 export * from "./repository";
 export * from "./review";
 export * from "./stellar";
+export * from "./team";
 export * from "./update";
 export * from "./wallet";
