@@ -10,6 +10,11 @@ export interface Review {
   createdAt: string;
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
+  /** Cryptographic signature fields — present for signed submissions (#558). */
+  signedPayload?: string;
+  signature?: string;
+  signatureNonce?: string;
+  signatureTimestamp?: string;
 }
 
 // Validation constraints
