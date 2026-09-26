@@ -181,6 +181,8 @@ export type ProjectSubmissionModerationStatus =
   | "rejected"
   | "flagged";
 
+export type ProjectSubmissionAssignmentAction = "assigned" | "reassigned" | "unassigned";
+
 export interface ProjectSubmission {
   id: string;
   projectId: string;
@@ -193,6 +195,8 @@ export interface ProjectSubmission {
   statusUpdatedAt?: string;
   statusUpdatedBy?: string;
   rejectionReason?: string;
+  assignedTo?: string;
+  assignedAt?: string;
 }
 
 export interface ProjectSubmissionModerationAction {
@@ -200,9 +204,10 @@ export interface ProjectSubmissionModerationAction {
   submissionId: string;
   projectId: string;
   moderatorAddress: string;
-  action: ProjectSubmissionModerationStatus;
+  action: ProjectSubmissionModerationStatus | ProjectSubmissionAssignmentAction;
   reason: string;
   timestamp: string;
+  assignedTo?: string;
 }
 
 /**

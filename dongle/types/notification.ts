@@ -11,6 +11,7 @@ export const REALTIME_NOTIFICATION_TYPES = [
   "review_approved",
   "review_rejected",
   "verification_evidence_requested",
+  "submission_assigned",
 ] as const;
 
 export const LEGACY_NOTIFICATION_TYPES = [
