@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useId } from "react";
+import React, { useId, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
@@ -10,6 +10,18 @@ import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.schema";
+import {
+  trackReviewSubmit,
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
+  trackFormFieldChange,
+  trackFormAbandon,
+} from "@/lib/analytics";
+import { GDPRConsent } from "@/components/gdpr/GDPRConsent";
+import { gdprService } from "@/services/gdpr/gdpr.service";
+import { trackConsentGiven } from "@/lib/analytics";
+import Link from "next/link";
 
 interface ReviewFormProps {
   projectId: string;
@@ -32,6 +44,7 @@ export default function ReviewForm({
 }: ReviewFormProps) {
   const ratingLabelId = useId();
   const ratingGroupId = useId();
+  const submittedRef = useRef(false);
 
   const {
     register,
@@ -53,8 +66,76 @@ export default function ReviewForm({
   const rating = watch("rating");
   const comment = watch("comment");
 
+  // Track field changes for completion-rate analytics.
+  useEffect(() => {
+    if (submittedRef.current) return;
+    trackFormFieldChange({
+      formType: "review",
+      fieldName: "rating",
+      fieldIndex: 1,
+      totalFields: 2,
+    });
+  }, [rating]);
+
+  useEffect(() => {
+    if (submittedRef.current) return;
+    trackFormFieldChange({
+      formType: "review",
+      fieldName: "comment",
+      fieldIndex: comment ? 2 : 1,
+      totalFields: 2,
+    });
+  }, [comment]);
+
+  // Track form abandonment on unmount.
+  useEffect(() => {
+    return () => {
+      if (!submittedRef.current && !isSubmitting) {
+        const touchedFields = (rating ? 1 : 0) + (comment ? 1 : 0);
+        trackFormAbandon({
+          formType: "review",
+          fieldCount: 2,
+          touchedFields,
+        });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onSubmitForm = async (data: ReviewFormData) => {
-    onSubmit(data);
+    trackFormSubmit({ formType: "review", fieldCount: 2 });
+
+    // Track GDPR consent on submit
+    const consentRecord = gdprService.getConsentStatus("review", projectId, userAddress);
+    if (consentRecord && consentRecord.consentGiven) {
+      trackConsentGiven({
+        formType: "review",
+        formId: projectId,
+        userId: userAddress,
+        purposes: consentRecord.purposes,
+      });
+    }
+
+    try {
+      trackFormSubmitSuccess({ formType: "review", fieldCount: 2 });
+      submittedRef.current = true;
+      trackReviewSubmit({
+        success: true,
+        action: initialReview ? "update" : "create",
+        projectId: projectName,
+        rating: data.rating,
+        commentLength: data.comment.length,
+      });
+      onSubmit(data);
+    } catch (error) {
+      trackReviewSubmit({
+        success: false,
+        action: initialReview ? "update" : "create",
+        projectId: projectName,
+        errorCode: error instanceof Error ? error.name || "Error" : "unknown",
+      });
+      trackFormSubmitError({ formType: "review", fieldCount: 2, errorCode: error instanceof Error ? error.name || "Error" : "unknown" });
+    }
   };
 
   return (
@@ -152,6 +233,13 @@ export default function ReviewForm({
           </div>
         </div>
 
+        <GDPRConsent
+          formType="review"
+          formId={projectId}
+          userId={userAddress}
+          purposes={["form_submission", "data_processing", "analytics"]}
+        />
+
         <div className="flex gap-3">
           <button
             type="button"
@@ -169,6 +257,12 @@ export default function ReviewForm({
           </button>
         </div>
       </form>
+
+      <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-4">
+        <Link href="/privacy-policy" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+          Privacy Policy
+        </Link>
+      </p>
     </ErrorBoundary>
   );
 }

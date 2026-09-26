@@ -59,6 +59,15 @@ vi.mock("@/context/wallet.context", () => ({
 
 vi.mock("@/lib/analytics", () => ({
   trackProjectSubmit: trackSubmitMock,
+  trackFormSubmit: vi.fn(),
+  trackFormSubmitSuccess: vi.fn(),
+  trackFormSubmitError: vi.fn(),
+  trackFormFieldChange: vi.fn(),
+  trackFormAbandon: vi.fn(),
+  trackFormBackupCreated: vi.fn(),
+  trackFormBackupRestored: vi.fn(),
+  trackFormBackupFailed: vi.fn(),
+  trackFormBackupRetentionCleaned: vi.fn(),
 }));
 
 const VALID_CONTRACT_ID = "C" + "A".repeat(53) + "B2";

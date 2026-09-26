@@ -16,6 +16,10 @@ import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
 import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { GDPRConsent } from "@/components/gdpr/GDPRConsent";
+import { gdprService } from "@/services/gdpr/gdpr.service";
+import Link from "next/link";
+import { trackConsentGiven } from "@/lib/analytics";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 import { useDraft } from "@/hooks/useDraft";
@@ -32,6 +36,13 @@ import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository"
 import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
+import {
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
+  trackFormFieldChange,
+  trackFormAbandon,
+} from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
 import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -203,6 +214,10 @@ export default function ProjectForm({
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
 
+  // Track field changes for completion-rate analytics.
+  const submittedRef = React.useRef(false);
+  const prevTouchedRef = React.useRef(0);
+
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
   // that fires when RHF's watch callback is passed into a memoized hook.
@@ -211,11 +226,66 @@ export default function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues)]);
 
+  // Track field changes for completion-rate analytics.
+  useEffect(() => {
+    if (submittedRef.current) return;
+    const touchedCount = Object.values(watchedValues).filter(
+      (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0),
+    ).length;
+    const totalFields = 10; // name, primaryCategory, tags, description, websiteUrl, githubUrl, logoUrl, docsUrl, auditReportUrl, bugBountyUrl, contractAddresses
+    if (touchedCount !== prevTouchedRef.current) {
+      prevTouchedRef.current = touchedCount;
+      trackFormFieldChange({
+        formType: "project",
+        fieldName: "form",
+        fieldIndex: touchedCount,
+        totalFields,
+      });
+    }
+  }, [JSON.stringify(watchedValues)]);
+
+  // Track form abandonment on unmount.
+  useEffect(() => {
+    return () => {
+      if (!submittedRef.current && !isSubmitting) {
+        const touchedCount = Object.values(watchedValues).filter(
+          (v) => v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0),
+        ).length;
+        trackFormAbandon({
+          formType: "project",
+          fieldCount: 10,
+          touchedFields: touchedCount,
+          walletAddress: publicKey,
+        });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
       if (customOnSubmit) {
         return customOnSubmit(payload);
       }
+
+      const fieldCount = Object.keys(payload).filter((k) => {
+        const v = (payload as Record<string, unknown>)[k];
+        return v !== undefined && v !== null && v !== "";
+      }).length;
+
+      // Track GDPR consent on submit
+      const userId = publicKey ?? "anonymous";
+      const consentRecord = gdprService.getConsentStatus("project", projectId ?? "new", userId);
+      if (consentRecord && consentRecord.consentGiven) {
+        trackConsentGiven({
+          formType: "project",
+          formId: projectId ?? "new",
+          userId,
+          purposes: consentRecord.purposes,
+        });
+      }
+
+      trackFormSubmit({ formType: "project", fieldCount, walletAddress: publicKey });
 
       setIsSubmitting(true);
       try {
@@ -278,6 +348,8 @@ export default function ProjectForm({
             category: CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ?? cleanedPayload.primaryCategory,
             projectId: mode === "edit" ? projectId : undefined,
           });
+          trackFormSubmitSuccess({ formType: "project", fieldCount, walletAddress: publicKey });
+          submittedRef.current = true;
           // Clear draft after successful submission
           draft.clearDraft();
           reset();
@@ -290,6 +362,7 @@ export default function ProjectForm({
             mode,
             errorCode: "transaction_incomplete",
           });
+          trackFormSubmitError({ formType: "project", fieldCount, errorCode: "transaction_incomplete", walletAddress: publicKey });
         }
       } catch (error) {
         logger.error("Soroban project operation failed", {
@@ -301,11 +374,12 @@ export default function ProjectForm({
           mode,
           errorCode: error instanceof Error ? error.name || "Error" : "unknown",
         });
+        trackFormSubmitError({ formType: "project", fieldCount, errorCode: error instanceof Error ? error.name || "Error" : "unknown", walletAddress: publicKey });
       } finally {
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, publicKey],
   );
 
   const onPreSubmit = useCallback(
@@ -637,6 +711,19 @@ export default function ProjectForm({
           {mode === "edit"
             ? "By updating, you agree to have your project details updated on the Stellar network."
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
+        </p>
+
+        <GDPRConsent
+          formType="project"
+          formId={projectId ?? "new"}
+          userId={publicKey ?? "anonymous"}
+          purposes={["form_submission", "data_processing", "backup"]}
+        />
+
+        <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <Link href="/privacy-policy" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+            Privacy Policy
+          </Link>
         </p>
       </form>
 
