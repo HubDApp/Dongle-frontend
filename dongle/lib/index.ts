@@ -18,4 +18,5 @@ export * from "./crypto-storage";
 export * from "./ipfs-gateway";
 export * from "./analytics";
 export * from "./i18n";
+export * from "./password";
 
