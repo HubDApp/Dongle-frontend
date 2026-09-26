@@ -37,6 +37,7 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
+import { formSubmissionNotificationService } from "@/services/notification";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -260,12 +261,22 @@ export default function ProjectForm({
                 existingNames,
               );
 
-              projectSubmissionService.recordSubmission({
+              const subRecord = projectSubmissionService.recordSubmission({
                 projectId: generateProjectIdFromName(cleanedPayload.name),
                 projectName: cleanedPayload.name,
                 submittedBy,
                 qualityScore,
                 flagReasons,
+              });
+
+              await formSubmissionNotificationService.notify({
+                submissionId: subRecord.id,
+                type: "project_submitted",
+                recipientAddress: submittedBy,
+                projectName: cleanedPayload.name,
+                projectId: subRecord.projectId,
+                submitter: submittedBy,
+                createdAt: subRecord.submittedAt,
               });
             } catch (moderationError) {
               console.error("[ProjectForm] Failed to record submission moderation:", moderationError);
