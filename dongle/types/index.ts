@@ -5,3 +5,4 @@ export * from "./repository";
 export * from "./review";
 export * from "./update";
 export * from "./notification";
+export * from "./team-collaboration";
