@@ -11,6 +11,7 @@ import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import { AuthProvider } from "@/context/auth.context";
 import { NotificationProvider } from "@/context/notification.context";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { TwoFAProvider } from "@/context/twofa.context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -69,7 +70,9 @@ export default function RootLayout({
                   <ConfirmDialogProvider>
                     <ComparisonProvider>
                       <AnalyticsRoot>
-                        <LayoutWrapper>{children}</LayoutWrapper>
+                        <TwoFAProvider>
+                          <LayoutWrapper>{children}</LayoutWrapper>
+                        </TwoFAProvider>
                       </AnalyticsRoot>
                     </ComparisonProvider>
                   </ConfirmDialogProvider>
