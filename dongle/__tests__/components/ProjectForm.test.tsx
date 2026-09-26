@@ -276,13 +276,27 @@ describe("ProjectForm component", () => {
   });
 
   it("mocks the Soroban service and verifies the submit call carries normalized form data", async () => {
-    renderForm();
+    renderForm({ initialData: { tags: [" DeFi ", "defi", "payments"] } });
     const user = await fillRequiredFields();
+
+    fireEvent.change(screen.getByLabelText(/project name/i), {
+      target: { value: "  Stellar Lend  " },
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "  A lending protocol for Stellar.  " },
+    });
+    fireEvent.change(screen.getByLabelText(/project website/i), {
+      target: { value: "  stellarlend.example  " },
+    });
 
     // Add one contract address slot and fill it.
     fireEvent.click(await screen.findByRole("button", { name: /add a contract address/i }));
     fireEvent.change(screen.getByLabelText(/^contract address 1$/i), {
       target: { value: VALID_CONTRACT_ID.toLowerCase() },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
+    fireEvent.change(screen.getByLabelText(/^contract address 2$/i), {
+      target: { value: ` ${VALID_CONTRACT_ID.toLowerCase()} ` },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /submit registration/i }));
@@ -293,8 +307,10 @@ describe("ProjectForm component", () => {
 
     const payload = sorobanMocks.registerProject.mock.calls[0][0];
     expect(payload.name).toBe("Stellar Lend");
+    expect(payload.description).toBe("A lending protocol for Stellar.");
     expect(payload.category).toBe("DeFi / DEX"); // "defi" mapped to display label
-    expect(payload.websiteUrl).toContain("stellarlend.example");
+    expect(payload.websiteUrl).toBe("https://stellarlend.example");
+    expect(payload.tags).toEqual(["defi", "payments"]);
     expect(payload.contractAddresses).toEqual([VALID_CONTRACT_ID]);
     expect(draftHookMocks.clearDraft).toHaveBeenCalled();
   });

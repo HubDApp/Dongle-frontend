@@ -102,11 +102,14 @@ const contractIdSchema = z.string().transform((val, ctx) => {
 });
 
 const projectSchema = z.object({
-  name: z.string().min(3, "Project name must be at least 3 characters"),
-  primaryCategory: z.string().min(1, "Please select a category"),
-  tags: z.array(z.string()),
+  name: z.string().trim().min(3, "Project name must be at least 3 characters"),
+  primaryCategory: z.string().trim().toLowerCase().min(1, "Please select a category"),
+  tags: z.array(z.string()).transform((tags) =>
+    [...new Set(tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean))],
+  ),
   description: z
     .string()
+    .trim()
     .min(10, "Description must be at least 10 characters")
     .max(500, "Description cannot exceed 500 characters"),
   websiteUrl: urlSchema,
@@ -121,7 +124,10 @@ const projectSchema = z.object({
    * contract ID.  The array itself is always present; individual slots can be
    * left blank.
    */
-  contractAddresses: z.array(contractIdSchema).max(5, "You can add at most 5 contract addresses"),
+  contractAddresses: z
+    .array(contractIdSchema)
+    .max(5, "You can add at most 5 contract addresses")
+    .transform((addresses) => [...new Set(addresses.filter(Boolean))]),
 });
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
