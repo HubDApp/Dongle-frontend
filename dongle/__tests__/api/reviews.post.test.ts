@@ -9,11 +9,15 @@ vi.mock("@/services/review/review.service", () => ({
   },
 }));
 
+vi.mock("@/lib/verify-signature", () => ({
+  verifySignature: vi.fn(),
+}));
+
+import { verifySignature } from "@/lib/verify-signature";
+
 describe("POST /api/reviews", () => {
   beforeEach(() => {
-    // Clear the in-memory store before each test
-    // The store is module-level, so we need to reset it
-    // In a real scenario, this would be handled by the test setup
+    vi.mocked(verifySignature).mockReturnValue(true);
   });
 
   it("should add a valid review with all required fields", async () => {
@@ -320,6 +324,97 @@ describe("POST /api/reviews", () => {
     );
 
     const response = await POST(request2);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.success).toBe(true);
+  });
+
+  // ── Signature verification tests (#558) ────────────────────────────────────
+
+  it("should accept a review with a valid signature", async () => {
+    vi.mocked(verifySignature).mockReturnValue(true);
+
+    const signedReview = {
+      projectId: "proj-sig",
+      projectName: "Signed Project",
+      userAddress: "GCXJZ4FZK6B2Q3K7J6Q5TJGZ5L7X4P5Q6R7S8T9U0V1W2X3Y4Z5A6B7C8D9E",
+      rating: 4,
+      comment: "This review is cryptographically signed for integrity.",
+      signedPayload: '{"comment":"This review is cryptographically signed for integrity.","nonce":"abc123","projectId":"proj-sig","projectName":"Signed Project","publicKey":"GCXJZ4FZK6B2Q3K7J6Q5TJGZ5L7X4P5Q6R7S8T9U0V1W2X3Y4Z5A6B7C8D9E","rating":4,"timestamp":"2026-01-01T00:00:00.000Z"}',
+      signature: "AAAAAABBBBBBCCCCCCDDDDDDEEEEEEFFFFGGGGGGHHHHHHIIIIIIJJJJJJKKKKKKLLLLLLMMMMMMNNNNNNOOOOOOPPPPPPQQQQQRRRRRRSSSSSSTTTTTTUUUUUUVVVVVVWWWWWWXXXXXXYYYYYYZZZZZZ==",
+    };
+
+    const request = new Request(
+      "http://localhost/api/reviews",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(signedReview),
+      }
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.success).toBe(true);
+    expect(data.data).toBeDefined();
+    expect(data.data.signedPayload).toBe(signedReview.signedPayload);
+    expect(data.data.signature).toBe(signedReview.signature);
+  });
+
+  it("should reject a review with an invalid signature", async () => {
+    vi.mocked(verifySignature).mockReturnValue(false);
+
+    const tamperedReview = {
+      projectId: "proj-tamper",
+      projectName: "Tampered Project",
+      userAddress: "GCXJZ4FZK6B2Q3K7J6Q5TJGZ5L7X4P5Q6R7S8T9U0V1W2X3Y4Z5A6B7C8D9E",
+      rating: 5,
+      comment: "This review was tampered with after signing.",
+      signedPayload: '{"comment":"This review was tampered with after signing.","nonce":"xyz789","projectId":"proj-tamper","projectName":"Tampered Project","publicKey":"GCXJZ4FZK6B2Q3K7J6Q5TJGZ5L7X4P5Q6R7S8T9U0V1W2X3Y4Z5A6B7C8D9E","rating":5,"timestamp":"2026-01-01T00:00:00.000Z"}',
+      signature: "INVALIDSIGNATUREINVALIDSIGNATUREINVALIDSIGNATUREINVALIDSIGNATUREINVALIDSIGNATUREINVALIDSIGNATUREINVALIDSIGNATUREINVALIDSIGNATURE==",
+    };
+
+    const request = new Request(
+      "http://localhost/api/reviews",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tamperedReview),
+      }
+    );
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.success).toBe(false);
+    expect(data.error).toBeDefined();
+    expect(data.error.code).toBe("AUTHENTICATION_ERROR");
+    expect(data.error.message).toContain("Invalid submission signature");
+  });
+
+  it("should accept a review without a signature if wallet signing is unavailable", async () => {
+    const unsignedReview = {
+      projectId: "proj-unsigned",
+      projectName: "Unsigned Project",
+      userAddress: "user3",
+      rating: 3,
+      comment: "This review was submitted without cryptographic signing.",
+    };
+
+    const request = new Request(
+      "http://localhost/api/reviews",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(unsignedReview),
+      }
+    );
+
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(201);

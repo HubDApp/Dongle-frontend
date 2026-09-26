@@ -26,6 +26,7 @@ import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
+import { submissionSigningService } from "@/services/submission-signing";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import WalletStatePanel,
@@ -389,6 +390,30 @@ export default function ProjectDetailPage() {
       if (editingReview) {
         await reviewService.updateReview(editingReview.id, data, gate.publicKey);
       } else {
+        // Cryptographically sign the review data before submission
+        let signedPayload: { payload: string; signature: string; nonce: string; timestamp: string } | undefined;
+        try {
+          const signed = await submissionSigningService.sign(
+            {
+              projectId: project.id,
+              projectName: project.name,
+              rating: data.rating,
+              comment: data.comment,
+            },
+            gate.publicKey,
+          );
+          signedPayload = {
+            payload: signed.signedPayload.payload,
+            signature: signed.signedPayload.signature,
+            nonce: signed.signedPayload.nonce,
+            timestamp: signed.signedPayload.timestamp,
+          };
+        } catch (signError) {
+          // If signing fails, still allow submission without signature
+          // (graceful degradation – wallet might not support signMessage)
+          console.warn("Signing review failed, submitting without signature:", signError);
+        }
+
         await reviewService.addReview(
           {
             projectId: project.id,
@@ -396,7 +421,8 @@ export default function ProjectDetailPage() {
             userAddress: gate.publicKey,
             ...data,
           },
-          gate.publicKey
+          gate.publicKey,
+          signedPayload,
         );
       }
 

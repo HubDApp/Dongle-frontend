@@ -19,6 +19,8 @@ export type AuditAction =
   | "report_assigned"
   | "report_unassigned"
   | "submission_moderated"
+  | "submission_signed"
+  | "submission_received"
   | "claim_submitted"
   | "claim_approved"
   | "claim_rejected"
@@ -38,6 +40,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   report_assigned: "Report Assigned",
   report_unassigned: "Report Unassigned",
   submission_moderated: "Submission Moderated",
+  submission_signed: "Submission Signed",
+  submission_received: "Submission Received",
   claim_submitted: "Claim Submitted",
   claim_approved: "Claim Approved",
   claim_rejected: "Claim Rejected",

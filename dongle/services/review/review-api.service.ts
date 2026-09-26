@@ -20,12 +20,20 @@ export const reviewApiService = {
   async addReview(
     review: Omit<Review, "id" | "createdAt">,
     userAddress: string,
+    signedPayload?: { payload: string; signature: string; nonce: string; timestamp: string },
   ): Promise<{ success: boolean; data?: Review; errors?: ReviewValidationError[] }> {
     try {
+      const body: Record<string, unknown> = { ...review, userAddress };
+      if (signedPayload) {
+        body.signedPayload = signedPayload.payload;
+        body.signature = signedPayload.signature;
+        body.signatureNonce = signedPayload.nonce;
+        body.signatureTimestamp = signedPayload.timestamp;
+      }
       const response = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...review, userAddress }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       if (!response.ok) {
