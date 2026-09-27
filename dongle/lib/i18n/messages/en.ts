@@ -400,6 +400,46 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
+
+  forms: {
+    builder: {
+      badge: "Form v{version}",
+      reset: "Clear answers",
+      branchHint:
+        "Changing Project type reveals a different section. Go back anytime — hidden branch answers are cleared automatically.",
+    },
+    versioning: {
+      title: "Version history",
+      subtitle: "Every schema change is stored with a changelog and timestamp.",
+      empty: "No versions yet.",
+      versionLabel: "Version {version}",
+      active: "Active",
+      noSummary: "No changelog entry",
+      timestamp: "Saved {date}",
+      author: "by {author}",
+      view: "View",
+      revert: "Revert",
+      viewingHistorical: "Viewing historical version {version}.",
+      backToActive: "Back to active version",
+    },
+    i18n: {
+      languageToggle: "Form language",
+    },
+    confirmation: {
+      successTitle: "Submission received",
+      successBody: "Thanks — your form was submitted successfully.",
+      confirmationNumber: "Confirmation number",
+      submittedAt: "Submitted {date}",
+      summaryTitle: "What you submitted",
+      nextStepsTitle: "Next steps",
+      openLink: "Continue",
+      submitAnother: "Submit another",
+      backHome: "Explore projects",
+      missingTitle: "Confirmation not found",
+      missingBody:
+        "We could not find that confirmation. Submit the form again to get a new number.",
+    },
+  },
 } as const;
 
 export type Messages = typeof en;

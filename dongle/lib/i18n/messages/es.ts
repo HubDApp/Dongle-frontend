@@ -419,4 +419,44 @@ export const es: Messages = {
     walletLinked: "Billetera vinculada",
     account: "Cuenta",
   },
+
+  forms: {
+    builder: {
+      badge: "Formulario v{version}",
+      reset: "Borrar respuestas",
+      branchHint:
+        "Cambiar el tipo de proyecto muestra otra sección. Puedes volver atrás en cualquier momento: las respuestas de ramas ocultas se borran automáticamente.",
+    },
+    versioning: {
+      title: "Historial de versiones",
+      subtitle: "Cada cambio de esquema se guarda con un registro y marca de tiempo.",
+      empty: "Aún no hay versiones.",
+      versionLabel: "Versión {version}",
+      active: "Activa",
+      noSummary: "Sin entrada de registro",
+      timestamp: "Guardado {date}",
+      author: "por {author}",
+      view: "Ver",
+      revert: "Revertir",
+      viewingHistorical: "Viendo la versión histórica {version}.",
+      backToActive: "Volver a la versión activa",
+    },
+    i18n: {
+      languageToggle: "Idioma del formulario",
+    },
+    confirmation: {
+      successTitle: "Envío recibido",
+      successBody: "Gracias — tu formulario se envió correctamente.",
+      confirmationNumber: "Número de confirmación",
+      submittedAt: "Enviado {date}",
+      summaryTitle: "Lo que enviaste",
+      nextStepsTitle: "Próximos pasos",
+      openLink: "Continuar",
+      submitAnother: "Enviar otro",
+      backHome: "Explorar proyectos",
+      missingTitle: "Confirmación no encontrada",
+      missingBody:
+        "No encontramos esa confirmación. Envía el formulario de nuevo para obtener un número nuevo.",
+    },
+  },
 };
