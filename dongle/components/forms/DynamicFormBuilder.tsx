@@ -101,7 +101,7 @@ export function DynamicFormBuilder() {
           <DynamicFormSections
             sections={
               isHistorical
-                ? displaySchema.sections.filter((s) => !s.branched)
+                ? displaySchema.sections
                 : form.visibleSections
             }
             fields={displaySchema.fields}

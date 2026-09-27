@@ -31,7 +31,7 @@ export function FormConfirmationPage({
           .map(([fieldId, value]) => ({
             fieldId,
             label: submission.summaryLabels[fieldId]!,
-            value: formatAnswerValue(value),
+            value: formatAnswerValue(value, locale),
           }))
       : buildSubmissionSummary(schema, submission.answers, locale);
 

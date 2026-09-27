@@ -10,6 +10,7 @@ import {
   getActiveVersion,
   getLastConfirmationNumber,
   getSubmission,
+  getVersion,
   type FormSchemaSnapshot,
   type FormSubmissionRecord,
 } from "@/services/form-builder";
@@ -28,8 +29,17 @@ export function FormConfirmationView() {
       fromQuery || getLastConfirmationNumber() || "";
     const record = confirmation ? getSubmission(confirmation) : null;
     setSubmission(record);
-    const active = getActiveVersion(DEMO_FORM_ID);
-    if (active) setSchema(active.schema);
+    // Prefer the schema version stamped on the submission so summaries stay accurate
+    // even after later publishes/reverts (#541 / #548).
+    if (record) {
+      const stamped =
+        getVersion(record.formId, record.formVersion) ??
+        getActiveVersion(record.formId);
+      if (stamped) setSchema(stamped.schema);
+    } else {
+      const active = getActiveVersion(DEMO_FORM_ID);
+      if (active) setSchema(active.schema);
+    }
     setReady(true);
   }, [searchParams]);
 

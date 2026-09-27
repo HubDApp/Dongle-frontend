@@ -63,6 +63,34 @@ export function FormFieldInput({
         </select>
       );
       break;
+    case "radio":
+      control = (
+        <fieldset className="space-y-2" aria-describedby={error ? errorId : undefined}>
+          <legend className="sr-only">{copy.label}</legend>
+          {copy.options.map((opt) => {
+            const optId = `${inputId}-${opt.value}`;
+            return (
+              <label
+                key={opt.value}
+                htmlFor={optId}
+                className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-200"
+              >
+                <input
+                  id={optId}
+                  name={field.id}
+                  type="radio"
+                  value={opt.value}
+                  checked={value === opt.value}
+                  onChange={() => onChange(opt.value)}
+                  className="h-4 w-4 border-zinc-300 text-blue-600 focus:ring-blue-500"
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </fieldset>
+      );
+      break;
     case "number":
       control = (
         <input

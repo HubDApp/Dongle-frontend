@@ -106,12 +106,22 @@ export function getLastConfirmationNumber(): string | null {
   }
 }
 
+const BOOLEAN_LABELS: Record<LocaleCode, { yes: string; no: string }> = {
+  en: { yes: "Yes", no: "No" },
+  es: { yes: "Sí", no: "No" },
+  pt: { yes: "Sim", no: "Não" },
+};
+
 export function formatAnswerValue(
   value: FormAnswers[string],
+  locale: LocaleCode = "en",
 ): string {
   if (value === undefined || value === null || value === "") return "—";
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") {
+    const labels = BOOLEAN_LABELS[locale] ?? BOOLEAN_LABELS.en;
+    return value ? labels.yes : labels.no;
+  }
   return String(value);
 }
 
@@ -124,7 +134,7 @@ export function buildSubmissionSummary(
   return fields.map((field) => ({
     fieldId: field.id,
     label: resolveLocalizedText(field.label, locale),
-    value: formatAnswerValue(answers[field.id]),
+    value: formatAnswerValue(answers[field.id], locale),
   }));
 }
 
