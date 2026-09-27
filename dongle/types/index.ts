@@ -1,4 +1,5 @@
 export * from "./audit-log";
+export * from "./form-template";
 export * from "./guards";
 export * from "./project";
 export * from "./repository";

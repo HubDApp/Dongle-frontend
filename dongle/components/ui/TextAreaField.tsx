@@ -4,10 +4,12 @@ interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaEl
   label: string;
   error?: string;
   showCounter?: boolean;
+  /** When true, shows a required indicator and sets aria-required. */
+  required?: boolean;
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, required, ...props }, ref) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
@@ -73,6 +75,11 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         <div className="flex justify-between items-end">
           <label htmlFor={textareaId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             {label}
+            {required ? (
+              <span className="text-red-500 ml-0.5" aria-hidden="true">
+                *
+              </span>
+            ) : null}
           </label>
           {showCounter && maxLength && (
             <span
@@ -93,6 +100,8 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           onChange={handleChange}
           value={value}
           defaultValue={defaultValue}
+          required={required}
+          aria-required={required || undefined}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
           aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : ""].filter(Boolean).join(" ") || undefined}
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}

@@ -14,13 +14,16 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 import { walletService } from "@/services/wallet/wallet.service";
 import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
-import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
+import { Rocket, CheckCircle2, Plus, X, FileDown, BookmarkPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 import { useDraft } from "@/hooks/useDraft";
 import { DraftIndicator } from "@/components/projects/DraftIndicator";
 import { SubmissionChecklist } from "@/components/projects/SubmissionChecklist";
+import { SaveTemplateModal } from "@/components/projects/SaveTemplateModal";
+import { FormTemplateLibrary } from "@/components/projects/FormTemplateLibrary";
 import { useWallet } from "@/context/wallet.context";
 
 import { Button } from "@/components/ui/Button";
@@ -37,6 +40,13 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
+import {
+  getFieldRequirements,
+  getRequirementMessage,
+} from "@/utils/form-requirements.util";
+import { downloadFormSubmissionPdf } from "@/utils/pdf-export.util";
+import { formTemplateService } from "@/services/form-template/form-template.service";
+import type { FormTemplate } from "@/types/form-template";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -97,28 +107,61 @@ const contractIdSchema = z.string().transform((val, ctx) => {
   return normalized;
 });
 
-const projectSchema = z.object({
-  name: z.string().min(3, "Project name must be at least 3 characters"),
-  primaryCategory: z.string().min(1, "Please select a category"),
-  tags: z.array(z.string()),
-  description: z
-    .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(500, "Description cannot exceed 500 characters"),
-  websiteUrl: urlSchema,
-  githubUrl: repositoryUrlSchema,
-  logoUrl: optionalUrlSchema,
-  docsUrl: optionalUrlSchema,
-  auditReportUrl: optionalUrlSchema,
-  bugBountyUrl: optionalUrlSchema,
-  /**
-   * Up to 5 optional Soroban contract addresses.
-   * Each entry is either an empty string (ignored on save) or a valid 56-char
-   * contract ID.  The array itself is always present; individual slots can be
-   * left blank.
-   */
-  contractAddresses: z.array(contractIdSchema).max(5, "You can add at most 5 contract addresses"),
-});
+const projectSchema = z
+  .object({
+    name: z.string().min(3, "Project name must be at least 3 characters"),
+    primaryCategory: z.string().min(1, "Please select a category"),
+    tags: z.array(z.string()),
+    description: z
+      .string()
+      .min(10, "Description must be at least 10 characters")
+      .max(500, "Description cannot exceed 500 characters"),
+    websiteUrl: urlSchema,
+    githubUrl: repositoryUrlSchema,
+    logoUrl: optionalUrlSchema,
+    docsUrl: optionalUrlSchema,
+    auditReportUrl: optionalUrlSchema,
+    bugBountyUrl: optionalUrlSchema,
+    /**
+     * Up to 5 optional Soroban contract addresses.
+     * Each entry is either an empty string (ignored on save) or a valid 56-char
+     * contract ID.  The array itself is always present; individual slots can be
+     * left blank.
+     */
+    contractAddresses: z
+      .array(contractIdSchema)
+      .max(5, "You can add at most 5 contract addresses"),
+  })
+  .superRefine((data, ctx) => {
+    const requirements = getFieldRequirements({
+      primaryCategory: data.primaryCategory,
+      contractAddresses: data.contractAddresses,
+      auditReportUrl: data.auditReportUrl,
+    });
+
+    const ensurePresent = (
+      field: keyof typeof requirements,
+      value: string | undefined,
+    ) => {
+      const rule = requirements[field];
+      if (!rule.required) return;
+      if (!isBlank(value)) return;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [field],
+        message:
+          rule.message ??
+          getRequirementMessage(field, data) ??
+          "This field is required",
+      });
+    };
+
+    ensurePresent("githubUrl", data.githubUrl);
+    ensurePresent("logoUrl", data.logoUrl);
+    ensurePresent("docsUrl", data.docsUrl);
+    ensurePresent("auditReportUrl", data.auditReportUrl);
+    ensurePresent("bugBountyUrl", data.bugBountyUrl);
+  });
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 
@@ -143,6 +186,8 @@ export default function ProjectForm({
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -193,6 +238,35 @@ export default function ProjectForm({
     }
   }, [draft.loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply template queued from /projects/templates
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem("dongle_pending_form_template");
+      if (!raw) return;
+      sessionStorage.removeItem("dongle_pending_form_template");
+      const data = JSON.parse(raw) as FormTemplate["data"];
+      reset({
+        name: data.name || "",
+        primaryCategory: data.primaryCategory || "",
+        tags: data.tags || [],
+        description: data.description || "",
+        websiteUrl: data.websiteUrl || "",
+        githubUrl: data.githubUrl || "",
+        logoUrl: data.logoUrl || "",
+        docsUrl: data.docsUrl || "",
+        auditReportUrl: data.auditReportUrl || "",
+        bugBountyUrl: data.bugBountyUrl || "",
+        contractAddresses: data.contractAddresses?.length
+          ? data.contractAddresses
+          : [],
+      });
+      toast.success("Template loaded into the form");
+    } catch {
+      // ignore invalid payload
+    }
+  }, [reset]);
+
   useUnsavedChanges(isDirty, isSubmitting);
 
   // Watch form values for checklist and auto-save.
@@ -202,6 +276,21 @@ export default function ProjectForm({
   // and the draft autosave effect below.
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
+  const fieldRequirements = getFieldRequirements({
+    primaryCategory: watchedValues.primaryCategory,
+    contractAddresses: watchedValues.contractAddresses,
+    auditReportUrl: watchedValues.auditReportUrl,
+  });
+
+  const fieldLabel = (
+    base: string,
+    field: keyof typeof fieldRequirements,
+    optionalFallback = true,
+  ) => {
+    const rule = fieldRequirements[field];
+    if (rule.required) return base;
+    return optionalFallback ? `${base} (Optional)` : base;
+  };
 
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
@@ -336,6 +425,48 @@ export default function ProjectForm({
     void handleSubmit(onPreSubmit)(event);
   };
 
+  const handleExportPdf = () => {
+    downloadFormSubmissionPdf({
+      ...watchedValues,
+      mode,
+      projectId,
+      submittedAt: new Date().toISOString(),
+    });
+    toast.success("Opening PDF export — use Print / Save as PDF");
+  };
+
+  const handleSaveTemplate = (name: string, description: string) => {
+    if (!publicKey) {
+      return { success: false, error: "Connect a wallet to save templates" };
+    }
+    const result = formTemplateService.saveAsTemplate(publicKey, name, watchedValues, {
+      description,
+    });
+    if (result.success) {
+      toast.success("Template saved");
+    }
+    return result;
+  };
+
+  const handleApplyTemplate = (template: FormTemplate) => {
+    reset({
+      name: template.data.name || "",
+      primaryCategory: template.data.primaryCategory || "",
+      tags: template.data.tags || [],
+      description: template.data.description || "",
+      websiteUrl: template.data.websiteUrl || "",
+      githubUrl: template.data.githubUrl || "",
+      logoUrl: template.data.logoUrl || "",
+      docsUrl: template.data.docsUrl || "",
+      auditReportUrl: template.data.auditReportUrl || "",
+      bugBountyUrl: template.data.bugBountyUrl || "",
+      contractAddresses: template.data.contractAddresses?.length
+        ? template.data.contractAddresses
+        : [],
+    });
+    setShowTemplateLibrary(false);
+  };
+
   const handleDiscardDraft = () => {
     setDiscardDialogOpen(true);
   };
@@ -409,6 +540,45 @@ export default function ProjectForm({
           onDiscard={handleDiscardDraft}
         />
 
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<FileDown className="w-4 h-4" />}
+            onClick={handleExportPdf}
+          >
+            Export PDF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<BookmarkPlus className="w-4 h-4" />}
+            onClick={() => setSaveTemplateOpen(true)}
+            disabled={!publicKey}
+          >
+            Save as template
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowTemplateLibrary((v) => !v)}
+          >
+            {showTemplateLibrary ? "Hide templates" : "Load from template"}
+          </Button>
+        </div>
+
+        {showTemplateLibrary && (
+          <FormTemplateLibrary
+            embedded
+            walletAddress={publicKey}
+            currentFormData={watchedValues}
+            onApplyTemplate={handleApplyTemplate}
+          />
+        )}
+
         {/* Quality Checklist */}
         <SubmissionChecklist
           formData={{
@@ -421,12 +591,14 @@ export default function ProjectForm({
             auditReportUrl: watchedValues.auditReportUrl,
             bugBountyUrl: watchedValues.bugBountyUrl,
             description: watchedValues.description,
+            contractAddresses: watchedValues.contractAddresses,
           }}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"
+            required={fieldRequirements.name.required}
             placeholder="e.g. Soroban Swap"
             maxLength={50}
             {...register("name")}
@@ -434,6 +606,7 @@ export default function ProjectForm({
           />
           <SelectField
             label="Category"
+            required={fieldRequirements.primaryCategory.required}
             options={CATEGORY_FORM_OPTIONS}
             {...register("primaryCategory")}
             error={errors.primaryCategory?.message}
@@ -456,6 +629,7 @@ export default function ProjectForm({
 
         <TextAreaField
           label="Description"
+          required={fieldRequirements.description.required}
           placeholder="What does your project do? Keep it concise and engaging."
           maxLength={500}
           {...register("description")}
@@ -464,6 +638,7 @@ export default function ProjectForm({
 
         <FormField
           label="Project Website"
+          required={fieldRequirements.websiteUrl.required}
           placeholder="https://yourproject.com"
           {...register("websiteUrl")}
           error={errors.websiteUrl?.message}
@@ -471,38 +646,50 @@ export default function ProjectForm({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
-            label="Repository URL (Optional)"
+            label={fieldLabel("Repository URL", "githubUrl")}
+            required={fieldRequirements.githubUrl.required}
             placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
-            helperText="Supported: GitHub, GitLab, Bitbucket"
+            helperText={
+              fieldRequirements.githubUrl.reason ||
+              "Supported: GitHub, GitLab, Bitbucket"
+            }
           />
           <FormField
-            label="Logo URL (Optional)"
+            label={fieldLabel("Logo URL", "logoUrl")}
+            required={fieldRequirements.logoUrl.required}
             placeholder="https://..."
             {...register("logoUrl")}
             error={errors.logoUrl?.message}
+            helperText={fieldRequirements.logoUrl.reason}
           />
           <FormField
-            label="Documentation URL (Optional)"
+            label={fieldLabel("Documentation URL", "docsUrl")}
+            required={fieldRequirements.docsUrl.required}
             placeholder="https://docs..."
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
+            helperText={fieldRequirements.docsUrl.reason}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
-            label="Audit Report URL (Optional)"
+            label={fieldLabel("Audit Report URL", "auditReportUrl")}
+            required={fieldRequirements.auditReportUrl.required}
             placeholder="https://..."
             {...register("auditReportUrl")}
             error={errors.auditReportUrl?.message}
+            helperText={fieldRequirements.auditReportUrl.reason}
           />
           <FormField
-            label="Bug Bounty URL (Optional)"
+            label={fieldLabel("Bug Bounty URL", "bugBountyUrl")}
+            required={fieldRequirements.bugBountyUrl.required}
             placeholder="https://..."
             {...register("bugBountyUrl")}
             error={errors.bugBountyUrl?.message}
+            helperText={fieldRequirements.bugBountyUrl.reason}
           />
         </div>
 
@@ -668,6 +855,12 @@ export default function ProjectForm({
         variant="danger"
         onConfirm={() => void confirmDiscardDraft()}
         onCancel={() => setDiscardDialogOpen(false)}
+      />
+
+      <SaveTemplateModal
+        isOpen={saveTemplateOpen}
+        onClose={() => setSaveTemplateOpen(false)}
+        onSave={handleSaveTemplate}
       />
     </Card>
     </ErrorBoundary>
