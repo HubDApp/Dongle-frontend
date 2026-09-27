@@ -13,6 +13,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import projectService from "@/services/project/project.service";
+import { Spinner } from "@/components/ui/Spinner";
 
 const ITEMS_PER_PAGE = 9;
 
@@ -348,3 +349,19 @@ function DiscoverContent() {
      </main>
    );
  }
+
+// ─── Page export — Suspense boundary required by useSearchParams ───────────────
+
+export default function DiscoverPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+          <Spinner size="lg" />
+        </main>
+      }
+    >
+      <DiscoverContent />
+    </Suspense>
+  );
+}
