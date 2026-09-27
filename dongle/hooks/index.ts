@@ -27,3 +27,4 @@ export { useDebounce, useDebouncedCallback } from "./useDebounce";
 export { useIntersectionObserver, useLazyLoad } from "./useIntersectionObserver";
 export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
 export type { WalletTransaction } from "./useWalletTransactions";
+export { useFormRecommendations } from "./useFormRecommendations";
