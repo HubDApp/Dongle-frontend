@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { normalizeUrl, extractDomain, encodeUrlForHtml, sanitizeAndEncodeUrl } from "@/lib/url";
+import {
+  normalizeUrl,
+  extractDomain,
+  encodeUrlForHtml,
+  sanitizeAndEncodeUrl,
+  isValidUrl,
+  validateUrl,
+  addProtocolIfMissing,
+  removeTrailingSlash,
+} from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 
 describe("normalizeUrl - Basic Validation", () => {
@@ -28,6 +37,100 @@ describe("normalizeUrl - Basic Validation", () => {
 
   it("throws on malformed URLs", () => {
     expect(() => normalizeUrl("not a url")).toThrow();
+  });
+});
+
+describe("isValidUrl - URL Format Validation", () => {
+  it("returns true for standard URLs with https and http", () => {
+    expect(isValidUrl("https://example.com")).toBe(true);
+    expect(isValidUrl("http://example.org/api/v1")).toBe(true);
+    expect(isValidUrl("https://subdomain.hubdapp.io/path?query=test#section")).toBe(true);
+  });
+
+  it("returns true for valid domains without protocol", () => {
+    expect(isValidUrl("example.com")).toBe(true);
+    expect(isValidUrl("github.com/HubDApp/Dongle-frontend")).toBe(true);
+  });
+
+  it("returns true for localhost and local IP development URLs", () => {
+    expect(isValidUrl("http://localhost:3000")).toBe(true);
+    expect(isValidUrl("http://127.0.0.1:8080/dashboard")).toBe(true);
+  });
+
+  it("returns false for invalid strings and empty inputs", () => {
+    expect(isValidUrl("")).toBe(false);
+    expect(isValidUrl("   ")).toBe(false);
+    expect(isValidUrl("random non url string")).toBe(false);
+    expect(isValidUrl(":::://bad")).toBe(false);
+  });
+
+  it("returns false for dangerous or non-http protocols", () => {
+    expect(isValidUrl("javascript:alert(1)")).toBe(false);
+    expect(isValidUrl("data:text/html,<div>test</div>")).toBe(false);
+    expect(isValidUrl("file:///etc/passwd")).toBe(false);
+    expect(isValidUrl("ftp://ftp.example.com")).toBe(false);
+  });
+});
+
+describe("addProtocolIfMissing", () => {
+  it("adds https:// when protocol is missing", () => {
+    expect(addProtocolIfMissing("example.com")).toBe("https://example.com");
+    expect(addProtocolIfMissing("sub.domain.org/path")).toBe("https://sub.domain.org/path");
+  });
+
+  it("leaves existing http or https intact", () => {
+    expect(addProtocolIfMissing("http://example.com")).toBe("http://example.com");
+    expect(addProtocolIfMissing("https://example.com")).toBe("https://example.com");
+  });
+
+  it("supports custom default protocol", () => {
+    expect(addProtocolIfMissing("example.com", "http://")).toBe("http://example.com");
+    expect(addProtocolIfMissing("example.com", "http")).toBe("http://example.com");
+  });
+
+  it("returns empty string on empty input", () => {
+    expect(addProtocolIfMissing("")).toBe("");
+  });
+});
+
+describe("removeTrailingSlash", () => {
+  it("removes trailing slashes from path and domain URLs", () => {
+    expect(removeTrailingSlash("https://example.com/")).toBe("https://example.com");
+    expect(removeTrailingSlash("https://example.com/api/v1/")).toBe("https://example.com/api/v1");
+    expect(removeTrailingSlash("https://example.com/path///")).toBe("https://example.com/path");
+  });
+
+  it("does not modify URLs that do not end in slash", () => {
+    expect(removeTrailingSlash("https://example.com/api/v1")).toBe("https://example.com/api/v1");
+    expect(removeTrailingSlash("https://example.com")).toBe("https://example.com");
+  });
+
+  it("does not corrupt bare protocol markers", () => {
+    expect(removeTrailingSlash("https://")).toBe("https://");
+  });
+
+  it("handles empty input safely", () => {
+    expect(removeTrailingSlash("")).toBe("");
+  });
+});
+
+describe("validateUrl - Diagnostics & Breakdown", () => {
+  it("returns isValid: true, normalizedUrl, and extracted domain for valid URLs", () => {
+    const result = validateUrl("www.example.com/test");
+    expect(result.isValid).toBe(true);
+    expect(result.normalizedUrl).toBe("https://www.example.com/test");
+    expect(result.domain).toBe("example.com");
+    expect(result.error).toBeUndefined();
+  });
+
+  it("returns isValid: false and descriptive error for invalid inputs", () => {
+    const emptyResult = validateUrl("");
+    expect(emptyResult.isValid).toBe(false);
+    expect(emptyResult.error).toBe("URL cannot be empty");
+
+    const badSchemeResult = validateUrl("javascript:alert(1)");
+    expect(badSchemeResult.isValid).toBe(false);
+    expect(badSchemeResult.error).toBeDefined();
   });
 });
 
