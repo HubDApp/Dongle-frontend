@@ -1,6 +1,7 @@
 export * from "./admin";
 export * from "./analytics";
 export * from "./compare";
+export * from "./forms";
 export * from "./landing";
 export * from "./layout";
 export * from "./projects";

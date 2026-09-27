@@ -95,12 +95,12 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           className={className}
         />
         {displayError && (
-          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
+          <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
           </span>
         )}
         {!displayError && helperText && (
-          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ms-1">
             {helperText}
           </span>
         )}

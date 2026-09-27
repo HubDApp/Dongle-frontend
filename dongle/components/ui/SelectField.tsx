@@ -41,12 +41,12 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
               </option>
             ))}
           </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
+          <div className="absolute end-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">
             <ChevronDown className="w-4 h-4" />
           </div>
         </div>
         {error && (
-          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
+          <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {error}
           </span>
         )}
