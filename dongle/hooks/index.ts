@@ -18,12 +18,6 @@ export { useWatchlist } from "./useWatchlist";
 export { useStellarAccount } from "./useStellarAccount";
 export { useUnsavedChanges } from "./useUnsavedChanges";
 export { useVerificationStatuses } from "./useVerificationStatuses";
-export { useProjectMetadata } from "./useProjectMetadata";
-export { useWalletPageGate } from "./useWalletPageGate";
-export { useModalFocusTrap } from "./useModalFocusTrap";
-export { useWalletTransactions } from "./useWalletTransactions";
-export { useAdminSession } from "./useAdminSession";
-export { useDebounce, useDebouncedCallback } from "./useDebounce";
-export { useIntersectionObserver, useLazyLoad } from "./useIntersectionObserver";
-export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
-export type { WalletTransaction } from "./useWalletTransactions";
+// Form UX scoring
+export { useFormUXScore } from "./useFormUXScore";
+export type { UseFormUXScoreOptions, UseFormUXScoreReturn } from "./useFormUXScore";
