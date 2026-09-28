@@ -34,3 +34,5 @@ export { useFieldUndoRedo } from "./useFieldUndoRedo";
 export type { UseFieldUndoRedoOptions, UseFieldUndoRedoResult } from "./useFieldUndoRedo";
 export { useFieldSearchReplace } from "./useFieldSearchReplace";
 export type { SearchMatch, UseFieldSearchReplaceOptions, UseFieldSearchReplaceResult } from "./useFieldSearchReplace";
+export { useFormConflict } from "./useFormConflict";
+export type { UseFormConflictOptions, UseFormConflictResult } from "./useFormConflict";
