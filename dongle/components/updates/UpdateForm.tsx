@@ -2,6 +2,7 @@
 
 import React, { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { UPDATE_TYPES, UpdateType, ProjectUpdate } from "@/types/update";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X } from "lucide-react";
@@ -104,6 +105,14 @@ export default function UpdateForm({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <FormTimeEstimate
+          fieldCount={type === UPDATE_TYPES.RELEASE ? 4 : 3}
+          completedFields={
+            1 + Number(title.trim().length > 0) + Number(content.trim().length > 0) +
+            (type === UPDATE_TYPES.RELEASE ? Number(version.trim().length > 0) : 0)
+          }
+          secondsPerField={40}
+        />
         <div>
           <label htmlFor={updateTypeId} className="block text-sm font-medium mb-2">
             Update Type
