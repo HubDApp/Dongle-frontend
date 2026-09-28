@@ -109,7 +109,11 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           </span>
         )}
         {!displayError && helperText && (
-          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+          <span
+            id={helperId}
+            className="text-xs text-zinc-500 dark:text-zinc-400 ml-1"
+            role="note"
+          >
             {helperText}
           </span>
         )}
