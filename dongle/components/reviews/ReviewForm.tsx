@@ -8,6 +8,7 @@ import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.schema";
 
@@ -79,6 +80,12 @@ export default function ReviewForm({
             size="sm"
           >
             <X className="w-5 h-5" />
+
+        <FormTimeEstimate
+          fieldCount={2}
+          completedFields={Number(Boolean(rating)) + Number(comment.trim().length > 0)}
+          secondsPerField={45}
+        />
           </IconButton>
         </div>
 

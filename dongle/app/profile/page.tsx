@@ -43,6 +43,7 @@ import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { savedSearchService } from "@/services/search/saved-search.service";
 import { getWatchlistNotifications } from "@/services/watchlist/watchlist-notification.service";
+import { GamificationPanel } from "@/components/gamification/GamificationPanel";
 
 interface StellarNonNativeBalance {
   asset_code?: string;
@@ -232,6 +233,8 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
+              <GamificationPanel walletAddress={gate.publicKey!} />
+
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <h2 className="text-2xl font-bold mb-6">Account Summary</h2>
 

@@ -5,6 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { TagInput } from "@/components/ui/TagInput";
@@ -253,6 +254,23 @@ export default function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues)]);
 
+  const trackedFieldCount = 10 + (watchedValues.contractAddresses?.length ?? 0);
+  const completedFieldCount = [
+    watchedValues.name,
+    watchedValues.primaryCategory,
+    watchedValues.tags?.length,
+    watchedValues.description,
+    watchedValues.websiteUrl,
+    watchedValues.githubUrl,
+    watchedValues.logoUrl,
+    watchedValues.docsUrl,
+    watchedValues.auditReportUrl,
+    watchedValues.bugBountyUrl,
+    ...(watchedValues.contractAddresses ?? []),
+  ].filter((value) =>
+    typeof value === "string" ? value.trim().length > 0 : Boolean(value),
+  ).length;
+
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
       if (customOnSubmit) {
@@ -284,6 +302,7 @@ export default function ProjectForm({
 
         if (result) {
           if (mode !== "edit") {
+            const qualityScore = computeQualityScore(cleanedPayload);
             try {
               let submittedBy = "unknown";
               try {
@@ -292,7 +311,6 @@ export default function ProjectForm({
                 // wallet may disconnect after tx
               }
 
-              const qualityScore = computeQualityScore(cleanedPayload);
               const existingNames = projectService
                 .getAllProjects()
                 .map((p) => p.name);
@@ -355,6 +373,21 @@ export default function ProjectForm({
           setSubmissionError(null);
           setSubmissionRetryCount(0);
           reset();
+          if (mode !== "edit") {
+            try {
+              awardSubmission(
+                publicKey,
+                `${generateProjectIdFromName(cleanedPayload.name)}:${Date.now()}`,
+                computeQualityScore(cleanedPayload),
+              );
+            } catch (gamificationError) {
+              logger.error(
+                "Failed to record submission rewards",
+                { operation: "awardSubmission", userAction: "tracking submission rewards" },
+                gamificationError,
+              );
+            }
+          }
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
           setTimeout(() => router.push(redirectPath), 1500);
