@@ -24,3 +24,5 @@ export { SkeletonList, SkeletonGrid } from "./SkeletonList";
 export { Spinner } from "./Spinner";
 export { TagInput } from "./TagInput";
 export { TextAreaField } from "./TextAreaField";
+export { ConditionalField, useFieldVisibility } from "./ConditionalField";
+export type { ConditionalFieldProps } from "./ConditionalField";
