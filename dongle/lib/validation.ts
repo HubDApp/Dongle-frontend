@@ -33,3 +33,12 @@ export function isValidHttpUrl(value: string | null | undefined): boolean {
     return false;
   }
 }
+
+export { validateEmailDomain } from "./email-domain-validator";
+
+export async function isValidEmailDomain(value: string | null | undefined): Promise<boolean> {
+  if (!isValidEmail(value)) return false;
+  const { validateEmailDomain } = await import("./email-domain-validator");
+  const result = await validateEmailDomain(value as string);
+  return result.valid;
+}
