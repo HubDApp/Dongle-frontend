@@ -30,3 +30,5 @@ export type { WalletTransaction } from "./useWalletTransactions";
 export { useFormRecommendations } from "./useFormRecommendations";
 export { useFormPasteDetection } from "./useFormPasteDetection";
 export type { PasteEvent, PasteStats, UseFormPasteDetectionOptions, UseFormPasteDetectionResult } from "./useFormPasteDetection";
+export { useFieldUndoRedo } from "./useFieldUndoRedo";
+export type { UseFieldUndoRedoOptions, UseFieldUndoRedoResult } from "./useFieldUndoRedo";
