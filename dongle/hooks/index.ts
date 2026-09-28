@@ -28,3 +28,5 @@ export { useIntersectionObserver, useLazyLoad } from "./useIntersectionObserver"
 export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
 export type { WalletTransaction } from "./useWalletTransactions";
 export { useFormRecommendations } from "./useFormRecommendations";
+export { useFormPasteDetection } from "./useFormPasteDetection";
+export type { PasteEvent, PasteStats, UseFormPasteDetectionOptions, UseFormPasteDetectionResult } from "./useFormPasteDetection";

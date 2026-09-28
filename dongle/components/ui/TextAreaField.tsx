@@ -1,13 +1,43 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
+import type { PasteEvent } from "@/hooks/useFormPasteDetection";
 
 interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
   showCounter?: boolean;
+  /**
+   * Called when the user pastes into this textarea.
+   * The sanitized text and multi-value array are provided.
+   */
+  onPasteDetected?: (event: PasteEvent) => void;
+  /**
+   * When true (default) the hook replaces the raw paste with the sanitized
+   * value.  Set to false to let the browser handle the paste natively while
+   * still getting the callback.
+   */
+  preventDefaultPaste?: boolean;
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  (
+    {
+      label,
+      error,
+      className = "",
+      id,
+      maxLength,
+      onChange,
+      value,
+      defaultValue,
+      showCounter = true,
+      onPasteDetected,
+      preventDefaultPaste = true,
+      name,
+      ...props
+    },
+    ref
+  ) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
@@ -16,6 +46,19 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const [charCount, setCharCount] = useState(0);
 
+    // -----------------------------------------------------------------------
+    // Paste detection (Issue #517)
+    // -----------------------------------------------------------------------
+    const { createPasteHandler } = useFormPasteDetection({
+      onPaste: onPasteDetected,
+      preventDefaultPaste,
+    });
+
+    const handlePaste = createPasteHandler(name ?? label);
+
+    // -----------------------------------------------------------------------
+    // Character counter
+    // -----------------------------------------------------------------------
     const syncCharCount = useCallback(() => {
       if (typeof value === "string") {
         setCharCount(value.length);
@@ -54,17 +97,19 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
     const isAtLimit = Boolean(maxLength && charCount === maxLength);
     const isOverLimit = Boolean(maxLength && charCount > maxLength);
 
-    const counterClass = isOverLimit || isAtLimit
-      ? "text-red-500 font-semibold"
-      : isNearLimit
-      ? "text-amber-500 font-medium"
-      : "text-zinc-500";
+    const counterClass =
+      isOverLimit || isAtLimit
+        ? "text-red-500 font-semibold"
+        : isNearLimit
+        ? "text-amber-500 font-medium"
+        : "text-zinc-500";
 
-    const baseBorder = error || isOverLimit || isAtLimit
-      ? "border-red-500/50 focus:border-red-500"
-      : isNearLimit
-      ? "border-amber-500/50 focus:border-amber-500"
-      : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
+    const baseBorder =
+      error || isOverLimit || isAtLimit
+        ? "border-red-500/50 focus:border-red-500"
+        : isNearLimit
+        ? "border-amber-500/50 focus:border-amber-500"
+        : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
 
     const displayError = error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined);
 
@@ -88,13 +133,19 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           {...props}
           ref={setRef}
           id={textareaId}
+          name={name}
           rows={4}
           maxLength={maxLength}
           onChange={handleChange}
+          onPaste={handlePaste}
           value={value}
           defaultValue={defaultValue}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
-          aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : ""].filter(Boolean).join(" ") || undefined}
+          aria-describedby={
+            [displayError ? errorId : "", maxLength && showCounter ? counterId : ""]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
         />
         {displayError && (

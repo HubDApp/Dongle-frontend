@@ -32,3 +32,6 @@ export { FormSubmissionProgress, useFormSubmissionProgress } from "./FormSubmiss
 export type { FormSubmissionProgressProps, SubmissionStep } from "./FormSubmissionProgress";
 export { FormValueComparison, areValuesDifferent } from "./FormValueComparison";
 export type { FormValueComparisonProps } from "./FormValueComparison";
+export { ConditionalField } from "./ConditionalField";
+export { FieldSuggestions } from "./FieldSuggestions";
+export { ThemeToggle } from "./ThemeToggle";
