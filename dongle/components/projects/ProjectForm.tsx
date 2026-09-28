@@ -14,7 +14,7 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 import { walletService } from "@/services/wallet/wallet.service";
 import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
-import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
+import { Rocket, CheckCircle2, Plus, X, GitCompare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
@@ -27,6 +27,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormExportMenu } from "@/components/ui/FormExportMenu";
+import { FormValueComparison } from "@/components/ui/FormValueComparison";
+import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
@@ -173,6 +175,9 @@ export default function ProjectForm({
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [submissionError, setSubmissionError] = useState<Error | string | null>(null);
+  const [submissionRetryCount, setSubmissionRetryCount] = useState(0);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -187,6 +192,22 @@ export default function ProjectForm({
   });
   const [draftRestored, setDraftRestored] = React.useState(false);
 
+  const defaultFormValues: ProjectFormValues = {
+    name: initialData?.name || "",
+    primaryCategory: initialData?.primaryCategory || initialData?.category || "",
+    tags: initialData?.tags || [],
+    description: initialData?.description || "",
+    websiteUrl: initialData?.websiteUrl || "",
+    githubUrl: initialData?.githubUrl || "",
+    logoUrl: initialData?.logoUrl || "",
+    docsUrl: initialData?.docsUrl || "",
+    auditReportUrl: initialData?.auditReportUrl || "",
+    bugBountyUrl: initialData?.bugBountyUrl || "",
+    contractAddresses: initialData?.contractAddresses?.length
+      ? initialData.contractAddresses
+      : [],
+  };
+
   const {
     register,
     handleSubmit,
@@ -195,23 +216,10 @@ export default function ProjectForm({
     reset,
     watch,
     getValues,
+    setValue,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
-    defaultValues: {
-      name: initialData?.name || "",
-      primaryCategory: initialData?.primaryCategory || initialData?.category || "",
-      tags: initialData?.tags || [],
-      description: initialData?.description || "",
-      websiteUrl: initialData?.websiteUrl || "",
-      githubUrl: initialData?.githubUrl || "",
-      logoUrl: initialData?.logoUrl || "",
-      docsUrl: initialData?.docsUrl || "",
-      auditReportUrl: initialData?.auditReportUrl || "",
-      bugBountyUrl: initialData?.bugBountyUrl || "",
-      contractAddresses: initialData?.contractAddresses?.length
-        ? initialData.contractAddresses
-        : [],
-    },
+    defaultValues: defaultFormValues,
   });
 
 
@@ -311,11 +319,14 @@ export default function ProjectForm({
           });
           // Clear draft after successful submission
           draft.clearDraft();
+          setSubmissionError(null);
+          setSubmissionRetryCount(0);
           reset();
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
           setTimeout(() => router.push(redirectPath), 1500);
         } else {
+          setSubmissionError("Transaction could not be completed. Please review and retry.");
           trackProjectSubmit({
             success: false,
             mode,
@@ -323,6 +334,7 @@ export default function ProjectForm({
           });
         }
       } catch (error) {
+        setSubmissionError(error instanceof Error ? error : String(error));
         logger.error("Soroban project operation failed", {
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
@@ -440,13 +452,42 @@ export default function ProjectForm({
           onDiscard={handleDiscardDraft}
         />
 
-        <FormExportMenu
-          getData={() => getValues()}
-          filename={watchedValues.name || "project-form"}
-          fields={EXPORT_FIELDS}
-          labels={EXPORT_LABELS}
-          className="justify-end"
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {mode === "edit" && initialData && (
+            <button
+              type="button"
+              onClick={() => setShowComparison(!showComparison)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-xs"
+            >
+              <GitCompare className="w-3.5 h-3.5" />
+              {showComparison ? "Hide Changes" : "Compare Changes"}
+            </button>
+          )}
+
+          <FormExportMenu
+            getData={() => getValues()}
+            filename={watchedValues.name || "project-form"}
+            fields={EXPORT_FIELDS}
+            labels={EXPORT_LABELS}
+            className="justify-end ml-auto"
+          />
+        </div>
+
+        {mode === "edit" && initialData && showComparison && (
+          <FormValueComparison
+            originalValues={defaultFormValues}
+            currentValues={watchedValues}
+            fieldLabels={EXPORT_LABELS}
+            onResetField={(key, originalVal) => {
+              setValue(key as any, originalVal, { shouldDirty: true, shouldValidate: true });
+            }}
+            onResetAll={(orig) => {
+              Object.entries(orig).forEach(([k, v]) => {
+                setValue(k as any, v, { shouldDirty: true, shouldValidate: true });
+              });
+            }}
+          />
+        )}
 
         {/* Quality Checklist */}
         <SubmissionChecklist
@@ -667,8 +708,29 @@ export default function ProjectForm({
             progress={progress}
             onRetry={() => {
               setIsSubmitting(true);
+              setSubmissionRetryCount((prev) => prev + 1);
               void retry().finally(() => setIsSubmitting(false));
             }}
+          />
+        )}
+
+        {(progress.phase === "failure" || (submissionError && progress.phase === "idle")) && (
+          <FormSubmissionRetry
+            error={submissionError || progress.errorMessage || progress.message}
+            retryCount={submissionRetryCount}
+            maxRetries={3}
+            isRetrying={isSubmitting || isInProgress}
+            onRetry={async () => {
+              setSubmissionRetryCount((prev) => prev + 1);
+              setIsSubmitting(true);
+              setSubmissionError(null);
+              if (progress.phase === "failure") {
+                await retry().finally(() => setIsSubmitting(false));
+              } else {
+                await executeSubmit(getValues() as ProjectFormValues);
+              }
+            }}
+            onDismiss={() => setSubmissionError(null)}
           />
         )}
 
