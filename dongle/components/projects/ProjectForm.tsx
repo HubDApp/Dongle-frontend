@@ -5,6 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { TagInput } from "@/components/ui/TagInput";
@@ -14,7 +15,7 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 import { walletService } from "@/services/wallet/wallet.service";
 import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
-import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
+import { Rocket, CheckCircle2, Plus, X, GitCompare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
@@ -26,6 +27,9 @@ import { useWallet } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FormExportMenu } from "@/components/ui/FormExportMenu";
+import { FormValueComparison } from "@/components/ui/FormValueComparison";
+import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
@@ -37,13 +41,8 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
-import { useFormConversion } from "@/hooks/useFormConversion";
-import { useFormCaptcha } from "@/hooks/useFormCaptcha";
-import { useFormHeatmap } from "@/hooks/useFormHeatmap";
-import { useFormSessionRecording } from "@/hooks/useFormSessionRecording";
-import { FormCaptcha } from "@/components/forms/FormCaptcha";
-import { FormHeatmapOverlay } from "@/components/forms/FormHeatmapOverlay";
-import { FormSessionRecordingControls } from "@/components/forms/FormSessionRecordingControls";
+import { useTranslation } from "@/lib/i18n/useTranslation";
+import { runFormIntegrations } from "@/services/form-integrations";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -129,6 +128,35 @@ const projectSchema = z.object({
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 
+/** Column order and headers for the form data export. */
+const EXPORT_FIELDS: Array<keyof ProjectFormValues> = [
+  "name",
+  "primaryCategory",
+  "tags",
+  "description",
+  "websiteUrl",
+  "githubUrl",
+  "logoUrl",
+  "docsUrl",
+  "auditReportUrl",
+  "bugBountyUrl",
+  "contractAddresses",
+];
+
+const EXPORT_LABELS: Record<string, string> = {
+  name: "Project Name",
+  primaryCategory: "Category",
+  tags: "Tags",
+  description: "Description",
+  websiteUrl: "Project Website",
+  githubUrl: "Repository URL",
+  logoUrl: "Logo URL",
+  docsUrl: "Documentation URL",
+  auditReportUrl: "Audit Report URL",
+  bugBountyUrl: "Bug Bounty URL",
+  contractAddresses: "Contract Addresses",
+};
+
 type ProjectFormProps = {
   mode?: "create" | "edit";
   initialData?: Partial<ProjectFormValues> & { category?: string };
@@ -150,10 +178,14 @@ export default function ProjectForm({
     payload: ProjectFormValues & { domain?: string } | null;
   }>({ isOpen: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [submissionError, setSubmissionError] = useState<Error | string | null>(null);
+  const [submissionRetryCount, setSubmissionRetryCount] = useState(0);
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
   const { publicKey } = useWallet();
+  const { t, locale } = useTranslation();
 
   // Draft management – passes wallet address so drafts sync to the server
   const draft = useDraft({
@@ -187,6 +219,22 @@ export default function ProjectForm({
     [heatmap.formRef, sessionRecording.formRef],
   );
 
+  const defaultFormValues: ProjectFormValues = {
+    name: initialData?.name || "",
+    primaryCategory: initialData?.primaryCategory || initialData?.category || "",
+    tags: initialData?.tags || [],
+    description: initialData?.description || "",
+    websiteUrl: initialData?.websiteUrl || "",
+    githubUrl: initialData?.githubUrl || "",
+    logoUrl: initialData?.logoUrl || "",
+    docsUrl: initialData?.docsUrl || "",
+    auditReportUrl: initialData?.auditReportUrl || "",
+    bugBountyUrl: initialData?.bugBountyUrl || "",
+    contractAddresses: initialData?.contractAddresses?.length
+      ? initialData.contractAddresses
+      : [],
+  };
+
   const {
     register,
     handleSubmit,
@@ -194,23 +242,11 @@ export default function ProjectForm({
     formState: { errors, isDirty },
     reset,
     watch,
+    getValues,
+    setValue,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
-    defaultValues: {
-      name: initialData?.name || "",
-      primaryCategory: initialData?.primaryCategory || initialData?.category || "",
-      tags: initialData?.tags || [],
-      description: initialData?.description || "",
-      websiteUrl: initialData?.websiteUrl || "",
-      githubUrl: initialData?.githubUrl || "",
-      logoUrl: initialData?.logoUrl || "",
-      docsUrl: initialData?.docsUrl || "",
-      auditReportUrl: initialData?.auditReportUrl || "",
-      bugBountyUrl: initialData?.bugBountyUrl || "",
-      contractAddresses: initialData?.contractAddresses?.length
-        ? initialData.contractAddresses
-        : [],
-    },
+    defaultValues: defaultFormValues,
   });
 
 
@@ -240,6 +276,23 @@ export default function ProjectForm({
     draft.saveDraft(watchedValues as ProjectFormValues);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues)]);
+
+  const trackedFieldCount = 10 + (watchedValues.contractAddresses?.length ?? 0);
+  const completedFieldCount = [
+    watchedValues.name,
+    watchedValues.primaryCategory,
+    watchedValues.tags?.length,
+    watchedValues.description,
+    watchedValues.websiteUrl,
+    watchedValues.githubUrl,
+    watchedValues.logoUrl,
+    watchedValues.docsUrl,
+    watchedValues.auditReportUrl,
+    watchedValues.bugBountyUrl,
+    ...(watchedValues.contractAddresses ?? []),
+  ].filter((value) =>
+    typeof value === "string" ? value.trim().length > 0 : Boolean(value),
+  ).length;
 
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
@@ -275,6 +328,7 @@ export default function ProjectForm({
           heatmap.captureSnapshot();
           sessionRecording.stop();
           if (mode !== "edit") {
+            const qualityScore = computeQualityScore(cleanedPayload);
             try {
               let submittedBy = "unknown";
               try {
@@ -283,7 +337,6 @@ export default function ProjectForm({
                 // wallet may disconnect after tx
               }
 
-              const qualityScore = computeQualityScore(cleanedPayload);
               const existingNames = projectService
                 .getAllProjects()
                 .map((p) => p.name);
@@ -300,6 +353,36 @@ export default function ProjectForm({
                 qualityScore,
                 flagReasons,
               });
+
+              // Fire-and-forget post-submit integrations (email / webhooks / CRM).
+              // Failures are isolated inside the orchestrator and never block UX.
+              const submissionId = generateProjectIdFromName(cleanedPayload.name);
+              void runFormIntegrations({
+                submissionId,
+                formType: "project-submission",
+                data: {
+                  name: cleanedPayload.name,
+                  projectName: cleanedPayload.name,
+                  primaryCategory:
+                    CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ??
+                    cleanedPayload.primaryCategory,
+                  websiteUrl: cleanedPayload.websiteUrl,
+                  githubUrl: cleanedPayload.githubUrl,
+                  description: cleanedPayload.description,
+                  docsUrl: cleanedPayload.docsUrl,
+                  logoUrl: cleanedPayload.logoUrl,
+                },
+                locale,
+                metadata: {
+                  submittedBy,
+                  mode,
+                },
+              }).catch((integrationError) => {
+                console.error(
+                  "[ProjectForm] Form integrations failed:",
+                  integrationError,
+                );
+              });
             } catch (moderationError) {
               console.error("[ProjectForm] Failed to record submission moderation:", moderationError);
             }
@@ -313,12 +396,29 @@ export default function ProjectForm({
           });
           // Clear draft after successful submission
           draft.clearDraft();
+          setSubmissionError(null);
+          setSubmissionRetryCount(0);
           reset();
+          if (mode !== "edit") {
+            try {
+              awardSubmission(
+                publicKey,
+                `${generateProjectIdFromName(cleanedPayload.name)}:${Date.now()}`,
+                computeQualityScore(cleanedPayload),
+              );
+            } catch (gamificationError) {
+              logger.error(
+                "Failed to record submission rewards",
+                { operation: "awardSubmission", userAction: "tracking submission rewards" },
+                gamificationError,
+              );
+            }
+          }
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
           setTimeout(() => router.push(redirectPath), 1500);
         } else {
-          conversion.trackFailure("transaction_incomplete");
+          setSubmissionError("Transaction could not be completed. Please review and retry.");
           trackProjectSubmit({
             success: false,
             mode,
@@ -326,6 +426,7 @@ export default function ProjectForm({
           });
         }
       } catch (error) {
+        setSubmissionError(error instanceof Error ? error : String(error));
         logger.error("Soroban project operation failed", {
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
@@ -342,7 +443,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft, conversion, heatmap, sessionRecording],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, locale],
   );
 
   const onPreSubmit = useCallback(
@@ -469,6 +570,43 @@ export default function ProjectForm({
           onDiscard={handleDiscardDraft}
         />
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {mode === "edit" && initialData && (
+            <button
+              type="button"
+              onClick={() => setShowComparison(!showComparison)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-xs"
+            >
+              <GitCompare className="w-3.5 h-3.5" />
+              {showComparison ? "Hide Changes" : "Compare Changes"}
+            </button>
+          )}
+
+          <FormExportMenu
+            getData={() => getValues()}
+            filename={watchedValues.name || "project-form"}
+            fields={EXPORT_FIELDS}
+            labels={EXPORT_LABELS}
+            className="justify-end ml-auto"
+          />
+        </div>
+
+        {mode === "edit" && initialData && showComparison && (
+          <FormValueComparison
+            originalValues={defaultFormValues}
+            currentValues={watchedValues}
+            fieldLabels={EXPORT_LABELS}
+            onResetField={(key, originalVal) => {
+              setValue(key as any, originalVal, { shouldDirty: true, shouldValidate: true });
+            }}
+            onResetAll={(orig) => {
+              Object.entries(orig).forEach(([k, v]) => {
+                setValue(k as any, v, { shouldDirty: true, shouldValidate: true });
+              });
+            }}
+          />
+        )}
+
         {/* Quality Checklist */}
         <SubmissionChecklist
           formData={{
@@ -491,12 +629,14 @@ export default function ProjectForm({
             maxLength={50}
             {...register("name")}
             error={errors.name?.message}
+            helperText={t("projectForm.hints.name")}
           />
           <SelectField
             label="Category"
             options={CATEGORY_FORM_OPTIONS}
             {...register("primaryCategory")}
             error={errors.primaryCategory?.message}
+            helperText={t("projectForm.hints.category")}
           />
         </div>
 
@@ -520,6 +660,7 @@ export default function ProjectForm({
           maxLength={500}
           {...register("description")}
           error={errors.description?.message}
+          helperText={t("projectForm.hints.description")}
         />
 
         <FormField
@@ -527,6 +668,7 @@ export default function ProjectForm({
           placeholder="https://yourproject.com"
           {...register("websiteUrl")}
           error={errors.websiteUrl?.message}
+          helperText={t("projectForm.hints.websiteUrl")}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -535,19 +677,21 @@ export default function ProjectForm({
             placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
-            helperText="Supported: GitHub, GitLab, Bitbucket"
+            helperText={t("projectForm.hints.githubUrl")}
           />
           <FormField
             label="Logo URL (Optional)"
             placeholder="https://..."
             {...register("logoUrl")}
             error={errors.logoUrl?.message}
+            helperText={t("projectForm.hints.logoUrl")}
           />
           <FormField
             label="Documentation URL (Optional)"
             placeholder="https://docs..."
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
+            helperText={t("projectForm.hints.docsUrl")}
           />
         </div>
 
@@ -557,12 +701,14 @@ export default function ProjectForm({
             placeholder="https://..."
             {...register("auditReportUrl")}
             error={errors.auditReportUrl?.message}
+            helperText={t("projectForm.hints.auditReportUrl")}
           />
           <FormField
             label="Bug Bounty URL (Optional)"
             placeholder="https://..."
             {...register("bugBountyUrl")}
             error={errors.bugBountyUrl?.message}
+            helperText={t("projectForm.hints.bugBountyUrl")}
           />
         </div>
 
@@ -576,9 +722,8 @@ export default function ProjectForm({
                   (Optional)
                 </span>
               </label>
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                Soroban contract IDs associated with this project — 56 characters
-                starting with&nbsp;'C'.
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400" role="note">
+                {t("projectForm.hints.contractAddresses")}
               </p>
             </div>
           </div>
@@ -726,8 +871,29 @@ export default function ProjectForm({
             progress={progress}
             onRetry={() => {
               setIsSubmitting(true);
+              setSubmissionRetryCount((prev) => prev + 1);
               void retry().finally(() => setIsSubmitting(false));
             }}
+          />
+        )}
+
+        {(progress.phase === "failure" || (submissionError && progress.phase === "idle")) && (
+          <FormSubmissionRetry
+            error={submissionError || progress.errorMessage || progress.message}
+            retryCount={submissionRetryCount}
+            maxRetries={3}
+            isRetrying={isSubmitting || isInProgress}
+            onRetry={async () => {
+              setSubmissionRetryCount((prev) => prev + 1);
+              setIsSubmitting(true);
+              setSubmissionError(null);
+              if (progress.phase === "failure") {
+                await retry().finally(() => setIsSubmitting(false));
+              } else {
+                await executeSubmit(getValues() as ProjectFormValues);
+              }
+            }}
+            onDismiss={() => setSubmissionError(null)}
           />
         )}
 
