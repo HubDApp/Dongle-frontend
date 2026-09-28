@@ -30,6 +30,16 @@ import {
   trackFormSubmissionSuccess,
   trackFormValidationPerformance,
 } from "@/lib/analytics";
+import {
+  recordFieldFocus,
+  recordFieldChange,
+  recordFieldValidationOutcome,
+  recordValidationPerf,
+  recordSubmissionAttempt,
+  recordSubmissionSuccess,
+  recordSubmissionError,
+  recordFormAbandonment,
+} from "@/lib/analytics/form-aggregator";
 
 /** Threshold above which a validation is flagged as "slow" in analytics. */
 const SLOW_VALIDATION_THRESHOLD_MS = 100;
@@ -128,6 +138,8 @@ export function useFormAnalytics({
       totalFieldCount: fieldCount,
       timeSpentMs,
     });
+    // Aggregate locally (issue #521)
+    recordFormAbandonment(formId);
   }, [formId, fieldCount]);
 
   useEffect(() => {
@@ -153,6 +165,8 @@ export function useFormAnalytics({
           fieldCount,
           hasErrors: opts?.hasErrors ?? false,
         });
+        // Aggregate locally (issue #521)
+        recordSubmissionAttempt(formId);
         submissionStartRef.current = Date.now();
         try {
           await handler(data, opts?.hasErrors);
@@ -161,6 +175,8 @@ export function useFormAnalytics({
               ? Date.now() - submissionStartRef.current
               : undefined;
           trackFormSubmissionSuccess({ formId, durationMs });
+          // Aggregate locally (issue #521)
+          recordSubmissionSuccess(formId, durationMs);
         } catch (err: unknown) {
           const code =
             err instanceof Error
@@ -175,6 +191,8 @@ export function useFormAnalytics({
               ? "validation"
               : "unknown",
           });
+          // Aggregate locally (issue #521)
+          recordSubmissionError(formId, code);
           // Re-throw so the form's own error handling still works
           throw err;
         }
@@ -188,6 +206,8 @@ export function useFormAnalytics({
       onFocus: () => {
         lastInteractedFieldRef.current = fieldName;
         trackFormFieldFocus({ formId, fieldName });
+        // Aggregate locally (issue #522)
+        recordFieldFocus(formId, fieldName);
       },
       onChange: (e) => {
         lastInteractedFieldRef.current = fieldName;
@@ -202,6 +222,8 @@ export function useFormAnalytics({
         if (existing) clearTimeout(existing);
         const timer = setTimeout(() => {
           trackFormFieldChange({ formId, fieldName, hasValue });
+          // Aggregate locally (issue #522)
+          recordFieldChange(formId, fieldName);
           changeTimersRef.current.delete(fieldName);
         }, FIELD_CHANGE_DEBOUNCE_MS);
         changeTimersRef.current.set(fieldName, timer);
@@ -214,6 +236,8 @@ export function useFormAnalytics({
           changeTimersRef.current.delete(fieldName);
           const hasValue = e.target.value.trim().length > 0;
           trackFormFieldChange({ formId, fieldName, hasValue });
+          // Aggregate locally (issue #522)
+          recordFieldChange(formId, fieldName);
         }
       },
     }),
@@ -238,6 +262,8 @@ export function useFormAnalytics({
           isSlow: durationMs > SLOW_VALIDATION_THRESHOLD_MS,
           debounceDelayMs,
         });
+        // Aggregate locally (issue #523)
+        recordValidationPerf(formId, fieldName, durationMs, debounceDelayMs);
         return result;
       } catch (err) {
         const durationMs = Math.round(performance.now() - start);
@@ -248,16 +274,19 @@ export function useFormAnalytics({
           isSlow: durationMs > SLOW_VALIDATION_THRESHOLD_MS,
           debounceDelayMs,
         });
+        // Aggregate locally (issue #523)
+        recordValidationPerf(formId, fieldName, durationMs, debounceDelayMs);
         throw err;
       }
     },
     [formId]
   );
 
-  // ── Manual field validation recorder ─────────────────────────────────────
   const recordFieldValidation = useCallback(
     (fieldName: string, success: boolean, errorCode?: string) => {
       trackFormFieldValidation({ formId, fieldName, success, errorCode });
+      // Aggregate locally (issue #522)
+      recordFieldValidationOutcome(formId, fieldName, success, errorCode);
     },
     [formId]
   );

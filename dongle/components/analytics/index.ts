@@ -1,2 +1,3 @@
 export { default as AnalyticsProvider } from "./AnalyticsProvider";
 export { default as AnalyticsRoot } from "./AnalyticsRoot";
+export { default as FormAnalyticsPanel } from "./FormAnalyticsPanel";
