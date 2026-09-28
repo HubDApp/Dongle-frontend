@@ -16,6 +16,10 @@ interface InMemoryReview {
   createdAt: string;
   helpfulVotes: string[];
   unhelpfulVotes: string[];
+  signedPayload?: string;
+  signature?: string;
+  signatureNonce?: string;
+  signatureTimestamp?: string;
 }
 
 const store = new Map<string, InMemoryReview>();
