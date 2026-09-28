@@ -29,6 +29,7 @@ import {
   Activity,
   Wallet,
   Search,
+  ShieldCheck,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
@@ -760,6 +761,14 @@ export default function ProfilePage() {
                     onClick={() => router.push("/projects/new")}
                   >
                     Submit Project
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => router.push("/settings/twofa")}
+                    leftIcon={<ShieldCheck className="w-4 h-4" />}
+                  >
+                    Two-Factor Auth
                   </Button>
                 </div>
               </div>
