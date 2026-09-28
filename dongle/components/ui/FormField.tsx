@@ -6,10 +6,12 @@ interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   helperText?: string;
   showCounter?: boolean;
+  /** When true, shows a required indicator and sets aria-required. */
+  required?: boolean;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, required, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
@@ -70,6 +72,11 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         <div className="flex justify-between items-end">
           <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             {label}
+            {required ? (
+              <span className="text-red-500 ml-0.5" aria-hidden="true">
+                *
+              </span>
+            ) : null}
           </label>
           {showCounter && maxLength && (
             <span
@@ -90,6 +97,8 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           defaultValue={defaultValue}
           error={!!displayError}
           onChange={handleChange}
+          required={required}
+          aria-required={required || undefined}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
           aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
           className={className}
