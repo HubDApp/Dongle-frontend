@@ -173,6 +173,19 @@ export const es: Messages = {
       confirmLabel: "Descartar borrador",
       cancelLabel: "Conservar borrador",
     },
+    hints: {
+      name: "Usa un nombre claro y único para que otros puedan encontrar tu proyecto.",
+      category: "Elige la categoría que mejor coincida con el uso principal del proyecto.",
+      tags: "Añade algunas palabras clave (pulsa Enter tras cada una) para mejorar la visibilidad.",
+      description: "Resume qué hace el proyecto en 1–3 frases. Evita el lenguaje publicitario.",
+      websiteUrl: "Enlace a la página pública que los usuarios deben visitar primero.",
+      githubUrl: "Compatible: GitHub, GitLab, Bitbucket. Se prefieren repositorios públicos.",
+      logoUrl: "URL directa de imagen (PNG/SVG/JPG). Los logos cuadrados funcionan mejor.",
+      docsUrl: "Enlace a documentación, whitepaper o guía de inicio.",
+      auditReportUrl: "Enlace a un informe de auditoría de seguridad público, si existe.",
+      bugBountyUrl: "Enlace a un programa activo de bug bounty o divulgación de vulnerabilidades.",
+      contractAddresses: "IDs de contratos Soroban — 56 caracteres que empiezan por 'C'.",
+    },
   },
 
   reviews: {

@@ -3,15 +3,17 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
+  helperText?: string;
   showCounter?: boolean;
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
     const counterId = `${textareaId}-counter`;
+    const helperId = `${textareaId}-helper`;
 
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const [charCount, setCharCount] = useState(0);
@@ -94,12 +96,21 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           value={value}
           defaultValue={defaultValue}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
-          aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : ""].filter(Boolean).join(" ") || undefined}
+          aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
         />
         {displayError && (
           <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
             {displayError}
+          </span>
+        )}
+        {!displayError && helperText && (
+          <span
+            id={helperId}
+            className="text-xs text-zinc-500 dark:text-zinc-400 ml-1"
+            role="note"
+          >
+            {helperText}
           </span>
         )}
       </div>
