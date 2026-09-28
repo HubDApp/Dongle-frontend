@@ -1,4 +1,5 @@
 export { default as AddressDisplay } from "./AddressDisplay";
+export { AutocompleteField } from "./AutocompleteField";
 export { Badge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
