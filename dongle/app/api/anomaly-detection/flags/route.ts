@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Default: Get pending reviews
-    const pending = manager.getPendingReviews(formType || undefined, severity, limit);
+    const pending = manager.getPendingReviews(formType || undefined, severity || undefined, limit);
     return NextResponse.json({
       count: pending.length,
       limit,
