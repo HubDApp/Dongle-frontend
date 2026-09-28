@@ -29,4 +29,15 @@ export {
   trackProjectSubmit,
   trackVerificationRequest,
   trackReviewSubmit,
+  // Issue #521: Form submission analytics
+  trackFormSubmissionAttempt,
+  trackFormSubmissionSuccess,
+  trackFormSubmissionError,
+  trackFormAbandonment,
+  // Issue #522: Form field interaction analytics
+  trackFormFieldFocus,
+  trackFormFieldChange,
+  trackFormFieldValidation,
+  // Issue #523: Form validation performance analytics
+  trackFormValidationPerformance,
 } from "./events";

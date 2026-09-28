@@ -11,6 +11,7 @@ import { ShieldCheck } from "lucide-react";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { toast } from "sonner";
 import { trackVerificationRequest } from "@/lib/analytics";
+import { useFormAnalytics } from "@/hooks/useFormAnalytics";
 
 const verificationSchema = z.object({
   projectId: z
@@ -30,7 +31,7 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
   } = useForm<VerificationFormValues>({
     resolver: zodResolver(verificationSchema),
@@ -39,30 +40,47 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
     },
   });
 
+  // Issue #521, #522, #523: form analytics
+  const analytics = useFormAnalytics({
+    formId: "verification-request",
+    fieldCount: 1,
+    isDirty,
+  });
+
+  const projectIdHandlers = analytics.fieldHandlers("projectId");
+
   const onSubmit = async (data: VerificationFormValues) => {
     setIsSubmitting(true);
-    const promise = sorobanService.requestVerification(data.projectId, data.projectId);
-
-    toast.promise(promise, {
-      loading: "Submitting verification request...",
-      success: () => {
-        setIsSubmitting(false);
-        reset();
-        trackVerificationRequest({
-          success: true,
-          projectRefLength: data.projectId.length,
+    // Track submission attempt (issue #521)
+    const hasErrors = Object.keys(errors).length > 0;
+    analytics.wrapSubmit(
+      async () => {
+        const promise = sorobanService.requestVerification(data.projectId, data.projectId);
+        toast.promise(promise, {
+          loading: "Submitting verification request...",
+          success: () => {
+            setIsSubmitting(false);
+            reset();
+            trackVerificationRequest({
+              success: true,
+              projectRefLength: data.projectId.length,
+            });
+            if (onSuccess) onSuccess(data.projectId);
+            return `Verification requested successfully!`;
+          },
+          error: (err) => {
+            setIsSubmitting(false);
+            trackVerificationRequest({
+              success: false,
+              errorCode: err instanceof Error ? err.name || "Error" : "unknown",
+            });
+            return `Request failed: ${err.message}`;
+          },
         });
-        if (onSuccess) onSuccess(data.projectId);
-        return `Verification requested successfully!`;
       },
-      error: (err) => {
-        setIsSubmitting(false);
-        trackVerificationRequest({
-          success: false,
-          errorCode: err instanceof Error ? err.name || "Error" : "unknown",
-        });
-        return `Request failed: ${err.message}`;
-      },
+      { hasErrors }
+    )(data).catch(() => {
+      setIsSubmitting(false);
     });
   };
 
@@ -91,6 +109,21 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
           label="Project ID or Domain"
           placeholder="e.g. yourproject.com"
           {...register("projectId")}
+          onFocus={projectIdHandlers.onFocus}
+          onChange={(e) => {
+            projectIdHandlers.onChange(e);
+            register("projectId").onChange(e);
+          }}
+          onBlur={(e) => {
+            projectIdHandlers.onBlur(e);
+            register("projectId").onBlur(e);
+            // Track field-level validation on blur (issue #522)
+            analytics.recordFieldValidation(
+              "projectId",
+              !errors.projectId,
+              errors.projectId?.message
+            );
+          }}
           error={errors.projectId?.message}
         />
 
