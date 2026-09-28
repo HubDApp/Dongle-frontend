@@ -1,6 +1,8 @@
 export { useAdminAccess } from "./useAdminAccess";
 export type { AdminAccessResult } from "./useAdminAccess";
 export { useAsyncData } from "./useAsyncData";
+export { useCopyToClipboard } from "./useCopyToClipboard";
+export type { UseCopyToClipboardReturn } from "./useCopyToClipboard";
 export { ConfirmDialogProvider, useConfirm } from "./useConfirm";
 export { useDiscoverParams } from "./useDiscoverParams";
 export type { SortBy, DiscoverParams, DiscoverParamsActions } from "./useDiscoverParams";

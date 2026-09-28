@@ -4,6 +4,8 @@ export { Badge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { ConfirmDialog } from "./ConfirmDialog";
+export { CopyableFormField } from "./CopyableFormField";
+export { CopyableTextAreaField } from "./CopyableTextAreaField";
 export type { ConfirmDialogVariant, ConfirmDialogOptions } from "./ConfirmDialog";
 export { default as ErrorDisplay } from "./ErrorDisplay";
 export { FormField } from "./FormField";
