@@ -5,5 +5,4 @@ export * from "./repository";
 export * from "./review";
 export * from "./update";
 export * from "./notification";
-export * from "./webhook";
-export * from "./batch";
+export * from "./twofa";
