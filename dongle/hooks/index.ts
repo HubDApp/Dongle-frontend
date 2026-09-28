@@ -25,6 +25,8 @@ export { useWalletTransactions } from "./useWalletTransactions";
 export { useAdminSession } from "./useAdminSession";
 export { useDebounce, useDebouncedCallback } from "./useDebounce";
 export { useIntersectionObserver, useLazyLoad } from "./useIntersectionObserver";
+export { useTeamCollaboration } from "./useTeamCollaboration";
+export type { UseTeamCollaborationOptions, UseTeamCollaborationReturn } from "./useTeamCollaboration";
 export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
 export type { WalletTransaction } from "./useWalletTransactions";
 export { useFormRecommendations } from "./useFormRecommendations";

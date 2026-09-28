@@ -1,10 +1,12 @@
 export { default as AddressDisplay } from "./AddressDisplay";
+export { Avatar, AvatarFallback, AvatarImage } from "./Avatar";
 export { Badge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogVariant, ConfirmDialogOptions } from "./ConfirmDialog";
 export { default as ErrorDisplay } from "./ErrorDisplay";
+export { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./DropdownMenu";
 export { FormField } from "./FormField";
 export { IconButton } from "./IconButton";
 export type { IconButtonProps } from "./IconButton";
