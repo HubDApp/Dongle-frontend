@@ -26,6 +26,7 @@ import { useWallet } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FormExportMenu } from "@/components/ui/FormExportMenu";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
@@ -122,6 +123,35 @@ const projectSchema = z.object({
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 
+/** Column order and headers for the form data export. */
+const EXPORT_FIELDS: Array<keyof ProjectFormValues> = [
+  "name",
+  "primaryCategory",
+  "tags",
+  "description",
+  "websiteUrl",
+  "githubUrl",
+  "logoUrl",
+  "docsUrl",
+  "auditReportUrl",
+  "bugBountyUrl",
+  "contractAddresses",
+];
+
+const EXPORT_LABELS: Record<string, string> = {
+  name: "Project Name",
+  primaryCategory: "Category",
+  tags: "Tags",
+  description: "Description",
+  websiteUrl: "Project Website",
+  githubUrl: "Repository URL",
+  logoUrl: "Logo URL",
+  docsUrl: "Documentation URL",
+  auditReportUrl: "Audit Report URL",
+  bugBountyUrl: "Bug Bounty URL",
+  contractAddresses: "Contract Addresses",
+};
+
 type ProjectFormProps = {
   mode?: "create" | "edit";
   initialData?: Partial<ProjectFormValues> & { category?: string };
@@ -164,6 +194,7 @@ export default function ProjectForm({
     formState: { errors, isDirty },
     reset,
     watch,
+    getValues,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: {
@@ -407,6 +438,14 @@ export default function ProjectForm({
           isSaving={draft.isSaving}
           saveError={draft.saveError}
           onDiscard={handleDiscardDraft}
+        />
+
+        <FormExportMenu
+          getData={() => getValues()}
+          filename={watchedValues.name || "project-form"}
+          fields={EXPORT_FIELDS}
+          labels={EXPORT_LABELS}
+          className="justify-end"
         />
 
         {/* Quality Checklist */}
