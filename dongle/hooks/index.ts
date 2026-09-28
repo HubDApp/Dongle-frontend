@@ -32,3 +32,5 @@ export { useFormPasteDetection } from "./useFormPasteDetection";
 export type { PasteEvent, PasteStats, UseFormPasteDetectionOptions, UseFormPasteDetectionResult } from "./useFormPasteDetection";
 export { useFieldUndoRedo } from "./useFieldUndoRedo";
 export type { UseFieldUndoRedoOptions, UseFieldUndoRedoResult } from "./useFieldUndoRedo";
+export { useFieldSearchReplace } from "./useFieldSearchReplace";
+export type { SearchMatch, UseFieldSearchReplaceOptions, UseFieldSearchReplaceResult } from "./useFieldSearchReplace";

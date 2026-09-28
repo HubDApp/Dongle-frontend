@@ -34,6 +34,8 @@ export { FormValueComparison, areValuesDifferent } from "./FormValueComparison";
 export type { FormValueComparisonProps } from "./FormValueComparison";
 export { FieldUndoRedoControls } from "./FieldUndoRedoControls";
 export type { FieldUndoRedoControlsProps } from "./FieldUndoRedoControls";
+export { FieldSearchReplacePanel } from "./FieldSearchReplacePanel";
+export type { FieldSearchReplacePanelProps } from "./FieldSearchReplacePanel";
 export { ConditionalField } from "./ConditionalField";
 export { FieldSuggestions } from "./FieldSuggestions";
 export { ThemeToggle } from "./ThemeToggle";
