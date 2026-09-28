@@ -28,4 +28,5 @@ export { useIntersectionObserver, useLazyLoad } from "./useIntersectionObserver"
 export type { UseWalletPageGateOptions, WalletPageGateResult } from "./useWalletPageGate";
 export type { WalletTransaction } from "./useWalletTransactions";
 export { useFormRecommendations } from "./useFormRecommendations";
-export { useFormRateLimit } from "./useFormRateLimit";
+export { useFormExperiment } from "./useFormExperiment";
+

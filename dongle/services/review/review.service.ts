@@ -116,6 +116,7 @@ async function getReviews(): Promise<Review[]> {
 async function addReview(
   review: Omit<Review, "id" | "createdAt">,
   userAddress: string,
+  signedPayload?: { payload: string; signature: string; nonce: string; timestamp: string },
 ): Promise<{ success: boolean; data?: Review; errors?: ReviewValidationError[] }> {
   const validationErrors = validateReview(review.rating, review.comment);
   if (validationErrors.length > 0) {
@@ -124,7 +125,7 @@ async function addReview(
 
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.addReview(review, userAddress);
+      return await reviewApiService.addReview(review, userAddress, signedPayload);
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -138,6 +139,12 @@ async function addReview(
     return { success: false, errors: [{ field: "comment", message: "You have already reviewed this project" }] };
   }
   const newReview: Review = { ...review, userAddress, id: generateId(), createdAt: new Date().toISOString() };
+  if (signedPayload) {
+    newReview.signedPayload = signedPayload.payload;
+    newReview.signature = signedPayload.signature;
+    newReview.signatureNonce = signedPayload.nonce;
+    newReview.signatureTimestamp = signedPayload.timestamp;
+  }
   saveLocalReviews([newReview, ...reviews]);
   return { success: true, data: newReview };
 }
