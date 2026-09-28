@@ -40,6 +40,8 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
+import { runFormIntegrations } from "@/services/form-integrations";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -182,6 +184,7 @@ export default function ProjectForm({
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
   const { publicKey } = useWallet();
+  const { t, locale } = useTranslation();
 
   // Draft management – passes wallet address so drafts sync to the server
   const draft = useDraft({
@@ -306,6 +309,36 @@ export default function ProjectForm({
                 qualityScore,
                 flagReasons,
               });
+
+              // Fire-and-forget post-submit integrations (email / webhooks / CRM).
+              // Failures are isolated inside the orchestrator and never block UX.
+              const submissionId = generateProjectIdFromName(cleanedPayload.name);
+              void runFormIntegrations({
+                submissionId,
+                formType: "project-submission",
+                data: {
+                  name: cleanedPayload.name,
+                  projectName: cleanedPayload.name,
+                  primaryCategory:
+                    CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ??
+                    cleanedPayload.primaryCategory,
+                  websiteUrl: cleanedPayload.websiteUrl,
+                  githubUrl: cleanedPayload.githubUrl,
+                  description: cleanedPayload.description,
+                  docsUrl: cleanedPayload.docsUrl,
+                  logoUrl: cleanedPayload.logoUrl,
+                },
+                locale,
+                metadata: {
+                  submittedBy,
+                  mode,
+                },
+              }).catch((integrationError) => {
+                console.error(
+                  "[ProjectForm] Form integrations failed:",
+                  integrationError,
+                );
+              });
             } catch (moderationError) {
               console.error("[ProjectForm] Failed to record submission moderation:", moderationError);
             }
@@ -348,7 +381,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, locale],
   );
 
   const onPreSubmit = useCallback(
@@ -511,12 +544,14 @@ export default function ProjectForm({
             maxLength={50}
             {...register("name")}
             error={errors.name?.message}
+            helperText={t("projectForm.hints.name")}
           />
           <SelectField
             label="Category"
             options={CATEGORY_FORM_OPTIONS}
             {...register("primaryCategory")}
             error={errors.primaryCategory?.message}
+            helperText={t("projectForm.hints.category")}
           />
         </div>
 
@@ -540,6 +575,7 @@ export default function ProjectForm({
           maxLength={500}
           {...register("description")}
           error={errors.description?.message}
+          helperText={t("projectForm.hints.description")}
         />
 
         <FormField
@@ -547,6 +583,7 @@ export default function ProjectForm({
           placeholder="https://yourproject.com"
           {...register("websiteUrl")}
           error={errors.websiteUrl?.message}
+          helperText={t("projectForm.hints.websiteUrl")}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -555,19 +592,21 @@ export default function ProjectForm({
             placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
-            helperText="Supported: GitHub, GitLab, Bitbucket"
+            helperText={t("projectForm.hints.githubUrl")}
           />
           <FormField
             label="Logo URL (Optional)"
             placeholder="https://..."
             {...register("logoUrl")}
             error={errors.logoUrl?.message}
+            helperText={t("projectForm.hints.logoUrl")}
           />
           <FormField
             label="Documentation URL (Optional)"
             placeholder="https://docs..."
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
+            helperText={t("projectForm.hints.docsUrl")}
           />
         </div>
 
@@ -577,12 +616,14 @@ export default function ProjectForm({
             placeholder="https://..."
             {...register("auditReportUrl")}
             error={errors.auditReportUrl?.message}
+            helperText={t("projectForm.hints.auditReportUrl")}
           />
           <FormField
             label="Bug Bounty URL (Optional)"
             placeholder="https://..."
             {...register("bugBountyUrl")}
             error={errors.bugBountyUrl?.message}
+            helperText={t("projectForm.hints.bugBountyUrl")}
           />
         </div>
 
@@ -596,9 +637,8 @@ export default function ProjectForm({
                   (Optional)
                 </span>
               </label>
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                Soroban contract IDs associated with this project — 56 characters
-                starting with&nbsp;'C'.
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400" role="note">
+                {t("projectForm.hints.contractAddresses")}
               </p>
             </div>
           </div>

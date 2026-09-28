@@ -160,6 +160,19 @@ export const en = {
       confirmLabel: "Discard Draft",
       cancelLabel: "Keep Draft",
     },
+    hints: {
+      name: "Use a clear, unique name so others can find your project.",
+      category: "Pick the category that best matches your project's primary use.",
+      tags: "Add a few keywords (press Enter after each) to improve discoverability.",
+      description: "Summarize what the project does in 1–3 sentences. Avoid marketing fluff.",
+      websiteUrl: "Link to the public homepage users should visit first.",
+      githubUrl: "Supported: GitHub, GitLab, Bitbucket. Public repos preferred.",
+      logoUrl: "Direct image URL (PNG/SVG/JPG). Square logos work best.",
+      docsUrl: "Link to docs, whitepaper, or getting-started guide.",
+      auditReportUrl: "Link to a public security audit report if available.",
+      bugBountyUrl: "Link to an active bug bounty or vulnerability disclosure program.",
+      contractAddresses: "Soroban contract IDs — 56 characters starting with 'C'.",
+    },
   },
 
   reviews: {
