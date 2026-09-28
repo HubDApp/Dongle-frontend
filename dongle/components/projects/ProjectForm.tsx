@@ -173,14 +173,20 @@ export default function ProjectForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<{
     isOpen: boolean;
+    isExact: boolean;
     matches: Project[];
     reasons: string[];
     payload: ProjectFormValues & { domain?: string } | null;
-  }>({ isOpen: false, matches: [], reasons: [], payload: null });
+  }>({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [submissionError, setSubmissionError] = useState<Error | string | null>(null);
   const [submissionRetryCount, setSubmissionRetryCount] = useState(0);
+
+  // A/B testing experiment for project submission layout and flow
+  const experiment = useFormExperiment({
+    experimentId: "project-submission-v2",
+  });
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
@@ -368,6 +374,7 @@ export default function ProjectForm({
             category: CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ?? cleanedPayload.primaryCategory,
             projectId: mode === "edit" ? projectId : undefined,
           });
+          experiment.trackSubmission();
           // Clear draft after successful submission
           draft.clearDraft();
           setSubmissionError(null);
@@ -398,6 +405,7 @@ export default function ProjectForm({
             mode,
             errorCode: "transaction_incomplete",
           });
+          experiment.trackError();
         }
       } catch (error) {
         setSubmissionError(error instanceof Error ? error : String(error));
@@ -410,6 +418,7 @@ export default function ProjectForm({
           mode,
           errorCode: error instanceof Error ? error.name || "Error" : "unknown",
         });
+        experiment.trackError();
       } finally {
         setIsSubmitting(false);
       }
@@ -419,26 +428,49 @@ export default function ProjectForm({
 
   const onPreSubmit = useCallback(
     (data: ProjectFormValues) => {
+      experiment.trackStart();
       const payload = {
         ...data,
         domain: extractDomain(data.websiteUrl),
       };
 
-      const result = projectService.detectDuplicates({
+      const result = findDuplicates({
+        id: mode === "edit" ? projectId : undefined,
         name: payload.name,
         websiteUrl: payload.websiteUrl,
         githubUrl: payload.githubUrl,
-        excludeProjectId: mode === "edit" ? projectId : undefined,
+        contractAddresses: payload.contractAddresses,
+        description: payload.description,
+        primaryCategory: payload.primaryCategory,
       });
 
-      if (result.hasDuplicates) {
-        setDuplicateWarning({ isOpen: true, matches: result.matches, payload, reasons: result.reasons });
+      if (result.hasExactDuplicate) {
+        // Prevent exact duplicates
+        setDuplicateWarning({
+          isOpen: true,
+          isExact: true,
+          matches: result.candidates.map((c) => c.project),
+          reasons: result.reasons,
+          payload: null,
+        });
+        return;
+      }
+
+      if (result.hasPotentialDuplicates) {
+        // Warn and suggest merges
+        setDuplicateWarning({
+          isOpen: true,
+          isExact: false,
+          matches: result.candidates.map((c) => c.project),
+          reasons: result.reasons,
+          payload,
+        });
         return;
       }
 
       void executeSubmit(payload);
     },
-    [executeSubmit, mode, projectId],
+    [executeSubmit, mode, projectId, experiment],
   );
 
   const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -491,9 +523,16 @@ export default function ProjectForm({
           <Rocket className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            {mode === "edit" ? "Edit Project" : "Register Project"}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight">
+              {mode === "edit" ? "Edit Project" : "Register Project"}
+            </h2>
+            {experiment.variant.id === "variant_guided_steps" && (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                Guided Steps Variant
+              </span>
+            )}
+          </div>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
             {mode === "edit"
               ? "Update your project's information."
@@ -816,20 +855,36 @@ export default function ProjectForm({
 
       <ConfirmDialog
         isOpen={duplicateWarning.isOpen}
-        title="Possible Duplicate Detected"
-        description={`We found existing projects that look very similar to yours:\n\n${duplicateWarning.reasons.join("\n")}\n\nAre you sure you want to continue with this submission?`}
-        confirmLabel="Continue Anyway"
-        cancelLabel="Cancel"
-        variant="warning"
+        title={duplicateWarning.isExact ? "Exact Duplicate Detected" : "Possible Duplicate Detected"}
+        description={
+          duplicateWarning.isExact
+            ? `An identical project already exists in the registry:\n\n${duplicateWarning.reasons.join(
+                "\n",
+              )}\n\nExact duplicate submissions are prevented to protect registry integrity. Please review the existing project or edit your details.`
+            : `We found existing projects that look similar to yours:\n\n${duplicateWarning.reasons.join(
+                "\n",
+              )}\n\nWould you like to continue with your submission or review existing records?`
+        }
+        confirmLabel={duplicateWarning.isExact ? "Review Project" : "Continue Anyway"}
+        cancelLabel={duplicateWarning.isExact ? "Close" : "Cancel"}
+        variant={duplicateWarning.isExact ? "danger" : "warning"}
         onConfirm={() => {
+          if (duplicateWarning.isExact) {
+            const firstMatch = duplicateWarning.matches[0];
+            setDuplicateWarning({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
+            if (firstMatch) {
+              router.push(`/projects/${firstMatch.id}`);
+            }
+            return;
+          }
           const payload = duplicateWarning.payload;
-          setDuplicateWarning({ isOpen: false, matches: [], reasons: [], payload: null });
+          setDuplicateWarning({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
           if (payload) {
             void executeSubmit(payload);
           }
         }}
         onCancel={() => {
-          setDuplicateWarning({ isOpen: false, matches: [], reasons: [], payload: null });
+          setDuplicateWarning({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
         }}
       />
 
