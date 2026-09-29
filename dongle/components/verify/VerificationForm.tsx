@@ -15,6 +15,7 @@ import {
   FormAnnouncerProvider,
   useFormAnnouncer,
 } from "@/components/ui/FormAnnouncer";
+import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
 
 const verificationSchema = z.object({
   projectId: z
@@ -115,7 +116,23 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
         className="space-y-6"
         noValidate
       >
+        {/* Error summary at top of form */}
+        <FormErrorSummary
+          errors={
+            errors.projectId?.message
+              ? [
+                  {
+                    fieldId: "verification-project-id",
+                    label: "Project ID or Domain",
+                    message: errors.projectId.message,
+                  },
+                ]
+              : []
+          }
+        />
+
         <FormField
+          id="verification-project-id"
           label="Project ID or Domain"
           placeholder="e.g. yourproject.com"
           {...register("projectId")}

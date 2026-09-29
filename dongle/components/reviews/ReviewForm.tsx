@@ -14,6 +14,7 @@ import {
   FormAnnouncerProvider,
   useFormAnnouncer,
 } from "@/components/ui/FormAnnouncer";
+import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
 
 interface ReviewFormProps {
   projectId: string;
@@ -122,6 +123,18 @@ function ReviewFormInner({
             <X className="w-5 h-5" />
           </IconButton>
         </div>
+
+        {/* Error summary — shown at the top whenever validation fails */}
+        <FormErrorSummary
+          errors={[
+            ...(errors.rating?.message
+              ? [{ fieldId: ratingGroupId, label: "Rating", message: errors.rating.message }]
+              : []),
+            ...(errors.comment?.message
+              ? [{ fieldId: `${ratingGroupId}-comment`, label: "Comment", message: errors.comment.message }]
+              : []),
+          ]}
+        />
 
         <div className="space-y-4">
           <div>

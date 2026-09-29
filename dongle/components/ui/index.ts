@@ -44,3 +44,5 @@ export type {
   AnnounceOptions,
   AnnouncePriority,
 } from "./FormAnnouncer";
+export { FormErrorSummary, buildErrorItems } from "./FormErrorSummary";
+export type { FormErrorSummaryProps, FormErrorItem } from "./FormErrorSummary";
