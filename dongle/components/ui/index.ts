@@ -1,10 +1,12 @@
 export { default as AddressDisplay } from "./AddressDisplay";
+export { Avatar, AvatarFallback, AvatarImage } from "./Avatar";
 export { Badge } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogVariant, ConfirmDialogOptions } from "./ConfirmDialog";
 export { default as ErrorDisplay } from "./ErrorDisplay";
+export { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./DropdownMenu";
 export { FormField } from "./FormField";
 export { IconButton } from "./IconButton";
 export type { IconButtonProps } from "./IconButton";
@@ -34,3 +36,12 @@ export { FormSubmissionProgress, useFormSubmissionProgress } from "./FormSubmiss
 export type { FormSubmissionProgressProps, SubmissionStep } from "./FormSubmissionProgress";
 export { FormValueComparison, areValuesDifferent } from "./FormValueComparison";
 export type { FormValueComparisonProps } from "./FormValueComparison";
+export { FieldUndoRedoControls } from "./FieldUndoRedoControls";
+export type { FieldUndoRedoControlsProps } from "./FieldUndoRedoControls";
+export { FieldSearchReplacePanel } from "./FieldSearchReplacePanel";
+export type { FieldSearchReplacePanelProps } from "./FieldSearchReplacePanel";
+export { FormConflictResolution } from "./FormConflictResolution";
+export type { FormConflictResolutionProps, FormVersion } from "./FormConflictResolution";
+export { ConditionalField } from "./ConditionalField";
+export { FieldSuggestions } from "./FieldSuggestions";
+export { ThemeToggle } from "./ThemeToggle";

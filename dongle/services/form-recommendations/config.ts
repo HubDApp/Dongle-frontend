@@ -26,9 +26,11 @@ export const DEFAULT_CONFIG: RecommendationConfig = {
   maxValueLength: 120,
 
   // Weights are normalised by their sum, so these are relative, not absolute.
-  frequencyWeight: 0.4,
-  recencyWeight: 0.3,
-  feedbackWeight: 0.3,
+  // Explicit feedback outweighs implicit frequency: a value the user has
+  // accepted should beat one they merely type often.
+  frequencyWeight: 0.2,
+  recencyWeight: 0.2,
+  feedbackWeight: 0.6,
 
   // Fourteen days: a value used two weeks ago scores half the recency of one
   // used today.
@@ -88,7 +90,9 @@ export const SENSITIVE_VALUE_PATTERNS: readonly RegExp[] = [
 
 /** Returns true when the field must never be learned from. */
 export function isSensitiveField(fieldName: string): boolean {
-  const normalised = fieldName.toLowerCase().replace(/[\s-]/g, "");
+  // Strip separators on both sides so "api_key", "api-key" and "apiKey"
+  // all normalise to the same token as the stored patterns.
+  const normalised = fieldName.toLowerCase().replace(/[\s_-]/g, "");
   return SENSITIVE_FIELD_PATTERNS.some((pattern) =>
     normalised.includes(pattern.replace(/[\s_-]/g, "")),
   );

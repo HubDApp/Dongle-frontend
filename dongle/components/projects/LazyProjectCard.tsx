@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useLazyLoad } from "@/hooks/useIntersectionObserver";
 import type { Project } from "@/types/project";
@@ -14,6 +15,12 @@ const ProjectCardDynamic = dynamic(
     ),
   },
 );
+
+interface LazyProjectCardProps {
+  project: Project;
+  verificationStatus?: VerificationStatus;
+  highlightTerm?: string;
+}
 
 /**
  * Defers rendering of ProjectCard until it enters the viewport.
