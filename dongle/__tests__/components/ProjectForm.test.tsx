@@ -117,6 +117,38 @@ describe("ProjectForm component", () => {
     expect(screen.getByRole("button", { name: /submit registration/i })).toBeInTheDocument();
   });
 
+  it("updates the time estimate as fields are filled and added", async () => {
+    renderForm();
+
+    expect(screen.getByText("About 5 minutes remaining")).toBeInTheDocument();
+    expect(screen.getByText("0 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/every project starts with an idea/i)).toBeInTheDocument();
+
+    const user = await fillRequiredFields();
+
+    expect(screen.getByText("About 3 minutes remaining")).toBeInTheDocument();
+    expect(screen.getByText("4 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/great start/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/repository url/i), "https://github.com/stellar/lend");
+    await user.type(screen.getByLabelText(/logo url/i), "https://stellarlend.example/logo.png");
+    expect(screen.getByText("6 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/halfway there/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/documentation url/i), "https://docs.stellarlend.example");
+    await user.type(screen.getByLabelText(/audit report url/i), "https://stellarlend.example/audit");
+    expect(screen.getByText("8 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/three quarters done/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /show encouragement/i }));
+    expect(screen.queryByText(/three quarters done/i)).not.toBeInTheDocument();
+    expect(screen.getByText("8 of 10 fields complete")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
+
+    expect(screen.getByText("8 of 11 fields complete")).toBeInTheDocument();
+  });
+
   it("shows validation errors for invalid inputs", async () => {
     const user = userEvent.setup();
     renderForm();
@@ -243,13 +275,27 @@ describe("ProjectForm component", () => {
   });
 
   it("mocks the Soroban service and verifies the submit call carries normalized form data", async () => {
-    renderForm();
+    renderForm({ initialData: { tags: [" DeFi ", "defi", "payments"] } });
     const user = await fillRequiredFields();
+
+    fireEvent.change(screen.getByLabelText(/project name/i), {
+      target: { value: "  Stellar Lend  " },
+    });
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "  A lending protocol for Stellar.  " },
+    });
+    fireEvent.change(screen.getByLabelText(/project website/i), {
+      target: { value: "  stellarlend.example  " },
+    });
 
     // Add one contract address slot and fill it.
     fireEvent.click(await screen.findByRole("button", { name: /add a contract address/i }));
     fireEvent.change(screen.getByLabelText(/^contract address 1$/i), {
       target: { value: VALID_CONTRACT_ID.toLowerCase() },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
+    fireEvent.change(screen.getByLabelText(/^contract address 2$/i), {
+      target: { value: ` ${VALID_CONTRACT_ID.toLowerCase()} ` },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /submit registration/i }));
@@ -260,8 +306,10 @@ describe("ProjectForm component", () => {
 
     const payload = sorobanMocks.registerProject.mock.calls[0][0];
     expect(payload.name).toBe("Stellar Lend");
+    expect(payload.description).toBe("A lending protocol for Stellar.");
     expect(payload.category).toBe("DeFi / DEX"); // "defi" mapped to display label
-    expect(payload.websiteUrl).toContain("stellarlend.example");
+    expect(payload.websiteUrl).toBe("https://stellarlend.example");
+    expect(payload.tags).toEqual(["defi", "payments"]);
     expect(payload.contractAddresses).toEqual([VALID_CONTRACT_ID]);
     expect(draftHookMocks.clearDraft).toHaveBeenCalled();
   });

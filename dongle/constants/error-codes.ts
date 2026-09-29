@@ -681,9 +681,9 @@ export function getErrorInfo(code: ErrorCode): ErrorCodeInfo {
 export function getErrorCodesByCategory(
   category: ErrorCodeInfo["category"]
 ): ErrorCode[] {
-  return Object.values(ErrorCode).filter(
-    (code) => ERROR_CODE_REGISTRY[code as ErrorCode]?.category === category
-  ) as ErrorCode[];
+  return Object.values(ERROR_CODE_REGISTRY)
+    .filter((info) => info.category === category)
+    .map((info) => info.code);
 }
 
 /**

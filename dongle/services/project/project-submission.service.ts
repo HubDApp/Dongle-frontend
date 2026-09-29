@@ -9,6 +9,9 @@ import {
   ProjectSubmissionAssignmentAction,
 } from "@/types/project";
 
+// Re-exported so consumers can import the submission shape from the service.
+export type { ProjectSubmission };
+
 const STORAGE_KEY = "dongle_project_submissions";
 const MODERATION_LOG_KEY = "dongle_submission_moderation_log";
 

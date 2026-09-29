@@ -36,7 +36,7 @@ const STATE_COOKIE = "dongle_oauth_state";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 const STATE_MAX_AGE = 60 * 10;
 
-function sessionSecret(): Uint8Array {
+function sessionSecret(): Uint8Array<ArrayBuffer> {
   const raw =
     process.env.AUTH_SESSION_SECRET ??
     process.env.ADMIN_JWT_SECRET ??

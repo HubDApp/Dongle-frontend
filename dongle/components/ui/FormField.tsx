@@ -1,20 +1,28 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import type { FieldValues, Path, UseFormRegister, UseFormRegisterReturn } from "react-hook-form";
 import { Input } from "./Input";
 
-interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface FormFieldProps<TFieldValues extends FieldValues = FieldValues>
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name"> {
   label: string;
+  name?: Path<TFieldValues> | string;
+  register?: UseFormRegister<TFieldValues>;
   error?: string;
   helperText?: string;
   showCounter?: boolean;
+  /** When true, shows a required indicator and sets aria-required. */
+  required?: boolean;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, name, register, error, helperText, className = "", id, maxLength, onChange, onBlur, value, defaultValue, showCounter = true, required, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
     const counterId = `${inputId}-counter`;
     const helperId = `${inputId}-helper`;
+    const registration: UseFormRegisterReturn | undefined =
+      register && name ? register(name as Path<FieldValues>) : undefined;
 
     const internalRef = useRef<HTMLInputElement | null>(null);
     const [charCount, setCharCount] = useState(0);
@@ -41,16 +49,25 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         } else if (ref) {
           (ref as React.MutableRefObject<HTMLInputElement | null>).current = element;
         }
+        if (registration?.ref) {
+          registration.ref(element);
+        }
         if (element) {
           setCharCount(element.value.length);
         }
       },
-      [ref]
+      [ref, registration]
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setCharCount(e.target.value.length);
+      registration?.onChange(e);
       onChange?.(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      registration?.onBlur(e);
+      onBlur?.(e);
     };
 
     const isNearLimit = Boolean(maxLength && charCount >= maxLength * 0.9 && charCount < maxLength);
@@ -70,6 +87,11 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         <div className="flex justify-between items-end">
           <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             {label}
+            {required ? (
+              <span className="text-red-500 ml-0.5" aria-hidden="true">
+                *
+              </span>
+            ) : null}
           </label>
           {showCounter && maxLength && (
             <span
@@ -85,11 +107,15 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           {...props}
           ref={setRef}
           id={inputId}
+          name={registration?.name ?? name}
           maxLength={maxLength}
           value={value}
           defaultValue={defaultValue}
           error={!!displayError}
           onChange={handleChange}
+          onBlur={handleBlur}
+          required={required}
+          aria-required={required || undefined}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
           aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
           className={className}
@@ -100,7 +126,11 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           </span>
         )}
         {!displayError && helperText && (
-          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+          <span
+            id={helperId}
+            className="text-xs text-zinc-500 dark:text-zinc-400 ml-1"
+            role="note"
+          >
             {helperText}
           </span>
         )}

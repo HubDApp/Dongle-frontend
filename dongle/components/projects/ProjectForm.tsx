@@ -5,6 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { TagInput } from "@/components/ui/TagInput";
@@ -14,22 +15,33 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 import { walletService } from "@/services/wallet/wallet.service";
 import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
-import { Rocket, CheckCircle2, Plus, X } from "lucide-react";
+import { Rocket, CheckCircle2, Plus, X, GitCompare } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
 import { useOnChainTransaction } from "@/hooks/useOnChainTransaction";
 import { useDraft } from "@/hooks/useDraft";
 import { DraftIndicator } from "@/components/projects/DraftIndicator";
 import { SubmissionChecklist } from "@/components/projects/SubmissionChecklist";
+import { SaveTemplateModal } from "@/components/projects/SaveTemplateModal";
+import { FormTemplateLibrary } from "@/components/projects/FormTemplateLibrary";
 import { useWallet } from "@/context/wallet.context";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FormExportMenu } from "@/components/ui/FormExportMenu";
+import { FormValueComparison } from "@/components/ui/FormValueComparison";
+import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
-import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
+import {
+  CATEGORY_DISPLAY_TO_FORM,
+  CATEGORY_FORM_OPTIONS,
+  CATEGORY_FORM_MAP,
+} from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
@@ -37,6 +49,8 @@ import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
+import { useTranslation } from "@/lib/i18n/useTranslation";
+import { runFormIntegrations } from "@/services/form-integrations";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -97,30 +111,92 @@ const contractIdSchema = z.string().transform((val, ctx) => {
   return normalized;
 });
 
-const projectSchema = z.object({
-  name: z.string().min(3, "Project name must be at least 3 characters"),
-  primaryCategory: z.string().min(1, "Please select a category"),
-  tags: z.array(z.string()),
-  description: z
-    .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(500, "Description cannot exceed 500 characters"),
-  websiteUrl: urlSchema,
-  githubUrl: repositoryUrlSchema,
-  logoUrl: optionalUrlSchema,
-  docsUrl: optionalUrlSchema,
-  auditReportUrl: optionalUrlSchema,
-  bugBountyUrl: optionalUrlSchema,
-  /**
-   * Up to 5 optional Soroban contract addresses.
-   * Each entry is either an empty string (ignored on save) or a valid 56-char
-   * contract ID.  The array itself is always present; individual slots can be
-   * left blank.
-   */
-  contractAddresses: z.array(contractIdSchema).max(5, "You can add at most 5 contract addresses"),
-});
+const projectSchema = z
+  .object({
+    name: z.string().min(3, "Project name must be at least 3 characters"),
+    primaryCategory: z.string().min(1, "Please select a category"),
+    tags: z.array(z.string()),
+    description: z
+      .string()
+      .min(10, "Description must be at least 10 characters")
+      .max(500, "Description cannot exceed 500 characters"),
+    websiteUrl: urlSchema,
+    githubUrl: repositoryUrlSchema,
+    logoUrl: optionalUrlSchema,
+    docsUrl: optionalUrlSchema,
+    auditReportUrl: optionalUrlSchema,
+    bugBountyUrl: optionalUrlSchema,
+    /**
+     * Up to 5 optional Soroban contract addresses.
+     * Each entry is either an empty string (ignored on save) or a valid 56-char
+     * contract ID.  The array itself is always present; individual slots can be
+     * left blank.
+     */
+    contractAddresses: z
+      .array(contractIdSchema)
+      .max(5, "You can add at most 5 contract addresses"),
+  })
+  .superRefine((data, ctx) => {
+    const requirements = getFieldRequirements({
+      primaryCategory: data.primaryCategory,
+      contractAddresses: data.contractAddresses,
+      auditReportUrl: data.auditReportUrl,
+    });
+
+    const ensurePresent = (
+      field: keyof typeof requirements,
+      value: string | undefined,
+    ) => {
+      const rule = requirements[field];
+      if (!rule.required) return;
+      if (!isBlank(value)) return;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [field],
+        message:
+          rule.message ??
+          getRequirementMessage(field, data) ??
+          "This field is required",
+      });
+    };
+
+    ensurePresent("githubUrl", data.githubUrl);
+    ensurePresent("logoUrl", data.logoUrl);
+    ensurePresent("docsUrl", data.docsUrl);
+    ensurePresent("auditReportUrl", data.auditReportUrl);
+    ensurePresent("bugBountyUrl", data.bugBountyUrl);
+  });
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
+
+/** Column order and headers for the form data export. */
+const EXPORT_FIELDS: Array<keyof ProjectFormValues> = [
+  "name",
+  "primaryCategory",
+  "tags",
+  "description",
+  "websiteUrl",
+  "githubUrl",
+  "logoUrl",
+  "docsUrl",
+  "auditReportUrl",
+  "bugBountyUrl",
+  "contractAddresses",
+];
+
+const EXPORT_LABELS: Record<string, string> = {
+  name: "Project Name",
+  primaryCategory: "Category",
+  tags: "Tags",
+  description: "Description",
+  websiteUrl: "Project Website",
+  githubUrl: "Repository URL",
+  logoUrl: "Logo URL",
+  docsUrl: "Documentation URL",
+  auditReportUrl: "Audit Report URL",
+  bugBountyUrl: "Bug Bounty URL",
+  contractAddresses: "Contract Addresses",
+};
 
 type ProjectFormProps = {
   mode?: "create" | "edit";
@@ -138,15 +214,33 @@ export default function ProjectForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<{
     isOpen: boolean;
+    isExact: boolean;
     matches: Project[];
     reasons: string[];
     payload: ProjectFormValues & { domain?: string } | null;
-  }>({ isOpen: false, matches: [], reasons: [], payload: null });
+  }>({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [submissionError, setSubmissionError] = useState<Error | string | null>(null);
+  const [submissionRetryCount, setSubmissionRetryCount] = useState(0);
+
+  // A/B testing experiment for project submission layout and flow
+  const experiment = useFormExperiment({
+    experimentId: "project-submission-v2",
+  });
 
   const router = useRouter();
   const { progress, run, retry, isInProgress } = useOnChainTransaction();
   const { publicKey } = useWallet();
+  const { t, locale } = useTranslation();
+
+  // Form audit logging — records every field change with a timestamp, the
+  // acting wallet identity, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "project-form",
+    formType: mode === "edit" ? "project-edit" : "project-create",
+    actor: publicKey,
+  });
 
   // Draft management – passes wallet address so drafts sync to the server
   const draft = useDraft({
@@ -156,6 +250,45 @@ export default function ProjectForm({
     walletAddress: publicKey,
   });
   const [draftRestored, setDraftRestored] = React.useState(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+
+  const formType = mode === "edit" ? "project-edit" : "project-submission";
+  const conversion = useFormConversion({
+    formId: "project-form",
+    formType,
+  });
+  const captcha = useFormCaptcha({ action: "project_submit" });
+  const heatmap = useFormHeatmap({ formId: "project-form", formType });
+  const sessionRecording = useFormSessionRecording({
+    formId: "project-form",
+    formType,
+    autoStart: false,
+  });
+
+  const bindFormRef = useCallback(
+    (node: HTMLFormElement | null) => {
+      heatmap.formRef(node);
+      sessionRecording.formRef(node);
+    },
+    [heatmap.formRef, sessionRecording.formRef],
+  );
+
+  const defaultFormValues: ProjectFormValues = {
+    name: initialData?.name || "",
+    primaryCategory: initialData?.primaryCategory || initialData?.category || "",
+    tags: initialData?.tags || [],
+    description: initialData?.description || "",
+    websiteUrl: initialData?.websiteUrl || "",
+    githubUrl: initialData?.githubUrl || "",
+    logoUrl: initialData?.logoUrl || "",
+    docsUrl: initialData?.docsUrl || "",
+    auditReportUrl: initialData?.auditReportUrl || "",
+    bugBountyUrl: initialData?.bugBountyUrl || "",
+    contractAddresses: initialData?.contractAddresses?.length
+      ? initialData.contractAddresses
+      : [],
+  };
 
   const {
     register,
@@ -163,25 +296,40 @@ export default function ProjectForm({
     control,
     formState: { errors, isDirty },
     reset,
+    trigger,
     watch,
+    getValues,
+    setValue,
   } = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
-    defaultValues: {
-      name: initialData?.name || "",
-      primaryCategory: initialData?.primaryCategory || initialData?.category || "",
-      tags: initialData?.tags || [],
-      description: initialData?.description || "",
-      websiteUrl: initialData?.websiteUrl || "",
-      githubUrl: initialData?.githubUrl || "",
-      logoUrl: initialData?.logoUrl || "",
-      docsUrl: initialData?.docsUrl || "",
-      auditReportUrl: initialData?.auditReportUrl || "",
-      bugBountyUrl: initialData?.bugBountyUrl || "",
-      contractAddresses: initialData?.contractAddresses?.length
-        ? initialData.contractAddresses
-        : [],
-    },
+    defaultValues: defaultFormValues,
   });
+
+  const nameField = register("name");
+  const matchingProjects = projectSearchQuery.trim().length >= 2
+    ? projectService.getAllProjects().filter((project) => {
+        const query = projectSearchQuery.trim().toLowerCase();
+        return [project.name, project.websiteUrl, project.githubUrl]
+          .some((value) => value?.toLowerCase().includes(query));
+      }).slice(0, 5)
+    : [];
+
+  const selectExistingProject = (project: Project) => {
+    reset({
+      name: project.name,
+      primaryCategory: CATEGORY_DISPLAY_TO_FORM[project.primaryCategory] ?? "",
+      tags: project.tags ?? [],
+      description: project.description ?? "",
+      websiteUrl: project.websiteUrl ?? "",
+      githubUrl: project.githubUrl ?? "",
+      logoUrl: project.logoUrl ?? "",
+      docsUrl: project.docsUrl ?? "",
+      auditReportUrl: project.auditReportUrl ?? "",
+      bugBountyUrl: project.bugBountyUrl ?? "",
+      contractAddresses: project.contractAddresses?.slice(0, 5) ?? [],
+    });
+    setProjectSearchQuery("");
+  };
 
 
 
@@ -193,6 +341,35 @@ export default function ProjectForm({
     }
   }, [draft.loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Apply template queued from /projects/templates
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = sessionStorage.getItem("dongle_pending_form_template");
+      if (!raw) return;
+      sessionStorage.removeItem("dongle_pending_form_template");
+      const data = JSON.parse(raw) as FormTemplate["data"];
+      reset({
+        name: data.name || "",
+        primaryCategory: data.primaryCategory || "",
+        tags: data.tags || [],
+        description: data.description || "",
+        websiteUrl: data.websiteUrl || "",
+        githubUrl: data.githubUrl || "",
+        logoUrl: data.logoUrl || "",
+        docsUrl: data.docsUrl || "",
+        auditReportUrl: data.auditReportUrl || "",
+        bugBountyUrl: data.bugBountyUrl || "",
+        contractAddresses: data.contractAddresses?.length
+          ? data.contractAddresses
+          : [],
+      });
+      toast.success("Template loaded into the form");
+    } catch {
+      // ignore invalid payload
+    }
+  }, [reset]);
+
   useUnsavedChanges(isDirty, isSubmitting);
 
   // Watch form values for checklist and auto-save.
@@ -202,6 +379,27 @@ export default function ProjectForm({
   // and the draft autosave effect below.
   // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
+  const fieldRequirements = getFieldRequirements({
+    primaryCategory: watchedValues.primaryCategory,
+    contractAddresses: watchedValues.contractAddresses,
+    auditReportUrl: watchedValues.auditReportUrl,
+  });
+
+  const fieldLabel = (
+    base: string,
+    field: keyof typeof fieldRequirements,
+    optionalFallback = true,
+  ) => {
+    const rule = fieldRequirements[field];
+    if (rule.required) return base;
+    return optionalFallback ? `${base} (Optional)` : base;
+  };
+
+  // Audit each field change (baseline is captured on the first render).
+  useEffect(() => {
+    trackAuditValues(watchedValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(watchedValues), trackAuditValues]);
 
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
@@ -210,6 +408,23 @@ export default function ProjectForm({
     draft.saveDraft(watchedValues as ProjectFormValues);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues)]);
+
+  const trackedFieldCount = 10 + (watchedValues.contractAddresses?.length ?? 0);
+  const completedFieldCount = [
+    watchedValues.name,
+    watchedValues.primaryCategory,
+    watchedValues.tags?.length,
+    watchedValues.description,
+    watchedValues.websiteUrl,
+    watchedValues.githubUrl,
+    watchedValues.logoUrl,
+    watchedValues.docsUrl,
+    watchedValues.auditReportUrl,
+    watchedValues.bugBountyUrl,
+    ...(watchedValues.contractAddresses ?? []),
+  ].filter((value) =>
+    typeof value === "string" ? value.trim().length > 0 : Boolean(value),
+  ).length;
 
   const executeSubmit = useCallback(
     async (payload: ProjectFormValues & { domain?: string }) => {
@@ -241,7 +456,11 @@ export default function ProjectForm({
         });
 
         if (result) {
+          conversion.trackSuccess({ mode, project_id: projectId ?? null });
+          heatmap.captureSnapshot();
+          sessionRecording.stop();
           if (mode !== "edit") {
+            const qualityScore = computeQualityScore(cleanedPayload);
             try {
               let submittedBy = "unknown";
               try {
@@ -250,7 +469,6 @@ export default function ProjectForm({
                 // wallet may disconnect after tx
               }
 
-              const qualityScore = computeQualityScore(cleanedPayload);
               const existingNames = projectService
                 .getAllProjects()
                 .map((p) => p.name);
@@ -267,6 +485,36 @@ export default function ProjectForm({
                 qualityScore,
                 flagReasons,
               });
+
+              // Fire-and-forget post-submit integrations (email / webhooks / CRM).
+              // Failures are isolated inside the orchestrator and never block UX.
+              const submissionId = generateProjectIdFromName(cleanedPayload.name);
+              void runFormIntegrations({
+                submissionId,
+                formType: "project-submission",
+                data: {
+                  name: cleanedPayload.name,
+                  projectName: cleanedPayload.name,
+                  primaryCategory:
+                    CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ??
+                    cleanedPayload.primaryCategory,
+                  websiteUrl: cleanedPayload.websiteUrl,
+                  githubUrl: cleanedPayload.githubUrl,
+                  description: cleanedPayload.description,
+                  docsUrl: cleanedPayload.docsUrl,
+                  logoUrl: cleanedPayload.logoUrl,
+                },
+                locale,
+                metadata: {
+                  submittedBy,
+                  mode,
+                },
+              }).catch((integrationError) => {
+                console.error(
+                  "[ProjectForm] Form integrations failed:",
+                  integrationError,
+                );
+              });
             } catch (moderationError) {
               console.error("[ProjectForm] Failed to record submission moderation:", moderationError);
             }
@@ -278,62 +526,164 @@ export default function ProjectForm({
             category: CATEGORY_FORM_MAP[cleanedPayload.primaryCategory] ?? cleanedPayload.primaryCategory,
             projectId: mode === "edit" ? projectId : undefined,
           });
+          experiment.trackSubmission();
           // Clear draft after successful submission
           draft.clearDraft();
+          setSubmissionError(null);
+          setSubmissionRetryCount(0);
           reset();
+          if (mode !== "edit") {
+            try {
+              awardSubmission(
+                publicKey,
+                `${generateProjectIdFromName(cleanedPayload.name)}:${Date.now()}`,
+                computeQualityScore(cleanedPayload),
+              );
+            } catch (gamificationError) {
+              logger.error(
+                "Failed to record submission rewards",
+                { operation: "awardSubmission", userAction: "tracking submission rewards" },
+                gamificationError,
+              );
+            }
+          }
           const redirectPath =
             mode === "edit" && projectId ? `/projects/${projectId}` : "/";
           setTimeout(() => router.push(redirectPath), 1500);
         } else {
+          setSubmissionError("Transaction could not be completed. Please review and retry.");
           trackProjectSubmit({
             success: false,
             mode,
             errorCode: "transaction_incomplete",
           });
+          experiment.trackError();
         }
       } catch (error) {
+        setSubmissionError(error instanceof Error ? error : String(error));
         logger.error("Soroban project operation failed", {
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
         }, error);
+        conversion.trackFailure(
+          error instanceof Error ? error.name || "Error" : "unknown",
+        );
         trackProjectSubmit({
           success: false,
           mode,
           errorCode: error instanceof Error ? error.name || "Error" : "unknown",
         });
+        experiment.trackError();
       } finally {
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, locale],
   );
 
   const onPreSubmit = useCallback(
     (data: ProjectFormValues) => {
+      experiment.trackStart();
       const payload = {
         ...data,
         domain: extractDomain(data.websiteUrl),
       };
 
-      const result = projectService.detectDuplicates({
+      const result = findDuplicates({
+        id: mode === "edit" ? projectId : undefined,
         name: payload.name,
         websiteUrl: payload.websiteUrl,
         githubUrl: payload.githubUrl,
-        excludeProjectId: mode === "edit" ? projectId : undefined,
+        contractAddresses: payload.contractAddresses,
+        description: payload.description,
+        primaryCategory: payload.primaryCategory,
       });
 
-      if (result.hasDuplicates) {
-        setDuplicateWarning({ isOpen: true, matches: result.matches, payload, reasons: result.reasons });
+      if (result.hasExactDuplicate) {
+        // Prevent exact duplicates
+        setDuplicateWarning({
+          isOpen: true,
+          isExact: true,
+          matches: result.candidates.map((c) => c.project),
+          reasons: result.reasons,
+          payload: null,
+        });
+        return;
+      }
+
+      if (result.hasPotentialDuplicates) {
+        // Warn and suggest merges
+        setDuplicateWarning({
+          isOpen: true,
+          isExact: false,
+          matches: result.candidates.map((c) => c.project),
+          reasons: result.reasons,
+          payload,
+        });
         return;
       }
 
       void executeSubmit(payload);
     },
-    [executeSubmit, mode, projectId],
+    [executeSubmit, mode, projectId, experiment],
   );
 
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    void handleSubmit(onPreSubmit)(event);
+  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    conversion.trackSubmitAttempt();
+    setCaptchaError(null);
+
+    const token = await captcha.runCaptcha();
+    const validation = captcha.validateOnSubmit(token);
+    if (!validation.valid) {
+      setCaptchaError(validation.message);
+      conversion.trackFailure("captcha_failed");
+      return;
+    }
+
+    void handleSubmit(onPreSubmit)();
+  };
+
+  const handleExportPdf = () => {
+    downloadFormSubmissionPdf({
+      ...watchedValues,
+      mode,
+      projectId,
+      submittedAt: new Date().toISOString(),
+    });
+    toast.success("Opening PDF export — use Print / Save as PDF");
+  };
+
+  const handleSaveTemplate = (name: string, description: string) => {
+    if (!publicKey) {
+      return { success: false, error: "Connect a wallet to save templates" };
+    }
+    const result = formTemplateService.saveAsTemplate(publicKey, name, watchedValues, {
+      description,
+    });
+    if (result.success) {
+      toast.success("Template saved");
+    }
+    return result;
+  };
+
+  const handleApplyTemplate = (template: FormTemplate) => {
+    reset({
+      name: template.data.name || "",
+      primaryCategory: template.data.primaryCategory || "",
+      tags: template.data.tags || [],
+      description: template.data.description || "",
+      websiteUrl: template.data.websiteUrl || "",
+      githubUrl: template.data.githubUrl || "",
+      logoUrl: template.data.logoUrl || "",
+      docsUrl: template.data.docsUrl || "",
+      auditReportUrl: template.data.auditReportUrl || "",
+      bugBountyUrl: template.data.bugBountyUrl || "",
+      contractAddresses: template.data.contractAddresses?.length
+        ? template.data.contractAddresses
+        : [],
+    });
+    setShowTemplateLibrary(false);
   };
 
   const handleDiscardDraft = () => {
@@ -355,6 +705,31 @@ export default function ProjectForm({
       contractAddresses: initialData?.contractAddresses || [],
     });
     setDiscardDialogOpen(false);
+  };
+
+  const goToSection = async (sectionIndex: number) => {
+    if (sectionIndex <= activeSection) {
+      setActiveSection(sectionIndex);
+      return;
+    }
+
+    for (let index = activeSection; index < sectionIndex; index += 1) {
+      const isValid = await trigger([...formSections[index].fields]);
+      if (!isValid) {
+        setActiveSection(index);
+        return;
+      }
+    }
+
+    setActiveSection(sectionIndex);
+  };
+
+  const goToNextSection = () => {
+    void goToSection(Math.min(activeSection + 1, formSections.length - 1));
+  };
+
+  const goToPreviousSection = () => {
+    setActiveSection((section) => Math.max(section - 1, 0));
   };
 
   return (
@@ -382,9 +757,16 @@ export default function ProjectForm({
           <Rocket className="w-6 h-6" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            {mode === "edit" ? "Edit Project" : "Register Project"}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold tracking-tight">
+              {mode === "edit" ? "Edit Project" : "Register Project"}
+            </h2>
+            {experiment.variant.id === "variant_guided_steps" && (
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                Guided Steps Variant
+              </span>
+            )}
+          </div>
           <p className="text-zinc-500 dark:text-zinc-400 text-sm">
             {mode === "edit"
               ? "Update your project's information."
@@ -393,7 +775,18 @@ export default function ProjectForm({
         </div>
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <div className="relative">
+      <form
+        ref={bindFormRef}
+        onSubmit={handleFormSubmit}
+        onFocusCapture={() => conversion.trackStart()}
+        className="space-y-6"
+      >
+        <FormHeatmapOverlay
+          cells={heatmap.cells}
+          problemAreas={heatmap.problemAreas}
+          visible={showHeatmap}
+        />
         {draftRestored && (
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
@@ -409,6 +802,43 @@ export default function ProjectForm({
           onDiscard={handleDiscardDraft}
         />
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {mode === "edit" && initialData && (
+            <button
+              type="button"
+              onClick={() => setShowComparison(!showComparison)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-xs"
+            >
+              <GitCompare className="w-3.5 h-3.5" />
+              {showComparison ? "Hide Changes" : "Compare Changes"}
+            </button>
+          )}
+
+          <FormExportMenu
+            getData={() => getValues()}
+            filename={watchedValues.name || "project-form"}
+            fields={EXPORT_FIELDS}
+            labels={EXPORT_LABELS}
+            className="justify-end ml-auto"
+          />
+        </div>
+
+        {mode === "edit" && initialData && showComparison && (
+          <FormValueComparison
+            originalValues={defaultFormValues}
+            currentValues={watchedValues}
+            fieldLabels={EXPORT_LABELS}
+            onResetField={(key, originalVal) => {
+              setValue(key as any, originalVal, { shouldDirty: true, shouldValidate: true });
+            }}
+            onResetAll={(orig) => {
+              Object.entries(orig).forEach(([k, v]) => {
+                setValue(k as any, v, { shouldDirty: true, shouldValidate: true });
+              });
+            }}
+          />
+        )}
+
         {/* Quality Checklist */}
         <SubmissionChecklist
           formData={{
@@ -421,22 +851,64 @@ export default function ProjectForm({
             auditReportUrl: watchedValues.auditReportUrl,
             bugBountyUrl: watchedValues.bugBountyUrl,
             description: watchedValues.description,
+            contractAddresses: watchedValues.contractAddresses,
           }}
         />
 
+        <nav aria-label="Project form progress" className="mb-8">
+          <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+            {formSections.map((section, index) => {
+              const isCurrent = activeSection === index;
+              const isComplete = index < activeSection;
+
+              return (
+                <li key={section.title}>
+                  <button
+                    type="button"
+                    onClick={() => void goToSection(index)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={`w-full border-t-2 pt-3 text-left transition-colors ${
+                      isCurrent
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : isComplete
+                        ? "border-green-500 text-green-600 dark:text-green-400"
+                        : "border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold uppercase tracking-wide">
+                      Step {index + 1}
+                    </span>
+                    <span className="mt-1 block text-sm font-medium sm:text-base">
+                      {section.title}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            {formSections[activeSection].description}
+          </p>
+        </nav>
+
+        {activeSection === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"
+            required={fieldRequirements.name.required}
             placeholder="e.g. Soroban Swap"
             maxLength={50}
             {...register("name")}
             error={errors.name?.message}
+            helperText={t("projectForm.hints.name")}
           />
           <SelectField
             label="Category"
+            required={fieldRequirements.primaryCategory.required}
             options={CATEGORY_FORM_OPTIONS}
             {...register("primaryCategory")}
             error={errors.primaryCategory?.message}
+            helperText={t("projectForm.hints.category")}
           />
         </div>
 
@@ -456,56 +928,73 @@ export default function ProjectForm({
 
         <TextAreaField
           label="Description"
+          required={fieldRequirements.description.required}
           placeholder="What does your project do? Keep it concise and engaging."
           maxLength={500}
           {...register("description")}
           error={errors.description?.message}
+          helperText={t("projectForm.hints.description")}
         />
+        </>}
 
+        {activeSection === 1 && <>
         <FormField
           label="Project Website"
+          required={fieldRequirements.websiteUrl.required}
           placeholder="https://yourproject.com"
           {...register("websiteUrl")}
           error={errors.websiteUrl?.message}
+          helperText={t("projectForm.hints.websiteUrl")}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
-            label="Repository URL (Optional)"
+            label={fieldLabel("Repository URL", "githubUrl")}
+            required={fieldRequirements.githubUrl.required}
             placeholder="https://github.com/owner/repo"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
-            helperText="Supported: GitHub, GitLab, Bitbucket"
+            helperText={t("projectForm.hints.githubUrl")}
           />
           <FormField
-            label="Logo URL (Optional)"
+            label={fieldLabel("Logo URL", "logoUrl")}
+            required={fieldRequirements.logoUrl.required}
             placeholder="https://..."
             {...register("logoUrl")}
             error={errors.logoUrl?.message}
+            helperText={t("projectForm.hints.logoUrl")}
           />
           <FormField
-            label="Documentation URL (Optional)"
+            label={fieldLabel("Documentation URL", "docsUrl")}
+            required={fieldRequirements.docsUrl.required}
             placeholder="https://docs..."
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
+            helperText={t("projectForm.hints.docsUrl")}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
-            label="Audit Report URL (Optional)"
+            label={fieldLabel("Audit Report URL", "auditReportUrl")}
+            required={fieldRequirements.auditReportUrl.required}
             placeholder="https://..."
             {...register("auditReportUrl")}
             error={errors.auditReportUrl?.message}
+            helperText={t("projectForm.hints.auditReportUrl")}
           />
           <FormField
-            label="Bug Bounty URL (Optional)"
+            label={fieldLabel("Bug Bounty URL", "bugBountyUrl")}
+            required={fieldRequirements.bugBountyUrl.required}
             placeholder="https://..."
             {...register("bugBountyUrl")}
             error={errors.bugBountyUrl?.message}
+            helperText={t("projectForm.hints.bugBountyUrl")}
           />
         </div>
+        </>}
 
+        {activeSection === 2 && <>
         {/* Contract Addresses */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -516,9 +1005,8 @@ export default function ProjectForm({
                   (Optional)
                 </span>
               </label>
-              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                Soroban contract IDs associated with this project — 56 characters
-                starting with&nbsp;'C'.
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400" role="note">
+                {t("projectForm.hints.contractAddresses")}
               </p>
             </div>
           </div>
@@ -609,6 +1097,44 @@ export default function ProjectForm({
           />
         </div>
 
+        <FormCaptcha
+          mode={captcha.mode}
+          challenge={captcha.challenge}
+          accessibleAnswer={captcha.accessibleAnswer}
+          onAnswerChange={captcha.setAccessibleAnswer}
+          onUseAccessible={captcha.useAccessibleAlternative}
+          onRequestChallenge={captcha.requestChallenge}
+          loading={captcha.loading}
+          error={captchaError}
+        />
+
+        <FormSessionRecordingControls
+          consented={sessionRecording.consented}
+          onEnable={sessionRecording.enableRecording}
+          onDisable={sessionRecording.disableRecording}
+          recordings={sessionRecording.recordings}
+          playing={sessionRecording.playing}
+          playbackFrame={sessionRecording.playbackFrame}
+          onPlay={(rec) => sessionRecording.startPlayback(rec)}
+          onStopPlayback={sessionRecording.stopPlayback}
+        />
+
+        <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              heatmap.captureSnapshot();
+              setShowHeatmap((v) => !v);
+            }}
+          >
+            {showHeatmap ? "Hide" : "Show"} interaction heatmap
+          </button>
+          <span>
+            Scroll depth: {Math.round((heatmap.snapshot?.maxScrollDepth ?? 0) * 100)}%
+          </span>
+        </div>
+
         <Button
           type="submit"
           isLoading={isSubmitting || isInProgress}
@@ -628,8 +1154,29 @@ export default function ProjectForm({
             progress={progress}
             onRetry={() => {
               setIsSubmitting(true);
+              setSubmissionRetryCount((prev) => prev + 1);
               void retry().finally(() => setIsSubmitting(false));
             }}
+          />
+        )}
+
+        {(progress.phase === "failure" || (submissionError && progress.phase === "idle")) && (
+          <FormSubmissionRetry
+            error={submissionError || progress.errorMessage || progress.message}
+            retryCount={submissionRetryCount}
+            maxRetries={3}
+            isRetrying={isSubmitting || isInProgress}
+            onRetry={async () => {
+              setSubmissionRetryCount((prev) => prev + 1);
+              setIsSubmitting(true);
+              setSubmissionError(null);
+              if (progress.phase === "failure") {
+                await retry().finally(() => setIsSubmitting(false));
+              } else {
+                await executeSubmit(getValues() as ProjectFormValues);
+              }
+            }}
+            onDismiss={() => setSubmissionError(null)}
           />
         )}
 
@@ -639,23 +1186,40 @@ export default function ProjectForm({
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
         </p>
       </form>
+      </div>
 
       <ConfirmDialog
         isOpen={duplicateWarning.isOpen}
-        title="Possible Duplicate Detected"
-        description={`We found existing projects that look very similar to yours:\n\n${duplicateWarning.reasons.join("\n")}\n\nAre you sure you want to continue with this submission?`}
-        confirmLabel="Continue Anyway"
-        cancelLabel="Cancel"
-        variant="warning"
+        title={duplicateWarning.isExact ? "Exact Duplicate Detected" : "Possible Duplicate Detected"}
+        description={
+          duplicateWarning.isExact
+            ? `An identical project already exists in the registry:\n\n${duplicateWarning.reasons.join(
+                "\n",
+              )}\n\nExact duplicate submissions are prevented to protect registry integrity. Please review the existing project or edit your details.`
+            : `We found existing projects that look similar to yours:\n\n${duplicateWarning.reasons.join(
+                "\n",
+              )}\n\nWould you like to continue with your submission or review existing records?`
+        }
+        confirmLabel={duplicateWarning.isExact ? "Review Project" : "Continue Anyway"}
+        cancelLabel={duplicateWarning.isExact ? "Close" : "Cancel"}
+        variant={duplicateWarning.isExact ? "danger" : "warning"}
         onConfirm={() => {
+          if (duplicateWarning.isExact) {
+            const firstMatch = duplicateWarning.matches[0];
+            setDuplicateWarning({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
+            if (firstMatch) {
+              router.push(`/projects/${firstMatch.id}`);
+            }
+            return;
+          }
           const payload = duplicateWarning.payload;
-          setDuplicateWarning({ isOpen: false, matches: [], reasons: [], payload: null });
+          setDuplicateWarning({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
           if (payload) {
             void executeSubmit(payload);
           }
         }}
         onCancel={() => {
-          setDuplicateWarning({ isOpen: false, matches: [], reasons: [], payload: null });
+          setDuplicateWarning({ isOpen: false, isExact: false, matches: [], reasons: [], payload: null });
         }}
       />
 
@@ -668,6 +1232,12 @@ export default function ProjectForm({
         variant="danger"
         onConfirm={() => void confirmDiscardDraft()}
         onCancel={() => setDiscardDialogOpen(false)}
+      />
+
+      <SaveTemplateModal
+        isOpen={saveTemplateOpen}
+        onClose={() => setSaveTemplateOpen(false)}
+        onSave={handleSaveTemplate}
       />
     </Card>
     </ErrorBoundary>
