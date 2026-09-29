@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { Check } from "lucide-react";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 export default function Hero() {
+  const { t } = useTranslation();
   return (
     <section className="relative py-24 md:py-32 overflow-hidden">
       {/* Background Mesh/Grid */}
@@ -15,34 +19,34 @@ export default function Hero() {
           <div className="flex-1 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 dark:bg-blue-500/5 border border-blue-500/20 dark:border-blue-500/10 text-xs font-semibold text-blue-600 dark:text-blue-400 mb-6 animate-fade-in shadow-[0_0_15px_rgba(59,130,246,0.2)]">
               <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-              Now live on Stellar Testnet
+              {t("hero.badge")}
             </div>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 leading-[1.1]">
-              The Trust Layer <br />
+              {t("hero.title")} <br />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400">
-                for Web3 Apps
+                {t("hero.titleHighlight")}
               </span>
             </h1>
             <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 mb-10 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              Dongle is the decentralized app store that brings transparency to dApps on Stellar. Discover, review, and verify protocols with on-chain trust.
+              {t("hero.subtitle")}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
               <Link 
                 href="/discover" 
                 className="w-full sm:w-auto px-8 py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-full hover:scale-105 transition-all shadow-xl shadow-blue-500/10 dark:shadow-none"
               >
-                Explore Apps
+                {t("hero.exploreApps")}
               </Link>
               <Link 
                 href="/docs" 
                 className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-bold rounded-full hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"
               >
-                Documentation
+                {t("nav.documentation")}
               </Link>
             </div>
             
             <div className="mt-12 flex items-center justify-center lg:justify-start gap-8 opacity-50 grayscale hover:grayscale-0 transition-all">
-               <div className="text-sm font-bold tracking-widest text-zinc-400">POWERED BY</div>
+               <div className="text-sm font-bold tracking-widest text-zinc-400">{t("hero.poweredBy")}</div>
                <div className="font-black text-xl italic tracking-tighter">STELLAR</div>
                <div className="font-black text-xl italic tracking-tighter">SOROBAN</div>
             </div>
@@ -68,8 +72,8 @@ export default function Hero() {
                     <Check className="w-6 h-6 text-green-500" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Status</div>
-                    <div className="text-sm font-bold">Verified On-Chain</div>
+                    <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider">{t("hero.status")}</div>
+                    <div className="text-sm font-bold">{t("hero.verifiedOnChain")}</div>
                   </div>
                 </div>
               </div>
@@ -80,7 +84,7 @@ export default function Hero() {
                    <div className="flex -space-x-3">
                       {[1,2,3].map(i => <div key={i} className="w-8 h-8 rounded-full border-2 border-white dark:border-zinc-900 bg-zinc-200 dark:bg-zinc-800"></div>)}
                    </div>
-                   <div className="text-sm font-bold">4.9/5 <span className="text-zinc-500 font-medium">(2k+ Reviews)</span></div>
+                   <div className="text-sm font-bold">4.9/5 <span className="text-zinc-500 font-medium">({t("hero.reviewsCount", { count: "2k+" })})</span></div>
                 </div>
               </div>
             </div>

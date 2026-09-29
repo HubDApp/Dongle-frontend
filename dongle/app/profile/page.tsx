@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
@@ -10,11 +10,10 @@ import { Review } from "@/types/review";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
+import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
+import { useWalletTransactions } from "@/hooks/useWalletTransactions";
 import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import {
   LogOut,
@@ -27,6 +26,10 @@ import {
   XCircle,
   Package,
   Bookmark,
+  Activity,
+  Wallet,
+  Search,
+  ShieldCheck,
 } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
@@ -37,6 +40,10 @@ import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { useSavedProjects } from "@/hooks/useSavedProjects";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { savedSearchService } from "@/services/search/saved-search.service";
+import { getWatchlistNotifications } from "@/services/watchlist/watchlist-notification.service";
+import { GamificationPanel } from "@/components/gamification/GamificationPanel";
 
 interface StellarNonNativeBalance {
   asset_code?: string;
@@ -49,10 +56,27 @@ const PROFILE_PURPOSE =
 export default function ProfilePage() {
   const router = useRouter();
   const gate = useWalletPageGate({ requireFundedAccount: true });
-  const { balances } = useStellarAccount();
+  const { balances, loading: balancesLoading, error: balancesError } = useStellarAccount();
+  const { transactions, loading: txLoading, error: txError } = useWalletTransactions(8);
   const confirm = useConfirm();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const { savedProjectIds } = useSavedProjects();
+  const {
+    watchlistProjects,
+    watchlistCount,
+    maxWatchlistSize,
+    filterByCategory,
+    trendingFromWatchlist,
+  } = useWatchlist();
+  const [watchlistCategory, setWatchlistCategory] = useState("All");
+  const savedSearches = useMemo(
+    () =>
+      gate.publicKey
+        ? savedSearchService.getSavedSearches(gate.publicKey)
+        : [],
+    [gate.publicKey],
+  );
+  const watchlistNotifications = getWatchlistNotifications();
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([]);
   const [loadedVerificationKey, setLoadedVerificationKey] = useState<string | null>(null);
   const [userReviews, setUserReviews] = useState<Review[]>([]);
@@ -64,6 +88,10 @@ export default function ProfilePage() {
   const savedProjects = savedProjectIds
     .map((projectId) => projectService.getProjectById(projectId))
     .filter((project): project is NonNullable<typeof project> => Boolean(project));
+  const filteredWatchlist = filterByCategory(watchlistCategory);
+  const ownedProjects = gate.publicKey
+    ? projectService.getProjectsByOwner(gate.publicKey)
+    : [];
 
   // Fetch verification statuses for saved projects
   useEffect(() => {
@@ -156,18 +184,11 @@ export default function ProfilePage() {
       <LayoutWrapper>
         <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
           <div className="container mx-auto px-4 max-w-2xl">
-            {gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel message="Loading your profile..." />
-            ) : (
-              <WalletStatePanel
-                state={gate.state}
-                pagePurpose={PROFILE_PURPOSE}
-                walletNetworkLabel={gate.walletNetworkLabel}
-                publicKey={gate.publicKey}
-                onConnect={gate.connectWallet}
-                onDisconnect={gate.disconnectWallet}
-              />
-            )}
+            <WalletGate
+              gate={gate}
+              pagePurpose={PROFILE_PURPOSE}
+              loadingMessage="Loading your profile..."
+            />
           </div>
         </main>
       </LayoutWrapper>
@@ -199,6 +220,8 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
+              <GamificationPanel walletAddress={gate.publicKey!} />
+
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <h2 className="text-2xl font-bold mb-6">Account Summary</h2>
 
@@ -240,7 +263,15 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {balances && balances.length > 0 && (
+                {balancesLoading ? (
+                  <div className="flex justify-center py-6">
+                    <Spinner size="md" />
+                  </div>
+                ) : balancesError ? (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                    {balancesError}
+                  </div>
+                ) : balances && balances.length > 0 ? (
                   <div>
                     <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 block">
                       Balances
@@ -278,6 +309,79 @@ export default function ProfilePage() {
                         );
                       })}
                     </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    No balances found for this account.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Activity className="w-6 h-6" />
+                    Recent Wallet Activity
+                  </h2>
+                  <Badge variant="secondary">{transactions.length}</Badge>
+                </div>
+
+                {txLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner size="md" />
+                  </div>
+                ) : txError ? (
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                    {txError}
+                  </div>
+                ) : transactions.length > 0 ? (
+                  <div className="space-y-3">
+                    {transactions.map((tx) => (
+                      <div
+                        key={tx.id}
+                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
+                      >
+                        <div>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-100 capitalize">
+                            {tx.type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {formatDate(tx.createdAt, "relative")}
+                          </p>
+                        </div>
+                        <p className="text-xs font-mono text-zinc-500 truncate max-w-[120px]">
+                          {tx.hash.slice(0, 8)}…
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <Wallet className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No recent on-chain activity found.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Package className="w-6 h-6" />
+                    Your Projects
+                  </h2>
+                  <Badge variant="secondary">{ownedProjects.length}</Badge>
+                </div>
+
+                {ownedProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {ownedProjects.map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No owned projects found for this wallet.</p>
                   </div>
                 )}
               </div>
@@ -354,14 +458,35 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <Bookmark className="w-6 h-6" />
-                    Saved Projects
+                    Watchlist
                   </h2>
-                  <Badge variant="secondary">{savedProjects.length}</Badge>
+                  <Badge variant="secondary">
+                    {watchlistCount}/{maxWatchlistSize}
+                  </Badge>
                 </div>
 
-                {savedProjects.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {["All", ...projectService.getCategories().filter((c) => c !== "All")].map(
+                    (cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setWatchlistCategory(cat)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          watchlistCategory === cat
+                            ? "bg-blue-500 text-white"
+                            : "bg-zinc-100 dark:bg-zinc-800"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                {filteredWatchlist.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {savedProjects.map((project) => (
+                    {filteredWatchlist.map((project) => (
                       <ProjectCard
                         key={project.id}
                         project={project}
@@ -372,7 +497,7 @@ export default function ProfilePage() {
                 ) : (
                   <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
                     <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No saved projects yet. Bookmark projects to revisit them later.</p>
+                    <p>No projects on your watchlist yet.</p>
                     <Button
                       variant="outline"
                       size="sm"
@@ -382,6 +507,74 @@ export default function ProfilePage() {
                       Browse Projects
                     </Button>
                   </div>
+                )}
+
+                {trendingFromWatchlist.length > 0 && (
+                  <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                    <h3 className="font-semibold mb-4">Trending from your watchlist</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {trendingFromWatchlist.map((project) => (
+                        <ProjectCard key={project.id} project={project} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {watchlistNotifications.length > 0 && (
+                  <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                    <h3 className="font-semibold mb-3">Recent notifications</h3>
+                    <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {watchlistNotifications.slice(0, 5).map((n) => (
+                        <li key={n.id}>{n.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Search className="w-6 h-6" />
+                    Saved Searches
+                  </h2>
+                  <Badge variant="secondary">{savedSearches.length}</Badge>
+                </div>
+                {savedSearches.length > 0 ? (
+                  <ul className="space-y-3">
+                    {savedSearches.map((search) => (
+                      <li
+                        key={search.id}
+                        className="flex items-center justify-between rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4"
+                      >
+                        <div>
+                          <p className="font-medium">{search.name}</p>
+                          <p className="text-xs text-zinc-500">
+                            {search.filters.query || "All projects"}
+                            {search.filters.preset ? ` · ${search.filters.preset}` : ""}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const params = new URLSearchParams();
+                            if (search.filters.query) params.set("q", search.filters.query);
+                            if (search.filters.categories?.length) {
+                              params.set("categories", search.filters.categories.join(","));
+                            }
+                            router.push(`/discover?${params.toString()}`);
+                          }}
+                        >
+                          Run
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-zinc-500 text-sm">
+                    Save custom filters from Discover (max 10 per wallet).
+                  </p>
                 )}
               </div>
 
@@ -506,8 +699,29 @@ export default function ProfilePage() {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Bookmark className="w-4 h-4" />
+                      Saved
+                    </span>
+                    <span className="font-bold text-lg">{savedProjects.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
                       <Package className="w-4 h-4" />
-                      Submitted
+                      Owned
+                    </span>
+                    <span className="font-bold text-lg">{ownedProjects.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Activity className="w-4 h-4" />
+                      Transactions
+                    </span>
+                    <span className="font-bold text-lg">{transactions.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Verifications
                     </span>
                     <span className="font-bold text-lg">{displayedVerificationRequests.length}</span>
                   </div>
@@ -537,6 +751,14 @@ export default function ProfilePage() {
                     onClick={() => router.push("/projects/new")}
                   >
                     Submit Project
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => router.push("/settings/twofa")}
+                    leftIcon={<ShieldCheck className="w-4 h-4" />}
+                  >
+                    Two-Factor Auth
                   </Button>
                 </div>
               </div>

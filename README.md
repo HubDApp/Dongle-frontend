@@ -24,7 +24,10 @@ Dongle is the frontend for an on-chain "app store." It reads project, review, an
 - **dApp discovery** — browse all registered dApps by category (DeFi, NFTs, Gaming, Tools, DAOs, etc.), sorted by rating, trending, recency, or verification status.
 - **Reviews and ratings** — connected users can leave a 1–5 star rating plus an optional written review. Ratings are aggregated on-chain; long-form review text and evidence live on IPFS, referenced by CID. Each wallet can submit one review per project (with updates).
 - **Verification flow** — project owners can request verification for a fee (paid in a Stellar asset such as XLM or USDC), attaching off-chain evidence (audits, docs, links). Admins/verifiers approve, reject, suspend, or revoke verification, and status is shown on the project page.
-- **Wallet-gated writes** — reading listings and reviews works without a wallet. Any write action (submitting a review, requesting verification, admin decisions) requires a connected wallet and a signed transaction.
+- **Wallet-gated writes** — reading listings and reviews works without a wallet. Optional Google/GitHub sign-in provides a read-only application session. Any write action (submitting a review, requesting verification, admin decisions) requires a connected Freighter wallet and a signed transaction.
+- **Languages** — English, Spanish, and Portuguese, with `?lang=` shareable links. See [docs/FEATURES.md](docs/FEATURES.md).
+- **Live notifications** — SSE badge + drawer for verification and review outcomes.
+- **Analytics** — `/analytics` trending dashboard with daily UTC cache and CSV export.
 
 **Data flow, roughly:**
 
@@ -97,6 +100,10 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SOROBAN_RPC_URL`                | Optional   | Soroban RPC endpoint. Defaults to Stellar testnet (`https://soroban-testnet.stellar.org:443`).                                              |
 | `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`     | Optional   | Network passphrase; must match the network selected in Freighter. Defaults to the testnet passphrase (`Test SDF Network ; September 2015`). |
 | `NEXT_PUBLIC_ADMIN_ALLOWLIST`                | Optional   | Comma-separated list of Stellar public keys (`G...`) allowed to access the admin dashboard. Leave empty to disable admin routes.            |
+| `AUTH_APP_URL` / `AUTH_SESSION_SECRET`       | OAuth      | Canonical origin and session signing secret (server-only).                                                                                  |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`  | OAuth      | Google OAuth. Secrets must never use a `NEXT_PUBLIC_` prefix.                                                                               |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`  | OAuth      | GitHub OAuth. Secrets must never use a `NEXT_PUBLIC_` prefix.                                                                               |
+| `CRON_SECRET`                                | Optional   | Bearer token for `GET /api/cron/analytics` (00:00 UTC).                                                                                     |
 
 **Development builds use placeholder defaults for the contract IDs when they're unset** — see [Known Limitations](#known-limitations). To point the app at real deployed contracts (testnet or mainnet), set all three contract ID variables explicitly and make sure `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` matches the network those contracts are deployed on.
 
@@ -105,8 +112,9 @@ cp .env.example .env.local
 ## Wallet & Network Setup
 
 - Dongle uses [Freighter](https://www.freighter.app/) as its wallet integration (`@stellar/freighter-api`). Install the browser extension to connect a wallet.
-- Read-only browsing (listings, ratings, reviews) does **not** require a wallet.
-- Any write action — submitting a review, requesting verification, admin approvals — requires a connected wallet and will prompt a Freighter signature.
+- Read-only browsing (listings, ratings, reviews) does **not** require a wallet. Google/GitHub OAuth is an optional identity for that mode.
+- Any write action — submitting a review, requesting verification, admin approvals — requires a connected wallet and will prompt a Freighter signature. OAuth login is not a Stellar account.
+- Feature architecture (i18n, SSE notifications, analytics cache, OAuth): **[`docs/FEATURES.md`](./docs/FEATURES.md)**.
 - By default the app targets **Stellar testnet**. Make sure Freighter's active network matches `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`, or signed transactions will be rejected by the RPC.
 - Verification requests require paying a fee in a Stellar asset (e.g. XLM or USDC) — make sure your testnet account is funded (via [Friendbot](https://friendbot.stellar.org/)) before exercising that flow locally.
 
@@ -121,6 +129,7 @@ cp .env.example .env.local
 | `pnpm typecheck`     | Run `tsc --noEmit` to check types without emitting output.        |
 | `pnpm test`          | Run the Vitest suite once.                                        |
 | `pnpm test:watch`    | Run Vitest in watch mode.                                         |
+| `node scripts/notification-load-test.mjs` | 100-client SSE concurrency check (from `dongle/`). |
 | `pnpm audit`         | Run the project's custom audit script (`scripts/audit-check.js`). |
 | `pnpm validate:env`  | Fail if production env vars are missing, invalid, or placeholders.|
 | `pnpm preview:smoke` | HTTP smoke-test main routes against `PREVIEW_URL`.                |

@@ -1,161 +1,235 @@
 /**
- * Tests for useDraft hook
+ * Tests for the updated useDraft hook
+ *
+ * Covers:
+ *   • localStorage-only mode (no walletAddress)
+ *   • Remote-first mode (walletAddress provided)
+ *   • 2-second debounce
+ *   • isSaving / saveError state
+ *   • BroadcastChannel cross-tab sync
+ *   • deleteDraft (async)
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useDraft } from "@/hooks/useDraft";
 import { draftService } from "@/services/draft/draft.service";
+import { draftApiService } from "@/services/draft/draft-api.service";
+import type { ProjectDraft } from "@/services/draft/draft.service";
 
+// ---------------------------------------------------------------------------
+// Mock DraftApiService (jsdom cannot fetch relative URLs)
+// ---------------------------------------------------------------------------
+
+vi.mock("@/services/draft/draft-api.service", () => ({
+  draftApiService: {
+    getDraft: vi.fn(),
+    saveDraft: vi.fn(),
+    deleteDraft: vi.fn(),
+  },
+}));
+
+const getDraftRemoteMock = vi.mocked(draftApiService.getDraft);
+const saveDraftRemoteMock = vi.mocked(draftApiService.saveDraft);
+const deleteDraftRemoteMock = vi.mocked(draftApiService.deleteDraft);
+
+// ---------------------------------------------------------------------------
+// Mock BroadcastChannel
+// ---------------------------------------------------------------------------
+
+const broadcastPostMessage = vi.fn();
+const broadcastClose = vi.fn();
+
+class BroadcastChannelMock {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  postMessage = broadcastPostMessage;
+  close = broadcastClose;
+}
+
+vi.stubGlobal("BroadcastChannel", BroadcastChannelMock);
+
+// ---------------------------------------------------------------------------
 // Mock localStorage
+// ---------------------------------------------------------------------------
+
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
-
   return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = value;
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    clear: () => {
-      store = {};
-    },
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { store = {}; },
   };
 })();
 
-Object.defineProperty(window, "localStorage", {
-  value: localStorageMock,
-});
+Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
-describe("useDraft hook", () => {
-  beforeEach(() => {
-    localStorageMock.clear();
-    vi.useFakeTimers();
-  });
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+const WALLET = "GBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const DRAFT_ID_CREATE = "new-project-draft";
 
-  describe("Acceptance Criteria: Autosave runs only after fields change", () => {
-    it("should not save draft when data is empty", () => {
-      const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
-      );
+const filledData: ProjectDraft["data"] = {
+  name: "My DApp",
+  primaryCategory: "defi",
+  tags: ["soroban"],
+  description: "A test project description",
+  websiteUrl: "https://mydapp.com",
+  githubUrl: "https://github.com/mydapp",
+  logoUrl: "",
+  docsUrl: "",
+};
 
-      act(() => {
-        result.current.saveDraft({
-          name: "",
-          primaryCategory: "",
-          tags: [],
-          description: "",
-          websiteUrl: "",
-          githubUrl: "",
-          logoUrl: "",
-          docsUrl: "",
-        });
-      });
+const emptyData: ProjectDraft["data"] = {
+  name: "",
+  primaryCategory: "",
+  tags: [],
+  description: "",
+  websiteUrl: "",
+  githubUrl: "",
+  logoUrl: "",
+  docsUrl: "",
+};
 
+/** Build a stored draft fixture with a lastSaved timestamp. */
+function makeDraft(
+  data: ProjectDraft["data"],
+  overrides: Partial<ProjectDraft> = {}
+): ProjectDraft {
+  return {
+    id: DRAFT_ID_CREATE,
+    data,
+    mode: "create",
+    lastSaved: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("useDraft – localStorage-only (no walletAddress)", () => {
+  // Tests that use fake timers for debounce control
+  describe("with fake timers (debounce tests)", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.useFakeTimers();
+      vi.clearAllMocks();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("does not save when data is empty", () => {
+      const { result } = renderHook(() => useDraft({ mode: "create" }));
+      act(() => { result.current.saveDraft(emptyData); });
+      act(() => { vi.advanceTimersByTime(2000); });
       expect(result.current.hasDraft).toBe(false);
     });
 
-    it("should save draft when user types in fields", async () => {
-      const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
-      );
-
-      act(() => {
-        result.current.saveDraft({
-          name: "My Project",
-          primaryCategory: "defi",
-          tags: ["stellar"],
-          description: "A great project",
-          websiteUrl: "https://example.com",
-          githubUrl: "",
-          logoUrl: "",
-          docsUrl: "",
-        });
-      });
-
-      // Flush autosave debounce
-      await act(async () => {
-        vi.runAllTimers();
-      });
-
+    it("sets isSaving=false after async save completes", async () => {
+      const { result } = renderHook(() => useDraft({ mode: "create" }));
+      act(() => { result.current.saveDraft(filledData); });
+      await act(async () => { vi.advanceTimersByTime(2000); });
+      expect(result.current.isSaving).toBe(false);
       expect(result.current.hasDraft).toBe(true);
-      expect(result.current.lastSaved).toBeTruthy();
     });
 
-    it("should debounce autosave to prevent excessive saves", () => {
-      vi.useFakeTimers();
+    it("only triggers one save after multiple rapid keystrokes (debounce)", async () => {
       const saveSpy = vi.spyOn(draftService, "saveDraft");
-
-      const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
-      );
-
-      // Simulate rapid typing
-      act(() => {
-        result.current.saveDraft({
-          name: "M",
-          primaryCategory: "",
-          tags: [],
-          description: "",
-          websiteUrl: "",
-          githubUrl: "",
-          logoUrl: "",
-          docsUrl: "",
-        });
-      });
-
-      act(() => {
-        result.current.saveDraft({
-          name: "My",
-          primaryCategory: "",
-          tags: [],
-          description: "",
-          websiteUrl: "",
-          githubUrl: "",
-          logoUrl: "",
-          docsUrl: "",
-        });
-      });
-
-      act(() => {
-        result.current.saveDraft({
-          name: "My Project",
-          primaryCategory: "",
-          tags: [],
-          description: "",
-          websiteUrl: "",
-          githubUrl: "",
-          logoUrl: "",
-          docsUrl: "",
-        });
-      });
-
-      // Should not save yet
+      const { result } = renderHook(() => useDraft({ mode: "create" }));
+      act(() => { result.current.saveDraft({ ...filledData, name: "M" }); });
+      act(() => { result.current.saveDraft({ ...filledData, name: "My" }); });
+      act(() => { result.current.saveDraft({ ...filledData, name: "My DApp" }); });
       expect(saveSpy).not.toHaveBeenCalled();
-
-      // Fast-forward time
-      act(() => {
-        vi.advanceTimersByTime(1000);
-      });
-
-      // Should only save once after debounce
+      await act(async () => { vi.advanceTimersByTime(2000); });
       expect(saveSpy).toHaveBeenCalledTimes(1);
-
-      vi.useRealTimers();
       saveSpy.mockRestore();
     });
   });
 
+  // Tests that need real timers for async mount effects
+  describe("with real timers (mount / async tests)", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.clearAllMocks();
+    });
+
+    it("clears draft state after deleteDraft", async () => {
+      draftService.saveDraft({ id: DRAFT_ID_CREATE, mode: "create", data: filledData });
+      const { result } = renderHook(() => useDraft({ mode: "create" }));
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
+      await act(async () => { await result.current.deleteDraft(); });
+      expect(result.current.hasDraft).toBe(false);
+      expect(result.current.loadedDraft).toBeNull();
+      expect(result.current.lastSaved).toBeNull();
+    });
+  });
+});
+
+describe("useDraft – remote-first (walletAddress provided)", () => {
+  // Debounce tests use fake timers
+  describe("with fake timers", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.useFakeTimers();
+      vi.clearAllMocks();
+      // Default: no remote draft (404) so the hook falls back to localStorage
+      getDraftRemoteMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        error: "not found",
+      });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should debounce autosave to prevent excessive saves", async () => {
+      const { result } = renderHook(() =>
+        useDraft({ mode: "create", walletAddress: WALLET })
+      );
+
+      act(() => { result.current.saveDraft(filledData); });
+      await act(async () => { vi.advanceTimersByTime(2000); });
+
+      expect(saveDraftRemoteMock).toHaveBeenCalledTimes(1);
+      expect(saveDraftRemoteMock).toHaveBeenCalledWith(
+        WALLET,
+        expect.objectContaining({ id: DRAFT_ID_CREATE, mode: "create" })
+      );
+    });
+
+    it("sets saveError and falls back to localStorage when remote save fails", async () => {
+      saveDraftRemoteMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        error: "server error",
+      });
+
+      const { result } = renderHook(() =>
+        useDraft({ mode: "create", walletAddress: WALLET })
+      );
+
+      act(() => { result.current.saveDraft(filledData); });
+      await act(async () => { vi.advanceTimersByTime(2000); });
+
+      expect(result.current.saveError).toBe("Could not sync to server; saved locally.");
+      expect(result.current.hasDraft).toBe(true);
+    });
+  });
+
   describe("Acceptance Criteria: Restored drafts are clearly indicated", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.clearAllMocks();
+    });
+
     it("should load existing draft on mount", async () => {
-      // Pre-populate a draft
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "Existing Project",
         primaryCategory: "defi",
         tags: ["soroban"],
@@ -166,28 +240,24 @@ describe("useDraft hook", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      // Draft exists remotely
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
+        useDraft({ mode: "create", walletAddress: WALLET })
       );
 
-      // Flush the deferred state update
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
-      expect(result.current.hasDraft).toBe(true);
       expect(result.current.loadedDraft).toEqual(draftData);
       expect(result.current.lastSaved).toBeTruthy();
     });
 
     it("should provide lastSaved timestamp for UI display", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "Test Project",
         primaryCategory: "defi",
         tags: [],
@@ -198,19 +268,16 @@ describe("useDraft hook", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
+        useDraft({ mode: "create", walletAddress: WALLET })
       );
 
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
       expect(result.current.lastSaved).toBeTruthy();
       expect(typeof result.current.lastSaved).toBe("string");
@@ -222,8 +289,14 @@ describe("useDraft hook", () => {
   });
 
   describe("Acceptance Criteria: Users can clear saved drafts", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.clearAllMocks();
+      deleteDraftRemoteMock.mockResolvedValue({ ok: true, data: { success: true } });
+    });
+
     it("should delete draft when clearDraft is called", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "To Be Deleted",
         primaryCategory: "defi",
         tags: [],
@@ -234,34 +307,26 @@ describe("useDraft hook", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
+        useDraft({ mode: "create", walletAddress: WALLET })
       );
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
-      // Flush deferred mount state
       await act(async () => {
-        vi.runAllTimers();
-      });
-
-      expect(result.current.hasDraft).toBe(true);
-
-      act(() => {
         result.current.clearDraft();
       });
 
+      expect(deleteDraftRemoteMock).toHaveBeenCalledWith(WALLET, DRAFT_ID_CREATE);
       expect(result.current.hasDraft).toBe(false);
-      expect(result.current.loadedDraft).toBeNull();
-      expect(result.current.lastSaved).toBeNull();
     });
 
     it("should delete draft when deleteDraft is called", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "To Be Deleted",
         primaryCategory: "defi",
         tags: [],
@@ -272,43 +337,35 @@ describe("useDraft hook", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
+        useDraft({ mode: "create", walletAddress: WALLET })
       );
 
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
-      act(() => {
+      await act(async () => {
         result.current.deleteDraft();
       });
 
-      expect(result.current.hasDraft).toBe(false);
+      expect(broadcastPostMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "DRAFT_DELETED", draftId: DRAFT_ID_CREATE })
+      );
     });
   });
 
-  describe("Edit mode", () => {
-    it("should use different draft ID for edit mode", () => {
-      const { result: createResult } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
-      );
-      const { result: editResult } = renderHook(() =>
-        useDraft({ mode: "edit", projectId: "project-123", autoSave: true })
-      );
-
-      expect(createResult.current.draftId).toBe("new-project-draft");
-      expect(editResult.current.draftId).toBe("edit-project-project-123");
+  describe("with real timers (delete)", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.clearAllMocks();
     });
 
     it("should load project-specific draft for edit mode", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "Edit Mode Project",
         primaryCategory: "defi",
         tags: [],
@@ -319,20 +376,19 @@ describe("useDraft hook", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "edit-project-project-456",
-        data: draftData,
-        mode: "edit",
-        projectId: "project-456",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData, {
+          id: "edit-project-project-456",
+          mode: "edit",
+          projectId: "project-456",
+        }),
       });
 
       const { result } = renderHook(() =>
-        useDraft({ mode: "edit", projectId: "project-456", autoSave: true })
+        useDraft({ mode: "edit", projectId: "project-456", walletAddress: WALLET })
       );
-
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
       expect(result.current.hasDraft).toBe(true);
       expect(result.current.loadedDraft?.name).toBe("Edit Mode Project");

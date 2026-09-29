@@ -19,6 +19,7 @@ export interface WalletPageGateResult {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
   isConnecting: boolean;
+  retryAccountLoad: (() => Promise<void>) | undefined;
 }
 
 /**
@@ -41,7 +42,7 @@ export function useWalletPageGate(
     disconnectWallet,
   } = useWallet();
 
-  const { loading: accountLoading, error: accountError } = useStellarAccount();
+  const { loading: accountLoading, error: accountError, refetch: refetchAccount } = useStellarAccount();
 
   if (isFreighterAvailable === false) {
     return {
@@ -51,6 +52,7 @@ export function useWalletPageGate(
       connectWallet,
       disconnectWallet,
       isConnecting,
+      retryAccountLoad: undefined,
     };
   }
 
@@ -62,6 +64,7 @@ export function useWalletPageGate(
       connectWallet,
       disconnectWallet,
       isConnecting,
+      retryAccountLoad: undefined,
     };
   }
 
@@ -73,6 +76,7 @@ export function useWalletPageGate(
       connectWallet,
       disconnectWallet,
       isConnecting,
+      retryAccountLoad: undefined,
     };
   }
 
@@ -84,6 +88,7 @@ export function useWalletPageGate(
       connectWallet,
       disconnectWallet,
       isConnecting,
+      retryAccountLoad: undefined,
     };
   }
 
@@ -96,6 +101,7 @@ export function useWalletPageGate(
         connectWallet,
         disconnectWallet,
         isConnecting,
+        retryAccountLoad: undefined,
       };
     }
 
@@ -107,6 +113,19 @@ export function useWalletPageGate(
         connectWallet,
         disconnectWallet,
         isConnecting,
+        retryAccountLoad: undefined,
+      };
+    }
+
+    if (accountError) {
+      return {
+        state: "account-error",
+        publicKey,
+        walletNetworkLabel,
+        connectWallet,
+        disconnectWallet,
+        isConnecting,
+        retryAccountLoad: refetchAccount,
       };
     }
   }
@@ -118,5 +137,6 @@ export function useWalletPageGate(
     connectWallet,
     disconnectWallet,
     isConnecting,
+    retryAccountLoad: undefined,
   };
 }

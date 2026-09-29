@@ -1,6 +1,8 @@
 import { generateId } from "@/lib/id-generator";
 import { projectService } from "./project.service";
 import { projectOwnerService } from "./project-owner.service";
+import { auditLogService } from "@/services/audit/audit-log.service";
+import { notificationService } from "@/services/notification/notification.service";
 import {
   ClaimProofType,
   ProjectClaimRequest,
@@ -99,16 +101,35 @@ export const projectClaimService = {
     return this.getRequests().filter((request) => request.projectId === projectId);
   },
 
+  /** Return the most recent pending/reviewed claim for a given user + project. */
+  getLatestRequestForUser(projectId: string, userAddress: string): ProjectClaimRequest | null {
+    const all = this.getRequests().filter(
+      (r) => r.projectId === projectId && r.requestedBy === userAddress
+    );
+    if (all.length === 0) return null;
+    return all.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+  },
+
   getPendingRequests(): ProjectClaimRequest[] {
     return this.getRequests().filter((request) => request.status === "pending");
   },
 
   hasPendingRequest(projectId: string, userAddress: string): boolean {
     return this.getRequests().some(
-      (request) => request.projectId === projectId && request.requestedBy === userAddress && request.status === "pending"
+      (request) =>
+        request.projectId === projectId &&
+        request.requestedBy === userAddress &&
+        request.status === "pending"
     );
   },
 
+  /**
+   * Create a new claim request, then:
+   * 1. Write a `claim_submitted` audit log entry.
+   * 2. Send a `claim_received` notification to the claimant.
+   */
   createRequest(
     data: {
       projectId: string;
@@ -118,7 +139,12 @@ export const projectClaimService = {
     },
     requestedBy: string
   ): { success: boolean; data?: ProjectClaimRequest; errors?: ProjectClaimRequestValidationError[] } {
-    const validationErrors = validateClaim(data.projectId, data.proofType, data.proofValue, data.explanation);
+    const validationErrors = validateClaim(
+      data.projectId,
+      data.proofType,
+      data.proofValue,
+      data.explanation
+    );
     if (validationErrors.length > 0) {
       return { success: false, errors: validationErrors };
     }
@@ -139,7 +165,12 @@ export const projectClaimService = {
     if (this.hasPendingRequest(data.projectId, requestedBy)) {
       return {
         success: false,
-        errors: [{ field: "proofType", message: "You already have a pending claim request for this project" }],
+        errors: [
+          {
+            field: "proofType",
+            message: "You already have a pending claim request for this project",
+          },
+        ],
       };
     }
 
@@ -157,10 +188,44 @@ export const projectClaimService = {
     const requests = this.getRequests();
     localStorage.setItem(STORAGE_KEY_CLAIMS, JSON.stringify([request, ...requests]));
 
+    // ── Side-effects ──────────────────────────────────────────────────────────
+
+    // 1. Audit trail
+    auditLogService.append({
+      actor: requestedBy,
+      action: "claim_submitted",
+      targetId: request.id,
+      targetLabel: project.name,
+      metadata: { projectId: project.id, proofType: request.proofType },
+    });
+
+    // 2. Confirmation notification to the claimant
+    notificationService.create({
+      recipientAddress: requestedBy,
+      type: "claim_received",
+      title: `Claim submitted for ${project.name}`,
+      message:
+        "Your ownership claim has been received and is pending admin review. " +
+        "You'll be notified here once a decision is made.",
+      claimRequestId: request.id,
+      projectId: project.id,
+      projectName: project.name,
+    });
+
     return { success: true, data: request };
   },
 
-  approveRequest(requestId: string, reviewedBy: string, reviewNote?: string): { success: boolean; error?: string } {
+  /**
+   * Approve a pending claim request, then:
+   * 1. Transfer ownership via projectOwnerService.
+   * 2. Write `claim_approved` + `ownership_transferred` audit log entries.
+   * 3. Send a `claim_approved` notification to the claimant.
+   */
+  approveRequest(
+    requestId: string,
+    reviewedBy: string,
+    reviewNote?: string
+  ): { success: boolean; error?: string } {
     const requests = this.getRequests();
     const index = requests.findIndex((request) => request.id === requestId);
     if (index === -1) {
@@ -170,26 +235,77 @@ export const projectClaimService = {
     if (requests[index].status !== "pending") {
       return { success: false, error: "Claim request has already been reviewed" };
     }
+
+    const trimmedNote = reviewNote?.trim() || undefined;
 
     requests[index] = {
       ...requests[index],
       status: "approved",
       reviewedAt: new Date().toISOString(),
       reviewedBy,
-      reviewNote: reviewNote?.trim() || undefined,
+      reviewNote: trimmedNote,
     };
     localStorage.setItem(STORAGE_KEY_CLAIMS, JSON.stringify(requests));
 
-    const project = projectService.getProjectById(requests[index].projectId);
-    if (project) {
-      const ownerAddress = requests[index].requestedBy;
-      projectOwnerService.setProjectOwnerOverride(project.id, ownerAddress);
-    }
+    const claimRequest = requests[index];
+    const project = projectService.getProjectById(claimRequest.projectId);
+    const projectName = project?.name ?? claimRequest.projectId;
+
+    // 1. Transfer ownership
+    projectOwnerService.setProjectOwnerOverride(claimRequest.projectId, claimRequest.requestedBy);
+
+    // 2. Audit trail — approval
+    auditLogService.append({
+      actor: reviewedBy,
+      action: "claim_approved",
+      targetId: requestId,
+      targetLabel: projectName,
+      reason: trimmedNote,
+      metadata: {
+        projectId: claimRequest.projectId,
+        newOwner: claimRequest.requestedBy,
+      },
+    });
+
+    // 3. Audit trail — ownership transfer
+    auditLogService.append({
+      actor: reviewedBy,
+      action: "ownership_transferred",
+      targetId: claimRequest.projectId,
+      targetLabel: projectName,
+      metadata: {
+        claimRequestId: requestId,
+        newOwner: claimRequest.requestedBy,
+        previousOwner: project?.ownerAddress ?? "",
+      },
+    });
+
+    // 4. Notification to the claimant
+    notificationService.create({
+      recipientAddress: claimRequest.requestedBy,
+      type: "claim_approved",
+      title: `Your claim for ${projectName} was approved`,
+      message: trimmedNote
+        ? `Admin note: ${trimmedNote}`
+        : "Ownership has been transferred to your wallet.",
+      claimRequestId: requestId,
+      projectId: claimRequest.projectId,
+      projectName,
+    });
 
     return { success: true };
   },
 
-  rejectRequest(requestId: string, reviewedBy: string, reviewNote?: string): { success: boolean; error?: string } {
+  /**
+   * Reject a pending claim request, then:
+   * 1. Write a `claim_rejected` audit log entry.
+   * 2. Send a `claim_rejected` notification to the claimant with the reason.
+   */
+  rejectRequest(
+    requestId: string,
+    reviewedBy: string,
+    reviewNote?: string
+  ): { success: boolean; error?: string } {
     const requests = this.getRequests();
     const index = requests.findIndex((request) => request.id === requestId);
     if (index === -1) {
@@ -200,14 +316,43 @@ export const projectClaimService = {
       return { success: false, error: "Claim request has already been reviewed" };
     }
 
+    const trimmedNote = reviewNote?.trim() || undefined;
+
     requests[index] = {
       ...requests[index],
       status: "rejected",
       reviewedAt: new Date().toISOString(),
       reviewedBy,
-      reviewNote: reviewNote?.trim() || undefined,
+      reviewNote: trimmedNote,
     };
     localStorage.setItem(STORAGE_KEY_CLAIMS, JSON.stringify(requests));
+
+    const claimRequest = requests[index];
+    const project = projectService.getProjectById(claimRequest.projectId);
+    const projectName = project?.name ?? claimRequest.projectId;
+
+    // 1. Audit trail
+    auditLogService.append({
+      actor: reviewedBy,
+      action: "claim_rejected",
+      targetId: requestId,
+      targetLabel: projectName,
+      reason: trimmedNote,
+      metadata: { projectId: claimRequest.projectId },
+    });
+
+    // 2. Notification to the claimant
+    notificationService.create({
+      recipientAddress: claimRequest.requestedBy,
+      type: "claim_rejected",
+      title: `Your claim for ${projectName} was not approved`,
+      message: trimmedNote
+        ? `Reason: ${trimmedNote}`
+        : "The admin did not approve this ownership claim.",
+      claimRequestId: requestId,
+      projectId: claimRequest.projectId,
+      projectName,
+    });
 
     return { success: true };
   },

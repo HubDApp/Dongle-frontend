@@ -7,27 +7,45 @@
 
 /** The set of admin actions that are recorded. */
 export type AuditAction =
+  | "admin_login"
+  | "admin_logout"
   | "verification_approved"
   | "verification_rejected"
+  | "verification_assigned"
+  | "verification_unassigned"
   | "fee_updated"
   | "report_resolved"
   | "report_dismissed"
+  | "report_assigned"
+  | "report_unassigned"
+  | "submission_moderated"
+  | "submission_signed"
+  | "submission_received"
+  | "claim_submitted"
   | "claim_approved"
   | "claim_rejected"
-  | "project_flagged"
-  | "takedown";
+  | "ownership_transferred";
 
 /** Human-readable labels for each action. */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  admin_login: "Admin Login",
+  admin_logout: "Admin Logout",
   verification_approved: "Verification Approved",
   verification_rejected: "Verification Rejected",
+  verification_assigned: "Verification Assigned",
+  verification_unassigned: "Verification Unassigned",
   fee_updated: "Fee Updated",
   report_resolved: "Report Resolved",
   report_dismissed: "Report Dismissed",
+  report_assigned: "Report Assigned",
+  report_unassigned: "Report Unassigned",
+  submission_moderated: "Submission Moderated",
+  submission_signed: "Submission Signed",
+  submission_received: "Submission Received",
+  claim_submitted: "Claim Submitted",
   claim_approved: "Claim Approved",
   claim_rejected: "Claim Rejected",
-  project_flagged: "Project Flagged",
-  takedown: "Takedown",
+  ownership_transferred: "Ownership Transferred",
 };
 
 /**

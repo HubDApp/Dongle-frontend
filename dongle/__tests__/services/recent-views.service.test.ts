@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { mockProjects } from "@/data/mockProjects";
+import { isEncrypted } from "@/lib/crypto-storage";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -28,6 +29,34 @@ Object.defineProperty(window, "localStorage", {
 describe("recentViewsService", () => {
   beforeEach(() => {
     localStorageMock.clear();
+    vi.restoreAllMocks();
+  });
+
+  describe("encryption & storage", () => {
+    it("stores views in encrypted format", () => {
+      const projectId = mockProjects[0].id;
+      recentViewsService.addView(projectId, "WALLET1");
+
+      const rawStored = localStorageMock.getItem("dongle_recent_views");
+      expect(rawStored).not.toBeNull();
+      expect(isEncrypted(rawStored)).toBe(true);
+      expect(rawStored).not.toContain(projectId);
+    });
+
+    it("migrates legacy unencrypted views on read", () => {
+      const legacyViews = JSON.stringify([
+        { projectId: "legacy-proj-1", viewedAt: "2026-01-01" },
+      ]);
+      localStorageMock.setItem("dongle_recent_views", legacyViews);
+      expect(isEncrypted(localStorageMock.getItem("dongle_recent_views"))).toBe(false);
+
+      const views = recentViewsService.getAllViews();
+      expect(views).toHaveLength(1);
+      expect(views[0].projectId).toBe("legacy-proj-1");
+
+      // Verify it is now migrated and encrypted
+      expect(isEncrypted(localStorageMock.getItem("dongle_recent_views"))).toBe(true);
+    });
   });
 
   describe("addView", () => {
@@ -46,7 +75,7 @@ describe("recentViewsService", () => {
       const walletAddress = "GABC123";
       recentViewsService.addView(projectId, walletAddress);
 
-      const views = recentViewsService.getAllViews();
+      const views = recentViewsService.getAllViews(walletAddress);
       expect(views).toHaveLength(1);
       expect(views[0].projectId).toBe(projectId);
       expect(views[0].walletAddress).toBe(walletAddress);
@@ -122,6 +151,7 @@ describe("recentViewsService", () => {
 
       const projects = recentViewsService.getRecentProjects();
       expect(projects).toHaveLength(2);
+      // Views are returned newest-first, so projects[0] is the last one added
       // Newest view (proj[1]) is first
       expect(projects[0].id).toBe(mockProjects[1].id);
       expect(projects[1].id).toBe(mockProjects[0].id);
@@ -211,6 +241,10 @@ describe("recentViewsService", () => {
       const timestamp = recentViewsService.getLastViewedAt(projectId, wallet1);
       expect(timestamp).toBeTruthy();
 
+      // When no wallet is specified, getLastViewedAt returns the most recent view
+      // regardless of wallet scope (views are not segregated)
+      const noWalletTimestamp = recentViewsService.getLastViewedAt(projectId);
+      expect(noWalletTimestamp).toBeTruthy();
       // Without wallet arg, getRecentViews returns ALL views (including wallet-scoped),
       // so the view is still found — verify it returns a timestamp, not null
       const anyWalletTimestamp = recentViewsService.getLastViewedAt(projectId);

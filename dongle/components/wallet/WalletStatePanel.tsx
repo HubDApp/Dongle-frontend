@@ -23,6 +23,7 @@ interface WalletStatePanelProps {
   publicKey?: string | null;
   onConnect?: () => void;
   onDisconnect?: () => void;
+  onRetry?: () => void;
   compact?: boolean;
   className?: string;
 }
@@ -36,6 +37,7 @@ const STATE_ICONS: Record<
   disconnected: <Wallet className="w-16 h-16 text-zinc-300 dark:text-zinc-700" />,
   "wrong-network": <AlertTriangle className="w-16 h-16 text-amber-500" />,
   "account-not-funded": <AlertCircle className="w-16 h-16 text-amber-500" />,
+  "account-error": <AlertCircle className="w-16 h-16 text-red-500" />,
 };
 
 export default function WalletStatePanel({
@@ -45,6 +47,7 @@ export default function WalletStatePanel({
   publicKey,
   onConnect,
   onDisconnect,
+  onRetry,
   compact = false,
   className = "",
 }: WalletStatePanelProps) {
@@ -116,7 +119,11 @@ export default function WalletStatePanel({
           renderAction(
             content.primaryAction,
             "primary",
-            state === "disconnected" ? onConnect : undefined,
+            state === "disconnected"
+              ? onConnect
+              : state === "account-error"
+                ? onRetry
+                : undefined,
           )}
         {content.secondaryAction &&
           renderAction(

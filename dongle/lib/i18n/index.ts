@@ -1,42 +1,49 @@
 /**
  * I18n infrastructure
- * 
- * This module provides a simple, type-safe i18n system that:
- * - Centralizes all user-facing strings
- * - Supports parameter interpolation
- * - Is ready for future multi-language support
- * - Maintains existing English copy
+ *
+ * Type-safe message lookup with parameter interpolation, locale switching,
+ * and subscriber notifications so React trees re-render on language change.
  */
 
 import { en, type Messages } from "./messages/en";
+import { es } from "./messages/es";
+import { pt } from "./messages/pt";
+import {
+  DEFAULT_LOCALE,
+  type LocaleCode,
+  isSupportedLocale,
+} from "./locales";
 
-type LocaleCode = "en";
-
-// Currently only English is supported, but structure allows easy expansion
-const messages: Record<LocaleCode, Messages> = {
+const catalogs: Record<LocaleCode, Messages> = {
   en,
+  es,
+  pt,
 };
 
-// Current locale (can be extended to support runtime switching)
-let currentLocale: LocaleCode = "en";
+let currentLocale: LocaleCode = DEFAULT_LOCALE;
+const listeners = new Set<() => void>();
 
-/**
- * Get the current locale
- */
 export function getLocale(): LocaleCode {
   return currentLocale;
 }
 
-/**
- * Set the current locale (for future use)
- */
 export function setLocale(locale: LocaleCode): void {
+  if (!isSupportedLocale(locale)) {
+    console.warn(`Invalid locale "${String(locale)}"; keeping ${currentLocale}`);
+    return;
+  }
+  if (locale === currentLocale) return;
   currentLocale = locale;
+  listeners.forEach((listener) => listener());
 }
 
-/**
- * Type helper to get nested keys from messages object
- */
+export function subscribeLocale(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 type NestedKeyOf<T> = T extends object
   ? {
       [K in keyof T]: K extends string
@@ -47,76 +54,108 @@ type NestedKeyOf<T> = T extends object
     }[keyof T]
   : never;
 
-type MessageKey = NestedKeyOf<Messages>;
+export type MessageKey = NestedKeyOf<Messages>;
 
 type InterpolationParams = Record<string, string | number>;
 
-/**
- * Get a message by key with optional parameter interpolation
- * 
- * @example
- * t("nav.discover") // "Discover"
- * t("hero.reviewsCount", { count: 2000 }) // "2k+ Reviews"
- * t("profile.submittedAt", { date: "2 days ago" }) // "Submitted 2 days ago"
- */
-export function t(key: MessageKey, params?: InterpolationParams): string {
-  const locale = getLocale();
-  const messageCatalog = messages[locale];
-
-  // Navigate nested object structure
+function lookup(catalog: Messages, key: string): string | undefined {
   const keys = key.split(".");
-  let value: any = messageCatalog;
-
+  let value: unknown = catalog;
   for (const k of keys) {
-    if (value && typeof value === "object" && k in value) {
-      value = value[k];
+    if (value && typeof value === "object" && k in (value as object)) {
+      value = (value as Record<string, unknown>)[k];
     } else {
-      console.warn(`Missing translation key: ${key}`);
-      return key;
+      return undefined;
     }
   }
-
-  if (typeof value !== "string") {
-    console.warn(`Translation key ${key} does not resolve to a string`);
-    return key;
-  }
-
-  // Interpolate parameters
-  if (params) {
-    return interpolate(value, params);
-  }
-
-  return value;
+  return typeof value === "string" ? value : undefined;
 }
 
 /**
- * Interpolate parameters into a message template
- * Supports {paramName} syntax
+ * Get a message by key with optional parameter interpolation.
+ * Missing keys fall back to English, then to the key itself.
  */
+export function t(key: MessageKey, params?: InterpolationParams): string {
+  const locale = getLocale();
+  const resolved =
+    lookup(catalogs[locale], key) ??
+    (locale === DEFAULT_LOCALE ? undefined : lookup(catalogs[DEFAULT_LOCALE], key));
+
+  if (resolved === undefined) {
+    console.warn(`Missing translation key: ${key}`);
+    return key;
+  }
+
+  if (params) {
+    return interpolate(resolved, params);
+  }
+  return resolved;
+}
+
 function interpolate(template: string, params: InterpolationParams): string {
-  return template.replace(/\{(\w+)\}/g, (match, key) => {
-    if (key in params) {
-      return String(params[key]);
+  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+    if (name in params) {
+      return String(params[name]);
     }
     return match;
   });
 }
 
-/**
- * Get all messages for the current locale
- * Useful for components that need access to multiple related messages
- */
 export function getMessages(): Messages {
-  return messages[currentLocale];
+  return catalogs[currentLocale];
 }
 
-/**
- * Check if a plural form should be used
- * Simple English pluralization helper
- */
+export function getCatalog(locale: LocaleCode): Messages {
+  return catalogs[locale];
+}
+
 export function plural(count: number): "" | "s" {
   return count === 1 ? "" : "s";
 }
 
+function flattenKeys(value: unknown, prefix = ""): string[] {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return Object.entries(value as Record<string, unknown>).flatMap(([k, v]) => {
+      const next = prefix ? `${prefix}.${k}` : k;
+      if (typeof v === "string") return [next];
+      return flattenKeys(v, next);
+    });
+  }
+  return [];
+}
+
+/**
+ * Compare a locale catalog against English and return missing leaf keys.
+ */
+export function findMissingTranslationKeys(locale: LocaleCode): string[] {
+  const enKeys = new Set(flattenKeys(catalogs.en));
+  const localeKeys = new Set(flattenKeys(catalogs[locale]));
+  return [...enKeys].filter((key) => !localeKeys.has(key)).sort();
+}
+
+export function findAllMissingTranslationKeys(): Record<LocaleCode, string[]> {
+  return {
+    en: [],
+    es: findMissingTranslationKeys("es"),
+    pt: findMissingTranslationKeys("pt"),
+  };
+}
+
 export { en } from "./messages/en";
+export { es } from "./messages/es";
+export { pt } from "./messages/pt";
 export type { Messages, LocaleCode };
+export {
+  DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
+  RTL_LOCALES,
+  LOCALE_STORAGE_KEY,
+  LANG_QUERY_PARAM,
+  isSupportedLocale,
+  isRtlLocale,
+  getDocumentDirection,
+  resolveLocale,
+  applyDocumentLocale,
+  persistLocale,
+  readStoredLocale,
+} from "./locales";

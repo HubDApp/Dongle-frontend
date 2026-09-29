@@ -10,7 +10,8 @@ export type WalletPageState =
   | "disconnected"
   | "wrong-network"
   | "account-loading"
-  | "account-not-funded";
+  | "account-not-funded"
+  | "account-error";
 
 export interface WalletStateContent {
   title: string;
@@ -102,6 +103,15 @@ export function getWalletStateContent(
           : undefined,
         secondaryAction: {
           label: "Disconnect Wallet",
+        },
+      };
+    case "account-error":
+      return {
+        title: "Failed to Load Account",
+        description:
+          "Could not retrieve your Stellar account data. This is usually a temporary network issue.",
+        primaryAction: {
+          label: "Try Again",
         },
       };
     default:

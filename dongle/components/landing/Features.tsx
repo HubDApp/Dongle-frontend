@@ -1,31 +1,35 @@
-import { ShieldCheck, MessageSquare, Code } from "lucide-react";
+"use client";
 
-const features = [
-  {
-    title: "On-Chain Verification",
-    description: "Every app listing and review is stored directly on the Stellar blockchain, ensuring data integrity and censorship resistance.",
-    icon: <ShieldCheck className="w-6 h-6" />,
-  },
-  {
-    title: "Community Reviews",
-    description: "Real users provide verified feedback. Reviewers earn reputation based on the accuracy and depth of their contributions.",
-    icon: <MessageSquare className="w-6 h-6" />,
-  },
-  {
-    title: "Developer Focused",
-    description: "Simple integration for developers to list their Stellar dApps and reach a community that values trust and transparency.",
-    icon: <Code className="w-6 h-6" />,
-  },
-];
+import { ShieldCheck, MessageSquare, Code } from "lucide-react";
+import { useTranslation } from "@/lib/i18n/useTranslation";
 
 export default function Features() {
+  const { t } = useTranslation();
+  const features = [
+    {
+      title: t("features.onChainVerification.title"),
+      description: t("features.onChainVerification.description"),
+      icon: <ShieldCheck className="w-6 h-6" />,
+    },
+    {
+      title: t("features.communityReviews.title"),
+      description: t("features.communityReviews.description"),
+      icon: <MessageSquare className="w-6 h-6" />,
+    },
+    {
+      title: t("features.developerFocused.title"),
+      description: t("features.developerFocused.description"),
+      icon: <Code className="w-6 h-6" />,
+    },
+  ];
+
   return (
     <section className="py-24 bg-white dark:bg-black">
       <div className="container mx-auto px-4">
         <div className="mb-16 text-center">
-          <h2 className="text-3xl font-bold mb-4">Why Dongle?</h2>
+          <h2 className="text-3xl font-bold mb-4">{t("features.sectionTitle")}</h2>
           <p className="text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">
-            We&apos;re building the infrastructure for a more trustworthy decentralized ecosystem.
+            {t("features.sectionSubtitle")}
           </p>
         </div>
         

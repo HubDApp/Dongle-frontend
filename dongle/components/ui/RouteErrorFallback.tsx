@@ -26,7 +26,7 @@ export function RouteErrorFallback({
   const router = useRouter();
 
   useEffect(() => {
-    console.error(section ? `[${section}]` : "[route]", error);
+    console.error(section ? `[${section}] An unexpected route error` : "[route] An unexpected error");
   }, [error, section]);
 
   const heading = section

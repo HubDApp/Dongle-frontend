@@ -15,6 +15,10 @@ export const Spinner = ({ className, size = "md" }: SpinnerProps) => {
   };
 
   return (
-    <Loader2 className={cn("animate-spin text-blue-500", sizes[size], className)} />
+    <Loader2
+      aria-hidden="true"
+      role="status"
+      className={cn("animate-spin text-blue-600 dark:text-blue-400", sizes[size], className)}
+    />
   );
 };

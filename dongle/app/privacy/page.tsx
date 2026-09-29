@@ -1,12 +1,14 @@
 "use client";
 
+import { formatDate } from "@/lib/date";
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-black pt-32 pb-16">
       <div className="container mx-auto px-4 max-w-3xl">
         <h1 className="text-4xl font-bold tracking-tight mb-4">Privacy Policy</h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-          Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          Last updated: {formatDate(new Date(), "long")}
         </p>
 
         <div className="prose prose-invert max-w-none space-y-8 text-zinc-900 dark:text-zinc-100">

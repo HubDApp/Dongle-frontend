@@ -1,77 +1,160 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import type { FieldValues, Path, UseFormRegister, UseFormRegisterReturn } from "react-hook-form";
 import { Input } from "./Input";
+import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
+import type { PasteEvent } from "@/hooks/useFormPasteDetection";
 
-interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface FormFieldProps<TFieldValues extends FieldValues = FieldValues>
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name"> {
   label: string;
+  name?: Path<TFieldValues> | string;
+  register?: UseFormRegister<TFieldValues>;
   error?: string;
   helperText?: string;
+  showCounter?: boolean;
+  /** When true, shows a required indicator and sets aria-required. */
+  required?: boolean;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, helperText, className = "", id, ...props }, ref) => {
+  ({ label, name, register, error, helperText, className = "", id, maxLength, onChange, onBlur, value, defaultValue, showCounter = true, required, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
     const counterId = `${inputId}-counter`;
     const helperId = `${inputId}-helper`;
+    const registration: UseFormRegisterReturn | undefined =
+      register && name ? register(name as Path<FieldValues>) : undefined;
 
-    const [charCount, setCharCount] = React.useState(0);
+    const internalRef = useRef<HTMLInputElement | null>(null);
+    const [charCount, setCharCount] = useState(0);
 
-    React.useEffect(() => {
-      if (typeof props.value === "string") {
-        setCharCount(props.value.length);
-      } else if (typeof props.defaultValue === "string") {
-        setCharCount(props.defaultValue.length);
+    // -----------------------------------------------------------------------
+    // Paste detection (Issue #517)
+    // -----------------------------------------------------------------------
+    const { createPasteHandler } = useFormPasteDetection({
+      onPaste: onPasteDetected,
+      preventDefaultPaste,
+    });
+
+    const handlePaste = createPasteHandler(name ?? label);
+
+    // -----------------------------------------------------------------------
+    // Character counter
+    // -----------------------------------------------------------------------
+    const syncCharCount = useCallback(() => {
+      if (typeof value === "string") {
+        setCharCount(value.length);
+      } else if (internalRef.current) {
+        setCharCount(internalRef.current.value.length);
+      } else if (typeof defaultValue === "string") {
+        setCharCount(defaultValue.length);
       }
-    }, [props.value, props.defaultValue]);
+    }, [value, defaultValue]);
+
+    useEffect(() => {
+      syncCharCount();
+    }, [value, defaultValue, syncCharCount]);
+
+    const setRef = useCallback(
+      (element: HTMLInputElement | null) => {
+        internalRef.current = element;
+        if (typeof ref === "function") {
+          ref(element);
+        } else if (ref) {
+          (ref as React.MutableRefObject<HTMLInputElement | null>).current = element;
+        }
+        if (registration?.ref) {
+          registration.ref(element);
+        }
+        if (element) {
+          setCharCount(element.value.length);
+        }
+      },
+      [ref, registration]
+    );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setCharCount(e.target.value.length);
-      props.onChange?.(e);
+      registration?.onChange(e);
+      onChange?.(e);
     };
 
-    const isNearLimit = props.maxLength && charCount >= props.maxLength * 0.9;
-    const isAtLimit = props.maxLength && charCount >= props.maxLength;
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      registration?.onBlur(e);
+      onBlur?.(e);
+    };
 
-    const counterClass = isAtLimit
-      ? "text-red-500"
-      : isNearLimit
-      ? "text-amber-500"
-      : "text-zinc-500";
+    const isNearLimit = Boolean(maxLength && charCount >= maxLength * 0.9 && charCount < maxLength);
+    const isAtLimit = Boolean(maxLength && charCount === maxLength);
+    const isOverLimit = Boolean(maxLength && charCount > maxLength);
+
+    const counterClass =
+      isOverLimit || isAtLimit
+        ? "text-red-500 font-semibold"
+        : isNearLimit
+        ? "text-amber-500 font-medium"
+        : "text-zinc-500";
+
+    const displayError = error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined);
 
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
           <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             {label}
+            {required ? (
+              <span className="text-red-500 ml-0.5" aria-hidden="true">
+                *
+              </span>
+            ) : null}
           </label>
-          {props.maxLength && (
+          {showCounter && maxLength && (
             <span
               id={counterId}
               className={`text-xs font-medium ${counterClass} transition-colors`}
               aria-live="polite"
             >
-              {charCount} / {props.maxLength}
+              {charCount} / {maxLength}
             </span>
           )}
         </div>
         <Input
           {...props}
-          ref={ref}
+          ref={setRef}
           id={inputId}
-          error={!!error}
+          name={registration?.name ?? name}
+          maxLength={maxLength}
+          value={value}
+          defaultValue={defaultValue}
+          error={!!displayError}
           onChange={handleChange}
-          aria-invalid={error || isAtLimit ? true : undefined}
-          aria-describedby={[error ? errorId : "", props.maxLength ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
+          onBlur={handleBlur}
+          required={required}
+          aria-required={required || undefined}
+          aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
+          aria-describedby={
+            [
+              displayError ? errorId : "",
+              maxLength && showCounter ? counterId : "",
+              helperText ? helperId : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className={className}
         />
-        {error && (
+        {displayError && (
           <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
-            {error}
+            {displayError}
           </span>
         )}
-        {!error && helperText && (
-          <span id={helperId} className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
+        {!displayError && helperText && (
+          <span
+            id={helperId}
+            className="text-xs text-zinc-500 dark:text-zinc-400 ml-1"
+            role="note"
+          >
             {helperText}
           </span>
         )}

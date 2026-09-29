@@ -2,6 +2,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  /** Draws the invalid border. Pair with `aria-invalid` and `aria-describedby`. */
   error?: boolean;
 }
 

@@ -42,8 +42,12 @@ export const VerificationBadge = ({
   const Icon = config.icon;
 
   return (
-    <Badge variant={config.variant} className={className}>
-      {showIcon && <Icon className="w-3 h-3 mr-1" />}
+    <Badge
+      variant={config.variant}
+      className={className}
+      aria-label={`Verification status: ${config.label}`}
+    >
+      {showIcon && <Icon className="w-3 h-3 mr-1" aria-hidden="true" />}
       {config.label}
     </Badge>
   );

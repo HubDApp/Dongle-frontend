@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+// ─── Contract existence validation ───────────────────────────────────────────
+
+/**
+ * Re-exported for consumer convenience so callers can import everything
+ * contract-related from a single module.
+ *
+ * @see lib/contract-validator for the full implementation.
+ */
+export {
+  ContractNotFoundError,
+  validateContractExists,
+} from "@/lib/contract-validator";
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 /**

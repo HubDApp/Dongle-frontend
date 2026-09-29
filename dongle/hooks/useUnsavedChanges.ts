@@ -1,66 +1,75 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/hooks/useConfirm";
+
+const UNSAVED_WARNING = {
+  title: "Unsaved Changes",
+  description: "You have unsaved changes. Are you sure you want to leave this page?",
+  confirmLabel: "Leave Page",
+  cancelLabel: "Stay Here",
+  variant: "danger" as const,
+};
 
 /**
  * Reusable hook to prevent losing unsaved form changes.
  * Warns before tab close/reloads, and client-side Next.js route transitions.
+ * Submitted or reset forms (isDirty=false or isSubmitting=true) do not warn.
  */
 export function useUnsavedChanges(isDirty: boolean, isSubmitting: boolean = false) {
   const router = useRouter();
   const confirm = useConfirm();
+  const allowLeaveRef = useRef(false);
 
   useEffect(() => {
     if (!isDirty || isSubmitting) return;
 
-    // 1. Intercept browser window/tab closing or reload
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (allowLeaveRef.current) return;
       e.preventDefault();
-      // standard spec requires setting returnValue
       e.returnValue = "";
       return "";
     };
 
-    // 2. Intercept client-side Next.js route changes (anchor clicks)
     const handleAnchorClick = (e: MouseEvent) => {
-      // Traverse up to find anchor tag
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
       let target = e.target as HTMLElement | null;
       while (target && target.tagName !== "A") {
         target = target.parentElement;
       }
 
-      if (target && target instanceof HTMLAnchorElement) {
-        const href = target.getAttribute("href");
+      if (!(target instanceof HTMLAnchorElement)) return;
 
-        // Ignore hash links, target="_blank", mailto/tel, and external domains
-        if (
-          href &&
-          !href.startsWith("#") &&
-          !href.startsWith("mailto:") &&
-          !href.startsWith("tel:") &&
-          target.target !== "_blank" &&
-          !href.startsWith("http://") &&
-          !href.startsWith("https://")
-        ) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          void (async () => {
-            const ok = await confirm({
-              title: "Unsaved Changes",
-              description: "You have unsaved changes. Are you sure you want to leave this page?",
-              confirmLabel: "Leave Page",
-              cancelLabel: "Stay Here",
-              variant: "danger",
-            });
-            if (ok) {
-              router.push(href);
-            }
-          })();
-        }
+      const href = target.getAttribute("href");
+      if (!href) return;
+      if (
+        href.startsWith("#") ||
+        href.startsWith("mailto:") ||
+        href.startsWith("tel:") ||
+        target.target === "_blank" ||
+        target.hasAttribute("download") ||
+        href.startsWith("http://") ||
+        href.startsWith("https://")
+      ) {
+        return;
       }
+
+      const current = `${window.location.pathname}${window.location.search}`;
+      if (href === current) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      void (async () => {
+        const ok = await confirm(UNSAVED_WARNING);
+        if (ok) {
+          allowLeaveRef.current = true;
+          router.push(href);
+        }
+      })();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);

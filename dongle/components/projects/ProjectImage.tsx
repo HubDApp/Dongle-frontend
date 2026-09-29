@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import { getGatewayForUrl, getIpfsGatewayUrls, cacheSuccessfulGateway, logGatewayFailure } from "@/lib/ipfs-gateway";
 
 interface ProjectImageProps {
   /** Remote URL of the project logo or screenshot */
@@ -29,9 +30,27 @@ export const ProjectImage = ({
   className = "",
   fallbackTextSize = "text-4xl",
 }: ProjectImageProps) => {
+  const gatewayUrls = React.useMemo(() => (logoUrl ? getIpfsGatewayUrls(logoUrl) : []), [logoUrl]);
+  const [gatewayIndex, setGatewayIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
 
-  const showImage = !!logoUrl && !imgError;
+  React.useEffect(() => {
+    setGatewayIndex(0);
+    setImgError(false);
+  }, [logoUrl]);
+
+  const imageUrl = gatewayUrls[gatewayIndex];
+  const showImage = !!imageUrl && !imgError;
+
+  const handleImageError = (error: unknown) => {
+    if (!imageUrl) return;
+    logGatewayFailure(imageUrl, error);
+    if (gatewayIndex < gatewayUrls.length - 1) {
+      setGatewayIndex((currentIndex) => currentIndex + 1);
+    } else {
+      setImgError(true);
+    }
+  };
 
   return (
     <div
@@ -39,20 +58,32 @@ export const ProjectImage = ({
     >
       {showImage ? (
         <Image
-          src={logoUrl}
+          src={imageUrl}
           alt={`${name} logo`}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 66vw, 50vw"
           className="object-contain p-2"
-          onError={() => setImgError(true)}
+          onLoad={() => {
+            const gateway = imageUrl ? getGatewayForUrl(imageUrl) : undefined;
+            if (gateway) cacheSuccessfulGateway(gateway);
+          }}
+          onError={handleImageError}
           priority={false}
         />
       ) : (
         <div
-          aria-hidden="true"
+          role={logoUrl ? "img" : undefined}
+          aria-label={logoUrl ? `${name} logo unavailable` : undefined}
           className={`absolute inset-0 flex items-center justify-center text-zinc-300 dark:text-zinc-700 font-bold ${fallbackTextSize}`}
         >
-          {name[0]?.toUpperCase()}
+          {logoUrl && imgError ? (
+            <span className="flex flex-col items-center gap-1">
+              <span>{name[0]?.toUpperCase()}</span>
+              <span className="text-xs font-medium">Image unavailable</span>
+            </span>
+          ) : (
+            name[0]?.toUpperCase()
+          )}
         </div>
       )}
     </div>

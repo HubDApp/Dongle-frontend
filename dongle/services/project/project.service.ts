@@ -1,8 +1,55 @@
 import { mockProjects } from "@/data/mockProjects";
 import { Project } from "@/types/project";
+import { extractDomain } from "@/lib/url";
+
+/**
+ * Normalize a string for case-insensitive comparison
+ */
+function norm(value: string): string {
+  return value.toLowerCase().trim();
+}
+
+/**
+ * Normalize a URL for comparison: removes protocol and trailing slash, lowercases
+ */
+function normalizeUrlForComparison(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+}
+
+/**
+ * Duplicate detection options
+ */
+export interface DuplicateDetectionOptions {
+  /** Name from the submission form */
+  name: string;
+  /** Website URL from the submission form */
+  websiteUrl?: string;
+  /** Repository URL from the submission form */
+  githubUrl?: string;
+  /** Project ID to exclude (when editing an existing project) */
+  excludeProjectId?: string;
+}
+
+/**
+ * Result of a duplicate detection check
+ */
+export interface DuplicateDetectionResult {
+  /** Whether likely duplicates were found */
+  hasDuplicates: boolean;
+  /** The matching projects */
+  matches: Project[];
+  /** Human-readable explanation of what matched */
+  reasons: string[];
+}
 import { projectOwnerService } from "./project-owner.service";
-import { projectStatusService } from "./project-status.service";
+import { projectSubmissionService } from "./project-submission.service";
 import { registry } from "@/services/data-access/registry";
+import { fuzzyMatch, levenshteinDistance } from "@/lib/utils";
+import { unique } from "@/lib/array";
 
 /**
  * Unified project service that provides a single source of truth
@@ -62,24 +109,92 @@ export const projectService = {
   },
 
   /**
-   * Search projects by name or description
+   * Get projects owned by a wallet address
+   */
+  getProjectsByOwner(ownerAddress: string): Project[] {
+    const normalized = ownerAddress.trim();
+    return this.getAllProjects().filter(
+      (p) => p.ownerAddress?.trim() === normalized,
+    );
+  },
+
+  /**
+   * Get projects discoverable in the directory (excludes moderated-out submissions)
+   */
+  getDiscoverableProjects(): Project[] {
+    return this.getAllProjects().filter((p) =>
+      projectSubmissionService.isDiscoverable(p.id),
+    );
+  },
+
+  /**
+   * Search projects by name, description, or tags with fuzzy matching for names.
+   * Results are sorted by relevance score (highest first).
    */
   searchProjects(query: string): Project[] {
-    const q = query.toLowerCase();
-    return this.getAllProjects().filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.tags?.some(tag => tag.toLowerCase().includes(q))
-    );
+    const q = query.toLowerCase().trim();
+    if (!q) return this.getDiscoverableProjects();
+
+    const discoverable = this.getDiscoverableProjects();
+    const scored: { project: Project; score: number }[] = [];
+
+    for (const p of discoverable) {
+      const name = p.name.toLowerCase();
+      const description = p.description.toLowerCase();
+      const tags = (p.tags ?? []).map((t) => t.toLowerCase());
+
+      let score = 0;
+
+      if (name === q) {
+        score += 100;
+      }
+      if (name.startsWith(q)) {
+        score += 50;
+      }
+      if (name.includes(q)) {
+        score += 30;
+      }
+      if (fuzzyMatch(p.name, query, 0.4)) {
+        score += 20;
+        const maxLen = Math.max(name.length, q.length);
+        if (maxLen > 0) {
+          const distance = levenshteinDistance(name, q);
+          score += (1 - distance / maxLen) * 10;
+        }
+      }
+
+      if (description.includes(q)) {
+        score += 15;
+      }
+      if (fuzzyMatch(p.description, query, 0.5)) {
+        score += 5;
+      }
+
+      for (const tag of tags) {
+        if (tag === q) {
+          score += 40;
+        } else if (tag.includes(q) || q.includes(tag)) {
+          score += 20;
+        } else if (fuzzyMatch(tag, q, 0.5)) {
+          score += 10;
+        }
+      }
+
+      if (score > 0) {
+        scored.push({ project: p, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.project);
   },
 
   /**
    * Get unique categories from all projects
    */
   getCategories(): string[] {
-    const categories = new Set(this.getAllProjects().map((p) => p.primaryCategory).filter(Boolean));
-    return ["All", ...Array.from(categories)];
+    const categories = unique(this.getAllProjects().map((p) => p.primaryCategory).filter(Boolean));
+    return ["All", ...categories];
   },
 
   /**
@@ -101,6 +216,65 @@ export const projectService = {
       );
     }
     return sorted;
+  },
+
+  /**
+   * Detect possible duplicate projects based on name, domain, and repository URL.
+   * All checks are case-insensitive and domain-normalized.
+   *
+   * @returns Object with hasDuplicates flag, matching projects, and human-readable reasons
+   */
+  detectDuplicates(options: DuplicateDetectionOptions): DuplicateDetectionResult {
+    const { name, websiteUrl, githubUrl, excludeProjectId } = options;
+    const matches: Project[] = [];
+    const reasons: string[] = [];
+    const seenIds = new Set<string>();
+
+    const existingProjects = this.getAllProjects();
+    const submittedDomain = websiteUrl ? extractDomain(websiteUrl) : "";
+
+    for (const existing of existingProjects) {
+      // Skip the project being edited
+      if (excludeProjectId && existing.id === excludeProjectId) continue;
+      if (seenIds.has(existing.id)) continue;
+
+      const matchReasons: string[] = [];
+
+      // Check by normalized name (case-insensitive, trimmed)
+      if (norm(existing.name) === norm(name)) {
+        matchReasons.push("identical name");
+      }
+
+      // Check by website domain (case-insensitive, domain-normalized)
+      if (
+        existing.domain &&
+        submittedDomain &&
+        normalizeUrlForComparison(existing.domain) === normalizeUrlForComparison(submittedDomain)
+      ) {
+        matchReasons.push("same website domain");
+      }
+
+      // Check by repository URL (case-insensitive, domain-normalized)
+      if (
+        existing.githubUrl &&
+        githubUrl &&
+        normalizeUrlForComparison(existing.githubUrl) === normalizeUrlForComparison(githubUrl)
+      ) {
+        matchReasons.push("same repository URL");
+      }
+
+      if (matchReasons.length > 0) {
+        seenIds.add(existing.id);
+        matches.push(existing);
+        reasons.push(`“${existing.name}” — ${matchReasons.join(", ")}`);
+      }
+    }
+
+    return {
+      hasDuplicates: matches.length > 0,
+      matches,
+      reasons,
+    };
   },
 
   // ── Repository-backed async API ──────────────────────────────────────────
@@ -132,3 +306,5 @@ export const projectService = {
     return registry.projects.search(query);
   },
 };
+
+export default projectService;

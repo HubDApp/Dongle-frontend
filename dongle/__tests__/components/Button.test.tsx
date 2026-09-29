@@ -25,6 +25,24 @@ describe("Button loading states", () => {
     expect(screen.queryByText("Update Project")).not.toBeInTheDocument();
   });
 
+  it("announces operation-specific loading state in a live region outside the button", () => {
+    const { rerender } = render(
+      <Button isLoading loadingText="Saving review...">
+        Save
+      </Button>,
+    );
+
+    const button = screen.getByRole("button", { name: /Saving review/i });
+    const status = screen.getByRole("status");
+    expect(button).not.toHaveAttribute("aria-live");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveClass("sr-only");
+    expect(status).toHaveTextContent("Saving review...");
+
+    rerender(<Button loadingText="Saving review...">Save</Button>);
+    expect(status).toHaveTextContent("");
+  });
+
   it("replaces the left icon with a spinner and keeps the label", () => {
     const { container } = render(
       <Button

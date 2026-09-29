@@ -1,0 +1,129 @@
+# UI component docs (MDX)
+
+Dongle's primitive components live in `dongle/components/ui/`.
+
+- **Live examples + playground:** [http://localhost:3000/docs/components](http://localhost:3000/docs/components) (`npm run dev`)
+
+## Button
+
+`import { Button } from "@/components/ui/Button"`
+
+Renders a native `<button>`. Forwards a ref.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `variant` | `"primary" \| "secondary" \| "outline" \| "ghost" \| "error"` | `"primary"` | Visual style |
+| `size` | `"sm" \| "md" \| "lg"` | `"md"` | Padding and font size |
+| `isLoading` | `boolean` | `false` | Sets `disabled` and `aria-busy` |
+| `loadingText` | `string` | — | Replaces `children` while loading |
+| `hideIconWhileLoading` | `boolean` | `false` | Spinner replaces `leftIcon` |
+| `leftIcon` / `rightIcon` | `ReactNode` | — | Decorative; mark with `aria-hidden` |
+| `…rest` | `ButtonHTMLAttributes` | — | `type`, `onClick`, `disabled`, `className`, all `aria-*` |
+
+```tsx
+<Button variant="primary" size="md" onClick={submit}>
+  Submit project
+</Button>
+
+<Button isLoading loadingText="Saving…">Save</Button>
+
+<Button variant="ghost" aria-label="Search" leftIcon={<SearchIcon />} />
+```
+
+### Accessibility
+
+| Prop | Usage |
+|------|--------|
+| `aria-label` | Required when there is no visible text (icon-only) |
+| `aria-busy` | Applied automatically during `isLoading` |
+| `type` | Use `"button"` inside forms unless submitting |
+| `aria-expanded` / `aria-controls` | Disclosure / menu triggers |
+| `disabled` | Native; prefer over `aria-disabled` unless you still need click handlers |
+
+## Card
+
+`import { Card } from "@/components/ui/Card"`
+
+A styled `div` for grouping content. Not interactive by default.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `variant` | `"default" \| "glass" \| "outline"` | `"default"` | Surface |
+| `padding` | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Inner spacing |
+| `…rest` | `HTMLAttributes<HTMLDivElement>` | — | `className`, `role`, `aria-*` |
+
+```tsx
+<Card variant="glass" padding="lg">
+  <h2>Featured</h2>
+</Card>
+```
+
+### Accessibility
+
+Card has no default `role`. Add one only when the grouping is a landmark or article:
+
+- `role="article"` for a listing
+- `role="region"` + `aria-label` (or `aria-labelledby`) for a named section
+- Do not attach `onClick` to the card; put a `Link` or `Button` inside so keyboard users get a tab stop
+
+## Badge
+
+`import { Badge } from "@/components/ui/Badge"`
+
+Compact status label (`div`).
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `variant` | `"primary" \| "secondary" \| "success" \| "warning" \| "error" \| "outline"` | `"primary"` | Colour |
+| `children` | `ReactNode` | — | Visible text; do not rely on colour alone |
+| `…rest` | `HTMLAttributes<HTMLDivElement>` | — | `role`, `aria-*` |
+
+```tsx
+<Badge variant="success">Verified</Badge>
+<Badge variant="warning" role="status">Pending</Badge>
+```
+
+### Accessibility
+
+| Prop | Usage |
+|------|--------|
+| (none) | Static labels need no live region |
+| `role="status"` | When the badge updates in place |
+| `aria-label` | If the only cue is colour (avoid this — keep text) |
+
+## Input
+
+`import { Input } from "@/components/ui/Input"`
+
+Native `<input>` with Dongle chrome. Forwards a ref. Prefer `FormField` when you need a visible label, helper, and error message.
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `error` | `boolean` | `false` | Red border |
+| `type` | HTML input types | `"text"` | `text`, `email`, `url`, `search`, … |
+| `…rest` | `InputHTMLAttributes` | — | `value`, `onChange`, `disabled`, `maxLength`, `aria-*` |
+
+```tsx
+<label htmlFor="name">Name</label>
+<Input id="name" name="name" autoComplete="organization" />
+
+<Input
+  error
+  aria-invalid
+  aria-describedby="url-error"
+  aria-label="Website"
+/>
+<p id="url-error" role="alert">Enter a valid https URL.</p>
+```
+
+### Accessibility
+
+| Prop | Usage |
+|------|--------|
+| `aria-label` or `<label htmlFor>` | Always — placeholder is not a name |
+| `aria-invalid` | Set with `error` |
+| `aria-describedby` | Space-separated ids of error / helper / counter |
+| `required` / `aria-required` | Required fields |
+| `autoComplete` | Use platform tokens (`url`, `email`) |
+
+`FormField` sets `htmlFor`, `aria-invalid`, and `aria-describedby` for you.
