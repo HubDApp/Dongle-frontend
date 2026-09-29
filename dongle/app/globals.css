@@ -114,6 +114,29 @@ html.dark {
     text-align: start;
   }
 
+  /* Form RTL surfaces (Issue #546) — flip layout and keep inputs readable */
+  .dongle-form[dir="rtl"],
+  .dongle-form.direction-rtl {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .dongle-form[dir="ltr"],
+  .dongle-form.direction-ltr {
+    direction: ltr;
+    text-align: left;
+  }
+
+  .dongle-form[dir="rtl"] input,
+  .dongle-form[dir="rtl"] textarea,
+  .dongle-form[dir="rtl"] select {
+    text-align: right;
+  }
+
+  .dongle-form[dir="rtl"] .rtl\:-scale-x-100 {
+    transform: scaleX(-1);
+  }
+
   .container {
     @apply mx-auto px-4 sm:px-6 lg:px-8;
   }
