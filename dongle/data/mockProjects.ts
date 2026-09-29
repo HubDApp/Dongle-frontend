@@ -1,6 +1,5 @@
 import { Project, PROJECT_CATEGORIES } from "@/types/project";
 import { extractDomain } from "@/lib/url";
-
 // Helper to generate deterministic but seemingly random dates
 const generateDate = (index: number) => {
   const baseDate = new Date("2023-01-01T00:00:00Z").getTime();
@@ -55,6 +54,7 @@ const baseProjects: Partial<Project>[] = [
     description: "Instant cross-border payments powered by Stellar.",
     rating: 4.6,
     reviews: 175,
+    status: "deprecated",
     websiteUrl: "https://xlm-pay.example.com",
   },
   {
@@ -75,6 +75,7 @@ const baseProjects: Partial<Project>[] = [
     description: "A censorship-resistant social network powered by Soroban.",
     rating: 4.1,
     reviews: 32,
+    status: "paused",
     websiteUrl: "https://stellar-social.example.com",
   },
   {
@@ -94,6 +95,7 @@ const baseProjects: Partial<Project>[] = [
     description: "No-code platform to mint and manage Stellar tokens.",
     rating: 4.4,
     reviews: 88,
+    status: "archived",
     websiteUrl: "https://token-forge.example.com",
     githubUrl: "https://github.com/example/token-forge",
     docsUrl: "https://docs.token-forge.example.com",
@@ -105,6 +107,7 @@ const baseProjects: Partial<Project>[] = [
     description: "Maximize your returns with automated yield farming strategies.",
     rating: 4.3,
     reviews: 112,
+    status: "flagged",
     websiteUrl: "https://yield-farm.example.com",
     githubUrl: "https://github.com/example/yield-farm",
   },
@@ -133,6 +136,7 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
         base.reviews! + Math.floor(Math.cos(i) * 50) + iteration * 10,
       ),
       createdAt: generateDate(i),
+      status: base.status ?? "active",
       websiteUrl: base.websiteUrl,
       githubUrl: base.githubUrl,
       logoUrl: base.logoUrl,
