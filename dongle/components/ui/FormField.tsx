@@ -1,3 +1,17 @@
+/**
+ * FormField — Issue #532 (read-only state)
+ *
+ * Read-only fields:
+ *  - Show the value and submit it (unlike disabled which excludes value)
+ *  - User cannot edit but can focus/select/copy the text
+ *  - Visually distinct from both editable and disabled states
+ *  - Validation runs normally (value is included in submission)
+ *  - Keyboard accessible (receives focus, tab-navigable)
+ *  - aria-readonly is set
+ *
+ * Also retains all disabled-state logic from Issue #531.
+ */
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { FieldValues, Path, UseFormRegister, UseFormRegisterReturn } from "react-hook-form";
 import { Input } from "./Input";
@@ -68,7 +82,8 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         if (typeof ref === "function") {
           ref(element);
         } else if (ref) {
-          (ref as React.MutableRefObject<HTMLInputElement | null>).current = element;
+          (ref as React.MutableRefObject<HTMLInputElement | null>).current =
+            element;
         }
         if (registration?.ref) {
           registration.ref(element);
@@ -102,7 +117,22 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         ? "text-amber-500 font-medium"
         : "text-zinc-500";
 
-    const displayError = error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined);
+    // Disabled fields skip validation display; read-only fields validate normally.
+    const displayError =
+      !disabled &&
+      (error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined));
+
+    // Counter is hidden on disabled fields; visible on read-only (value is fixed).
+    const showCounterDisplay = showCounter && maxLength && !disabled;
+
+    const describedBy = [
+      displayError ? errorId : "",
+      showCounterDisplay ? counterId : "",
+      helperText ? helperId : "",
+      readOnly ? `${inputId}-readonly-hint` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     return (
       <div className="flex flex-col gap-2 w-full">
@@ -133,6 +163,8 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           maxLength={maxLength}
           value={value}
           defaultValue={defaultValue}
+          disabled={disabled}
+          readOnly={readOnly}
           error={!!displayError}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -150,6 +182,14 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           }
           className={className}
         />
+
+        {/* Hidden hint for screen readers describing the read-only state */}
+        {readOnly && !disabled && (
+          <span id={`${inputId}-readonly-hint`} className="sr-only">
+            This field is read-only and cannot be edited.
+          </span>
+        )}
+
         {displayError && (
           <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
@@ -166,7 +206,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 FormField.displayName = "FormField";

@@ -36,8 +36,9 @@ interface VerificationFormProps {
   onSuccess?: (projectId: string) => void;
 }
 
-export default function VerificationForm({ onSuccess }: VerificationFormProps) {
+function VerificationFormInner({ onSuccess }: VerificationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { announce, announceError } = useFormAnnouncer();
 
   const {
     register,
@@ -61,6 +62,20 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
   });
 
   const projectIdHandlers = analytics.fieldHandlers("projectId");
+
+  // Announce validation errors when they surface.
+  useEffect(() => {
+    if (errors.projectId?.message) {
+      announceError(`Validation error: ${errors.projectId.message}`);
+    }
+  }, [errors.projectId, announceError]);
+
+  // Announce submitting state changes.
+  useEffect(() => {
+    if (isSubmitting) {
+      announce("Submitting verification request…");
+    }
+  }, [isSubmitting, announce]);
 
   const onSubmit = async (data: VerificationFormValues) => {
     setIsSubmitting(true);
@@ -92,7 +107,7 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
         if (onSuccess) onSuccess(data.projectId);
         return `Verification requested successfully!`;
       },
-      error: (err) => {
+      error: (err: Error) => {
         setIsSubmitting(false);
         trackVerificationRequest({
           success: false,
@@ -166,6 +181,7 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
           secondsPerField={30}
         />
         <FormField
+          id="verification-project-id"
           label="Project ID or Domain"
           fieldType="projectId"
           {...register("projectId")}
@@ -205,5 +221,13 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
         </Link>
       </p>
     </Card>
+  );
+}
+
+export default function VerificationForm(props: VerificationFormProps) {
+  return (
+    <FormAnnouncerProvider>
+      <VerificationFormInner {...props} />
+    </FormAnnouncerProvider>
   );
 }

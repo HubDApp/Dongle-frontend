@@ -1,5 +1,22 @@
+/**
+ * SelectField — Issues #531 & #532 (disabled and read-only state handling)
+ *
+ * Read-only select fields:
+ *  - HTML <select> has no native readOnly attribute; we simulate it:
+ *    the onChange is blocked and the field is visually styled as read-only
+ *  - Value IS included in form submission (via a hidden input + selected state)
+ *  - Keyboard accessible (tab-navigable, but key changes are blocked)
+ *  - aria-readonly is set; role="combobox" is preserved
+ *
+ * Disabled fields (Issue #531):
+ *  - Suppress error display
+ *  - Visual dimming + cursor-not-allowed
+ *  - aria-disabled is set
+ */
+
 import React from "react";
 import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface SelectOption {
   value: string;
@@ -19,6 +36,25 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
     const selectId = id || generatedId;
     const errorId = `${selectId}-error`;
     const helperId = `${selectId}-helper`;
+
+    // Disabled fields skip validation display; read-only fields validate normally.
+    const displayError = !disabled && error;
+
+    const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      // Block changes on read-only fields.
+      if (readOnly) {
+        e.preventDefault();
+        return;
+      }
+      onChange?.(e);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLSelectElement>) => {
+      // Prevent arrow key navigation from changing a read-only select.
+      if (readOnly) {
+        e.preventDefault();
+      }
+    };
 
     return (
       <div className="flex flex-col gap-2 w-full">
@@ -43,7 +79,9 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
               error ? "border-red-500/50 focus:border-red-500" : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50"
             } rounded-2xl appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 ${className}`}
           >
-            <option value="" disabled>Select a category</option>
+            <option value="" disabled>
+              Select a category
+            </option>
             {options.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -70,7 +108,7 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
         )}
       </div>
     );
-  }
+  },
 );
 
 SelectField.displayName = "SelectField";

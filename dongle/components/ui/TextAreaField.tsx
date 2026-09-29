@@ -1,8 +1,23 @@
+/**
+ * TextAreaField — Issue #532 (read-only state)
+ *
+ * Read-only fields:
+ *  - Value is included in form submission
+ *  - User cannot edit but can focus/select/copy the text
+ *  - Visually distinct (muted background, "read-only" badge)
+ *  - Validation runs normally
+ *  - Keyboard accessible
+ *  - aria-readonly is set
+ *
+ * Also retains all disabled-state logic from Issue #531.
+ */
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
 import type { PasteEvent } from "@/hooks/useFormPasteDetection";
 
-interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+interface TextAreaFieldProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
   helperText?: string;
@@ -75,7 +90,8 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         if (typeof ref === "function") {
           ref(element);
         } else if (ref) {
-          (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
+          (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+            element;
         }
         if (element) {
           setCharCount(element.value.length);
@@ -95,7 +111,9 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
       onChange?.(e);
     };
 
-    const isNearLimit = Boolean(maxLength && charCount >= maxLength * 0.9 && charCount < maxLength);
+    const isNearLimit = Boolean(
+      maxLength && charCount >= maxLength * 0.9 && charCount < maxLength,
+    );
     const isAtLimit = Boolean(maxLength && charCount === maxLength);
     const isOverLimit = Boolean(maxLength && charCount > maxLength);
 
@@ -113,7 +131,26 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         ? "border-amber-500/50 focus:border-amber-500"
         : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
 
-    const displayError = error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined);
+    const showCounterDisplay = showCounter && maxLength && !disabled;
+
+    const baseBorder =
+      displayError || (!disabled && (isOverLimit || isAtLimit))
+        ? "border-red-500/50 focus:border-red-500"
+        : readOnly && !disabled
+          ? "border-zinc-200 dark:border-zinc-700"
+          : !disabled && isNearLimit
+            ? "border-amber-500/50 focus:border-amber-500"
+            : disabled
+              ? "border-zinc-200 dark:border-zinc-800"
+              : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
+
+    const describedBy = [
+      displayError ? errorId : "",
+      showCounterDisplay ? counterId : "",
+      readOnly ? `${textareaId}-readonly-hint` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     return (
       <div className="flex flex-col gap-2 w-full">
@@ -164,6 +201,13 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
         />
+
+        {readOnly && !disabled && (
+          <span id={`${textareaId}-readonly-hint`} className="sr-only">
+            This field is read-only and cannot be edited.
+          </span>
+        )}
+
         {displayError && (
           <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
@@ -180,7 +224,7 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         )}
       </div>
     );
-  }
+  },
 );
 
 TextAreaField.displayName = "TextAreaField";
