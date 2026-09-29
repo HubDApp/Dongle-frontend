@@ -508,7 +508,7 @@ export default function ProjectForm({
                 existingNames,
               );
 
-              projectSubmissionService.recordSubmission({
+              const subRecord = projectSubmissionService.recordSubmission({
                 projectId: generateProjectIdFromName(cleanedPayload.name),
                 projectName: cleanedPayload.name,
                 submittedBy,
