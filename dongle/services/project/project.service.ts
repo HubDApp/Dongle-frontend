@@ -273,6 +273,8 @@ export const projectService = {
       matches,
       reasons,
     };
+  },
+
   // ── Repository-backed async API ──────────────────────────────────────────
   // These methods go through the DataAccessRegistry so that a real backend
   // or indexer can be plugged in without modifying UI components.

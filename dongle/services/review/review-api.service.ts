@@ -1,4 +1,4 @@
-import { Review, ReviewValidationError } from "@/types/review";
+import { Review, ReviewInput, ReviewValidationError } from "@/types/review";
 
 const API_BASE = "/api/reviews";
 
@@ -18,7 +18,7 @@ export const reviewApiService = {
   },
 
   async addReview(
-    review: Omit<Review, "id" | "createdAt">,
+    review: ReviewInput,
     userAddress: string,
   ): Promise<{ success: boolean; data?: Review; errors?: ReviewValidationError[] }> {
     try {

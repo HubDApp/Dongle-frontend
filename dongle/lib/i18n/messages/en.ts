@@ -400,6 +400,6 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
-} as const;
+} satisfies Record<string, unknown>;
 
 export type Messages = typeof en;

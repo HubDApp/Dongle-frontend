@@ -1,4 +1,9 @@
-import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
+import {
+  Review,
+  ReviewInput,
+  REVIEW_CONSTRAINTS,
+  ReviewValidationError,
+} from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
@@ -114,7 +119,7 @@ async function getReviews(): Promise<Review[]> {
 }
 
 async function addReview(
-  review: Omit<Review, "id" | "createdAt">,
+  review: ReviewInput,
   userAddress: string,
 ): Promise<{ success: boolean; data?: Review; errors?: ReviewValidationError[] }> {
   const validationErrors = validateReview(review.rating, review.comment);

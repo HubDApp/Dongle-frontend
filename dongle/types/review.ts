@@ -12,6 +12,16 @@ export interface Review {
   unhelpfulVotes?: string[];
 }
 
+/**
+ * Shape accepted when creating a review.
+ *
+ * `userAddress` is supplied separately by the caller (the connected wallet),
+ * so it is optional here for callers that still include it inline.
+ */
+export type ReviewInput = Omit<Review, "id" | "createdAt" | "userAddress"> & {
+  userAddress?: string;
+};
+
 // Validation constraints
 export const REVIEW_CONSTRAINTS = {
   RATING_MIN: 1,

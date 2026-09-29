@@ -25,7 +25,7 @@ describe("POST /api/reviews", () => {
       comment: "This is a great project with excellent features",
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -52,7 +52,7 @@ describe("POST /api/reviews", () => {
       // Missing projectName, userAddress, rating, comment
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -79,7 +79,7 @@ describe("POST /api/reviews", () => {
       comment: "This is a great project with excellent features",
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -106,7 +106,7 @@ describe("POST /api/reviews", () => {
       comment: "This is a great project with excellent features",
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -132,7 +132,7 @@ describe("POST /api/reviews", () => {
       comment: "This is a great project with excellent features",
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -158,7 +158,7 @@ describe("POST /api/reviews", () => {
       comment: "Too short",
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -185,7 +185,7 @@ describe("POST /api/reviews", () => {
       comment: "a".repeat(REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH + 1),
     };
 
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -213,7 +213,7 @@ describe("POST /api/reviews", () => {
       comment: "This is a great project with excellent features",
     };
 
-    const firstRequest = new Request(
+    const firstRequest = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -225,7 +225,7 @@ describe("POST /api/reviews", () => {
     await POST(firstRequest);
 
     // Second review from same user for same project
-    const secondRequest = new Request(
+    const secondRequest = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -259,7 +259,7 @@ describe("POST /api/reviews", () => {
       comment: "Good project with some minor issues",
     };
 
-    const request1 = new Request(
+    const request1 = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -270,7 +270,7 @@ describe("POST /api/reviews", () => {
 
     await POST(request1);
 
-    const request2 = new Request(
+    const request2 = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -299,7 +299,7 @@ describe("POST /api/reviews", () => {
       projectName: "Project 2",
     };
 
-    const request1 = new Request(
+    const request1 = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -310,7 +310,7 @@ describe("POST /api/reviews", () => {
 
     await POST(request1);
 
-    const request2 = new Request(
+    const request2 = new NextRequest(
       "http://localhost/api/reviews",
       {
         method: "POST",
@@ -325,3 +325,4 @@ describe("POST /api/reviews", () => {
     expect(response.status).toBe(201);
     expect(data.success).toBe(true);
   });
+});
