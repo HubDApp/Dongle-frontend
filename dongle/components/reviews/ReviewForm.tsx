@@ -1,27 +1,20 @@
 "use client";
 
-import React, { useId, useEffect, useRef } from "react";
+import React, { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.schema";
-import {
-  trackReviewSubmit,
-  trackFormSubmit,
-  trackFormSubmitSuccess,
-  trackFormSubmitError,
-  trackFormFieldChange,
-  trackFormAbandon,
-} from "@/lib/analytics";
-import { GDPRConsent } from "@/components/gdpr/GDPRConsent";
-import { gdprService } from "@/services/gdpr/gdpr.service";
-import { trackConsentGiven } from "@/lib/analytics";
-import Link from "next/link";
+import { useFormConversion } from "@/hooks/useFormConversion";
+import { useFormCaptcha } from "@/hooks/useFormCaptcha";
+import { FormCaptcha } from "@/components/forms/FormCaptcha";
 
 interface ReviewFormProps {
   projectId: string;
@@ -35,7 +28,9 @@ interface ReviewFormProps {
 }
 
 export default function ReviewForm({
+  projectId,
   projectName,
+  userAddress,
   initialReview,
   dailyReviewCount = 0,
   requiresCaptcha = false,
@@ -44,7 +39,16 @@ export default function ReviewForm({
 }: ReviewFormProps) {
   const ratingLabelId = useId();
   const ratingGroupId = useId();
-  const submittedRef = useRef(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  const conversion = useFormConversion({
+    formId: `review-form-${projectId}`,
+    formType: initialReview ? "review-update" : "review-submission",
+  });
+  const captcha = useFormCaptcha({
+    action: "review_submit",
+    enabled: requiresCaptcha || dailyReviewCount > 0,
+  });
 
   const {
     register,
@@ -66,75 +70,42 @@ export default function ReviewForm({
   const rating = watch("rating");
   const comment = watch("comment");
 
-  // Track field changes for completion-rate analytics.
-  useEffect(() => {
-    if (submittedRef.current) return;
-    trackFormFieldChange({
-      formType: "review",
-      fieldName: "rating",
-      fieldIndex: 1,
-      totalFields: 2,
-    });
-  }, [rating]);
+  // Form audit logging — records field changes with a timestamp, the acting
+  // review author, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "review-form",
+    formType: initialReview ? "review-edit" : "review-create",
+    actor: userAddress,
+  });
 
   useEffect(() => {
-    if (submittedRef.current) return;
-    trackFormFieldChange({
-      formType: "review",
-      fieldName: "comment",
-      fieldIndex: comment ? 2 : 1,
-      totalFields: 2,
-    });
-  }, [comment]);
-
-  // Track form abandonment on unmount.
-  useEffect(() => {
-    return () => {
-      if (!submittedRef.current && !isSubmitting) {
-        const touchedFields = (rating ? 1 : 0) + (comment ? 1 : 0);
-        trackFormAbandon({
-          formType: "review",
-          fieldCount: 2,
-          touchedFields,
-        });
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    trackAuditValues({ rating, comment });
+  }, [trackAuditValues, rating, comment]);
 
   const onSubmitForm = async (data: ReviewFormData) => {
-    trackFormSubmit({ formType: "review", fieldCount: 2 });
+    conversion.trackSubmitAttempt();
+    setCaptchaError(null);
 
-    // Track GDPR consent on submit
-    const consentRecord = gdprService.getConsentStatus("review", projectId, userAddress);
-    if (consentRecord && consentRecord.consentGiven) {
-      trackConsentGiven({
-        formType: "review",
-        formId: projectId,
-        userId: userAddress,
-        purposes: consentRecord.purposes,
-      });
+    let captchaToken: string | undefined;
+    if (requiresCaptcha) {
+      const result = await captcha.runCaptcha();
+      const validation = captcha.validateOnSubmit(result);
+      if (!validation.valid) {
+        setCaptchaError(validation.message);
+        conversion.trackFailure("captcha_failed");
+        return;
+      }
+      captchaToken = result.token ?? undefined;
     }
 
     try {
-      trackFormSubmitSuccess({ formType: "review", fieldCount: 2 });
-      submittedRef.current = true;
-      trackReviewSubmit({
-        success: true,
-        action: initialReview ? "update" : "create",
-        projectId: projectName,
-        rating: data.rating,
-        commentLength: data.comment.length,
+      onSubmit({
+        ...data,
+        captchaToken,
       });
-      onSubmit(data);
-    } catch (error) {
-      trackReviewSubmit({
-        success: false,
-        action: initialReview ? "update" : "create",
-        projectId: projectName,
-        errorCode: error instanceof Error ? error.name || "Error" : "unknown",
-      });
-      trackFormSubmitError({ formType: "review", fieldCount: 2, errorCode: error instanceof Error ? error.name || "Error" : "unknown" });
+      conversion.trackSuccess({ project_id: projectId });
+    } catch {
+      conversion.trackFailure("submit_error");
     }
   };
 
@@ -146,7 +117,11 @@ export default function ReviewForm({
         reset();
       }}
     >
-      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
+      <form
+        onSubmit={handleSubmit(onSubmitForm)}
+        onFocusCapture={() => conversion.trackStart()}
+        className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
+      >
         <div className="flex justify-between items-center">
           <div>
             <h3 className="text-xl font-bold">{initialReview ? "Edit Review" : "Add Review"}</h3>
@@ -160,6 +135,12 @@ export default function ReviewForm({
             size="sm"
           >
             <X className="w-5 h-5" />
+
+        <FormTimeEstimate
+          fieldCount={2}
+          completedFields={Number(Boolean(rating)) + Number(comment.trim().length > 0)}
+          secondsPerField={45}
+        />
           </IconButton>
         </div>
 
@@ -177,8 +158,6 @@ export default function ReviewForm({
                   id={`${ratingGroupId}-${star}`}
                   {...register("rating", { valueAsNumber: true })}
                   onClick={() => {
-                    // Manually set the value since register doesn't work with onClick
-                    const event = new Event("change", { bubbles: true });
                     const input = document.querySelector(
                       `input[name="rating"][value="${star}"]`
                     ) as HTMLInputElement;
@@ -192,13 +171,6 @@ export default function ReviewForm({
                       ? "bg-yellow-500 text-white shadow-lg shadow-yellow-500/20"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
                   }`}
-                  onMouseDown={() => {
-                    // Use a hidden input to properly register the value
-                    const hiddenInput = document.createElement("input");
-                    hiddenInput.type = "hidden";
-                    hiddenInput.name = "rating";
-                    hiddenInput.value = String(star);
-                  }}
                 >
                   <Star className="w-5 h-5 fill-current" />
                 </button>
@@ -233,12 +205,18 @@ export default function ReviewForm({
           </div>
         </div>
 
-        <GDPRConsent
-          formType="review"
-          formId={projectId}
-          userId={userAddress}
-          purposes={["form_submission", "data_processing", "analytics"]}
-        />
+        {requiresCaptcha && (
+          <FormCaptcha
+            mode={captcha.mode}
+            challenge={captcha.challenge}
+            accessibleAnswer={captcha.accessibleAnswer}
+            onAnswerChange={captcha.setAccessibleAnswer}
+            onUseAccessible={captcha.useAccessibleAlternative}
+            onRequestChallenge={captcha.requestChallenge}
+            loading={captcha.loading}
+            error={captchaError}
+          />
+        )}
 
         <div className="flex gap-3">
           <button

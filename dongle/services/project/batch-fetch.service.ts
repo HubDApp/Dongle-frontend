@@ -116,7 +116,7 @@ async function fetchChunk(
 
   // If the repository exposes a bulk getByIds method, prefer it.
   if (typeof (repo as { getByIds?: unknown }).getByIds === "function") {
-    const bulkRepo = repo as {
+    const bulkRepo = repo as unknown as {
       getByIds(ids: string[]): Promise<Project[]>;
     };
     const projects = await bulkRepo.getByIds(ids);

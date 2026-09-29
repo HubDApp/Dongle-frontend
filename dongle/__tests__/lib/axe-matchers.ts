@@ -1,16 +1,11 @@
-import { type AxeResults } from "vitest-axe";
+import { expect } from "vitest";
+import type { AxeResults } from "axe-core";
 
-declare global {
-  namespace Vi {
-    interface Assertion {
-      toHaveNoViolations(): void;
-    }
+declare module "vitest" {
+  interface Assertion<T> {
+    toHaveNoViolations(): T;
+    toHaveNoIncompleteViolations(): T;
   }
-}
-
-interface VitestAxeMatchers {
-  toHaveNoViolations(): { message: () => string; pass: boolean };
-  toHaveNoIncompleteViolations(): { message: () => string; pass: boolean };
 }
 
 expect.extend({
@@ -108,4 +103,4 @@ expect.extend({
       pass: false,
     };
   },
-} as unknown as VitestAxeMatchers);
+});

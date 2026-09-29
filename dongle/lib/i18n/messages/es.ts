@@ -173,6 +173,19 @@ export const es: Messages = {
       confirmLabel: "Descartar borrador",
       cancelLabel: "Conservar borrador",
     },
+    hints: {
+      name: "Usa un nombre claro y único para que otros puedan encontrar tu proyecto.",
+      category: "Elige la categoría que mejor coincida con el uso principal del proyecto.",
+      tags: "Añade algunas palabras clave (pulsa Enter tras cada una) para mejorar la visibilidad.",
+      description: "Resume qué hace el proyecto en 1–3 frases. Evita el lenguaje publicitario.",
+      websiteUrl: "Enlace a la página pública que los usuarios deben visitar primero.",
+      githubUrl: "Compatible: GitHub, GitLab, Bitbucket. Se prefieren repositorios públicos.",
+      logoUrl: "URL directa de imagen (PNG/SVG/JPG). Los logos cuadrados funcionan mejor.",
+      docsUrl: "Enlace a documentación, whitepaper o guía de inicio.",
+      auditReportUrl: "Enlace a un informe de auditoría de seguridad público, si existe.",
+      bugBountyUrl: "Enlace a un programa activo de bug bounty o divulgación de vulnerabilidades.",
+      contractAddresses: "IDs de contratos Soroban — 56 caracteres que empiezan por 'C'.",
+    },
   },
 
   reviews: {
@@ -502,51 +515,43 @@ export const es: Messages = {
     account: "Cuenta",
   },
 
-  gdpr: {
-    consent: {
-      title: "Privacidad y Consentimiento de Datos",
-      description: "Procesamos sus datos de formulario de acuerdo con nuestras prácticas de privacidad. Usted tiene derecho a exportar, eliminar o controlar sus datos en cualquier momento.",
-      label: "Acepto el procesamiento de mis datos de formulario según se describe en la {privacyPolicy}.",
-      privacyPolicyLink: "Política de Privacidad",
-      required: "Se requiere consentimiento para enviar este formulario.",
-      purposes: {
-        form_submission: "Procesar envíos de formulario",
-        data_processing: "Almacenar y procesar datos para mejorar el servicio",
-        analytics: "Análisis anónimo para mejorar la experiencia del usuario",
-        backup: "Crear copias de seguridad encriptadas de sus datos de formulario",
-      },
+  forms: {
+    builder: {
+      badge: "Formulario v{version}",
+      reset: "Borrar respuestas",
+      branchHint:
+        "Cambiar el tipo de proyecto muestra otra sección. Puedes volver atrás en cualquier momento: las respuestas de ramas ocultas se borran automáticamente.",
     },
-    export: {
-      button: "Exportar Mis Datos",
-      exporting: "Preparando exportación…",
-      exported: "Exportación lista — revise sus descargas",
-      description: "Descargue una copia de todos los datos que poseemos sobre usted.",
+    versioning: {
+      title: "Historial de versiones",
+      subtitle: "Cada cambio de esquema se guarda con un registro y marca de tiempo.",
+      empty: "Aún no hay versiones.",
+      versionLabel: "Versión {version}",
+      active: "Activa",
+      noSummary: "Sin entrada de registro",
+      timestamp: "Guardado {date}",
+      author: "por {author}",
+      view: "Ver",
+      revert: "Revertir",
+      viewingHistorical: "Viendo la versión histórica {version}.",
+      backToActive: "Volver a la versión activa",
     },
-    deletion: {
-      button: "Eliminar Mis Datos",
-      dialogTitle: "¿Eliminar sus datos?",
-      dialogDescription: "Esto eliminará permanentemente todos sus datos de formulario, copias de seguridad y registros de consentimiento. Esta acción no se puede deshacer.",
-      confirm: "Sí, eliminar mis datos",
-      cancel: "Cancelar",
-      success: "Sus datos han sido eliminados exitosamente.",
-      description: "Solicitar la eliminación permanente de todos sus datos de formulario.",
+    i18n: {
+      languageToggle: "Idioma del formulario",
     },
-    retention: {
-      title: "Política de Retención de Datos",
-      description: "Retenemos sus datos de formulario solo por el tiempo necesario. Las copias de seguridad se limpian automáticamente después de {maxBackupAge} días. Los datos archivados se eliminan después de {maxArchiveAge} días.",
-      maxBackupAge: "30",
-      maxArchiveAge: "90",
-      consentRetention: "Los registros de consentimiento se conservan durante {consentRetention} días.",
+    confirmation: {
+      successTitle: "Envío recibido",
+      successBody: "Gracias — tu formulario se envió correctamente.",
+      confirmationNumber: "Número de confirmación",
+      submittedAt: "Enviado {date}",
+      summaryTitle: "Lo que enviaste",
+      nextStepsTitle: "Próximos pasos",
+      openLink: "Continuar",
+      submitAnother: "Enviar otro",
+      backHome: "Explorar proyectos",
+      missingTitle: "Confirmación no encontrada",
+      missingBody:
+        "No encontramos esa confirmación. Envía el formulario de nuevo para obtener un número nuevo.",
     },
-  },
-
-  footer: {
-    tagline: "La capa de confianza para aplicaciones Web3.",
-    platform: "Plataforma",
-    resources: "Recursos",
-    copyright: "© {year} Dongle. Todos los derechos reservados.",
-    privacyPolicy: "Política de Privacidad",
-    termsOfService: "Términos de Servicio",
-    github: "GitHub",
   },
 };

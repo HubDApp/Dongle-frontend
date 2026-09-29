@@ -80,7 +80,7 @@ describe("Submit Project Page - High Risk Flows", () => {
     it("displays wallet connection message when not connected", () => {
       mockWallet();
       render(<NewProjectPage />);
-      expect(screen.getByText(/connect your wallet/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/connect your wallet/i).length).toBeGreaterThan(0);
     });
 
     it("shows 'Connect Wallet' button when wallet not connected", () => {

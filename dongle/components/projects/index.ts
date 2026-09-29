@@ -13,6 +13,7 @@ export { ReportProjectModal } from "./ReportProjectModal";
 export { RepositoryMetadata } from "./RepositoryMetadata";
 export { SubmissionChecklist } from "./SubmissionChecklist";
 export type { ChecklistItem } from "./SubmissionChecklist";
+export { SubmissionCollaborationPanel } from "./SubmissionCollaborationPanel";
 export { TransferOwnershipModal } from "./TransferOwnershipModal";
 export { VerificationBadge } from "./VerificationBadge";
 export type { VerificationStatus } from "./VerificationBadge";

@@ -4,6 +4,11 @@ import React, { useMemo } from "react";
 import { CheckCircle2, Circle, AlertCircle, Info, ShieldCheck, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
+import {
+  FIELD_LABELS,
+  getFieldRequirements,
+  type ProjectFormRequirementField,
+} from "@/utils/form-requirements.util";
 
 export interface ChecklistItem {
   id: string;
@@ -24,80 +29,91 @@ interface SubmissionChecklistProps {
     auditReportUrl?: string;
     bugBountyUrl?: string;
     description?: string;
+    contractAddresses?: string[];
   };
   className?: string;
 }
 
-export function SubmissionChecklist({ formData, className }: SubmissionChecklistProps) {
-  const checklist = useMemo<ChecklistItem[]>(() => {
-    const items: ChecklistItem[] = [
-      {
-        id: "name",
-        label: "Project Name",
-        description: "Clear, unique name (minimum 3 characters)",
-        required: true,
-        completed: (formData.name?.trim().length ?? 0) >= 3,
-      },
-      {
-        id: "category",
-        label: "Category",
-        description: "The category that best fits your project",
-        required: true,
-        completed: (formData.primaryCategory?.trim().length ?? 0) > 0,
-      },
-      {
-        id: "website",
-        label: "Project Website",
-        description: "Active website with project information",
-        required: true,
-        completed: !!formData.websiteUrl && formData.websiteUrl.trim().length > 0,
-      },
-      {
-        id: "description",
-        label: "Description",
-        description: "Clear explanation of what your project does (10-500 characters)",
-        required: true,
-        completed: (formData.description?.trim().length ?? 0) >= 10,
-      },
-      {
-        id: "logo",
-        label: "Logo URL",
-        description: "High-quality project logo for better visibility",
-        required: false,
-        completed: !!formData.logoUrl && formData.logoUrl.trim().length > 0,
-      },
-      {
-        id: "docs",
-        label: "Documentation",
-        description: "Developer or user documentation to help users understand your project",
-        required: false,
-        completed: !!formData.docsUrl && formData.docsUrl.trim().length > 0,
-      },
-      {
-        id: "repository",
-        label: "Repository URL",
-        description: "Link to GitHub, GitLab, or Bitbucket repository for transparency",
-        required: false,
-        completed: !!formData.githubUrl && formData.githubUrl.trim().length > 0,
-      },
-      {
-        id: "audit",
-        label: "Audit Report",
-        description: "Security audit report to build trust with users",
-        required: false,
-        completed: !!formData.auditReportUrl && formData.auditReportUrl.trim().length > 0,
-      },
-      {
-        id: "bugBounty",
-        label: "Bug Bounty Program",
-        description: "Active bug bounty program showing commitment to security",
-        required: false,
-        completed: !!formData.bugBountyUrl && formData.bugBountyUrl.trim().length > 0,
-      },
-    ];
+const CHECKLIST_META: Record<
+  Exclude<ProjectFormRequirementField, "contractAddresses">,
+  { description: string; completed: (formData: SubmissionChecklistProps["formData"]) => boolean }
+> = {
+  name: {
+    description: "Clear, unique name (minimum 3 characters)",
+    completed: (d) => (d.name?.trim().length ?? 0) >= 3,
+  },
+  primaryCategory: {
+    description: "The category that best fits your project",
+    completed: (d) => (d.primaryCategory?.trim().length ?? 0) > 0,
+  },
+  websiteUrl: {
+    description: "Active website with project information",
+    completed: (d) => !!d.websiteUrl && d.websiteUrl.trim().length > 0,
+  },
+  description: {
+    description: "Clear explanation of what your project does (10-500 characters)",
+    completed: (d) => (d.description?.trim().length ?? 0) >= 10,
+  },
+  logoUrl: {
+    description: "High-quality project logo for better visibility",
+    completed: (d) => !!d.logoUrl && d.logoUrl.trim().length > 0,
+  },
+  docsUrl: {
+    description: "Developer or user documentation to help users understand your project",
+    completed: (d) => !!d.docsUrl && d.docsUrl.trim().length > 0,
+  },
+  githubUrl: {
+    description: "Link to GitHub, GitLab, or Bitbucket repository for transparency",
+    completed: (d) => !!d.githubUrl && d.githubUrl.trim().length > 0,
+  },
+  auditReportUrl: {
+    description: "Security audit report to build trust with users",
+    completed: (d) => !!d.auditReportUrl && d.auditReportUrl.trim().length > 0,
+  },
+  bugBountyUrl: {
+    description: "Active bug bounty program showing commitment to security",
+    completed: (d) => !!d.bugBountyUrl && d.bugBountyUrl.trim().length > 0,
+  },
+};
 
-    return items;
-  }, [formData]);
+const CHECKLIST_ORDER: Array<Exclude<ProjectFormRequirementField, "contractAddresses">> = [
+  "name",
+  "primaryCategory",
+  "websiteUrl",
+  "description",
+  "logoUrl",
+  "docsUrl",
+  "githubUrl",
+  "auditReportUrl",
+  "bugBountyUrl",
+];
+
+export function SubmissionChecklist({ formData, className }: SubmissionChecklistProps) {
+  const requirements = useMemo(
+    () =>
+      getFieldRequirements({
+        primaryCategory: formData.primaryCategory,
+        contractAddresses: formData.contractAddresses,
+        auditReportUrl: formData.auditReportUrl,
+      }),
+    [formData.primaryCategory, formData.contractAddresses, formData.auditReportUrl],
+  );
+
+  const checklist = useMemo<ChecklistItem[]>(() => {
+    return CHECKLIST_ORDER.map((field) => {
+      const meta = CHECKLIST_META[field];
+      const rule = requirements[field];
+      return {
+        id: field,
+        label: FIELD_LABELS[field],
+        description: rule.reason
+          ? `${meta.description} (${rule.reason})`
+          : meta.description,
+        required: rule.required,
+        completed: meta.completed(formData),
+      };
+    });
+  }, [formData, requirements]);
 
   const stats = useMemo(() => {
     const required = checklist.filter((item) => item.required);
@@ -141,7 +157,6 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
   return (
     <Card className={className} padding="lg">
       <div className="space-y-4">
-        {/* Header */}
         <div className="flex items-start gap-3">
           <div className="p-2 bg-blue-500/10 rounded-lg">
             <Info className="w-5 h-5 text-blue-500" />
@@ -149,12 +164,11 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
           <div className="flex-1">
             <h3 className="font-semibold text-lg mb-1">Submission Quality Checklist</h3>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Complete all required fields to submit. Optional items improve visibility and trust.
+              Required fields update based on your category and other answers. Optional items improve visibility and trust.
             </p>
           </div>
         </div>
 
-        {/* Quality Score */}
         <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -183,7 +197,6 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
           </p>
         </div>
 
-        {/* Status Summary */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
             <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">Required</div>
@@ -199,7 +212,6 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
           </div>
         </div>
 
-        {/* Checklist Items */}
         <div className="space-y-2">
           {checklist.map((item) => (
             <div
@@ -252,7 +264,6 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
           ))}
         </div>
 
-        {/* Prepare for Verification */}
         <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900">
           <div className="flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
@@ -278,7 +289,6 @@ export function SubmissionChecklist({ formData, className }: SubmissionChecklist
           </div>
         </div>
 
-        {/* Submission Status */}
         {!canSubmit && (
           <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900">
             <p className="text-sm text-orange-700 dark:text-orange-300">
