@@ -1,13 +1,44 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+/**
+ * TextAreaField — Issue #531 (disabled state handling)
+ *
+ * Changes from baseline:
+ *  - Disabled fields suppress error display (validation is skipped)
+ *  - Disabled fields suppress counter display
+ *  - Disabled fields receive visual dimming + cursor-not-allowed
+ *  - aria-disabled is set to complement the native disabled attribute
+ *  - Label is dimmed when the field is disabled
+ */
 
-interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
+
+interface TextAreaFieldProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
   showCounter?: boolean;
 }
 
-export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+export const TextAreaField = React.forwardRef<
+  HTMLTextAreaElement,
+  TextAreaFieldProps
+>(
+  (
+    {
+      label,
+      error,
+      className = "",
+      id,
+      maxLength,
+      onChange,
+      value,
+      defaultValue,
+      showCounter = true,
+      disabled,
+      ...props
+    },
+    ref,
+  ) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
@@ -36,13 +67,14 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         if (typeof ref === "function") {
           ref(element);
         } else if (ref) {
-          (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current = element;
+          (ref as React.MutableRefObject<HTMLTextAreaElement | null>).current =
+            element;
         }
         if (element) {
           setCharCount(element.value.length);
         }
       },
-      [ref]
+      [ref],
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -50,31 +82,58 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
       onChange?.(e);
     };
 
-    const isNearLimit = Boolean(maxLength && charCount >= maxLength * 0.9 && charCount < maxLength);
+    const isNearLimit = Boolean(
+      maxLength && charCount >= maxLength * 0.9 && charCount < maxLength,
+    );
     const isAtLimit = Boolean(maxLength && charCount === maxLength);
     const isOverLimit = Boolean(maxLength && charCount > maxLength);
 
-    const counterClass = isOverLimit || isAtLimit
-      ? "text-red-500 font-semibold"
-      : isNearLimit
-      ? "text-amber-500 font-medium"
-      : "text-zinc-500";
+    const counterClass =
+      isOverLimit || isAtLimit
+        ? "text-red-500 font-semibold"
+        : isNearLimit
+          ? "text-amber-500 font-medium"
+          : "text-zinc-500";
 
-    const baseBorder = error || isOverLimit || isAtLimit
-      ? "border-red-500/50 focus:border-red-500"
-      : isNearLimit
-      ? "border-amber-500/50 focus:border-amber-500"
-      : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
+    // Disabled fields skip validation display.
+    const displayError =
+      !disabled &&
+      (error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined));
 
-    const displayError = error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined);
+    // Counter is hidden on disabled fields.
+    const showCounterDisplay = showCounter && maxLength && !disabled;
+
+    const baseBorder =
+      displayError || (!disabled && (isOverLimit || isAtLimit))
+        ? "border-red-500/50 focus:border-red-500"
+        : !disabled && isNearLimit
+          ? "border-amber-500/50 focus:border-amber-500"
+          : disabled
+            ? "border-zinc-200 dark:border-zinc-800"
+            : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
+
+    const describedBy = [
+      displayError ? errorId : "",
+      showCounterDisplay ? counterId : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
-          <label htmlFor={textareaId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+          <label
+            htmlFor={textareaId}
+            className={cn(
+              "text-sm font-semibold transition-colors",
+              disabled
+                ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                : "text-zinc-700 dark:text-zinc-300",
+            )}
+          >
             {label}
           </label>
-          {showCounter && maxLength && (
+          {showCounterDisplay && (
             <span
               id={counterId}
               className={`text-xs font-medium ${counterClass} transition-colors`}
@@ -93,18 +152,34 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           onChange={handleChange}
           value={value}
           defaultValue={defaultValue}
-          aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
-          aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : ""].filter(Boolean).join(" ") || undefined}
-          className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
+          disabled={disabled}
+          aria-disabled={disabled ? true : undefined}
+          aria-invalid={
+            displayError || isAtLimit || isOverLimit ? true : undefined
+          }
+          aria-describedby={describedBy || undefined}
+          className={cn(
+            `w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl`,
+            "focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all",
+            "text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none",
+            disabled &&
+              "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-500",
+            className,
+          )}
         />
+        {/* Errors are suppressed for disabled fields */}
         {displayError && (
-          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
+          <span
+            id={errorId}
+            className="text-xs font-medium text-red-500 ml-1"
+            role="alert"
+          >
             {displayError}
           </span>
         )}
       </div>
     );
-  }
+  },
 );
 
 TextAreaField.displayName = "TextAreaField";
