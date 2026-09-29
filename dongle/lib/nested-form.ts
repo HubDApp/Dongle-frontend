@@ -292,7 +292,7 @@ export function validateNestedForm<T>(
       if (typeof seg === "number") {
         pathKey += arrayNotation === "bracket" ? `[${seg}]` : `.${seg}`;
       } else {
-        pathKey += pathKey.length > 0 ? `.${seg}` : String(seg);
+        pathKey += pathKey.length > 0 ? `.${String(seg)}` : String(seg);
       }
     }
 

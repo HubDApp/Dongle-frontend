@@ -13,53 +13,72 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
+import type { PasteEvent } from "@/hooks/useFormPasteDetection";
 
 interface TextAreaFieldProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
+  helperText?: string;
   showCounter?: boolean;
+  /** When true, shows a required indicator and sets aria-required. */
+  required?: boolean;
 }
 
-export const TextAreaField = React.forwardRef<
-  HTMLTextAreaElement,
-  TextAreaFieldProps
->(
-  (
-    {
-      label,
-      error,
-      className = "",
-      id,
-      maxLength,
-      onChange,
-      value,
-      defaultValue,
-      showCounter = true,
-      disabled,
-      readOnly,
-      ...props
-    },
-    ref,
-  ) => {
+export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
+  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
     const counterId = `${textareaId}-counter`;
+    const helperId = `${textareaId}-helper`;
+
+    // Issue #524: derive contextual placeholder when none is provided
+    const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
+      fieldType: fieldType ?? inferFieldType("textarea", props.name),
+      maxLength,
+    });
 
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const [charCount, setCharCount] = useState(0);
+    const [wordCount, setWordCount] = useState(0);
 
+    const countWords = (text: string): number => {
+      const trimmedText = text.trim();
+      if (!trimmedText) return 0;
+      return trimmedText.split(/\s+/).length;
+    };
+
+    // -----------------------------------------------------------------------
+    // Paste detection (Issue #517)
+    // -----------------------------------------------------------------------
+    const { createPasteHandler } = useFormPasteDetection({
+      onPaste: onPasteDetected,
+      preventDefaultPaste,
+    });
+
+    const handlePaste = createPasteHandler(name ?? label);
+
+    // -----------------------------------------------------------------------
+    // Character counter
+    // -----------------------------------------------------------------------
     const syncCharCount = useCallback(() => {
+      let text = "";
       if (typeof value === "string") {
+        text = value;
         setCharCount(value.length);
       } else if (internalRef.current) {
+        text = internalRef.current.value;
         setCharCount(internalRef.current.value.length);
       } else if (typeof defaultValue === "string") {
+        text = defaultValue;
         setCharCount(defaultValue.length);
       }
-    }, [value, defaultValue]);
+      if (showWordCount) {
+        setWordCount(countWords(text));
+      }
+    }, [value, defaultValue, showWordCount, countWords]);
 
     useEffect(() => {
       syncCharCount();
@@ -76,16 +95,20 @@ export const TextAreaField = React.forwardRef<
         }
         if (element) {
           setCharCount(element.value.length);
+          if (showWordCount) {
+            setWordCount(countWords(element.value));
+          }
         }
       },
-      [ref],
+      [ref, showWordCount, countWords]
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      if (!readOnly) {
-        setCharCount(e.target.value.length);
-        onChange?.(e);
+      setCharCount(e.target.value.length);
+      if (showWordCount) {
+        setWordCount(countWords(e.target.value));
       }
+      onChange?.(e);
     };
 
     const isNearLimit = Boolean(
@@ -98,12 +121,15 @@ export const TextAreaField = React.forwardRef<
       isOverLimit || isAtLimit
         ? "text-red-500 font-semibold"
         : isNearLimit
-          ? "text-amber-500 font-medium"
-          : "text-zinc-500";
+        ? "text-amber-500 font-medium"
+        : "text-zinc-500";
 
-    const displayError =
-      !disabled &&
-      (error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined));
+    const baseBorder =
+      error || isOverLimit || isAtLimit
+        ? "border-red-500/50 focus:border-red-500"
+        : isNearLimit
+        ? "border-amber-500/50 focus:border-amber-500"
+        : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
 
     const showCounterDisplay = showCounter && maxLength && !disabled;
 
@@ -129,65 +155,51 @@ export const TextAreaField = React.forwardRef<
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
-          <div className="flex items-center gap-1.5">
-            <label
-              htmlFor={textareaId}
-              className={cn(
-                "text-sm font-semibold transition-colors",
-                disabled
-                  ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                  : "text-zinc-700 dark:text-zinc-300",
-              )}
-            >
-              {label}
-            </label>
-            {readOnly && !disabled && (
+          <label htmlFor={textareaId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            {label}
+            {required ? (
+              <span className="text-red-500 ml-0.5" aria-hidden="true">
+                *
+              </span>
+            ) : null}
+          </label>
+          <div className="flex gap-4">
+            {showWordCount && (
               <span
-                className="text-xs font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400"
-                aria-hidden="true"
+                id={wordCounterId}
+                className="text-xs font-medium text-zinc-500 dark:text-zinc-400 transition-colors"
+                aria-live="polite"
               >
-                read-only
+                {wordCount} {targetWordCount ? `/ ${targetWordCount}` : ""} words
+              </span>
+            )}
+            {showCounter && maxLength && (
+              <span
+                id={counterId}
+                className={`text-xs font-medium ${counterClass} transition-colors`}
+                aria-live="polite"
+              >
+                {charCount} / {maxLength}
               </span>
             )}
           </div>
-          {showCounterDisplay && (
-            <span
-              id={counterId}
-              className={`text-xs font-medium ${counterClass} transition-colors`}
-              aria-live="polite"
-            >
-              {charCount} / {maxLength}
-            </span>
-          )}
         </div>
         <textarea
           {...props}
           ref={setRef}
           id={textareaId}
+          name={name}
           rows={4}
           maxLength={maxLength}
           onChange={handleChange}
+          onPaste={handlePaste}
           value={value}
           defaultValue={defaultValue}
-          disabled={disabled}
-          readOnly={readOnly}
-          aria-disabled={disabled ? true : undefined}
-          aria-readonly={readOnly ? true : undefined}
-          aria-invalid={
-            displayError || isAtLimit || isOverLimit ? true : undefined
-          }
-          aria-describedby={describedBy || undefined}
-          className={cn(
-            `w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl`,
-            "focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all",
-            "text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none",
-            disabled &&
-              "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-500",
-            readOnly &&
-              !disabled &&
-              "cursor-default bg-zinc-100/60 dark:bg-zinc-800/30 text-zinc-700 dark:text-zinc-300 focus:ring-0 select-text",
-            className,
-          )}
+          required={required}
+          aria-required={required || undefined}
+          aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
+          aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
+          className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
         />
 
         {readOnly && !disabled && (
@@ -197,12 +209,17 @@ export const TextAreaField = React.forwardRef<
         )}
 
         {displayError && (
-          <span
-            id={errorId}
-            className="text-xs font-medium text-red-500 ml-1"
-            role="alert"
-          >
+          <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
+          </span>
+        )}
+        {!displayError && helperText && (
+          <span
+            id={helperId}
+            className="text-xs text-zinc-500 dark:text-zinc-400 ml-1"
+            role="note"
+          >
+            {helperText}
           </span>
         )}
       </div>

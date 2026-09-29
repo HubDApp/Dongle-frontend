@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useId, useEffect } from "react";
+import React, { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.schema";
-import {
-  FormAnnouncerProvider,
-  useFormAnnouncer,
-} from "@/components/ui/FormAnnouncer";
-import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
+import { useFormConversion } from "@/hooks/useFormConversion";
+import { useFormCaptcha } from "@/hooks/useFormCaptcha";
+import { FormCaptcha } from "@/components/forms/FormCaptcha";
 
 interface ReviewFormProps {
   projectId: string;
@@ -32,16 +32,26 @@ interface ReviewFormProps {
   onCancel: () => void;
 }
 
-// Inner component that uses the announcer hook.
-function ReviewFormInner({
+export default function ReviewForm({
+  projectId,
   projectName,
+  userAddress,
   initialReview,
   onSubmit,
   onCancel,
 }: ReviewFormProps) {
   const ratingLabelId = useId();
   const ratingGroupId = useId();
-  const { announce, announceError } = useFormAnnouncer();
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  const conversion = useFormConversion({
+    formId: `review-form-${projectId}`,
+    formType: initialReview ? "review-update" : "review-submission",
+  });
+  const captcha = useFormCaptcha({
+    action: "review_submit",
+    enabled: requiresCaptcha || dailyReviewCount > 0,
+  });
 
   const {
     register,
@@ -60,38 +70,57 @@ function ReviewFormInner({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
+  // Issue #521, #522, #523: form analytics
+  const analytics = useFormAnalytics({
+    formId: "review",
+    fieldCount: 2, // rating + comment
+    isDirty,
+  });
+
   const rating = watch("rating");
   const comment = watch("comment");
 
-  // Announce validation errors when they appear.
-  useEffect(() => {
-    const messages: string[] = [];
-    if (errors.rating?.message) messages.push(`Rating: ${errors.rating.message}`);
-    if (errors.comment?.message) messages.push(`Comment: ${errors.comment.message}`);
-    if (messages.length > 0) {
-      announceError(messages.join(". "));
-    }
-  }, [errors.rating, errors.comment, announceError]);
+  // Form audit logging — records field changes with a timestamp, the acting
+  // review author, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "review-form",
+    formType: initialReview ? "review-edit" : "review-create",
+    actor: userAddress,
+  });
 
-  // Announce submitting state.
   useEffect(() => {
-    if (isSubmitting) {
-      announce("Submitting your review…");
-    }
-  }, [isSubmitting, announce]);
-
-  // Announce successful submission.
-  useEffect(() => {
-    if (isSubmitSuccessful) {
-      announce(
-        initialReview ? "Review updated successfully." : "Review posted successfully.",
-      );
-    }
-  }, [isSubmitSuccessful, initialReview, announce]);
+    trackAuditValues({ rating, comment });
+  }, [trackAuditValues, rating, comment]);
 
   const onSubmitForm = async (data: ReviewFormData) => {
-    onSubmit(data);
+    conversion.trackSubmitAttempt();
+    setCaptchaError(null);
+
+    let captchaToken: string | undefined;
+    if (requiresCaptcha) {
+      const result = await captcha.runCaptcha();
+      const validation = captcha.validateOnSubmit(result);
+      if (!validation.valid) {
+        setCaptchaError(validation.message);
+        conversion.trackFailure("captcha_failed");
+        return;
+      }
+      captchaToken = result.token ?? undefined;
+    }
+
+    try {
+      onSubmit({
+        ...data,
+        captchaToken,
+      });
+      conversion.trackSuccess({ project_id: projectId });
+    } catch {
+      conversion.trackFailure("submit_error");
+    }
   };
+
+  // Track field-level validation errors on change
+  const commentFieldHandlers = analytics.fieldHandlers("comment");
 
   return (
     <ErrorBoundary
@@ -103,8 +132,8 @@ function ReviewFormInner({
     >
       <form
         onSubmit={handleSubmit(onSubmitForm)}
+        onFocusCapture={() => conversion.trackStart()}
         className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
-        noValidate
       >
         <div className="flex justify-between items-center">
           <div>
@@ -121,6 +150,12 @@ function ReviewFormInner({
             size="sm"
           >
             <X className="w-5 h-5" />
+
+        <FormTimeEstimate
+          fieldCount={2}
+          completedFields={Number(Boolean(rating)) + Number(comment.trim().length > 0)}
+          secondsPerField={45}
+        />
           </IconButton>
         </div>
 
@@ -142,7 +177,12 @@ function ReviewFormInner({
               Rating
               {errors.rating && <span className="text-red-500 ml-1">*</span>}
             </label>
-            <div role="radiogroup" aria-labelledby={ratingLabelId} className="flex gap-2">
+            <div
+              role="radiogroup"
+              aria-labelledby={ratingLabelId}
+              className="flex gap-2"
+              onFocus={() => analytics.fieldHandlers("rating").onFocus({} as React.FocusEvent<HTMLInputElement>)}
+            >
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
@@ -154,6 +194,10 @@ function ReviewFormInner({
                       `input[name="rating"][value="${star}"]`,
                     ) as HTMLInputElement;
                     if (input) input.checked = true;
+                    // Track field change for rating
+                    analytics.fieldHandlers("rating").onChange({
+                      target: { value: String(star) },
+                    } as React.ChangeEvent<HTMLInputElement>);
                   }}
                   aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
                   aria-checked={rating === star}
@@ -163,12 +207,6 @@ function ReviewFormInner({
                       ? "bg-yellow-500 text-white shadow-lg shadow-yellow-500/20"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
                   }`}
-                  onMouseDown={() => {
-                    const hiddenInput = document.createElement("input");
-                    hiddenInput.type = "hidden";
-                    hiddenInput.name = "rating";
-                    hiddenInput.value = String(star);
-                  }}
                 >
                   <Star className="w-5 h-5 fill-current" />
                 </button>
@@ -189,11 +227,18 @@ function ReviewFormInner({
             <TextAreaField
               label="Comment"
               required
+              fieldType="reviewComment"
               {...register("comment")}
               maxLength={REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH}
-              placeholder="Share your experience with this project..."
               error={errors.comment?.message}
               className="h-32"
+              onFocus={commentFieldHandlers.onFocus}
+              onChange={(e) => {
+                commentFieldHandlers.onChange(e);
+                // Also run the react-hook-form onChange
+                register("comment").onChange(e);
+              }}
+              onBlur={commentFieldHandlers.onBlur}
             />
             <div className="flex justify-between items-start mt-2 text-xs text-zinc-500">
               <span>Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters</span>
@@ -207,6 +252,19 @@ function ReviewFormInner({
             </div>
           </div>
         </div>
+
+        {requiresCaptcha && (
+          <FormCaptcha
+            mode={captcha.mode}
+            challenge={captcha.challenge}
+            accessibleAnswer={captcha.accessibleAnswer}
+            onAnswerChange={captcha.setAccessibleAnswer}
+            onUseAccessible={captcha.useAccessibleAlternative}
+            onRequestChallenge={captcha.requestChallenge}
+            loading={captcha.loading}
+            error={captchaError}
+          />
+        )}
 
         <div className="flex gap-3">
           <button
@@ -229,6 +287,12 @@ function ReviewFormInner({
           </button>
         </div>
       </form>
+
+      <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 mt-4">
+        <Link href="/privacy-policy" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+          Privacy Policy
+        </Link>
+      </p>
     </ErrorBoundary>
   );
 }

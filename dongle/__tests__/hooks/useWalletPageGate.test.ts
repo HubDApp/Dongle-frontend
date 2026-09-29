@@ -14,6 +14,7 @@ type WalletState = {
   isCorrectNetwork: boolean;
   walletNetworkLabel: string;
   isFreighterAvailable: boolean | null;
+  walletNetwork: string | null;
   connectWallet: ReturnType<typeof vi.fn>;
   disconnectWallet: ReturnType<typeof vi.fn>;
 };
@@ -26,10 +27,13 @@ function mockWallet(overrides: Partial<WalletState> = {}): WalletState {
     isCorrectNetwork: overrides.isCorrectNetwork ?? false,
     walletNetworkLabel: overrides.walletNetworkLabel ?? "Unknown",
     isFreighterAvailable: overrides.isFreighterAvailable ?? true,
+    walletNetwork: overrides.walletNetwork ?? null,
     connectWallet: overrides.connectWallet ?? vi.fn(),
     disconnectWallet: overrides.disconnectWallet ?? vi.fn(),
   };
-  vi.mocked(useWallet).mockReturnValue(defaults);
+  vi.mocked(useWallet).mockReturnValue(
+    defaults as unknown as ReturnType<typeof useWallet>,
+  );
   return defaults;
 }
 

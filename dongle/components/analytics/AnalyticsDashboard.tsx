@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import TimeSeriesChart from "./TimeSeriesChart";
+import FormAnalyticsPanel from "./FormAnalyticsPanel";
 import { downloadCsv, toCsv } from "@/lib/analytics-dashboard/csv";
 import type { AnalyticsRange, AnalyticsResult, VerificationFilter } from "@/lib/analytics-dashboard/metrics";
 import { ALL_CATEGORIES } from "@/types/project";
@@ -242,6 +243,18 @@ export default function AnalyticsDashboard() {
           </section>
         </>
       ) : null}
+
+      {/* ── Issues #521, #522, #523: Form analytics ── */}
+      <section className="mt-10" aria-labelledby="form-analytics-heading">
+        <h2 id="form-analytics-heading" className="mb-2 text-lg font-semibold">
+          Form Analytics
+        </h2>
+        <p className="mb-4 text-xs text-zinc-500">
+          Real-time session data: form submissions, field interactions, and validation
+          performance. Data reflects the current browser session only.
+        </p>
+        <FormAnalyticsPanel />
+      </section>
     </div>
   );
 }

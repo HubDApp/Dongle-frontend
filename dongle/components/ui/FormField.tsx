@@ -13,44 +13,55 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import type { FieldValues, Path, UseFormRegister, UseFormRegisterReturn } from "react-hook-form";
 import { Input } from "./Input";
-import { cn } from "@/lib/utils";
+import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
+import type { PasteEvent } from "@/hooks/useFormPasteDetection";
 
-interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface FormFieldProps<TFieldValues extends FieldValues = FieldValues>
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name"> {
   label: string;
+  name?: Path<TFieldValues> | string;
+  register?: UseFormRegister<TFieldValues>;
   error?: string;
   helperText?: string;
   showCounter?: boolean;
+  /** When true, shows a required indicator and sets aria-required. */
+  required?: boolean;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  (
-    {
-      label,
-      error,
-      helperText,
-      className = "",
-      id,
-      maxLength,
-      onChange,
-      value,
-      defaultValue,
-      showCounter = true,
-      disabled,
-      readOnly,
-      ...props
-    },
-    ref,
-  ) => {
+  ({ label, name, register, error, helperText, className = "", id, maxLength, onChange, onBlur, value, defaultValue, showCounter = true, required, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
     const counterId = `${inputId}-counter`;
     const helperId = `${inputId}-helper`;
+    const registration: UseFormRegisterReturn | undefined =
+      register && name ? register(name as Path<FieldValues>) : undefined;
+
+    // Issue #524: derive contextual placeholder when none is provided
+    const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
+      fieldType: fieldType ?? inferFieldType(props.type, props.name),
+      maxLength,
+    });
 
     const internalRef = useRef<HTMLInputElement | null>(null);
     const [charCount, setCharCount] = useState(0);
 
+    // -----------------------------------------------------------------------
+    // Paste detection (Issue #517)
+    // -----------------------------------------------------------------------
+    const { createPasteHandler } = useFormPasteDetection({
+      onPaste: onPasteDetected,
+      preventDefaultPaste,
+    });
+
+    const handlePaste = createPasteHandler(name ?? label);
+
+    // -----------------------------------------------------------------------
+    // Character counter
+    // -----------------------------------------------------------------------
     const syncCharCount = useCallback(() => {
       if (typeof value === "string") {
         setCharCount(value.length);
@@ -74,25 +85,28 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           (ref as React.MutableRefObject<HTMLInputElement | null>).current =
             element;
         }
+        if (registration?.ref) {
+          registration.ref(element);
+        }
         if (element) {
           setCharCount(element.value.length);
         }
       },
-      [ref],
+      [ref, registration]
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Read-only native inputs still fire change events in some browsers.
-      // We allow the handler to run only if the field is truly editable.
-      if (!readOnly) {
-        setCharCount(e.target.value.length);
-        onChange?.(e);
-      }
+      setCharCount(e.target.value.length);
+      registration?.onChange(e);
+      onChange?.(e);
     };
 
-    const isNearLimit = Boolean(
-      maxLength && charCount >= maxLength * 0.9 && charCount < maxLength,
-    );
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      registration?.onBlur(e);
+      onBlur?.(e);
+    };
+
+    const isNearLimit = Boolean(maxLength && charCount >= maxLength * 0.9 && charCount < maxLength);
     const isAtLimit = Boolean(maxLength && charCount === maxLength);
     const isOverLimit = Boolean(maxLength && charCount > maxLength);
 
@@ -100,8 +114,8 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
       isOverLimit || isAtLimit
         ? "text-red-500 font-semibold"
         : isNearLimit
-          ? "text-amber-500 font-medium"
-          : "text-zinc-500";
+        ? "text-amber-500 font-medium"
+        : "text-zinc-500";
 
     // Disabled fields skip validation display; read-only fields validate normally.
     const displayError =
@@ -123,29 +137,15 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
-          <div className="flex items-center gap-1.5">
-            <label
-              htmlFor={inputId}
-              className={cn(
-                "text-sm font-semibold transition-colors",
-                disabled
-                  ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                  : "text-zinc-700 dark:text-zinc-300",
-              )}
-            >
-              {label}
-            </label>
-            {/* Read-only badge — visible indicator that field is not editable */}
-            {readOnly && !disabled && (
-              <span
-                className="text-xs font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400"
-                aria-hidden="true"
-              >
-                read-only
+          <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+            {label}
+            {required ? (
+              <span className="text-red-500 ml-0.5" aria-hidden="true">
+                *
               </span>
-            )}
-          </div>
-          {showCounterDisplay && (
+            ) : null}
+          </label>
+          {showCounter && maxLength && (
             <span
               id={counterId}
               className={`text-xs font-medium ${counterClass} transition-colors`}
@@ -159,6 +159,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           {...props}
           ref={setRef}
           id={inputId}
+          name={registration?.name ?? name}
           maxLength={maxLength}
           value={value}
           defaultValue={defaultValue}
@@ -166,20 +167,20 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           readOnly={readOnly}
           error={!!displayError}
           onChange={handleChange}
-          aria-disabled={disabled ? true : undefined}
-          aria-readonly={readOnly ? true : undefined}
-          aria-invalid={
-            displayError || isAtLimit || isOverLimit ? true : undefined
+          onBlur={handleBlur}
+          required={required}
+          aria-required={required || undefined}
+          aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
+          aria-describedby={
+            [
+              displayError ? errorId : "",
+              maxLength && showCounter ? counterId : "",
+              helperText ? helperId : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
           }
-          aria-describedby={describedBy || undefined}
-          className={cn(
-            className,
-            disabled &&
-              "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-500",
-            readOnly &&
-              !disabled &&
-              "cursor-default bg-zinc-100/60 dark:bg-zinc-800/30 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 focus:ring-0 select-text",
-          )}
+          className={className}
         />
 
         {/* Hidden hint for screen readers describing the read-only state */}
@@ -190,23 +191,15 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
         )}
 
         {displayError && (
-          <span
-            id={errorId}
-            className="text-xs font-medium text-red-500 ml-1"
-            role="alert"
-          >
+          <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
           </span>
         )}
         {!displayError && helperText && (
           <span
             id={helperId}
-            className={cn(
-              "text-xs ml-1",
-              disabled
-                ? "text-zinc-400 dark:text-zinc-600"
-                : "text-zinc-500 dark:text-zinc-400",
-            )}
+            className="text-xs text-zinc-500 dark:text-zinc-400 ml-1"
+            role="note"
           >
             {helperText}
           </span>
