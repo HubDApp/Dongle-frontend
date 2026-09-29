@@ -147,147 +147,280 @@ export function trackReviewSubmit(opts: {
   }
 }
 
-// ─── Issue #521: Form submission analytics ────────────────────────────────────
-
 /**
- * Track that the user attempted to submit a form.
- * Called immediately before the submission handler fires.
+ * Tracks a form submission attempt.
+ * `formType` identifies the form (e.g. "project", "verification", "review").
  */
-export function trackFormSubmissionAttempt(opts: {
-  formId: string;
-  fieldCount?: number;
-  hasErrors?: boolean;
+export function trackFormSubmit(opts: {
+  formType: string;
+  fieldCount: number;
+  walletAddress?: string | null;
 }): void {
-  track("form_submission_attempt", {
-    form_id: opts.formId,
-    field_count: opts.fieldCount ?? null,
-    has_errors: opts.hasErrors ?? false,
+  track("form_submit", {
+    form_type: opts.formType,
+    field_count: opts.fieldCount,
+    ...withWalletFingerprint({}, opts.walletAddress),
   });
 }
 
-/**
- * Track a successful form submission.
- */
-export function trackFormSubmissionSuccess(opts: {
-  formId: string;
-  durationMs?: number;
+/** Tracks a successful form submission. */
+export function trackFormSubmitSuccess(opts: {
+  formType: string;
+  fieldCount: number;
+  walletAddress?: string | null;
 }): void {
-  track("form_submission_success", {
-    form_id: opts.formId,
-    duration_ms: opts.durationMs ?? null,
+  track("form_submit_success", {
+    form_type: opts.formType,
+    field_count: opts.fieldCount,
+    ...withWalletFingerprint({}, opts.walletAddress),
   });
 }
 
-/**
- * Track a form submission that resulted in an error.
- * Only the error code / type is sent — no user data.
- */
-export function trackFormSubmissionError(opts: {
-  formId: string;
+/** Tracks a form submission error. */
+export function trackFormSubmitError(opts: {
+  formType: string;
+  fieldCount: number;
   errorCode: string;
-  errorType?: "validation" | "network" | "contract" | "unknown";
+  walletAddress?: string | null;
 }): void {
-  track("form_submission_error", {
-    form_id: opts.formId,
+  track("form_submit_error", {
+    form_type: opts.formType,
+    field_count: opts.fieldCount,
     error_code: opts.errorCode,
-    error_type: opts.errorType ?? "unknown",
+    ...withWalletFingerprint({}, opts.walletAddress),
   });
 }
 
-/**
- * Track user abandonment — fired when the form is unmounted while dirty.
- * No field values are included.
- */
-export function trackFormAbandonment(opts: {
-  formId: string;
-  lastInteractedField?: string;
-  filledFieldCount?: number;
-  totalFieldCount?: number;
-  timeSpentMs?: number;
-}): void {
-  track("form_abandonment", {
-    form_id: opts.formId,
-    last_interacted_field: opts.lastInteractedField ?? null,
-    filled_field_count: opts.filledFieldCount ?? null,
-    total_field_count: opts.totalFieldCount ?? null,
-    time_spent_ms: opts.timeSpentMs ?? null,
-  });
-}
-
-// ─── Issue #522: Form field interaction analytics ─────────────────────────────
-
-/**
- * Track that a user focused a specific field.
- * Field name is sent as-is (must not be a PII field like "email").
- */
-export function trackFormFieldFocus(opts: {
-  formId: string;
-  fieldName: string;
-}): void {
-  track("form_field_focus", {
-    form_id: opts.formId,
-    field_name: opts.fieldName,
-  });
-}
-
-/**
- * Track that a user changed a field value (debounced at call sites).
- * No field value is ever sent.
- */
+/** Tracks a field value change for completion-rate tracking. */
 export function trackFormFieldChange(opts: {
-  formId: string;
+  formType: string;
   fieldName: string;
-  /** Whether the new value is non-empty. */
-  hasValue: boolean;
+  fieldIndex: number;
+  totalFields: number;
 }): void {
   track("form_field_change", {
-    form_id: opts.formId,
+    form_type: opts.formType,
     field_name: opts.fieldName,
-    has_value: opts.hasValue,
+    field_index: opts.fieldIndex,
+    total_fields: opts.totalFields,
   });
 }
 
-/**
- * Track a field-level validation outcome triggered by blur or submit.
- */
-export function trackFormFieldValidation(opts: {
-  formId: string;
-  fieldName: string;
-  success: boolean;
-  errorCode?: string;
+/** Tracks a user abandoning a form without submitting. */
+export function trackFormAbandon(opts: {
+  formType: string;
+  fieldCount: number;
+  touchedFields: number;
+  walletAddress?: string | null;
 }): void {
-  if (opts.success) {
-    track("form_field_validation_success", {
-      form_id: opts.formId,
-      field_name: opts.fieldName,
-    });
-  } else {
-    track("form_field_validation_error", {
-      form_id: opts.formId,
-      field_name: opts.fieldName,
-      error_code: opts.errorCode ?? "unknown",
-    });
-  }
+  track("form_abandon", {
+    form_type: opts.formType,
+    field_count: opts.fieldCount,
+    touched_fields: opts.touchedFields,
+    ...withWalletFingerprint({}, opts.walletAddress),
+  });
 }
 
-// ─── Issue #523: Form validation performance analytics ────────────────────────
-
-/**
- * Track how long a validation pass took.
- * Slow validations (>100 ms) surface in the dashboard.
- */
-export function trackFormValidationPerformance(opts: {
+/** Tracks that a form backup was created. */
+export function trackFormBackupCreated(opts: {
+  formType: string;
   formId: string;
-  fieldName?: string;
-  durationMs: number;
-  isSlow?: boolean;
-  debounceDelayMs?: number;
+  backupId: string;
+  backupCount: number;
 }): void {
-  track("form_validation_performance", {
+  track("form_backup_created", {
+    form_type: opts.formType,
     form_id: opts.formId,
-    field_name: opts.fieldName ?? null,
-    duration_ms: opts.durationMs,
-    is_slow: opts.isSlow ?? opts.durationMs > 100,
-    debounce_delay_ms: opts.debounceDelayMs ?? null,
+    backup_id: opts.backupId,
+    backup_count: opts.backupCount,
+  });
+}
+
+/** Tracks that a form backup was restored. */
+export function trackFormBackupRestored(opts: {
+  formType: string;
+  formId: string;
+  backupId: string;
+  restoredFromAgeMs: number;
+}): void {
+  track("form_backup_restored", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    backup_id: opts.backupId,
+    restored_from_age_ms: opts.restoredFromAgeMs,
+  });
+}
+
+/** Tracks a form backup failure. */
+export function trackFormBackupFailed(opts: {
+  formType: string;
+  formId: string;
+  errorCode: string;
+}): void {
+  track("form_backup_failed", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    error_code: opts.errorCode,
+  });
+}
+
+/** Tracks that the backup retention policy cleaned up old backups. */
+export function trackFormBackupRetentionCleaned(opts: {
+  formType: string;
+  formId: string;
+  removedCount: number;
+  remainingCount: number;
+}): void {
+  track("form_backup_retention_cleaned", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    removed_count: opts.removedCount,
+    remaining_count: opts.remainingCount,
+  });
+}
+
+/** Tracks that a backup was archived. */
+export function trackFormArchiveCreated(opts: {
+  formType: string;
+  formId: string;
+  backupId: string;
+  archivedCount: number;
+}): void {
+  track("form_archive_created", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    backup_id: opts.backupId,
+    archived_count: opts.archivedCount,
+  });
+}
+
+/** Tracks that an archived backup was restored. */
+export function trackFormArchiveRestored(opts: {
+  formType: string;
+  formId: string;
+  backupId: string;
+}): void {
+  track("form_archive_restored", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    backup_id: opts.backupId,
+  });
+}
+
+/** Tracks a search performed on archived backups. */
+export function trackFormArchiveSearch(opts: {
+  formType: string;
+  formId: string;
+  queryLength: number;
+  resultCount: number;
+}): void {
+  track("form_archive_search", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    query_length: opts.queryLength,
+    result_count: opts.resultCount,
+  });
+}
+
+/** Tracks that an archived backup was deleted. */
+export function trackFormArchiveDeleted(opts: {
+  formType: string;
+  formId: string;
+  backupId: string;
+}): void {
+  track("form_archive_deleted", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    backup_id: opts.backupId,
+  });
+}
+
+/** Tracks that the archive retention policy cleaned up old archived backups. */
+export function trackFormArchiveRetentionCleaned(opts: {
+  formType: string;
+  formId: string;
+  removedCount: number;
+  remainingCount: number;
+}): void {
+  track("form_archive_retention_cleaned", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    removed_count: opts.removedCount,
+    remaining_count: opts.remainingCount,
+  });
+}
+
+/** Tracks that user consent was given for form data processing. */
+export function trackConsentGiven(opts: {
+  formType: string;
+  formId: string;
+  userId: string;
+  purposes: string[];
+}): void {
+  track("consent_given", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    user_id: opts.userId,
+    purposes: opts.purposes.join(","),
+  });
+}
+
+/** Tracks that user consent was withdrawn for form data processing. */
+export function trackConsentWithdrawn(opts: {
+  formType: string;
+  formId: string;
+  userId: string;
+}): void {
+  track("consent_withdrawn", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    user_id: opts.userId,
+  });
+}
+
+/** Tracks that a user exported their form data. */
+export function trackDataExport(opts: {
+  formType: string;
+  formId: string;
+  userId: string;
+  recordCount: number;
+}): void {
+  track("data_export", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    user_id: opts.userId,
+    record_count: opts.recordCount,
+  });
+}
+
+/** Tracks that a user requested data deletion. */
+export function trackDataDeletionRequested(opts: {
+  formType: string;
+  formId: string;
+  userId: string;
+}): void {
+  track("data_deletion_requested", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    user_id: opts.userId,
+  });
+}
+
+/** Tracks that data deletion was completed. */
+export function trackDataDeletionCompleted(opts: {
+  formType: string;
+  formId: string;
+  userId: string;
+  backupsDeleted: number;
+  archivesDeleted: number;
+  consentRecordsDeleted: number;
+}): void {
+  track("data_deletion_completed", {
+    form_type: opts.formType,
+    form_id: opts.formId,
+    user_id: opts.userId,
+    backups_deleted: opts.backupsDeleted,
+    archives_deleted: opts.archivesDeleted,
+    consent_records_deleted: opts.consentRecordsDeleted,
   });
 }

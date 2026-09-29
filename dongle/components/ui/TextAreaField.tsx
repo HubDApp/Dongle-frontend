@@ -27,6 +27,13 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
 
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const [charCount, setCharCount] = useState(0);
+    const [wordCount, setWordCount] = useState(0);
+
+    const countWords = (text: string): number => {
+      const trimmedText = text.trim();
+      if (!trimmedText) return 0;
+      return trimmedText.split(/\s+/).length;
+    };
 
     // -----------------------------------------------------------------------
     // Paste detection (Issue #517)
@@ -42,14 +49,21 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
     // Character counter
     // -----------------------------------------------------------------------
     const syncCharCount = useCallback(() => {
+      let text = "";
       if (typeof value === "string") {
+        text = value;
         setCharCount(value.length);
       } else if (internalRef.current) {
+        text = internalRef.current.value;
         setCharCount(internalRef.current.value.length);
       } else if (typeof defaultValue === "string") {
+        text = defaultValue;
         setCharCount(defaultValue.length);
       }
-    }, [value, defaultValue]);
+      if (showWordCount) {
+        setWordCount(countWords(text));
+      }
+    }, [value, defaultValue, showWordCount, countWords]);
 
     useEffect(() => {
       syncCharCount();
@@ -65,13 +79,19 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         }
         if (element) {
           setCharCount(element.value.length);
+          if (showWordCount) {
+            setWordCount(countWords(element.value));
+          }
         }
       },
-      [ref]
+      [ref, showWordCount, countWords]
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setCharCount(e.target.value.length);
+      if (showWordCount) {
+        setWordCount(countWords(e.target.value));
+      }
       onChange?.(e);
     };
 
@@ -106,15 +126,26 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
               </span>
             ) : null}
           </label>
-          {showCounter && maxLength && (
-            <span
-              id={counterId}
-              className={`text-xs font-medium ${counterClass} transition-colors`}
-              aria-live="polite"
-            >
-              {charCount} / {maxLength}
-            </span>
-          )}
+          <div className="flex gap-4">
+            {showWordCount && (
+              <span
+                id={wordCounterId}
+                className="text-xs font-medium text-zinc-500 dark:text-zinc-400 transition-colors"
+                aria-live="polite"
+              >
+                {wordCount} {targetWordCount ? `/ ${targetWordCount}` : ""} words
+              </span>
+            )}
+            {showCounter && maxLength && (
+              <span
+                id={counterId}
+                className={`text-xs font-medium ${counterClass} transition-colors`}
+                aria-live="polite"
+              >
+                {charCount} / {maxLength}
+              </span>
+            )}
+          </div>
         </div>
         <textarea
           {...props}
@@ -134,7 +165,7 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
         />
         {displayError && (
-          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
+          <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
           </span>
         )}

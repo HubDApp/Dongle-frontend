@@ -151,7 +151,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           className={className}
         />
         {displayError && (
-          <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">
+          <span id={errorId} className="text-xs font-medium text-red-500 ms-1" role="alert">
             {displayError}
           </span>
         )}

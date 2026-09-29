@@ -29,17 +29,25 @@ export {
   trackProjectSubmit,
   trackVerificationRequest,
   trackReviewSubmit,
-  // Issue #521: Form submission analytics
-  trackFormSubmissionAttempt,
-  trackFormSubmissionSuccess,
-  trackFormSubmissionError,
-  trackFormAbandonment,
-  // Issue #522: Form field interaction analytics
-  trackFormFieldFocus,
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
   trackFormFieldChange,
-  trackFormFieldValidation,
-  // Issue #523: Form validation performance analytics
-  trackFormValidationPerformance,
+  trackFormAbandon,
+  trackFormBackupCreated,
+  trackFormBackupRestored,
+  trackFormBackupFailed,
+  trackFormBackupRetentionCleaned,
+  trackFormArchiveCreated,
+  trackFormArchiveRestored,
+  trackFormArchiveSearch,
+  trackFormArchiveDeleted,
+  trackFormArchiveRetentionCleaned,
+  trackConsentGiven,
+  trackConsentWithdrawn,
+  trackDataExport,
+  trackDataDeletionRequested,
+  trackDataDeletionCompleted,
 } from "./events";
 
 // Issue #522 & #523: form analytics aggregation

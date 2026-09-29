@@ -19,18 +19,25 @@ export type AnalyticsEventName =
   | "review_submit"
   | "review_update"
   | "review_submit_failed"
-  // Form submission analytics (issue #521)
-  | "form_submission_attempt"
-  | "form_submission_success"
-  | "form_submission_error"
-  | "form_abandonment"
-  // Form field interaction analytics (issue #522)
-  | "form_field_focus"
+  | "form_submit"
+  | "form_submit_success"
+  | "form_submit_error"
   | "form_field_change"
-  | "form_field_validation_error"
-  | "form_field_validation_success"
-  // Form validation performance analytics (issue #523)
-  | "form_validation_performance";
+  | "form_abandon"
+  | "form_backup_created"
+  | "form_backup_restored"
+  | "form_backup_failed"
+  | "form_backup_retention_cleaned"
+  | "form_archive_created"
+  | "form_archive_restored"
+  | "form_archive_search"
+  | "form_archive_deleted"
+  | "form_archive_retention_cleaned"
+  | "consent_given"
+  | "consent_withdrawn"
+  | "data_export"
+  | "data_deletion_requested"
+  | "data_deletion_completed";
 
 /** Flat property bag — values must be JSON-serializable primitives. */
 export type AnalyticsProperties = Record<

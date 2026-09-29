@@ -1,10 +1,28 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import DiscoverPage from "@/app/discover/page";
 import { mockProjects } from "@/data/mockProjects";
 import { projectService } from "@/services/project/project.service";
 import type { SortBy } from "@/hooks/useDiscoverParams";
+
+// jsdom in the current Node version does not implement window.matchMedia, but
+// ProjectCard calls getPrefetchValue() which reads it. Provide a minimal stub.
+beforeAll(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+});
 
 // Mock soroban so verification fetches resolve immediately
 vi.mock("@/services/stellar/soroban.service", () => ({
@@ -292,6 +310,30 @@ describe("Discover Page - High Risk Flows", () => {
       // The query matches several mock projects ("Soroban Swap V2", etc.),
       // each rendering the name (with the matched phrase highlighted).
       expect(screen.getAllByText(mockProjects[0].name).length).toBeGreaterThan(0);
+    });
+
+    it("shows lifecycle status badges on project cards", async () => {
+      render(<DiscoverPage />);
+      await finishInitialLoad();
+
+      const deprecatedProjects = mockProjects.filter((p) => p.status === "deprecated");
+      expect(deprecatedProjects.length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Deprecated").length).toBeGreaterThan(0);
+    });
+
+    it("filters projects by lifecycle status", async () => {
+      render(<DiscoverPage />);
+      await finishInitialLoad();
+
+      const statusSelect = screen.getByLabelText(
+        /Filter by lifecycle status/i,
+      ) as HTMLSelectElement;
+      fireEvent.change(statusSelect, { target: { value: "deprecated" } });
+
+      const deprecatedProject = mockProjects.find((p) => p.status === "deprecated");
+      expect(deprecatedProject).toBeTruthy();
+      expect(screen.getByText(deprecatedProject!.name)).toBeInTheDocument();
+      expect(screen.queryByText(mockProjects[0].name)).not.toBeInTheDocument();
     });
 
     it("filters projects by category", async () => {

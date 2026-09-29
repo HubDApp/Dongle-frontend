@@ -44,6 +44,13 @@ import {
 } from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
+import {
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
+  trackFormFieldChange,
+  trackFormAbandon,
+} from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
 import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -384,7 +391,6 @@ export default function ProjectForm({
   // The React Compiler flags it as non-memoizable, but this component does not
   // rely on memoization of watchedValues — it's read-only for the checklist
   // and the draft autosave effect below.
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
   const fieldRequirements = getFieldRequirements({
     primaryCategory: watchedValues.primaryCategory,
@@ -407,6 +413,10 @@ export default function ProjectForm({
     trackAuditValues(watchedValues);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues), trackAuditValues]);
+
+  // Track field changes for completion-rate analytics.
+  const submittedRef = React.useRef(false);
+  const prevTouchedRef = React.useRef(0);
 
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
@@ -439,7 +449,27 @@ export default function ProjectForm({
         return customOnSubmit(payload);
       }
 
+      const fieldCount = Object.keys(payload).filter((k) => {
+        const v = (payload as Record<string, unknown>)[k];
+        return v !== undefined && v !== null && v !== "";
+      }).length;
+
+      // Track GDPR consent on submit
+      const userId = publicKey ?? "anonymous";
+      const consentRecord = gdprService.getConsentStatus("project", projectId ?? "new", userId);
+      if (consentRecord && consentRecord.consentGiven) {
+        trackConsentGiven({
+          formType: "project",
+          formId: projectId ?? "new",
+          userId,
+          purposes: consentRecord.purposes,
+        });
+      }
+
+      trackFormSubmit({ formType: "project", fieldCount, walletAddress: publicKey });
+
       setIsSubmitting(true);
+      void formEventsService.emit("FORM_SUBMIT_START", { payload }, projectId);
       try {
         // Strip any blank entries left in the contractAddresses list
         const cleanedPayload = {
@@ -485,7 +515,7 @@ export default function ProjectForm({
                 existingNames,
               );
 
-              projectSubmissionService.recordSubmission({
+              const subRecord = projectSubmissionService.recordSubmission({
                 projectId: generateProjectIdFromName(cleanedPayload.name),
                 projectName: cleanedPayload.name,
                 submittedBy,
@@ -750,8 +780,9 @@ export default function ProjectForm({
         mode,
         projectId,
         isSubmitting,
+        // eslint-disable-next-line react-hooks/incompatible-library
         watchField: (name) => watch(name),
-        formErrors: errors as Record<string, any>,
+        formErrors: errors as Record<string, unknown>,
       }}
     >
     <ErrorBoundary
@@ -785,6 +816,16 @@ export default function ProjectForm({
               : "Onboard your dApp to the Dongle ecosystem."}
           </p>
         </div>
+        {mode === "edit" && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsHistoryModalOpen(true)}
+            leftIcon={<HistoryIcon className="w-4 h-4" />}
+          >
+            View History
+          </Button>
+        )}
       </div>
 
       <div className="relative">
@@ -1070,6 +1111,17 @@ export default function ProjectForm({
                 field.onChange(next);
               };
 
+              /** Uppercase + trim on blur for a clean UX */
+              const handleBlur = (index: number) => {
+                const current = addresses[index];
+                if (current && current.trim()) {
+                  const next = addresses.map((a, i) =>
+                    i === index ? a.trim().toUpperCase() : a,
+                  );
+                  field.onChange(next);
+                }
+              };
+
               const handleRemove = (index: number) => {
                 field.onChange(addresses.filter((_, i) => i !== index));
               };
@@ -1087,33 +1139,98 @@ export default function ProjectForm({
                     </button>
                   ) : (
                     <>
-                      {addresses.map((addr, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              value={addr}
-                              onChange={(e) => handleChange(index, e.target.value)}
-                              placeholder="CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                              aria-label={`Contract address ${index + 1}`}
-                              className="w-full font-mono text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors"
-                            />
-                            {errors.contractAddresses?.[index]?.message && (
-                              <p className="mt-1 text-sm text-red-500 dark:text-red-400">
-                                {errors.contractAddresses[index].message}
+                      {addresses.map((addr, index) => {
+                        const fieldError = errors.contractAddresses?.[index]?.message;
+                        const charCount = addr.length;
+                        const isComplete = charCount === 56;
+                        const hasValue = charCount > 0;
+
+                        // Inline validity: only show green when all 56 chars entered and no error
+                        const showValid = isComplete && !fieldError;
+                        const showInvalid = hasValue && fieldError;
+
+                        return (
+                          <div key={index} className="flex items-start gap-2">
+                            <div className="flex-1 space-y-1">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={addr}
+                                  onChange={(e) => handleChange(index, e.target.value)}
+                                  onBlur={() => handleBlur(index)}
+                                  placeholder="CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                                  aria-label={`Contract address ${index + 1}`}
+                                  aria-invalid={!!fieldError}
+                                  aria-describedby={
+                                    fieldError
+                                      ? `contract-error-${index}`
+                                      : `contract-counter-${index}`
+                                  }
+                                  maxLength={56}
+                                  spellCheck={false}
+                                  autoComplete="off"
+                                  className={`w-full font-mono text-sm bg-zinc-50 dark:bg-zinc-900 border rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors ${
+                                    showInvalid
+                                      ? "border-red-400 dark:border-red-600 focus:ring-red-500/20"
+                                      : showValid
+                                      ? "border-green-400 dark:border-green-600 focus:ring-green-500/20"
+                                      : "border-zinc-200 dark:border-zinc-800 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400"
+                                  }`}
+                                />
+
+                                {/* Inline validity indicator */}
+                                {hasValue && (
+                                  <span
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold"
+                                    aria-hidden="true"
+                                  >
+                                    {showValid ? (
+                                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    ) : showInvalid ? (
+                                      <AlertCircle className="w-4 h-4 text-red-500" />
+                                    ) : (
+                                      <span className="text-zinc-400 tabular-nums">
+                                        {charCount}/56
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Char counter (assistive text) */}
+                              <p
+                                id={`contract-counter-${index}`}
+                                className="text-xs text-zinc-400 dark:text-zinc-500 tabular-nums"
+                                aria-live="polite"
+                              >
+                                {charCount === 0
+                                  ? "56 characters required"
+                                  : `${charCount} / 56`}
                               </p>
-                            )}
+
+                              {/* Field error */}
+                              {fieldError && (
+                                <p
+                                  id={`contract-error-${index}`}
+                                  role="alert"
+                                  className="text-xs text-red-500 dark:text-red-400"
+                                >
+                                  {fieldError}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(index)}
+                              aria-label={`Remove contract address ${index + 1}`}
+                              className="mt-2 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(index)}
-                            aria-label={`Remove contract address ${index + 1}`}
-                            className="mt-1 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       {addresses.length < 5 && (
                         <button
@@ -1226,6 +1343,19 @@ export default function ProjectForm({
           {mode === "edit"
             ? "By updating, you agree to have your project details updated on the Stellar network."
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
+        </p>
+
+        <GDPRConsent
+          formType="project"
+          formId={projectId ?? "new"}
+          userId={publicKey ?? "anonymous"}
+          purposes={["form_submission", "data_processing", "backup"]}
+        />
+
+        <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <Link href="/privacy-policy" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+            Privacy Policy
+          </Link>
         </p>
       </form>
       </div>

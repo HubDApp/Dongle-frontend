@@ -1,5 +1,6 @@
 export { ClaimProjectModal } from "./ClaimProjectModal";
 export { ClaimStatusBanner } from "./ClaimStatusBanner";
+export { UnclaimedProjectBanner } from "./UnclaimedProjectBanner";
 export { ContractAddressList } from "./ContractAddressList";
 export { DraftIndicator } from "./DraftIndicator";
 export { ProjectCard } from "./ProjectCard";

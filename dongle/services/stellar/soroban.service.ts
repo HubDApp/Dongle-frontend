@@ -328,6 +328,17 @@ export const sorobanService = {
       throw new WalletNotConnectedError();
     }
 
+    // Service-side validation: reject structurally invalid contract IDs before
+    // spending a transaction fee.  The form already validates client-side, but
+    // this guard catches any callers that bypass the form layer.
+    const contractErrors = validateContractAddresses(params.contractAddresses ?? []);
+    if (contractErrors.length > 0) {
+      const detail = contractErrors
+        .map((e) => `[${e.index}] "${e.value}": ${e.error}`)
+        .join("; ");
+      throw new ContractCallError(`Invalid contract address(es): ${detail}`);
+    }
+
     const args = [
       nativeToScVal(params.name),
       nativeToScVal(params.category),
@@ -855,6 +866,15 @@ export const sorobanService = {
     if (!project) throw new ContractCallError("Project not found");
     if (project.owner !== publicKey) {
       throw new ContractCallError("Only project owner can update the project");
+    }
+
+    // Service-side contract address validation
+    const contractErrors = validateContractAddresses(params.contractAddresses ?? []);
+    if (contractErrors.length > 0) {
+      const detail = contractErrors
+        .map((e) => `[${e.index}] "${e.value}": ${e.error}`)
+        .join("; ");
+      throw new ContractCallError(`Invalid contract address(es): ${detail}`);
     }
 
     const args = [

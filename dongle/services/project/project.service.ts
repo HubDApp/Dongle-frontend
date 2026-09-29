@@ -66,7 +66,7 @@ export const projectService = {
    * Get all projects
    */
   getAllProjects(): Project[] {
-    return mockProjects;
+    return mockProjects.map((p) => projectStatusService.applyOverride(p));
   },
 
   /**
@@ -77,12 +77,14 @@ export const projectService = {
     const project = mockProjects.find((p) => p.id === id) ?? null;
     if (!project) return null;
 
+    let resolved: Project = projectStatusService.applyOverride(project);
+
     const overrideOwner = projectOwnerService.getProjectOwnerOverride(project.id);
     if (overrideOwner) {
-      return { ...project, ownerAddress: overrideOwner };
+      resolved = { ...resolved, ownerAddress: overrideOwner };
     }
 
-    return project;
+    return resolved;
   },
 
   /**
@@ -281,15 +283,17 @@ export const projectService = {
 
   /** Async: fetch all projects via the active repository implementation. */
   async fetchAll(): Promise<Project[]> {
-    return registry.projects.getAll();
+    const projects = await registry.projects.getAll();
+    return projects.map((p) => projectStatusService.applyOverride(p));
   },
 
   /** Async: fetch a single project by ID via the active repository. */
   async fetchById(id: string): Promise<Project | null> {
     const project = await registry.projects.getById(id);
     if (!project) return null;
+    const resolved = projectStatusService.applyOverride(project);
     const overrideOwner = projectOwnerService.getProjectOwnerOverride(project.id);
-    return overrideOwner ? { ...project, ownerAddress: overrideOwner } : project;
+    return overrideOwner ? { ...resolved, ownerAddress: overrideOwner } : resolved;
   },
 
   /** Async: fetch projects filtered by category via the active repository. */
