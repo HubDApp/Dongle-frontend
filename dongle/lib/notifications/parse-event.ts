@@ -1,9 +1,21 @@
 import {
   isKnownNotificationType,
   type NotificationStreamEvent,
+  type NotificationType,
 } from "@/types/notification";
 
-export function parseNotificationEvent(raw: unknown): NotificationStreamEvent | null {
+/**
+ * A stream event whose `type` has been validated against the known set.
+ *
+ * `NotificationStreamEvent.type` stays a plain string so the ingest boundary
+ * can accept and reject arbitrary payloads, but `parseNotificationEvent`
+ * narrows it for every downstream consumer.
+ */
+export type ParsedNotificationEvent = NotificationStreamEvent & {
+  type: NotificationType;
+};
+
+export function parseNotificationEvent(raw: unknown): ParsedNotificationEvent | null {
   if (!raw || typeof raw !== "object") return null;
   const record = raw as Record<string, unknown>;
   if (typeof record.id !== "string" || !record.id) return null;
