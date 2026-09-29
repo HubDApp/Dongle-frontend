@@ -520,7 +520,7 @@ export default function ProjectForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"
-            placeholder="e.g. Soroban Swap"
+            fieldType="projectName"
             maxLength={50}
             {...register("name")}
             onFocus={formAnalytics.fieldHandlers("name").onFocus}
@@ -559,7 +559,7 @@ export default function ProjectForm({
 
         <TextAreaField
           label="Description"
-          placeholder="What does your project do? Keep it concise and engaging."
+          fieldType="projectDescription"
           maxLength={500}
           {...register("description")}
           onFocus={formAnalytics.fieldHandlers("description").onFocus}
@@ -577,7 +577,7 @@ export default function ProjectForm({
 
         <FormField
           label="Project Website"
-          placeholder="https://yourproject.com"
+          fieldType="websiteUrl"
           {...register("websiteUrl")}
           onFocus={formAnalytics.fieldHandlers("websiteUrl").onFocus}
           onChange={(e) => {
@@ -595,20 +595,20 @@ export default function ProjectForm({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             label="Repository URL (Optional)"
-            placeholder="https://github.com/owner/repo"
+            fieldType="githubUrl"
             {...register("githubUrl")}
             error={errors.githubUrl?.message}
             helperText="Supported: GitHub, GitLab, Bitbucket"
           />
           <FormField
             label="Logo URL (Optional)"
-            placeholder="https://..."
+            fieldType="logoUrl"
             {...register("logoUrl")}
             error={errors.logoUrl?.message}
           />
           <FormField
             label="Documentation URL (Optional)"
-            placeholder="https://docs..."
+            fieldType="docsUrl"
             {...register("docsUrl")}
             error={errors.docsUrl?.message}
           />
@@ -617,13 +617,13 @@ export default function ProjectForm({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Audit Report URL (Optional)"
-            placeholder="https://..."
+            fieldType="auditUrl"
             {...register("auditReportUrl")}
             error={errors.auditReportUrl?.message}
           />
           <FormField
             label="Bug Bounty URL (Optional)"
-            placeholder="https://..."
+            fieldType="bugBountyUrl"
             {...register("bugBountyUrl")}
             error={errors.bugBountyUrl?.message}
           />

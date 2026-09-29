@@ -107,7 +107,7 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           label="Project ID or Domain"
-          placeholder="e.g. yourproject.com"
+          fieldType="projectId"
           {...register("projectId")}
           onFocus={projectIdHandlers.onFocus}
           onChange={(e) => {

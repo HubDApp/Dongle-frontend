@@ -1,20 +1,33 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "./Input";
+import { getFieldPlaceholder, inferFieldType } from "@/lib/form-placeholder";
+import type { FieldType } from "@/lib/form-placeholder";
 
 interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   error?: string;
   helperText?: string;
   showCounter?: boolean;
+  /**
+   * Explicit semantic field type for contextual placeholder generation (issue #524).
+   * When omitted the field type is inferred from the `type` attribute and `name`.
+   */
+  fieldType?: FieldType;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, fieldType, placeholder, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;
     const counterId = `${inputId}-counter`;
     const helperId = `${inputId}-helper`;
+
+    // Issue #524: derive contextual placeholder when none is provided
+    const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
+      fieldType: fieldType ?? inferFieldType(props.type, props.name),
+      maxLength,
+    });
 
     const internalRef = useRef<HTMLInputElement | null>(null);
     const [charCount, setCharCount] = useState(0);
@@ -90,6 +103,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           defaultValue={defaultValue}
           error={!!displayError}
           onChange={handleChange}
+          placeholder={resolvedPlaceholder}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
           aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
           className={className}

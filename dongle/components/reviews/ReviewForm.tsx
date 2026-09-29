@@ -162,9 +162,9 @@ export default function ReviewForm({
             <TextAreaField
               label="Comment"
               required
+              fieldType="reviewComment"
               {...register("comment")}
               maxLength={REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH}
-              placeholder="Share your experience with this project..."
               error={errors.comment?.message}
               className="h-32"
               onFocus={commentFieldHandlers.onFocus}

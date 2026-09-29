@@ -1,17 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { getFieldPlaceholder, inferFieldType } from "@/lib/form-placeholder";
+import type { FieldType } from "@/lib/form-placeholder";
 
 interface TextAreaFieldProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   error?: string;
   showCounter?: boolean;
+  /**
+   * Explicit semantic field type for contextual placeholder generation (issue #524).
+   * When omitted the field type is inferred from the `name` attribute.
+   */
+  fieldType?: FieldType;
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, fieldType, placeholder, ...props }, ref) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
     const counterId = `${textareaId}-counter`;
+
+    // Issue #524: derive contextual placeholder when none is provided
+    const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
+      fieldType: fieldType ?? inferFieldType("textarea", props.name),
+      maxLength,
+    });
 
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const [charCount, setCharCount] = useState(0);
@@ -93,6 +106,7 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
           onChange={handleChange}
           value={value}
           defaultValue={defaultValue}
+          placeholder={resolvedPlaceholder}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
           aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : ""].filter(Boolean).join(" ") || undefined}
           className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${baseBorder} rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none ${className}`}
