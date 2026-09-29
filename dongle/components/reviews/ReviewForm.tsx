@@ -67,6 +67,13 @@ export default function ReviewForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
+  // Issue #521, #522, #523: form analytics
+  const analytics = useFormAnalytics({
+    formId: "review",
+    fieldCount: 2, // rating + comment
+    isDirty,
+  });
+
   const rating = watch("rating");
   const comment = watch("comment");
 
@@ -109,6 +116,9 @@ export default function ReviewForm({
     }
   };
 
+  // Track field-level validation errors on change
+  const commentFieldHandlers = analytics.fieldHandlers("comment");
+
   return (
     <ErrorBoundary
       operation="Review form"
@@ -150,7 +160,12 @@ export default function ReviewForm({
               Rating
               {errors.rating && <span className="text-red-500 ml-1">*</span>}
             </label>
-            <div role="radiogroup" aria-labelledby={ratingLabelId} className="flex gap-2">
+            <div
+              role="radiogroup"
+              aria-labelledby={ratingLabelId}
+              className="flex gap-2"
+              onFocus={() => analytics.fieldHandlers("rating").onFocus({} as React.FocusEvent<HTMLInputElement>)}
+            >
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
@@ -162,6 +177,10 @@ export default function ReviewForm({
                       `input[name="rating"][value="${star}"]`
                     ) as HTMLInputElement;
                     if (input) input.checked = true;
+                    // Track field change for rating
+                    analytics.fieldHandlers("rating").onChange({
+                      target: { value: String(star) },
+                    } as React.ChangeEvent<HTMLInputElement>);
                   }}
                   aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
                   aria-checked={rating === star}
@@ -188,11 +207,18 @@ export default function ReviewForm({
             <TextAreaField
               label="Comment"
               required
+              fieldType="reviewComment"
               {...register("comment")}
               maxLength={REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH}
-              placeholder="Share your experience with this project..."
               error={errors.comment?.message}
               className="h-32"
+              onFocus={commentFieldHandlers.onFocus}
+              onChange={(e) => {
+                commentFieldHandlers.onChange(e);
+                // Also run the react-hook-form onChange
+                register("comment").onChange(e);
+              }}
+              onBlur={commentFieldHandlers.onBlur}
             />
             <div className="flex justify-between items-start mt-2 text-xs text-zinc-500">
               <span>Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters</span>

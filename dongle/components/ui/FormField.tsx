@@ -26,6 +26,12 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
     const registration: UseFormRegisterReturn | undefined =
       register && name ? register(name as Path<FieldValues>) : undefined;
 
+    // Issue #524: derive contextual placeholder when none is provided
+    const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
+      fieldType: fieldType ?? inferFieldType(props.type, props.name),
+      maxLength,
+    });
+
     const internalRef = useRef<HTMLInputElement | null>(null);
     const [charCount, setCharCount] = useState(0);
 

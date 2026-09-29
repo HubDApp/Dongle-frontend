@@ -379,6 +379,13 @@ export default function ProjectForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
+  // Issue #521, #522, #523: form analytics
+  const formAnalytics = useFormAnalytics({
+    formId: mode === "edit" ? "project-edit" : "project-submit",
+    fieldCount: EXPORT_FIELDS.length,
+    isDirty,
+  });
+
   // Watch form values for checklist and auto-save.
   // react-hook-form's watch() is intentionally used here for live value access.
   // The React Compiler flags it as non-memoizable, but this component does not
@@ -653,7 +660,12 @@ export default function ProjectForm({
         return;
       }
 
-      void executeSubmit(payload);
+      // Track submission attempt (issue #521)
+      const hasErrors = Object.keys(errors).length > 0;
+      void formAnalytics.wrapSubmit(
+        async (p) => executeSubmit(p as ProjectFormValues & { domain?: string }),
+        { hasErrors }
+      )(payload);
     },
     [executeSubmit, mode, projectId, experiment],
   );
@@ -940,6 +952,16 @@ export default function ProjectForm({
             placeholder="e.g. Soroban Swap"
             maxLength={50}
             {...register("name")}
+            onFocus={formAnalytics.fieldHandlers("name").onFocus}
+            onChange={(e) => {
+              formAnalytics.fieldHandlers("name").onChange(e);
+              register("name").onChange(e);
+            }}
+            onBlur={(e) => {
+              formAnalytics.fieldHandlers("name").onBlur(e);
+              register("name").onBlur(e);
+              formAnalytics.recordFieldValidation("name", !errors.name, errors.name?.message);
+            }}
             error={errors.name?.message}
             helperText={t("projectForm.hints.name")}
           />
@@ -973,6 +995,16 @@ export default function ProjectForm({
           placeholder="What does your project do? Keep it concise and engaging."
           maxLength={500}
           {...register("description")}
+          onFocus={formAnalytics.fieldHandlers("description").onFocus}
+          onChange={(e) => {
+            formAnalytics.fieldHandlers("description").onChange(e);
+            register("description").onChange(e);
+          }}
+          onBlur={(e) => {
+            formAnalytics.fieldHandlers("description").onBlur(e);
+            register("description").onBlur(e);
+            formAnalytics.recordFieldValidation("description", !errors.description, errors.description?.message);
+          }}
           error={errors.description?.message}
           helperText={t("projectForm.hints.description")}
         />
@@ -984,6 +1016,16 @@ export default function ProjectForm({
           required={fieldRequirements.websiteUrl.required}
           placeholder="https://yourproject.com"
           {...register("websiteUrl")}
+          onFocus={formAnalytics.fieldHandlers("websiteUrl").onFocus}
+          onChange={(e) => {
+            formAnalytics.fieldHandlers("websiteUrl").onChange(e);
+            register("websiteUrl").onChange(e);
+          }}
+          onBlur={(e) => {
+            formAnalytics.fieldHandlers("websiteUrl").onBlur(e);
+            register("websiteUrl").onBlur(e);
+            formAnalytics.recordFieldValidation("websiteUrl", !errors.websiteUrl, errors.websiteUrl?.message);
+          }}
           error={errors.websiteUrl?.message}
           helperText={t("projectForm.hints.websiteUrl")}
         />

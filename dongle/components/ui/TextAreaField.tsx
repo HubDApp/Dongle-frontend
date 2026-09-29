@@ -19,6 +19,12 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
     const counterId = `${textareaId}-counter`;
     const helperId = `${textareaId}-helper`;
 
+    // Issue #524: derive contextual placeholder when none is provided
+    const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
+      fieldType: fieldType ?? inferFieldType("textarea", props.name),
+      maxLength,
+    });
+
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const [charCount, setCharCount] = useState(0);
     const [wordCount, setWordCount] = useState(0);

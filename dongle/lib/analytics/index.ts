@@ -49,3 +49,15 @@ export {
   trackDataDeletionRequested,
   trackDataDeletionCompleted,
 } from "./events";
+
+// Issue #522 & #523: form analytics aggregation
+export {
+  getFormAnalyticsAggregates,
+  resetFormAnalyticsData,
+} from "./form-aggregator";
+export type {
+  FieldInteractionStats,
+  ValidationPerfStats,
+  FormSubmissionStats,
+  FormAnalyticsAggregates,
+} from "./form-aggregator";

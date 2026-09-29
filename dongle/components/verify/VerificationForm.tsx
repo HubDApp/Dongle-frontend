@@ -53,6 +53,15 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
   });
   const projectId = useWatch({ control, name: "projectId" });
 
+  // Issue #521, #522, #523: form analytics
+  const analytics = useFormAnalytics({
+    formId: "verification-request",
+    fieldCount: 1,
+    isDirty,
+  });
+
+  const projectIdHandlers = analytics.fieldHandlers("projectId");
+
   const onSubmit = async (data: VerificationFormValues) => {
     setIsSubmitting(true);
     trackFormSubmit({ formType: "verification", fieldCount: 1 });
@@ -92,6 +101,9 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
         trackFormSubmitError({ formType: "verification", fieldCount: 1, errorCode: err instanceof Error ? err.name || "Error" : "unknown" });
         return `Request failed: ${err.message}`;
       },
+      { hasErrors }
+    )(data).catch(() => {
+      setIsSubmitting(false);
     });
   };
 
@@ -155,8 +167,23 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
         />
         <FormField
           label="Project ID or Domain"
-          placeholder="e.g. yourproject.com"
+          fieldType="projectId"
           {...register("projectId")}
+          onFocus={projectIdHandlers.onFocus}
+          onChange={(e) => {
+            projectIdHandlers.onChange(e);
+            register("projectId").onChange(e);
+          }}
+          onBlur={(e) => {
+            projectIdHandlers.onBlur(e);
+            register("projectId").onBlur(e);
+            // Track field-level validation on blur (issue #522)
+            analytics.recordFieldValidation(
+              "projectId",
+              !errors.projectId,
+              errors.projectId?.message
+            );
+          }}
           error={errors.projectId?.message}
         />
 
