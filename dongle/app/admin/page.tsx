@@ -11,9 +11,6 @@ import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
@@ -746,19 +743,6 @@ export default function AdminDashboard() {
           pagePurpose={ADMIN_PURPOSE}
           loadingMessage="Verifying wallet access..."
         />
-        {isAdminChecking || gate.state === "account-loading" ? (
-          <WalletStateLoadingPanel message="Verifying admin access..." />
-        ) : (
-          <WalletStatePanel
-            state={gate.state}
-            pagePurpose={ADMIN_PURPOSE}
-            walletNetworkLabel={gate.walletNetworkLabel}
-            publicKey={gate.publicKey}
-            onConnect={gate.connectWallet}
-            onDisconnect={gate.disconnectWallet}
-            onRetry={gate.retryAccountLoad}
-          />
-        )}
       </div>
     );
   }

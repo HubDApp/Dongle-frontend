@@ -8,7 +8,7 @@ describe("DELETE /api/reviews/[id]", () => {
   });
 
   it("should return 404 if review ID not found", async () => {
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews/nonexistent-id",
       {
         method: "DELETE",
@@ -16,7 +16,9 @@ describe("DELETE /api/reviews/[id]", () => {
       }
     );
 
-    const response = await DELETE(request);
+    const response = await DELETE(request, {
+      params: Promise.resolve({ id: "nonexistent-id" }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -42,7 +44,7 @@ describe("DELETE /api/reviews/[id]", () => {
     // In real testing, we'd need access to the store
 
     // Try to delete as user2
-    const request = new Request(
+    const request = new NextRequest(
       "http://localhost/api/reviews/review1",
       {
         method: "DELETE",
@@ -50,7 +52,9 @@ describe("DELETE /api/reviews/[id]", () => {
       }
     );
 
-    const response = await DELETE(request);
+    const response = await DELETE(request, {
+      params: Promise.resolve({ id: "review1" }),
+    });
     const data = await response.json();
 
     expect(response.status).toBe(403);

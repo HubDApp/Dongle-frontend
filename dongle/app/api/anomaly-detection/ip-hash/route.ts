@@ -44,8 +44,9 @@ function extractClientIP(request: NextRequest): string {
     return cfConnectingIP;
   }
 
-  // Fallback to NextRequest's internal IP (may not always be reliable)
-  return request.ip || "unknown";
+  // NextRequest no longer exposes a client IP directly; callers must rely on
+  // the proxy headers above. Fall back to a sentinel when none are present.
+  return "unknown";
 }
 
 /**
