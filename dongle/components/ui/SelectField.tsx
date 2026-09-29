@@ -24,12 +24,19 @@ export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>
       <div className="flex flex-col gap-2 w-full">
         <label htmlFor={selectId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           {label}
+          {required ? (
+            <span className="text-red-500 ml-0.5" aria-hidden="true">
+              *
+            </span>
+          ) : null}
         </label>
         <div className="relative">
           <select
             {...props}
             ref={ref}
             id={selectId}
+            required={required}
+            aria-required={required || undefined}
             aria-invalid={error ? true : undefined}
             aria-describedby={[error ? errorId : "", !error && helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
             className={`w-full px-5 py-4 bg-zinc-50 dark:bg-zinc-900/50 border ${

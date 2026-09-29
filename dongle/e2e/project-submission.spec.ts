@@ -34,9 +34,9 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    await expect(page.getByLabelText(/project name/i)).toBeVisible();
-    await expect(page.getByLabelText(/description/i)).toBeVisible();
-    await expect(page.getByLabelText(/category/i)).toBeVisible();
+    await expect(page.getByLabel(/project name/i)).toBeVisible();
+    await expect(page.getByLabel(/description/i)).toBeVisible();
+    await expect(page.getByLabel(/category/i)).toBeVisible();
   });
 
   test("form validation - all required fields enforced", async ({ page }) => {
@@ -59,8 +59,8 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    await page.getByLabelText(/project name/i).fill("Test Project");
-    await page.getByLabelText(/description/i).fill("short");
+    await page.getByLabel(/project name/i).fill("Test Project");
+    await page.getByLabel(/description/i).fill("short");
 
     const submitButton = page.getByRole("button", {
       name: /Submit Registration/i,
@@ -77,12 +77,12 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    await page.getByLabelText(/project name/i).fill("Test Project");
+    await page.getByLabel(/project name/i).fill("Test Project");
     await page
-      .getByLabelText(/description/i)
+      .getByLabel(/description/i)
       .fill("This is a valid description with more than twenty characters");
-    await page.getByLabelText(/category/i).selectOption("defi");
-    await page.getByLabelText(/Project Website/i).fill("not-a-valid-url");
+    await page.getByLabel(/category/i).selectOption("defi");
+    await page.getByLabel(/Project Website/i).fill("not-a-valid-url");
 
     const submitButton = page.getByRole("button", {
       name: /Submit Registration/i,
@@ -97,12 +97,12 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    await page.getByLabelText(/project name/i).fill("My Test Project");
+    await page.getByLabel(/project name/i).fill("My Test Project");
     await page
-      .getByLabelText(/description/i)
+      .getByLabel(/description/i)
       .fill("This is a valid project description with enough characters.");
-    await page.getByLabelText(/category/i).selectOption("defi");
-    await page.getByLabelText(/Project Website/i).fill("https://example.com");
+    await page.getByLabel(/category/i).selectOption("defi");
+    await page.getByLabel(/Project Website/i).fill("https://example.com");
 
     const submitButton = page.getByRole("button", {
       name: /Submit Registration/i,
@@ -115,11 +115,11 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    await page.getByLabelText(/project name/i).fill("Test Project");
+    await page.getByLabel(/project name/i).fill("Test Project");
     await page
-      .getByLabelText(/description/i)
+      .getByLabel(/description/i)
       .fill("This is a valid description with enough characters.");
-    await page.getByLabelText(/category/i).selectOption("defi");
+    await page.getByLabel(/category/i).selectOption("defi");
 
     const alerts = page.locator('[role="alert"]');
     await expect(alerts).toHaveCount(0);
@@ -158,13 +158,13 @@ test.describe("Project Submission Flow (#373)", () => {
 
     await page.getByRole("button", { name: /add a contract address/i }).click();
 
-    await page.getByLabelText(/project name/i).fill("Test Project");
+    await page.getByLabel(/project name/i).fill("Test Project");
     await page
-      .getByLabelText(/description/i)
+      .getByLabel(/description/i)
       .fill("This is a valid description with more than twenty characters");
-    await page.getByLabelText(/category/i).selectOption("defi");
+    await page.getByLabel(/category/i).selectOption("defi");
     await page
-      .getByLabelText(/Project Website/i)
+      .getByLabel(/Project Website/i)
       .fill("https://example.com");
     await page
       .getByRole("textbox", { name: /^contract address 1$/i })
@@ -185,12 +185,12 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    await page.getByLabelText(/project name/i).fill("Draft Project");
+    await page.getByLabel(/project name/i).fill("Draft Project");
 
     await page.reload();
     await waitForPageLoad(page);
 
-    await expect(page.getByLabelText(/project name/i)).toHaveValue(
+    await expect(page.getByLabel(/project name/i)).toHaveValue(
       "Draft Project",
     );
   });
@@ -200,7 +200,7 @@ test.describe("Project Submission Flow (#373)", () => {
     await waitForPageLoad(page);
     await expectNoSpinners(page);
 
-    const categorySelect = page.getByLabelText(/category/i);
+    const categorySelect = page.getByLabel(/category/i);
     const options = categorySelect.locator("option");
     const count = await options.count();
     expect(count).toBeGreaterThan(1);

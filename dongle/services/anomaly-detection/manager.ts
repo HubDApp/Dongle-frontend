@@ -162,9 +162,12 @@ export class AnomalyManager {
     submission.reviewedBy = reviewedBy;
     submission.reviewNotes = reviewNotes;
 
-    // Record feedback for learning
+    // Record feedback for learning. The review verdict — not the raw
+    // feedback entry — is what the model is trained on, so only a reviewed
+    // submission is marked as having used its feedback for learning.
     if (isAnomaly !== undefined) {
       this.recordFeedback(flagId, isAnomaly, reviewNotes || "");
+      submission.feedbackUsedForLearning = true;
     }
 
     this.flaggedSubmissions.set(flagId, submission);
@@ -190,13 +193,7 @@ export class AnomalyManager {
 
     this.learningFeedback.push(learningEntry);
 
-    const submission = this.flaggedSubmissions.get(submissionId);
-    if (submission) {
-      submission.feedbackUsedForLearning = true;
-      this.flaggedSubmissions.set(submissionId, submission);
-    }
-
-    // Optionally retrain model with new feedback
+    // Retrain the model with the new feedback
     this.updateModelsIfNeeded(true);
   }
 

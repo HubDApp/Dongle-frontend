@@ -25,7 +25,7 @@ export function isValidEmail(value: string | null | undefined): boolean {
 }
 
 export function isValidHttpUrl(value: string | null | undefined): boolean {
-  if (isBlank(value)) return false;
+  if (typeof value !== "string" || isBlank(value)) return false;
   try {
     const url = new URL(value.trim());
     return url.protocol === "http:" || url.protocol === "https:";

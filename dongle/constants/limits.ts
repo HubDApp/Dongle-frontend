@@ -60,6 +60,9 @@ export const MAX_WATCHLIST_SIZE = 20;
 /** Maximum saved search filters per wallet. */
 export const MAX_SAVED_SEARCHES = 10;
 
+/** Maximum user-saved form templates per wallet. */
+export const MAX_FORM_TEMPLATES = 25;
+
 // ─── Review moderation / spam ────────────────────────────────────────────────
 
 /** Reviews per wallet per day before velocity flagging and CAPTCHA. */
