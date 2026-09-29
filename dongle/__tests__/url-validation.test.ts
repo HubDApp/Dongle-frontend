@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeUrl, extractDomain, encodeUrlForHtml, sanitizeAndEncodeUrl } from "@/lib/url";
+import { normalizeUrl, extractDomain, encodeUrlForHtml, sanitizeAndEncodeUrl, validateUrl, getUrlHostname } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 
 describe("normalizeUrl - Basic Validation", () => {
@@ -156,3 +156,123 @@ describe("normalizeRepositoryUrl", () => {
     expect(normalizeRepositoryUrl("github.com/owner/repo")).toBe("https://github.com/owner/repo");
   });
 });
+
+// ---------------------------------------------------------------------------
+// validateUrl – Issue #502
+// ---------------------------------------------------------------------------
+
+describe("validateUrl – non-throwing boolean validator", () => {
+  it("returns true for a valid https URL", () => {
+    expect(validateUrl("https://example.com")).toBe(true);
+  });
+
+  it("returns true for a valid http URL", () => {
+    expect(validateUrl("http://example.com")).toBe(true);
+  });
+
+  it("returns true for a bare domain (prepends https://)", () => {
+    expect(validateUrl("example.com")).toBe(true);
+  });
+
+  it("returns true for URLs with paths", () => {
+    expect(validateUrl("https://example.com/projects/123")).toBe(true);
+  });
+
+  it("returns true for URLs with query strings", () => {
+    expect(validateUrl("https://example.com/search?q=test")).toBe(true);
+  });
+
+  it("returns true for URLs with fragments", () => {
+    expect(validateUrl("https://example.com/page#section")).toBe(true);
+  });
+
+  it("returns true for URLs with ports", () => {
+    expect(validateUrl("https://example.com:8080/path")).toBe(true);
+  });
+
+  it("returns true for subdomains", () => {
+    expect(validateUrl("https://docs.example.com")).toBe(true);
+  });
+
+  it("returns true for www domains", () => {
+    expect(validateUrl("https://www.example.com")).toBe(true);
+  });
+
+  it("returns true for already-normalized URLs", () => {
+    const url = "https://example.com/path?query=1";
+    expect(validateUrl(url)).toBe(true);
+  });
+
+  it("returns false for an empty string", () => {
+    expect(validateUrl("")).toBe(false);
+  });
+
+  it("returns false for whitespace-only input", () => {
+    expect(validateUrl("   ")).toBe(false);
+  });
+
+  it("returns false for malformed URLs", () => {
+    expect(validateUrl("not a url")).toBe(false);
+  });
+
+  it("returns false for javascript: protocol", () => {
+    expect(validateUrl("javascript:alert(1)")).toBe(false);
+  });
+
+  it("returns false for data: protocol", () => {
+    expect(validateUrl("data:text/html,<h1>hi</h1>")).toBe(false);
+  });
+
+  it("returns false for vbscript: protocol", () => {
+    expect(validateUrl("vbscript:msgbox(1)")).toBe(false);
+  });
+
+  it("returns false for ftp: protocol", () => {
+    expect(validateUrl("ftp://example.com")).toBe(false);
+  });
+
+  it("returns false for file: protocol", () => {
+    expect(validateUrl("file:///etc/passwd")).toBe(false);
+  });
+
+  it("does not throw – never raises an exception", () => {
+    expect(() => validateUrl("javascript:alert(1)")).not.toThrow();
+    expect(() => validateUrl("")).not.toThrow();
+    expect(() => validateUrl("   ")).not.toThrow();
+    expect(() => validateUrl("not a url")).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUrlHostname – Issue #502
+// ---------------------------------------------------------------------------
+
+describe("getUrlHostname – hostname extraction (preserving subdomains)", () => {
+  it("extracts hostname from a full https URL", () => {
+    expect(getUrlHostname("https://example.com/path")).toBe("example.com");
+  });
+
+  it("preserves www prefix (unlike extractDomain)", () => {
+    expect(getUrlHostname("https://www.example.com")).toBe("www.example.com");
+  });
+
+  it("preserves non-www subdomains", () => {
+    expect(getUrlHostname("https://docs.example.com/guide")).toBe("docs.example.com");
+  });
+
+  it("normalizes bare domain before extracting", () => {
+    expect(getUrlHostname("example.com")).toBe("example.com");
+  });
+
+  it("returns empty string for invalid input", () => {
+    expect(getUrlHostname("javascript:alert(1)")).toBe("");
+    expect(getUrlHostname("")).toBe("");
+    expect(getUrlHostname("not a url")).toBe("");
+  });
+
+  it("differs from extractDomain on www URLs", () => {
+    const url = "https://www.example.com";
+    expect(extractDomain(url)).toBe("example.com");    // strips www
+    expect(getUrlHostname(url)).toBe("www.example.com"); // keeps www
+  });
+});

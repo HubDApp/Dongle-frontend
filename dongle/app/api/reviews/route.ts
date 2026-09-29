@@ -3,6 +3,11 @@ import { Review } from "@/types/review";
 import { hasMinLength } from "@/lib/validation";
 import { verifySignature } from "@/lib/verify-signature";
 import {
+  isReviewerBanned,
+  recordReviewSubmission,
+} from "@/lib/moderation-store";
+import { assessReviewSpam } from "@/utils/review-spam.util";
+import {
   withErrorHandler,
   createSuccessResponse,
   createErrorResponse,
@@ -21,15 +26,23 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
-function validateReviewInput(rating: unknown, comment: unknown): string | null {
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+function validateReviewInput(
+  rating: unknown,
+  comment: unknown,
+): ValidationError | null {
   if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-    return "Rating must be an integer between 1 and 5";
+    return { field: "rating", message: "Rating must be an integer between 1 and 5" };
   }
   if (typeof comment !== "string" || !hasMinLength(comment, 10)) {
-    return "Comment must be at least 10 characters";
+    return { field: "comment", message: "Comment must be at least 10 characters" };
   }
   if (comment.length > 1000) {
-    return "Comment cannot exceed 1000 characters";
+    return { field: "comment", message: "Comment cannot exceed 1000 characters" };
   }
   return null;
 }
@@ -67,7 +80,10 @@ export async function POST(request: NextRequest) {
 
     if (!projectId || !projectName || !userAddress) {
       return NextResponse.json(
-        createErrorResponse(ErrorCode.VALIDATION_ERROR, "Missing required fields", 400),
+        {
+          success: false,
+          errors: [{ field: "comment", message: "Missing required fields" }],
+        },
         { status: 400 }
       );
     }
@@ -75,7 +91,7 @@ export async function POST(request: NextRequest) {
     const validationError = validateReviewInput(rating, comment);
     if (validationError) {
       return NextResponse.json(
-        createErrorResponse(ErrorCode.VALIDATION_ERROR, validationError, 400),
+        { success: false, errors: [validationError] },
         { status: 400 }
       );
     }
@@ -105,11 +121,10 @@ export async function POST(request: NextRequest) {
     );
     if (existing) {
       return NextResponse.json(
-        createErrorResponse(
-          ErrorCode.CONFLICT,
-          "You have already reviewed this project",
-          409
-        ),
+        {
+          success: false,
+          errors: [{ field: "comment", message: "You have already reviewed this project" }],
+        },
         { status: 409 }
       );
     }

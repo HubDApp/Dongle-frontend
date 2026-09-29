@@ -65,25 +65,11 @@ export default function EditProjectPage() {
     return (
       <main className={pageClass}>
         <div className="container mx-auto px-4">
-          <div className="max-w-xl mx-auto animate-fade-in">
-            <WalletGate
-              gate={gate}
-              pagePurpose={EDIT_PURPOSE}
-              loadingMessage="Verifying your wallet..."
-            />
-            {gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel message="Verifying your wallet..." />
-            ) : (
-              <WalletStatePanel
-                state={gate.state}
+          <div className="max-w-xl mx-auto animate-fade-in">              <WalletGate
+                gate={gate}
                 pagePurpose={EDIT_PURPOSE}
-                walletNetworkLabel={gate.walletNetworkLabel}
-                publicKey={gate.publicKey}
-                onConnect={gate.connectWallet}
-                onDisconnect={gate.disconnectWallet}
-                onRetry={gate.retryAccountLoad}
+                loadingMessage="Verifying your wallet..."
               />
-            )}
           </div>
         </div>
       </main>

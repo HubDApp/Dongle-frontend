@@ -189,19 +189,6 @@ export default function ProfilePage() {
               pagePurpose={PROFILE_PURPOSE}
               loadingMessage="Loading your profile..."
             />
-            {gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel message="Loading your profile..." />
-            ) : (
-              <WalletStatePanel
-                state={gate.state}
-                pagePurpose={PROFILE_PURPOSE}
-                walletNetworkLabel={gate.walletNetworkLabel}
-                publicKey={gate.publicKey}
-                onConnect={gate.connectWallet}
-                onDisconnect={gate.disconnectWallet}
-                onRetry={gate.retryAccountLoad}
-              />
-            )}
           </div>
         </main>
       </LayoutWrapper>
