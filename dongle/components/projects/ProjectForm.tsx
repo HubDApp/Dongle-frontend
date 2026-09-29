@@ -37,7 +37,11 @@ import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
-import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
+import {
+  CATEGORY_DISPLAY_TO_FORM,
+  CATEGORY_FORM_OPTIONS,
+  CATEGORY_FORM_MAP,
+} from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
@@ -292,6 +296,7 @@ export default function ProjectForm({
     control,
     formState: { errors, isDirty },
     reset,
+    trigger,
     watch,
     getValues,
     setValue,
@@ -299,6 +304,32 @@ export default function ProjectForm({
     resolver: zodResolver(projectSchema),
     defaultValues: defaultFormValues,
   });
+
+  const nameField = register("name");
+  const matchingProjects = projectSearchQuery.trim().length >= 2
+    ? projectService.getAllProjects().filter((project) => {
+        const query = projectSearchQuery.trim().toLowerCase();
+        return [project.name, project.websiteUrl, project.githubUrl]
+          .some((value) => value?.toLowerCase().includes(query));
+      }).slice(0, 5)
+    : [];
+
+  const selectExistingProject = (project: Project) => {
+    reset({
+      name: project.name,
+      primaryCategory: CATEGORY_DISPLAY_TO_FORM[project.primaryCategory] ?? "",
+      tags: project.tags ?? [],
+      description: project.description ?? "",
+      websiteUrl: project.websiteUrl ?? "",
+      githubUrl: project.githubUrl ?? "",
+      logoUrl: project.logoUrl ?? "",
+      docsUrl: project.docsUrl ?? "",
+      auditReportUrl: project.auditReportUrl ?? "",
+      bugBountyUrl: project.bugBountyUrl ?? "",
+      contractAddresses: project.contractAddresses?.slice(0, 5) ?? [],
+    });
+    setProjectSearchQuery("");
+  };
 
 
 
@@ -676,6 +707,31 @@ export default function ProjectForm({
     setDiscardDialogOpen(false);
   };
 
+  const goToSection = async (sectionIndex: number) => {
+    if (sectionIndex <= activeSection) {
+      setActiveSection(sectionIndex);
+      return;
+    }
+
+    for (let index = activeSection; index < sectionIndex; index += 1) {
+      const isValid = await trigger([...formSections[index].fields]);
+      if (!isValid) {
+        setActiveSection(index);
+        return;
+      }
+    }
+
+    setActiveSection(sectionIndex);
+  };
+
+  const goToNextSection = () => {
+    void goToSection(Math.min(activeSection + 1, formSections.length - 1));
+  };
+
+  const goToPreviousSection = () => {
+    setActiveSection((section) => Math.max(section - 1, 0));
+  };
+
   return (
     <ProjectFormContext.Provider
       value={{
@@ -799,6 +855,43 @@ export default function ProjectForm({
           }}
         />
 
+        <nav aria-label="Project form progress" className="mb-8">
+          <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+            {formSections.map((section, index) => {
+              const isCurrent = activeSection === index;
+              const isComplete = index < activeSection;
+
+              return (
+                <li key={section.title}>
+                  <button
+                    type="button"
+                    onClick={() => void goToSection(index)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={`w-full border-t-2 pt-3 text-left transition-colors ${
+                      isCurrent
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : isComplete
+                        ? "border-green-500 text-green-600 dark:text-green-400"
+                        : "border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold uppercase tracking-wide">
+                      Step {index + 1}
+                    </span>
+                    <span className="mt-1 block text-sm font-medium sm:text-base">
+                      {section.title}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            {formSections[activeSection].description}
+          </p>
+        </nav>
+
+        {activeSection === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"
@@ -842,7 +935,9 @@ export default function ProjectForm({
           error={errors.description?.message}
           helperText={t("projectForm.hints.description")}
         />
+        </>}
 
+        {activeSection === 1 && <>
         <FormField
           label="Project Website"
           required={fieldRequirements.websiteUrl.required}
@@ -897,7 +992,9 @@ export default function ProjectForm({
             helperText={t("projectForm.hints.bugBountyUrl")}
           />
         </div>
+        </>}
 
+        {activeSection === 2 && <>
         {/* Contract Addresses */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
