@@ -1,12 +1,15 @@
 /**
- * FormField — Issue #531 (disabled state handling)
+ * FormField — Issue #532 (read-only state)
  *
- * Changes from baseline:
- *  - Disabled fields suppress error display (validation is skipped)
- *  - Disabled fields suppress counter display
- *  - Disabled fields receive visual dimming + cursor-not-allowed via Tailwind
- *  - aria-disabled is set to complement the native disabled attribute
- *  - Label is dimmed when the field is disabled
+ * Read-only fields:
+ *  - Show the value and submit it (unlike disabled which excludes value)
+ *  - User cannot edit but can focus/select/copy the text
+ *  - Visually distinct from both editable and disabled states
+ *  - Validation runs normally (value is included in submission)
+ *  - Keyboard accessible (receives focus, tab-navigable)
+ *  - aria-readonly is set
+ *
+ * Also retains all disabled-state logic from Issue #531.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -34,6 +37,7 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
       defaultValue,
       showCounter = true,
       disabled,
+      readOnly,
       ...props
     },
     ref,
@@ -78,8 +82,12 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setCharCount(e.target.value.length);
-      onChange?.(e);
+      // Read-only native inputs still fire change events in some browsers.
+      // We allow the handler to run only if the field is truly editable.
+      if (!readOnly) {
+        setCharCount(e.target.value.length);
+        onChange?.(e);
+      }
     };
 
     const isNearLimit = Boolean(
@@ -95,18 +103,19 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           ? "text-amber-500 font-medium"
           : "text-zinc-500";
 
-    // Disabled fields skip validation display.
+    // Disabled fields skip validation display; read-only fields validate normally.
     const displayError =
       !disabled &&
       (error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined));
 
-    // Counter is hidden on disabled fields (no point counting chars the user can't change).
+    // Counter is hidden on disabled fields; visible on read-only (value is fixed).
     const showCounterDisplay = showCounter && maxLength && !disabled;
 
     const describedBy = [
       displayError ? errorId : "",
       showCounterDisplay ? counterId : "",
       helperText ? helperId : "",
+      readOnly ? `${inputId}-readonly-hint` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -114,17 +123,28 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
-          <label
-            htmlFor={inputId}
-            className={cn(
-              "text-sm font-semibold transition-colors",
-              disabled
-                ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                : "text-zinc-700 dark:text-zinc-300",
+          <div className="flex items-center gap-1.5">
+            <label
+              htmlFor={inputId}
+              className={cn(
+                "text-sm font-semibold transition-colors",
+                disabled
+                  ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                  : "text-zinc-700 dark:text-zinc-300",
+              )}
+            >
+              {label}
+            </label>
+            {/* Read-only badge — visible indicator that field is not editable */}
+            {readOnly && !disabled && (
+              <span
+                className="text-xs font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400"
+                aria-hidden="true"
+              >
+                read-only
+              </span>
             )}
-          >
-            {label}
-          </label>
+          </div>
           {showCounterDisplay && (
             <span
               id={counterId}
@@ -143,9 +163,11 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           value={value}
           defaultValue={defaultValue}
           disabled={disabled}
+          readOnly={readOnly}
           error={!!displayError}
           onChange={handleChange}
           aria-disabled={disabled ? true : undefined}
+          aria-readonly={readOnly ? true : undefined}
           aria-invalid={
             displayError || isAtLimit || isOverLimit ? true : undefined
           }
@@ -154,9 +176,19 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
             className,
             disabled &&
               "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-500",
+            readOnly &&
+              !disabled &&
+              "cursor-default bg-zinc-100/60 dark:bg-zinc-800/30 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 focus:ring-0 select-text",
           )}
         />
-        {/* Errors are suppressed for disabled fields */}
+
+        {/* Hidden hint for screen readers describing the read-only state */}
+        {readOnly && !disabled && (
+          <span id={`${inputId}-readonly-hint`} className="sr-only">
+            This field is read-only and cannot be edited.
+          </span>
+        )}
+
         {displayError && (
           <span
             id={errorId}

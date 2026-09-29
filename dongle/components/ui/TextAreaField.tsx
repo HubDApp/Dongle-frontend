@@ -1,12 +1,15 @@
 /**
- * TextAreaField — Issue #531 (disabled state handling)
+ * TextAreaField — Issue #532 (read-only state)
  *
- * Changes from baseline:
- *  - Disabled fields suppress error display (validation is skipped)
- *  - Disabled fields suppress counter display
- *  - Disabled fields receive visual dimming + cursor-not-allowed
- *  - aria-disabled is set to complement the native disabled attribute
- *  - Label is dimmed when the field is disabled
+ * Read-only fields:
+ *  - Value is included in form submission
+ *  - User cannot edit but can focus/select/copy the text
+ *  - Visually distinct (muted background, "read-only" badge)
+ *  - Validation runs normally
+ *  - Keyboard accessible
+ *  - aria-readonly is set
+ *
+ * Also retains all disabled-state logic from Issue #531.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -35,6 +38,7 @@ export const TextAreaField = React.forwardRef<
       defaultValue,
       showCounter = true,
       disabled,
+      readOnly,
       ...props
     },
     ref,
@@ -78,8 +82,10 @@ export const TextAreaField = React.forwardRef<
     );
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setCharCount(e.target.value.length);
-      onChange?.(e);
+      if (!readOnly) {
+        setCharCount(e.target.value.length);
+        onChange?.(e);
+      }
     };
 
     const isNearLimit = Boolean(
@@ -95,26 +101,27 @@ export const TextAreaField = React.forwardRef<
           ? "text-amber-500 font-medium"
           : "text-zinc-500";
 
-    // Disabled fields skip validation display.
     const displayError =
       !disabled &&
       (error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined));
 
-    // Counter is hidden on disabled fields.
     const showCounterDisplay = showCounter && maxLength && !disabled;
 
     const baseBorder =
       displayError || (!disabled && (isOverLimit || isAtLimit))
         ? "border-red-500/50 focus:border-red-500"
-        : !disabled && isNearLimit
-          ? "border-amber-500/50 focus:border-amber-500"
-          : disabled
-            ? "border-zinc-200 dark:border-zinc-800"
-            : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
+        : readOnly && !disabled
+          ? "border-zinc-200 dark:border-zinc-700"
+          : !disabled && isNearLimit
+            ? "border-amber-500/50 focus:border-amber-500"
+            : disabled
+              ? "border-zinc-200 dark:border-zinc-800"
+              : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
 
     const describedBy = [
       displayError ? errorId : "",
       showCounterDisplay ? counterId : "",
+      readOnly ? `${textareaId}-readonly-hint` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -122,17 +129,27 @@ export const TextAreaField = React.forwardRef<
     return (
       <div className="flex flex-col gap-2 w-full">
         <div className="flex justify-between items-end">
-          <label
-            htmlFor={textareaId}
-            className={cn(
-              "text-sm font-semibold transition-colors",
-              disabled
-                ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
-                : "text-zinc-700 dark:text-zinc-300",
+          <div className="flex items-center gap-1.5">
+            <label
+              htmlFor={textareaId}
+              className={cn(
+                "text-sm font-semibold transition-colors",
+                disabled
+                  ? "text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
+                  : "text-zinc-700 dark:text-zinc-300",
+              )}
+            >
+              {label}
+            </label>
+            {readOnly && !disabled && (
+              <span
+                className="text-xs font-medium px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400"
+                aria-hidden="true"
+              >
+                read-only
+              </span>
             )}
-          >
-            {label}
-          </label>
+          </div>
           {showCounterDisplay && (
             <span
               id={counterId}
@@ -153,7 +170,9 @@ export const TextAreaField = React.forwardRef<
           value={value}
           defaultValue={defaultValue}
           disabled={disabled}
+          readOnly={readOnly}
           aria-disabled={disabled ? true : undefined}
+          aria-readonly={readOnly ? true : undefined}
           aria-invalid={
             displayError || isAtLimit || isOverLimit ? true : undefined
           }
@@ -164,10 +183,19 @@ export const TextAreaField = React.forwardRef<
             "text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none",
             disabled &&
               "opacity-50 cursor-not-allowed bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-500",
+            readOnly &&
+              !disabled &&
+              "cursor-default bg-zinc-100/60 dark:bg-zinc-800/30 text-zinc-700 dark:text-zinc-300 focus:ring-0 select-text",
             className,
           )}
         />
-        {/* Errors are suppressed for disabled fields */}
+
+        {readOnly && !disabled && (
+          <span id={`${textareaId}-readonly-hint`} className="sr-only">
+            This field is read-only and cannot be edited.
+          </span>
+        )}
+
         {displayError && (
           <span
             id={errorId}
