@@ -49,6 +49,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/projects/templates" className="hover:text-black dark:hover:text-white">
+                  Form templates
+                </Link>
+              </li>
+              <li>
                 <Link href="/profile" className="hover:text-black dark:hover:text-white">
                   {t("nav.profile")}
                 </Link>

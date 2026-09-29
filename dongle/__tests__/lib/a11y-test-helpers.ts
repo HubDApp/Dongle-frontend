@@ -1,11 +1,9 @@
 import { type ReactElement } from "react";
+import { expect } from "vitest";
 import { render } from "@testing-library/react";
-import {
-  axe,
-  type AxeResults,
-  type RuleObject,
-  type RunOptions,
-} from "vitest-axe";
+import type { UserEvent } from "@testing-library/user-event";
+import { axe } from "vitest-axe";
+import type { AxeResults, RuleObject, RunOptions } from "axe-core";
 
 export const DEFAULT_A11Y_OPTIONS: RunOptions = {
   runOnly: {
@@ -254,7 +252,7 @@ export function getAllFocusableElements(
 
 export async function tabThroughSequence(
   elements: HTMLElement[],
-  user: ReturnType<(typeof import("@testing-library/user-event"))["setup"]>,
+  user: UserEvent,
 ): Promise<void> {
   for (const el of elements) {
     await user.tab();

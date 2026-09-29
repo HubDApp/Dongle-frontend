@@ -25,11 +25,20 @@ export function isValidEmail(value: string | null | undefined): boolean {
 }
 
 export function isValidHttpUrl(value: string | null | undefined): boolean {
-  if (isBlank(value)) return false;
+  if (typeof value !== "string" || isBlank(value)) return false;
   try {
     const url = new URL(value.trim());
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
+}
+
+export { validateEmailDomain } from "./email-domain-validator";
+
+export async function isValidEmailDomain(value: string | null | undefined): Promise<boolean> {
+  if (!isValidEmail(value)) return false;
+  const { validateEmailDomain } = await import("./email-domain-validator");
+  const result = await validateEmailDomain(value as string);
+  return result.valid;
 }

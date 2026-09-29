@@ -117,37 +117,36 @@ describe("ProjectForm component", () => {
     expect(screen.getByRole("button", { name: /submit registration/i })).toBeInTheDocument();
   });
 
-  it("searches existing projects and pre-fills related fields when selected", async () => {
-    const user = userEvent.setup();
-    projectServiceMock.getAllProjects.mockReturnValue([{
-      id: "existing-project",
-      name: "Stellar Wallet",
-      primaryCategory: "Payments",
-      tags: ["wallet", "payments"],
-      description: "A wallet for Stellar payments.",
-      rating: 4.5,
-      reviews: 12,
-      createdAt: "2024-01-01T00:00:00.000Z",
-      websiteUrl: "https://stellarwallet.example",
-      githubUrl: "https://github.com/stellar/wallet",
-      logoUrl: "https://stellarwallet.example/logo.png",
-      docsUrl: "https://docs.stellarwallet.example",
-    }]);
+  it("updates the time estimate as fields are filled and added", async () => {
     renderForm();
 
-    const nameField = await screen.findByLabelText(/project name/i);
-    await user.type(nameField, "stellar wal");
-    await user.click(screen.getByRole("button", { name: /use existing project stellar wallet/i }));
+    expect(screen.getByText("About 5 minutes remaining")).toBeInTheDocument();
+    expect(screen.getByText("0 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/every project starts with an idea/i)).toBeInTheDocument();
 
-    expect(nameField).toHaveValue("Stellar Wallet");
-    expect(screen.getByLabelText(/^category$/i)).toHaveValue("payments");
-    expect(screen.getByLabelText(/tags/i)).toHaveTextContent("wallet");
-    expect(screen.getByLabelText(/description/i)).toHaveValue("A wallet for Stellar payments.");
-    expect(screen.getByLabelText(/project website/i)).toHaveValue("https://stellarwallet.example");
-    expect(screen.getByLabelText(/repository url/i)).toHaveValue("https://github.com/stellar/wallet");
-    expect(screen.getByLabelText(/logo url/i)).toHaveValue("https://stellarwallet.example/logo.png");
-    expect(screen.getByLabelText(/documentation url/i)).toHaveValue("https://docs.stellarwallet.example");
-    expect(screen.queryByRole("list", { name: /matching existing projects/i })).not.toBeInTheDocument();
+    const user = await fillRequiredFields();
+
+    expect(screen.getByText("About 3 minutes remaining")).toBeInTheDocument();
+    expect(screen.getByText("4 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/great start/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/repository url/i), "https://github.com/stellar/lend");
+    await user.type(screen.getByLabelText(/logo url/i), "https://stellarlend.example/logo.png");
+    expect(screen.getByText("6 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/halfway there/i)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/documentation url/i), "https://docs.stellarlend.example");
+    await user.type(screen.getByLabelText(/audit report url/i), "https://stellarlend.example/audit");
+    expect(screen.getByText("8 of 10 fields complete")).toBeInTheDocument();
+    expect(screen.getByText(/three quarters done/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /show encouragement/i }));
+    expect(screen.queryByText(/three quarters done/i)).not.toBeInTheDocument();
+    expect(screen.getByText("8 of 10 fields complete")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /add a contract address/i }));
+
+    expect(screen.getByText("8 of 11 fields complete")).toBeInTheDocument();
   });
 
   it("shows validation errors for invalid inputs", async () => {

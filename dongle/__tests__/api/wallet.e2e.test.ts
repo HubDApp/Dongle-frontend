@@ -2,6 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { useWallet } from "@/context/wallet.context";
 
+declare global {
+  interface Navigator {
+    __freighter_available?: boolean;
+    __freighter_address?: string | null;
+    __freighter_network?: string;
+  }
+}
+
 describe("E2E: Wallet Connection Flow", () => {
   beforeEach(() => {
     // Setup wallet context mocks

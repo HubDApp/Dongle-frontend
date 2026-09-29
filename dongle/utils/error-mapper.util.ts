@@ -22,11 +22,21 @@ import {
   StorageError,
   DataIntegrityError,
 } from "@/lib/errors";
+import {
+  ErrorCode,
+  getErrorInfo,
+  extractErrorCode,
+} from "@/constants/error-codes";
 
 export interface MappedError {
   userMessage: string;
   technicalDetails?: string;
-  code: ErrorCode;
+  /**
+   * Machine-readable code. Usually a member of {@link ErrorCode}, but custom
+   * `DomainError` subclasses may carry their own string codes, so the type is
+   * deliberately kept as the widened `string`.
+   */
+  code: string;
   actionable?: string;
   /** Whether this error should be reported to Sentry/monitoring */
   shouldReport?: boolean;

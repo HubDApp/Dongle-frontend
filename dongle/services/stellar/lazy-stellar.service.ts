@@ -29,9 +29,11 @@ async function loadStellarService() {
  */
 export const lazyStellarService = {
   /**
-   * Fetch account details from Horizon
+   * Fetch account details from Horizon.
+   *
+   * The return type is inferred so it always matches the underlying service.
    */
-  async getAccount(publicKey: string): Promise<Horizon.ServerApi.AccountRecord> {
+  async getAccount(publicKey: string) {
     const service = await loadStellarService();
     return service.getAccount(publicKey);
   },
