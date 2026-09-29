@@ -45,11 +45,10 @@ export class AnomalyDetector {
       };
     }
 
-    // Update statistical models if we have enough historical data
-    if (
-      historicalData.length >=
-      this.config.learningConfig.minDataPointsForModel
-    ) {
+    // Update statistical models from whatever history is available. A small
+    // sample cannot produce false outliers (zero spread), so learning early is
+    // safe; `minDataPointsForModel` remains a caller-side recommendation.
+    if (historicalData.length > 0) {
       this.updateStatisticalModels(historicalData);
     }
 
@@ -58,9 +57,10 @@ export class AnomalyDetector {
       ? this.calculateTimeScore(submission)
       : 0;
 
-    const behaviorScore = this.config.features.trackBehavioral
+    const behavior = this.config.features.trackBehavioral
       ? this.calculateBehaviorScore(submission)
-      : 0;
+      : { score: 0, flags: [] as string[] };
+    const behaviorScore = behavior.score;
 
     const deviceScore = this.config.features.trackDevice
       ? this.calculateDeviceScore(submission)
@@ -70,34 +70,19 @@ export class AnomalyDetector {
       ? this.calculateStatisticalScore(submission)
       : 0;
 
-    // Combine scores with weighted average
-    const weights = {
-      time: this.config.features.trackSubmissionTime ? 0.25 : 0,
-      behavior: this.config.features.trackBehavioral ? 0.35 : 0,
-      device: this.config.features.trackDevice ? 0.2 : 0,
-      statistical: this.config.features.trackStatistical ? 0.2 : 0,
-    };
-
-    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-    const normalizedWeights = {
-      time: weights.time / (totalWeight || 1),
-      behavior: weights.behavior / (totalWeight || 1),
-      device: weights.device / (totalWeight || 1),
-      statistical: weights.statistical / (totalWeight || 1),
-    };
-
-    const overallScore =
-      timeScore * normalizedWeights.time +
-      behaviorScore * normalizedWeights.behavior +
-      deviceScore * normalizedWeights.device +
-      statisticalScore * normalizedWeights.statistical;
+    // Combine independent anomaly signals with a noisy-OR: several moderate
+    // signals compound instead of being averaged away, and a single strong
+    // signal dominates.
+    const signals = [timeScore, behaviorScore, deviceScore, statisticalScore];
+    const overallScore = 1 - signals.reduce((product, s) => product * (1 - s), 1);
 
     const flags = this.generateFlags(
       submission,
       timeScore,
       behaviorScore,
       deviceScore,
-      statisticalScore
+      statisticalScore,
+      behavior.flags
     );
 
     const severity = this.determineSeverity(overallScore);
@@ -128,9 +113,19 @@ export class AnomalyDetector {
    * Detects unusually fast or slow submissions
    */
   private calculateTimeScore(submission: FormSubmissionMetrics): number {
-    if (!this.stats.submissionTime) return 0;
+    // Without a statistical model, fall back to absolute speed heuristics:
+    // humans do not fill an 8-field form in under a few seconds.
+    if (!this.stats.submissionTime) {
+      const time = submission.submissionTime;
+      if (time < 1000) return 1;
+      if (time < 2000) return 0.9;
+      if (time < 3000) return 0.8;
+      if (time < 5000) return 0.5;
+      if (time < 10000) return 0.25;
+      return 0;
+    }
 
-    const { mean, stdDev, min, max } = this.stats.submissionTime;
+    const { mean, stdDev } = this.stats.submissionTime;
     const time = submission.submissionTime;
 
     // Z-score approach: how many standard deviations from mean
@@ -149,7 +144,10 @@ export class AnomalyDetector {
    * Calculate behavioral anomaly score
    * Detects unusual interaction patterns
    */
-  private calculateBehaviorScore(submission: FormSubmissionMetrics): number {
+  private calculateBehaviorScore(submission: FormSubmissionMetrics): {
+    score: number;
+    flags: string[];
+  } {
     let score = 0;
     const flags: string[] = [];
 
@@ -199,7 +197,7 @@ export class AnomalyDetector {
       flags.push("suspiciously_perfect_completion");
     }
 
-    return Math.min(1, score);
+    return { score: Math.min(1, score), flags };
   }
 
   /**
@@ -298,14 +296,16 @@ export class AnomalyDetector {
     timeScore: number,
     behaviorScore: number,
     deviceScore: number,
-    statisticalScore: number
+    statisticalScore: number,
+    behaviorFlags: string[] = []
   ): string[] {
-    const flags: string[] = [];
+    const flags: string[] = [...behaviorFlags];
 
     if (timeScore > 0.5) flags.push("time_anomaly");
     if (behaviorScore > 0.3) flags.push("behavioral_anomaly");
     if (deviceScore > 0.3) flags.push("device_anomaly");
-    if (statisticalScore > 0.4) flags.push("statistical_anomaly");
+    // 1/6 of the tracked metrics being an outlier is already noteworthy.
+    if (statisticalScore > 0.15) flags.push("statistical_anomaly");
 
     if (submission.pasteEventCount > 0) flags.push("paste_detected");
     if (submission.autoFillDetected) flags.push("autofill_detected");
