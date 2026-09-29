@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import type { ComponentProps } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ReviewForm from "@/components/reviews/ReviewForm";
@@ -18,7 +19,9 @@ vi.mock("@/hooks/useUnsavedChanges", () => ({
   useUnsavedChanges: vi.fn(),
 }));
 
-const defaultProps = {
+type ReviewFormProps = ComponentProps<typeof ReviewForm>;
+
+const defaultProps: ReviewFormProps = {
   projectId: "project-1",
   projectName: "Stellar Wallet",
   userAddress: "GUSER123",
@@ -26,7 +29,7 @@ const defaultProps = {
   onCancel: vi.fn(),
 };
 
-function renderForm(overrides: Partial<typeof defaultProps> = {}) {
+function renderForm(overrides: Partial<ReviewFormProps> = {}) {
   return render(<ReviewForm {...defaultProps} {...overrides} />);
 }
 

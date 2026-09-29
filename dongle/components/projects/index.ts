@@ -1,5 +1,6 @@
 export { ClaimProjectModal } from "./ClaimProjectModal";
 export { ClaimStatusBanner } from "./ClaimStatusBanner";
+export { UnclaimedProjectBanner } from "./UnclaimedProjectBanner";
 export { ContractAddressList } from "./ContractAddressList";
 export { DraftIndicator } from "./DraftIndicator";
 export { ProjectCard } from "./ProjectCard";
@@ -13,6 +14,7 @@ export { ReportProjectModal } from "./ReportProjectModal";
 export { RepositoryMetadata } from "./RepositoryMetadata";
 export { SubmissionChecklist } from "./SubmissionChecklist";
 export type { ChecklistItem } from "./SubmissionChecklist";
+export { SubmissionCollaborationPanel } from "./SubmissionCollaborationPanel";
 export { TransferOwnershipModal } from "./TransferOwnershipModal";
 export { VerificationBadge } from "./VerificationBadge";
 export type { VerificationStatus } from "./VerificationBadge";

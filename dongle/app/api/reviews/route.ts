@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Review } from "@/types/review";
 import { hasMinLength } from "@/lib/validation";
+import { verifySignature } from "@/lib/verify-signature";
+import {
+  isReviewerBanned,
+  recordReviewSubmission,
+} from "@/lib/moderation-store";
+import { assessReviewSpam } from "@/utils/review-spam.util";
 import {
   withErrorHandler,
   createSuccessResponse,
@@ -20,15 +26,23 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
-function validateReviewInput(rating: unknown, comment: unknown): string | null {
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+function validateReviewInput(
+  rating: unknown,
+  comment: unknown,
+): ValidationError | null {
   if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-    return "Rating must be an integer between 1 and 5";
+    return { field: "rating", message: "Rating must be an integer between 1 and 5" };
   }
   if (typeof comment !== "string" || !hasMinLength(comment, 10)) {
-    return "Comment must be at least 10 characters";
+    return { field: "comment", message: "Comment must be at least 10 characters" };
   }
   if (comment.length > 1000) {
-    return "Comment cannot exceed 1000 characters";
+    return { field: "comment", message: "Comment cannot exceed 1000 characters" };
   }
   return null;
 }
@@ -62,11 +76,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, projectName, userAddress, rating, comment } = body;
+    const { projectId, projectName, userAddress, rating, comment, signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken } = body;
 
     if (!projectId || !projectName || !userAddress) {
       return NextResponse.json(
-        createErrorResponse(ErrorCode.VALIDATION_ERROR, "Missing required fields", 400),
+        {
+          success: false,
+          errors: [{ field: "comment", message: "Missing required fields" }],
+        },
         { status: 400 }
       );
     }
@@ -74,9 +91,22 @@ export async function POST(request: NextRequest) {
     const validationError = validateReviewInput(rating, comment);
     if (validationError) {
       return NextResponse.json(
-        createErrorResponse(ErrorCode.VALIDATION_ERROR, validationError, 400),
+        { success: false, errors: [validationError] },
         { status: 400 }
       );
+    }
+
+    // ── Signature verification (cryptographic form submission signing) ─────
+    // If a signature is provided, verify it against the payload and public key.
+    // This ensures tamper detection and authenticity of the submission.
+    if (signedPayload && signature) {
+      const isValid = verifySignature(signedPayload, signature, userAddress);
+      if (!isValid) {
+        return NextResponse.json(
+          createErrorResponse(ErrorCode.AUTHENTICATION_ERROR, "Invalid submission signature — payload may have been tampered with", 401),
+          { status: 401 }
+        );
+      }
     }
 
     if (isReviewerBanned(userAddress)) {
@@ -91,16 +121,14 @@ export async function POST(request: NextRequest) {
     );
     if (existing) {
       return NextResponse.json(
-        createErrorResponse(
-          ErrorCode.CONFLICT,
-          "You have already reviewed this project",
-          409
-        ),
+        {
+          success: false,
+          errors: [{ field: "comment", message: "You have already reviewed this project" }],
+        },
         { status: 409 }
       );
     }
 
-    const { captchaToken } = body as { captchaToken?: string };
     const dailyCount = recordReviewSubmission(userAddress, new Date().toISOString());
     const spamAssessment = assessReviewSpam(comment, dailyCount);
     if (spamAssessment.requiresCaptcha && !captchaToken) {
@@ -125,6 +153,10 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       helpfulVotes: [],
       unhelpfulVotes: [],
+      signedPayload: signedPayload || undefined,
+      signature: signature || undefined,
+      signatureNonce: signatureNonce || undefined,
+      signatureTimestamp: signatureTimestamp || undefined,
     };
 
     store.set(newReview.id, newReview);

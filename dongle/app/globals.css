@@ -114,6 +114,29 @@ html.dark {
     text-align: start;
   }
 
+  /* Form RTL surfaces (Issue #546) — flip layout and keep inputs readable */
+  .dongle-form[dir="rtl"],
+  .dongle-form.direction-rtl {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .dongle-form[dir="ltr"],
+  .dongle-form.direction-ltr {
+    direction: ltr;
+    text-align: left;
+  }
+
+  .dongle-form[dir="rtl"] input,
+  .dongle-form[dir="rtl"] textarea,
+  .dongle-form[dir="rtl"] select {
+    text-align: right;
+  }
+
+  .dongle-form[dir="rtl"] .rtl\:-scale-x-100 {
+    transform: scaleX(-1);
+  }
+
   .container {
     @apply mx-auto px-4 sm:px-6 lg:px-8;
   }
@@ -158,3 +181,106 @@ body {
 }
 
 /* WCAG AA contrast ratios documented: --color-primary #2563eb 4.6:1, --color-success #16a34a 4.5:1, --color-error #dc2626 5.1:1 */
+
+/* ==========================================================================
+   Focus management — Issue #528
+   Consistent, high-visibility focus indicators that meet WCAG 2.1 SC 2.4.7
+   (Any Keyboard Operable UI). Uses :focus-visible so mouse users are not
+   affected.
+   ========================================================================== */
+
+/*
+ * Global :focus-visible ring — applies to every interactive element that does
+ * not already have its own custom focus style.
+ */
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Dark mode — use a lighter blue so the ring is visible on dark surfaces */
+html.dark :focus-visible,
+@media (prefers-color-scheme: dark) {
+  :focus-visible {
+    outline-color: #60a5fa;
+  }
+}
+
+/*
+ * Form controls — replace the outline with a box-shadow ring so the shape
+ * follows the control's border-radius naturally.
+ */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px #2563eb;
+}
+
+html.dark input:focus-visible,
+html.dark textarea:focus-visible,
+html.dark select:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px #60a5fa;
+}
+
+/*
+ * Buttons — extend the radius and shadow to match the button shape.
+ */
+button:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px #2563eb;
+  border-radius: inherit;
+}
+
+html.dark button:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px #60a5fa;
+}
+
+/*
+ * Links — keep a visible underline on focus in addition to the outline.
+ */
+a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  text-decoration: underline;
+}
+
+html.dark a:focus-visible {
+  outline-color: #60a5fa;
+}
+
+/*
+ * High-contrast media query — use a more prominent indicator for users
+ * who have enabled forced colours / Windows High Contrast mode.
+ */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid ButtonText;
+    outline-offset: 2px;
+  }
+}
+
+/*
+ * Screen-reader-only utility class.
+ * Referenced by live regions injected by useFormFocusManagement.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
