@@ -139,41 +139,28 @@ export function normalizeUrl(urlStr: string): string {
 }
 
 /**
- * Checks if a string is a valid HTTP or HTTPS URL (with or without protocol prefix).
- * Returns true if valid, false for invalid structure, unsupported protocols, or empty input.
+ * HTML entity encodes characters so a URL is safe to render inside HTML
+ * attributes or text nodes. Escapes &, <, >, ", ', and `.
  */
-export function isValidUrl(urlStr: string): boolean {
-  if (!urlStr || typeof urlStr !== "string" || !urlStr.trim()) {
-    return false;
-  }
-  try {
-    normalizeUrl(urlStr);
-    return true;
-  } catch {
-    return false;
-  }
+export function encodeUrlForHtml(urlStr: string): string {
+  return urlStr
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .replace(/`/g, "&#x60;");
 }
 
 /**
- * Validates a URL and returns a detailed diagnostics object.
+ * Normalizes and validates a URL, then HTML-encodes it for safe rendering.
+ * Returns "" for empty, invalid, or unsafe (non http/https) input.
  */
-export function validateUrl(urlStr: string): UrlValidationResult {
-  if (!urlStr || typeof urlStr !== "string" || !urlStr.trim()) {
-    return { isValid: false, error: "URL cannot be empty" };
-  }
+export function sanitizeAndEncodeUrl(urlStr: string): string {
   try {
-    const normalized = normalizeUrl(urlStr);
-    const domain = extractDomain(normalized);
-    return {
-      isValid: true,
-      normalizedUrl: normalized,
-      domain,
-    };
-  } catch (err: any) {
-    return {
-      isValid: false,
-      error: err?.message || "Invalid URL",
-    };
+    return encodeUrlForHtml(normalizeUrl(urlStr));
+  } catch {
+    return "";
   }
 }
 

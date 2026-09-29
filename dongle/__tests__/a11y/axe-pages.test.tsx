@@ -10,7 +10,6 @@ import { FormField } from "@/components/ui/FormField";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { SelectField } from "@/components/ui/SelectField";
 import { ProjectCard } from "@/components/projects/ProjectCard";
-import { ReviewList } from "@/components/reviews/ReviewList";
 import { mockProjects } from "@/data/mockProjects";
 import { CATEGORY_FORM_OPTIONS, PROJECT_CATEGORIES } from "@/types/project";
 import { REVIEW_CONSTRAINTS } from "@/types/review";
@@ -125,7 +124,7 @@ describe("axe-core - Page-Level Accessibility (WCAG AA)", () => {
                   <Card>
                     <h3>{p.name}</h3>
                     <p>{p.primaryCategory}</p>
-                    <Badge variant="default">Rating: {p.rating.toFixed(1)}</Badge>
+                    <Badge variant="primary">Rating: {p.rating.toFixed(1)}</Badge>
                   </Card>
                 </li>
               ))}
@@ -205,7 +204,7 @@ describe("axe-core - Page-Level Accessibility (WCAG AA)", () => {
                     <Card padding="sm">
                       <div>
                         <strong>{r.user}</strong>
-                        <Badge variant="default" aria-label={`Rated ${r.rating} out of 5 stars`}>
+                        <Badge variant="primary" aria-label={`Rated ${r.rating} out of 5 stars`}>
                           {r.rating}/5
                         </Badge>
                       </div>
@@ -247,14 +246,12 @@ describe("axe-core - Page-Level Accessibility (WCAG AA)", () => {
               options={CATEGORY_FORM_OPTIONS}
               value="defi"
               onChange={() => {}}
-              helperText="Pick the most relevant category. You can add more details in tags."
             />
             <TextAreaField
               id="project-description"
               label="Project description"
               placeholder="What does this project do and who is it for?"
               rows={5}
-              helperText={`Minimum ${REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters.`}
               maxLength={1000}
             />
             <FormField

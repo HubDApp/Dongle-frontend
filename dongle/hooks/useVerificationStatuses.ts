@@ -15,36 +15,36 @@ export function useVerificationStatuses(
   ids: string[],
   options?: { bypassCache?: boolean },
 ): UseVerificationStatusesReturn {
-  const { data, error, isValidating, mutate } = useSWR<Record<string, VerificationStatus>, Error>(
+  const { data, error, isLoading, isValidating, mutate } = useSWR<
+    Record<string, VerificationStatus>,
+    Error
+  >(
     ids,
-    async (key) => {
+    async (key: string[]) => {
       const { batchFetchVerificationStatuses } = await import(
         "@/services/stellar/batch-verification.service"
       );
 
+      // The timeout signal aborts the request itself; it needs no manual
+      // cleanup (AbortSignal.timeout cannot be aborted, only observed).
       const signal = AbortSignal.timeout(30_000);
+      const statuses = await batchFetchVerificationStatuses(
+        key,
+        signal,
+        options?.bypassCache,
+      );
 
-      try {
-        const statuses = await batchFetchVerificationStatuses(key, signal, options?.bypassCache);
-
-        // Update the underlying project cache
-        if (statuses) {
-          const statusRecord: Record<string, VerificationStatus> = {};
-          for (const [id, status] of Object.entries(statuses)) {
-            verificationStatusCache.set(id, status);
-            statusRecord[id] = status;
-          }
+      // Update the underlying project cache
+      if (statuses) {
+        for (const [id, status] of Object.entries(statuses)) {
+          verificationStatusCache.set(id, status);
         }
-
-        return statuses || {};
-      } catch (e) {
-        throw e;
-      } finally {
-        signal.abort();
       }
+
+      return statuses || {};
     },
     {
-      revalidateInterval: 300_000, // 5 minutes
+      refreshInterval: 300_000, // 5 minutes
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       dedupingInterval: 60_000,
@@ -64,6 +64,8 @@ export function useVerificationStatuses(
     statuses: data || {},
     isLoading: isLoading || isValidating,
     error: error || null,
-    refresh: () => mutate(),
+    refresh: async () => {
+      await mutate();
+    },
   };
 }

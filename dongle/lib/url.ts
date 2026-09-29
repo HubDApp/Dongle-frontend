@@ -201,3 +201,45 @@ export function sanitizeAndEncodeUrl(urlStr: string): string {
     return "";
   }
 }
+
+/**
+ * Returns true when the URL is valid and safe (http/https only).
+ * Unlike `normalizeUrl`, this never throws — it simply returns false for invalid input.
+ *
+ * @example
+ * validateUrl("example.com")                 // true  (https:// will be prepended on normalize)
+ * validateUrl("https://example.com")         // true
+ * validateUrl("javascript:alert(1)")         // false
+ * validateUrl("")                            // false
+ * validateUrl("  ")                          // false
+ * validateUrl("not a url")                   // false
+ */
+export function validateUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== "string") return false;
+  try {
+    normalizeUrl(urlStr);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extracts the hostname from a URL, preserving subdomains.
+ *
+ * Unlike `extractDomain`, this does NOT strip the leading `www.` prefix,
+ * making it suitable for display and deduplication within the same apex domain.
+ *
+ * @example
+ * getUrlHostname("https://www.example.com/path") // "www.example.com"
+ * getUrlHostname("https://docs.example.com")     // "docs.example.com"
+ * getUrlHostname("invalid")                       // ""
+ */
+export function getUrlHostname(urlStr: string): string {
+  try {
+    const normalized = normalizeUrl(urlStr);
+    return new URL(normalized).hostname;
+  } catch {
+    return "";
+  }
+}

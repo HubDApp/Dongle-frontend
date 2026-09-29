@@ -14,7 +14,6 @@
  */
 
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VALIDATION UTILITIES
@@ -505,9 +504,8 @@ export function hasPlaceholderContracts(contracts: {
  * @returns JSON Schema representation of the environment variables
  */
 export function exportJsonSchema() {
-  return zodToJsonSchema(CompleteEnvSchema, {
-    name: "DongleEnvironmentVariables",
-    $refStrategy: "none",
+  return z.toJSONSchema(CompleteEnvSchema, {
+    reused: "inline",
   });
 }
 
@@ -553,7 +551,3 @@ export interface DongleEnvironmentVariables {
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export {
-  DEV_CONTRACT_PLACEHOLDER,
-  type EnvConfig,
-};
