@@ -58,7 +58,7 @@ export default defineConfig({
       "@/lib/stellar-address": path.resolve(__dirname, "./utils/stellar-address.util"),
       "@/lib/submission-quality": path.resolve(__dirname, "./utils/submission-quality.util"),
       "@/lib/transaction-progress": path.resolve(__dirname, "./utils/transaction-progress.util"),
-      "@/lib/url": path.resolve(__dirname, "./utils/url.util"),
+      "@/lib/url": path.resolve(__dirname, "./lib/url.ts"),
       "@/lib/utils": path.resolve(__dirname, "./utils/utils.util"),
       "@/services/data-access/migration": path.resolve(__dirname, "./services/data-access/migration.service"),
       "@/services/data-access/MockUpdateRepository": path.resolve(__dirname, "./services/data-access/MockUpdateRepository.service"),

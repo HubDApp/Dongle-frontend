@@ -114,8 +114,8 @@ const baseProjects: Partial<Project>[] = [
 ];
 
 // Generate 50+ projects by duplicating and modifying base projects
-export const mockProjects: Project[] = Array.from({ length: 60 }).map(
-  (_, i) => {
+export const mockProjects: Project[] = [
+  ...Array.from({ length: 60 }).map((_, i) => {
     const base = baseProjects[i % baseProjects.length];
     const iteration = Math.floor(i / baseProjects.length);
 
@@ -147,5 +147,22 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       contractAddresses: base.contractAddresses,
       ownerAddress: base.ownerAddress || `GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890${i.toString().padStart(4, '0')}ABCDEFGHIJKLMNOPQR`,
     };
+  }),
+  {
+    id: "proj-no-request",
+    name: "Project Without Verification Request",
+    primaryCategory: PROJECT_CATEGORIES.DEFI,
+    tags: ["Validation"],
+    description: "A valid project that exists but has no verification request yet.",
+    rating: 4.9,
+    reviews: 11,
+    createdAt: new Date("2024-01-15T00:00:00Z").toISOString(),
+    status: "active",
+    websiteUrl: "https://proj-no-request.example.com",
+    githubUrl: "https://github.com/example/proj-no-request",
+    docsUrl: "https://docs.proj-no-request.example.com",
+    domain: "proj-no-request.example.com",
+    contractAddresses: [],
+    ownerAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
   },
-);
+] as Project[];

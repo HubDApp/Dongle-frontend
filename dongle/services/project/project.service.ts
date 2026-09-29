@@ -47,6 +47,7 @@ export interface DuplicateDetectionResult {
 }
 import { projectOwnerService } from "./project-owner.service";
 import { projectSubmissionService } from "./project-submission.service";
+import { projectStatusService } from "./project-status.service";
 import { registry } from "@/services/data-access/registry";
 import { fuzzyMatch, levenshteinDistance } from "@/lib/utils";
 import { unique } from "@/lib/array";

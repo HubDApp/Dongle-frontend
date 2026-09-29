@@ -5,7 +5,7 @@ export function unique<T>(values: T[]): T[] {
 }
 
 export function compact<T>(values: Array<T | null | undefined | false | ''>): T[] {
-  return values.filter(Boolean) as T[];
+  return values.filter((value) => value !== null && value !== undefined && value !== false && value !== '') as T[];
 }
 
 export function chunk<T>(values: T[], size: number): T[][] {

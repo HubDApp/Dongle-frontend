@@ -110,7 +110,7 @@ export function FormErrorSummary({
     const target = document.getElementById(fieldId);
     if (target) {
       target.focus();
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.scrollIntoView?.({ behavior: "smooth", block: "center" });
     }
   };
 

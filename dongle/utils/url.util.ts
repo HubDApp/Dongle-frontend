@@ -139,32 +139,6 @@ export function normalizeUrl(urlStr: string): string {
 }
 
 /**
- * HTML entity encodes characters so a URL is safe to render inside HTML
- * attributes or text nodes. Escapes &, <, >, ", ', and `.
- */
-export function encodeUrlForHtml(urlStr: string): string {
-  return urlStr
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;")
-    .replace(/`/g, "&#x60;");
-}
-
-/**
- * Normalizes and validates a URL, then HTML-encodes it for safe rendering.
- * Returns "" for empty, invalid, or unsafe (non http/https) input.
- */
-export function sanitizeAndEncodeUrl(urlStr: string): string {
-  try {
-    return encodeUrlForHtml(normalizeUrl(urlStr));
-  } catch {
-    return "";
-  }
-}
-
-/**
  * Extracts normalized domain name from a URL string for duplicate detection and safety checks.
  */
 export function extractDomain(urlStr: string): string {
@@ -172,18 +146,6 @@ export function extractDomain(urlStr: string): string {
     const normalized = normalizeUrl(urlStr);
     const parsed = new URL(normalized);
     return parsed.hostname.replace(/^www\./i, "");
-  } catch {
-    return "";
-  }
-}
-
-/**
- * Sanitizes, validates, and HTML-encodes a URL for safe rendering in HTML templates/attributes.
- */
-export function sanitizeAndEncodeUrl(urlStr: string): string {
-  try {
-    const normalized = normalizeUrl(urlStr);
-    return encodeUrlForHtml(normalized);
   } catch {
     return "";
   }
