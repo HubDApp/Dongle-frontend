@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import LanguageSelector from "@/components/i18n/LanguageSelector";
 import { useDynamicForm } from "@/hooks/useDynamicForm";
+import { useFormKeyboardNav } from "@/hooks/useFormKeyboardNav";
 import {
   resolveFormDescription,
   resolveFormTitle,
@@ -19,6 +20,20 @@ export function DynamicFormBuilder() {
   const form = useDynamicForm();
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Ref for the <form> element — used by keyboard nav and (optionally) audit
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Keyboard navigation: Enter advances fields, Escape resets the form
+  useFormKeyboardNav(formRef, {
+    onCancel: () => {
+      if (viewingVersion != null) {
+        setViewingVersion(null);
+      } else {
+        form.resetAnswers();
+      }
+    },
+  });
 
   const displaySchema = useMemo(() => {
     if (viewingVersion == null) return form.schema;
@@ -97,7 +112,20 @@ export function DynamicFormBuilder() {
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+        {/*
+         * Keyboard navigation is wired via useFormKeyboardNav:
+         *   Tab / Shift+Tab  — moves to next/previous field (native)
+         *   Arrow keys        — handled natively by <select> elements
+         *   Enter             — advances to next field; on last field focuses submit
+         *   Escape            — resets answers (or closes historical view)
+         */}
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="space-y-6"
+          noValidate
+          aria-label={title}
+        >
           <DynamicFormSections
             sections={
               isHistorical
