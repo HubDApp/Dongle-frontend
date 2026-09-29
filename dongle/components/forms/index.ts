@@ -4,3 +4,4 @@ export { FormConfirmationPage } from "./FormConfirmationPage";
 export { FormConfirmationView } from "./FormConfirmationView";
 export { FormFieldInput } from "./FormFieldInput";
 export { FormVersionHistory } from "./FormVersionHistory";
+export { FormA11yAuditPanel } from "./FormA11yAuditPanel";
