@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { ShieldCheck } from "lucide-react";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { toast } from "sonner";
@@ -31,7 +32,8 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors, isDirty },
+    control,
+    formState: { errors },
     reset,
   } = useForm<VerificationFormValues>({
     resolver: zodResolver(verificationSchema),
@@ -39,6 +41,7 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
       projectId: "",
     },
   });
+  const projectId = useWatch({ control, name: "projectId" });
 
   // Issue #521, #522, #523: form analytics
   const analytics = useFormAnalytics({
@@ -105,6 +108,11 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <FormTimeEstimate
+          fieldCount={1}
+          completedFields={Number(projectId.trim().length > 0)}
+          secondsPerField={30}
+        />
         <FormField
           label="Project ID or Domain"
           fieldType="projectId"

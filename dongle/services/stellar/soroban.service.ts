@@ -22,7 +22,19 @@ import {
   TransactionFailedError,
   ContractCallError,
 } from "@/lib/errors";
-import type { ISorobanService } from "./soroban.interface";
+import type {
+  ISorobanService,
+  SorobanTransactionOptions,
+  TransactionPhaseHandler,
+} from "./soroban.interface";
+
+// Re-export the shared option types and the errors thrown by this service so
+// consumers (and the lazy wrapper) can import them from one place.
+export type {
+  SorobanTransactionOptions,
+  TransactionPhaseHandler,
+} from "./soroban.interface";
+export { WalletNotConnectedError, NetworkMismatchError } from "@/lib/errors";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,

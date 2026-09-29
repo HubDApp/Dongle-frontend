@@ -173,6 +173,19 @@ export const es: Messages = {
       confirmLabel: "Descartar borrador",
       cancelLabel: "Conservar borrador",
     },
+    hints: {
+      name: "Usa un nombre claro y único para que otros puedan encontrar tu proyecto.",
+      category: "Elige la categoría que mejor coincida con el uso principal del proyecto.",
+      tags: "Añade algunas palabras clave (pulsa Enter tras cada una) para mejorar la visibilidad.",
+      description: "Resume qué hace el proyecto en 1–3 frases. Evita el lenguaje publicitario.",
+      websiteUrl: "Enlace a la página pública que los usuarios deben visitar primero.",
+      githubUrl: "Compatible: GitHub, GitLab, Bitbucket. Se prefieren repositorios públicos.",
+      logoUrl: "URL directa de imagen (PNG/SVG/JPG). Los logos cuadrados funcionan mejor.",
+      docsUrl: "Enlace a documentación, whitepaper o guía de inicio.",
+      auditReportUrl: "Enlace a un informe de auditoría de seguridad público, si existe.",
+      bugBountyUrl: "Enlace a un programa activo de bug bounty o divulgación de vulnerabilidades.",
+      contractAddresses: "IDs de contratos Soroban — 56 caracteres que empiezan por 'C'.",
+    },
   },
 
   reviews: {
@@ -418,5 +431,45 @@ export const es: Messages = {
     linkWallet: "Vincular billetera",
     walletLinked: "Billetera vinculada",
     account: "Cuenta",
+  },
+
+  forms: {
+    builder: {
+      badge: "Formulario v{version}",
+      reset: "Borrar respuestas",
+      branchHint:
+        "Cambiar el tipo de proyecto muestra otra sección. Puedes volver atrás en cualquier momento: las respuestas de ramas ocultas se borran automáticamente.",
+    },
+    versioning: {
+      title: "Historial de versiones",
+      subtitle: "Cada cambio de esquema se guarda con un registro y marca de tiempo.",
+      empty: "Aún no hay versiones.",
+      versionLabel: "Versión {version}",
+      active: "Activa",
+      noSummary: "Sin entrada de registro",
+      timestamp: "Guardado {date}",
+      author: "por {author}",
+      view: "Ver",
+      revert: "Revertir",
+      viewingHistorical: "Viendo la versión histórica {version}.",
+      backToActive: "Volver a la versión activa",
+    },
+    i18n: {
+      languageToggle: "Idioma del formulario",
+    },
+    confirmation: {
+      successTitle: "Envío recibido",
+      successBody: "Gracias — tu formulario se envió correctamente.",
+      confirmationNumber: "Número de confirmación",
+      submittedAt: "Enviado {date}",
+      summaryTitle: "Lo que enviaste",
+      nextStepsTitle: "Próximos pasos",
+      openLink: "Continuar",
+      submitAnother: "Enviar otro",
+      backHome: "Explorar proyectos",
+      missingTitle: "Confirmación no encontrada",
+      missingBody:
+        "No encontramos esa confirmación. Envía el formulario de nuevo para obtener un número nuevo.",
+    },
   },
 };

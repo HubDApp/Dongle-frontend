@@ -20,7 +20,7 @@ export interface SorobanAggregateResult {
   rpcError?: string;
 }
 
-function isUsableContractId(value: string | undefined): boolean {
+function isUsableContractId(value: string | undefined): value is string {
   if (!value) return false;
   if (value === DEV_CONTRACT_PLACEHOLDER) return false;
   return /^C[A-Z2-7]{55}$/.test(value);

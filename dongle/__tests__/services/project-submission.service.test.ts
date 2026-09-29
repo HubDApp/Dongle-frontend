@@ -3,21 +3,22 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 
 describe("projectSubmissionService", () => {
   beforeEach(() => {
-    vi.stubGlobal("localStorage", {
+    const memoryStorage = {
       store: {} as Record<string, string>,
       getItem(key: string) {
-        return this.store[key] ?? null;
+        return memoryStorage.store[key] ?? null;
       },
       setItem(key: string, value: string) {
-        this.store[key] = value;
+        memoryStorage.store[key] = value;
       },
       removeItem(key: string) {
-        delete this.store[key];
+        delete memoryStorage.store[key];
       },
       clear() {
-        this.store = {};
+        memoryStorage.store = {};
       },
-    });
+    };
+    vi.stubGlobal("localStorage", memoryStorage);
     localStorage.clear();
   });
 
