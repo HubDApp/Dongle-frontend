@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,6 +11,10 @@ import { ShieldCheck } from "lucide-react";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { toast } from "sonner";
 import { trackVerificationRequest } from "@/lib/analytics";
+import {
+  FormAnnouncerProvider,
+  useFormAnnouncer,
+} from "@/components/ui/FormAnnouncer";
 
 const verificationSchema = z.object({
   projectId: z
@@ -24,8 +28,9 @@ interface VerificationFormProps {
   onSuccess?: (projectId: string) => void;
 }
 
-export default function VerificationForm({ onSuccess }: VerificationFormProps) {
+function VerificationFormInner({ onSuccess }: VerificationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { announce, announceError } = useFormAnnouncer();
 
   const {
     register,
@@ -39,9 +44,26 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
     },
   });
 
+  // Announce validation errors when they surface.
+  useEffect(() => {
+    if (errors.projectId?.message) {
+      announceError(`Validation error: ${errors.projectId.message}`);
+    }
+  }, [errors.projectId, announceError]);
+
+  // Announce submitting state changes.
+  useEffect(() => {
+    if (isSubmitting) {
+      announce("Submitting verification request…");
+    }
+  }, [isSubmitting, announce]);
+
   const onSubmit = async (data: VerificationFormValues) => {
     setIsSubmitting(true);
-    const promise = sorobanService.requestVerification(data.projectId, data.projectId);
+    const promise = sorobanService.requestVerification(
+      data.projectId,
+      data.projectId,
+    );
 
     toast.promise(promise, {
       loading: "Submitting verification request...",
@@ -52,15 +74,17 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
           success: true,
           projectRefLength: data.projectId.length,
         });
+        announce("Verification requested successfully.");
         if (onSuccess) onSuccess(data.projectId);
         return `Verification requested successfully!`;
       },
-      error: (err) => {
+      error: (err: Error) => {
         setIsSubmitting(false);
         trackVerificationRequest({
           success: false,
           errorCode: err instanceof Error ? err.name || "Error" : "unknown",
         });
+        announceError(`Request failed: ${err.message}`);
         return `Request failed: ${err.message}`;
       },
     });
@@ -86,7 +110,11 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-6"
+        noValidate
+      >
         <FormField
           label="Project ID or Domain"
           placeholder="e.g. yourproject.com"
@@ -99,5 +127,13 @@ export default function VerificationForm({ onSuccess }: VerificationFormProps) {
         </Button>
       </form>
     </Card>
+  );
+}
+
+export default function VerificationForm(props: VerificationFormProps) {
+  return (
+    <FormAnnouncerProvider>
+      <VerificationFormInner {...props} />
+    </FormAnnouncerProvider>
   );
 }

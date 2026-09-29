@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useId } from "react";
+import React, { useId, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
@@ -10,6 +10,10 @@ import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.schema";
+import {
+  FormAnnouncerProvider,
+  useFormAnnouncer,
+} from "@/components/ui/FormAnnouncer";
 
 interface ReviewFormProps {
   projectId: string;
@@ -18,26 +22,31 @@ interface ReviewFormProps {
   initialReview?: Review;
   dailyReviewCount?: number;
   requiresCaptcha?: boolean;
-  onSubmit: (review: Omit<Review, "id" | "createdAt" | "userAddress" | "projectId" | "projectName"> & { captchaToken?: string }) => void;
+  onSubmit: (
+    review: Omit<
+      Review,
+      "id" | "createdAt" | "userAddress" | "projectId" | "projectName"
+    > & { captchaToken?: string },
+  ) => void;
   onCancel: () => void;
 }
 
-export default function ReviewForm({
+// Inner component that uses the announcer hook.
+function ReviewFormInner({
   projectName,
   initialReview,
-  dailyReviewCount = 0,
-  requiresCaptcha = false,
   onSubmit,
   onCancel,
 }: ReviewFormProps) {
   const ratingLabelId = useId();
   const ratingGroupId = useId();
+  const { announce, announceError } = useFormAnnouncer();
 
   const {
     register,
     handleSubmit,
     watch,
-    formState: { errors, isDirty, isSubmitting },
+    formState: { errors, isDirty, isSubmitting, isSubmitSuccessful },
     reset,
   } = useForm<ReviewFormData>({
     resolver: zodResolver(reviewFormSchema),
@@ -53,6 +62,32 @@ export default function ReviewForm({
   const rating = watch("rating");
   const comment = watch("comment");
 
+  // Announce validation errors when they appear.
+  useEffect(() => {
+    const messages: string[] = [];
+    if (errors.rating?.message) messages.push(`Rating: ${errors.rating.message}`);
+    if (errors.comment?.message) messages.push(`Comment: ${errors.comment.message}`);
+    if (messages.length > 0) {
+      announceError(messages.join(". "));
+    }
+  }, [errors.rating, errors.comment, announceError]);
+
+  // Announce submitting state.
+  useEffect(() => {
+    if (isSubmitting) {
+      announce("Submitting your review…");
+    }
+  }, [isSubmitting, announce]);
+
+  // Announce successful submission.
+  useEffect(() => {
+    if (isSubmitSuccessful) {
+      announce(
+        initialReview ? "Review updated successfully." : "Review posted successfully.",
+      );
+    }
+  }, [isSubmitSuccessful, initialReview, announce]);
+
   const onSubmitForm = async (data: ReviewFormData) => {
     onSubmit(data);
   };
@@ -65,10 +100,16 @@ export default function ReviewForm({
         reset();
       }}
     >
-      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
+      <form
+        onSubmit={handleSubmit(onSubmitForm)}
+        className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
+        noValidate
+      >
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="text-xl font-bold">{initialReview ? "Edit Review" : "Add Review"}</h3>
+            <h3 className="text-xl font-bold">
+              {initialReview ? "Edit Review" : "Add Review"}
+            </h3>
             <p className="text-sm text-zinc-500">{projectName}</p>
           </div>
           <IconButton
@@ -96,10 +137,8 @@ export default function ReviewForm({
                   id={`${ratingGroupId}-${star}`}
                   {...register("rating", { valueAsNumber: true })}
                   onClick={() => {
-                    // Manually set the value since register doesn't work with onClick
-                    const event = new Event("change", { bubbles: true });
                     const input = document.querySelector(
-                      `input[name="rating"][value="${star}"]`
+                      `input[name="rating"][value="${star}"]`,
                     ) as HTMLInputElement;
                     if (input) input.checked = true;
                   }}
@@ -112,7 +151,6 @@ export default function ReviewForm({
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
                   }`}
                   onMouseDown={() => {
-                    // Use a hidden input to properly register the value
                     const hiddenInput = document.createElement("input");
                     hiddenInput.type = "hidden";
                     hiddenInput.name = "rating";
@@ -123,7 +161,10 @@ export default function ReviewForm({
                 </button>
               ))}
             </div>
-            <input type="hidden" {...register("rating", { valueAsNumber: true })} />
+            <input
+              type="hidden"
+              {...register("rating", { valueAsNumber: true })}
+            />
             {errors.rating && (
               <p className="text-red-500 dark:text-red-400 text-sm mt-2">
                 {errors.rating.message}
@@ -143,11 +184,13 @@ export default function ReviewForm({
             />
             <div className="flex justify-between items-start mt-2 text-xs text-zinc-500">
               <span>Min: {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH} characters</span>
-              {comment.length > 0 && comment.trim().length < REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH && (
-                <span className="text-amber-500 dark:text-amber-400 font-medium">
-                  {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH - comment.trim().length} more character(s) required
-                </span>
-              )}
+              {comment.length > 0 &&
+                comment.trim().length < REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH && (
+                  <span className="text-amber-500 dark:text-amber-400 font-medium">
+                    {REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH - comment.trim().length} more
+                    character(s) required
+                  </span>
+                )}
             </div>
           </div>
         </div>
@@ -165,10 +208,26 @@ export default function ReviewForm({
             disabled={isSubmitting}
             className="flex-1 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            {isSubmitting ? "Submitting..." : initialReview ? "Update Review" : "Post Review"}
+            {isSubmitting
+              ? "Submitting..."
+              : initialReview
+                ? "Update Review"
+                : "Post Review"}
           </button>
         </div>
       </form>
     </ErrorBoundary>
+  );
+}
+
+// Public export — wraps the inner form with FormAnnouncerProvider so it is
+// self-contained.  If a parent already provides FormAnnouncerContext the inner
+// hook will pick that up instead of the nested one (React always uses the
+// nearest provider), so there is no duplication.
+export default function ReviewForm(props: ReviewFormProps) {
+  return (
+    <FormAnnouncerProvider>
+      <ReviewFormInner {...props} />
+    </FormAnnouncerProvider>
   );
 }

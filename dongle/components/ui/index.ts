@@ -32,3 +32,15 @@ export { FormSubmissionProgress, useFormSubmissionProgress } from "./FormSubmiss
 export type { FormSubmissionProgressProps, SubmissionStep } from "./FormSubmissionProgress";
 export { FormValueComparison, areValuesDifferent } from "./FormValueComparison";
 export type { FormValueComparisonProps } from "./FormValueComparison";
+export {
+  FormAnnouncer,
+  FormAnnouncerProvider,
+  useFormAnnouncer,
+} from "./FormAnnouncer";
+export type {
+  FormAnnouncerProps,
+  FormAnnouncerProviderProps,
+  FormAnnouncerContextValue,
+  AnnounceOptions,
+  AnnouncePriority,
+} from "./FormAnnouncer";
