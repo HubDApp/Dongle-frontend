@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useId } from "react";
+import React, { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
@@ -11,6 +11,9 @@ import { TextAreaField } from "@/components/ui/TextAreaField";
 import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.schema";
+import { useFormConversion } from "@/hooks/useFormConversion";
+import { useFormCaptcha } from "@/hooks/useFormCaptcha";
+import { FormCaptcha } from "@/components/forms/FormCaptcha";
 
 interface ReviewFormProps {
   projectId: string;
@@ -24,6 +27,7 @@ interface ReviewFormProps {
 }
 
 export default function ReviewForm({
+  projectId,
   projectName,
   initialReview,
   dailyReviewCount = 0,
@@ -33,6 +37,16 @@ export default function ReviewForm({
 }: ReviewFormProps) {
   const ratingLabelId = useId();
   const ratingGroupId = useId();
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  const conversion = useFormConversion({
+    formId: `review-form-${projectId}`,
+    formType: initialReview ? "review-update" : "review-submission",
+  });
+  const captcha = useFormCaptcha({
+    action: "review_submit",
+    enabled: requiresCaptcha || dailyReviewCount > 0,
+  });
 
   const {
     register,
@@ -55,7 +69,30 @@ export default function ReviewForm({
   const comment = watch("comment");
 
   const onSubmitForm = async (data: ReviewFormData) => {
-    onSubmit(data);
+    conversion.trackSubmitAttempt();
+    setCaptchaError(null);
+
+    let captchaToken: string | undefined;
+    if (requiresCaptcha) {
+      const result = await captcha.runCaptcha();
+      const validation = captcha.validateOnSubmit(result);
+      if (!validation.valid) {
+        setCaptchaError(validation.message);
+        conversion.trackFailure("captcha_failed");
+        return;
+      }
+      captchaToken = result.token ?? undefined;
+    }
+
+    try {
+      onSubmit({
+        ...data,
+        captchaToken,
+      });
+      conversion.trackSuccess({ project_id: projectId });
+    } catch {
+      conversion.trackFailure("submit_error");
+    }
   };
 
   return (
@@ -66,7 +103,11 @@ export default function ReviewForm({
         reset();
       }}
     >
-      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
+      <form
+        onSubmit={handleSubmit(onSubmitForm)}
+        onFocusCapture={() => conversion.trackStart()}
+        className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
+      >
         <div className="flex justify-between items-center">
           <div>
             <h3 className="text-xl font-bold">{initialReview ? "Edit Review" : "Add Review"}</h3>
@@ -103,8 +144,6 @@ export default function ReviewForm({
                   id={`${ratingGroupId}-${star}`}
                   {...register("rating", { valueAsNumber: true })}
                   onClick={() => {
-                    // Manually set the value since register doesn't work with onClick
-                    const event = new Event("change", { bubbles: true });
                     const input = document.querySelector(
                       `input[name="rating"][value="${star}"]`
                     ) as HTMLInputElement;
@@ -118,13 +157,6 @@ export default function ReviewForm({
                       ? "bg-yellow-500 text-white shadow-lg shadow-yellow-500/20"
                       : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
                   }`}
-                  onMouseDown={() => {
-                    // Use a hidden input to properly register the value
-                    const hiddenInput = document.createElement("input");
-                    hiddenInput.type = "hidden";
-                    hiddenInput.name = "rating";
-                    hiddenInput.value = String(star);
-                  }}
                 >
                   <Star className="w-5 h-5 fill-current" />
                 </button>
@@ -158,6 +190,19 @@ export default function ReviewForm({
             </div>
           </div>
         </div>
+
+        {requiresCaptcha && (
+          <FormCaptcha
+            mode={captcha.mode}
+            challenge={captcha.challenge}
+            accessibleAnswer={captcha.accessibleAnswer}
+            onAnswerChange={captcha.setAccessibleAnswer}
+            onUseAccessible={captcha.useAccessibleAlternative}
+            onRequestChallenge={captcha.requestChallenge}
+            loading={captcha.loading}
+            error={captchaError}
+          />
+        )}
 
         <div className="flex gap-3">
           <button

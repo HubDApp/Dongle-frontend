@@ -237,6 +237,29 @@ export default function ProjectForm({
     walletAddress: publicKey,
   });
   const [draftRestored, setDraftRestored] = React.useState(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+
+  const formType = mode === "edit" ? "project-edit" : "project-submission";
+  const conversion = useFormConversion({
+    formId: "project-form",
+    formType,
+  });
+  const captcha = useFormCaptcha({ action: "project_submit" });
+  const heatmap = useFormHeatmap({ formId: "project-form", formType });
+  const sessionRecording = useFormSessionRecording({
+    formId: "project-form",
+    formType,
+    autoStart: false,
+  });
+
+  const bindFormRef = useCallback(
+    (node: HTMLFormElement | null) => {
+      heatmap.formRef(node);
+      sessionRecording.formRef(node);
+    },
+    [heatmap.formRef, sessionRecording.formRef],
+  );
 
   const defaultFormValues: ProjectFormValues = {
     name: initialData?.name || "",
@@ -387,6 +410,9 @@ export default function ProjectForm({
         });
 
         if (result) {
+          conversion.trackSuccess({ mode, project_id: projectId ?? null });
+          heatmap.captureSnapshot();
+          sessionRecording.stop();
           if (mode !== "edit") {
             const qualityScore = computeQualityScore(cleanedPayload);
             try {
@@ -493,6 +519,9 @@ export default function ProjectForm({
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
         }, error);
+        conversion.trackFailure(
+          error instanceof Error ? error.name || "Error" : "unknown",
+        );
         trackProjectSubmit({
           success: false,
           mode,
@@ -553,8 +582,20 @@ export default function ProjectForm({
     [executeSubmit, mode, projectId, experiment],
   );
 
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    void handleSubmit(onPreSubmit)(event);
+  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    conversion.trackSubmitAttempt();
+    setCaptchaError(null);
+
+    const token = await captcha.runCaptcha();
+    const validation = captcha.validateOnSubmit(token);
+    if (!validation.valid) {
+      setCaptchaError(validation.message);
+      conversion.trackFailure("captcha_failed");
+      return;
+    }
+
+    void handleSubmit(onPreSubmit)();
   };
 
   const handleExportPdf = () => {
@@ -663,7 +704,18 @@ export default function ProjectForm({
         </div>
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <div className="relative">
+      <form
+        ref={bindFormRef}
+        onSubmit={handleFormSubmit}
+        onFocusCapture={() => conversion.trackStart()}
+        className="space-y-6"
+      >
+        <FormHeatmapOverlay
+          cells={heatmap.cells}
+          problemAreas={heatmap.problemAreas}
+          visible={showHeatmap}
+        />
         {draftRestored && (
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
@@ -933,6 +985,44 @@ export default function ProjectForm({
           />
         </div>
 
+        <FormCaptcha
+          mode={captcha.mode}
+          challenge={captcha.challenge}
+          accessibleAnswer={captcha.accessibleAnswer}
+          onAnswerChange={captcha.setAccessibleAnswer}
+          onUseAccessible={captcha.useAccessibleAlternative}
+          onRequestChallenge={captcha.requestChallenge}
+          loading={captcha.loading}
+          error={captchaError}
+        />
+
+        <FormSessionRecordingControls
+          consented={sessionRecording.consented}
+          onEnable={sessionRecording.enableRecording}
+          onDisable={sessionRecording.disableRecording}
+          recordings={sessionRecording.recordings}
+          playing={sessionRecording.playing}
+          playbackFrame={sessionRecording.playbackFrame}
+          onPlay={(rec) => sessionRecording.startPlayback(rec)}
+          onStopPlayback={sessionRecording.stopPlayback}
+        />
+
+        <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              heatmap.captureSnapshot();
+              setShowHeatmap((v) => !v);
+            }}
+          >
+            {showHeatmap ? "Hide" : "Show"} interaction heatmap
+          </button>
+          <span>
+            Scroll depth: {Math.round((heatmap.snapshot?.maxScrollDepth ?? 0) * 100)}%
+          </span>
+        </div>
+
         <Button
           type="submit"
           isLoading={isSubmitting || isInProgress}
@@ -984,6 +1074,7 @@ export default function ProjectForm({
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
         </p>
       </form>
+      </div>
 
       <ConfirmDialog
         isOpen={duplicateWarning.isOpen}
