@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { X, Star } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
@@ -29,6 +30,7 @@ interface ReviewFormProps {
 export default function ReviewForm({
   projectId,
   projectName,
+  userAddress,
   initialReview,
   dailyReviewCount = 0,
   requiresCaptcha = false,
@@ -67,6 +69,18 @@ export default function ReviewForm({
 
   const rating = watch("rating");
   const comment = watch("comment");
+
+  // Form audit logging — records field changes with a timestamp, the acting
+  // review author, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "review-form",
+    formType: initialReview ? "review-edit" : "review-create",
+    actor: userAddress,
+  });
+
+  useEffect(() => {
+    trackAuditValues({ rating, comment });
+  }, [trackAuditValues, rating, comment]);
 
   const onSubmitForm = async (data: ReviewFormData) => {
     conversion.trackSubmitAttempt();

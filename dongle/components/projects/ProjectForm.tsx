@@ -34,6 +34,7 @@ import { FormExportMenu } from "@/components/ui/FormExportMenu";
 import { FormValueComparison } from "@/components/ui/FormValueComparison";
 import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
@@ -229,6 +230,14 @@ export default function ProjectForm({
   const { publicKey } = useWallet();
   const { t, locale } = useTranslation();
 
+  // Form audit logging — records every field change with a timestamp, the
+  // acting wallet identity, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "project-form",
+    formType: mode === "edit" ? "project-edit" : "project-create",
+    actor: publicKey,
+  });
+
   // Draft management – passes wallet address so drafts sync to the server
   const draft = useDraft({
     mode,
@@ -354,6 +363,12 @@ export default function ProjectForm({
     if (rule.required) return base;
     return optionalFallback ? `${base} (Optional)` : base;
   };
+
+  // Audit each field change (baseline is captured on the first render).
+  useEffect(() => {
+    trackAuditValues(watchedValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(watchedValues), trackAuditValues]);
 
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning

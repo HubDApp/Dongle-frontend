@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { extractClientIP, hashClientIP } from "@/lib/request-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ function extractClientIP(request: NextRequest): string {
 export async function GET(request: NextRequest) {
   try {
     const clientIP = extractClientIP(request);
-    const ipHash = hashIP(clientIP);
+    const ipHash = hashClientIP(clientIP);
 
     return NextResponse.json({
       ipHash,

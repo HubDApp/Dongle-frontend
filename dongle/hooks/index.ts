@@ -6,6 +6,8 @@ export { useDiscoverParams } from "./useDiscoverParams";
 export type { SortBy, DiscoverParams, DiscoverParamsActions } from "./useDiscoverParams";
 export { useDraft } from "./useDraft";
 export { useErrorMapper } from "./useErrorMapper";
+export { useFormAuditLog } from "./useFormAuditLog";
+export type { UseFormAuditLogOptions, FormAuditLogHandle, LogActionExtras } from "./useFormAuditLog";
 export { useModalForm } from "./useModalForm";
 export { useOnChainTransaction } from "./useOnChainTransaction";
 export { useOnlineStatus } from "./useOnlineStatus";
