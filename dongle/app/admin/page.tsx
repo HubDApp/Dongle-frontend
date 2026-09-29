@@ -6,7 +6,7 @@ import {
   ProjectSubmission,
 } from "@/types/project";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletGate from "@/components/wallet/WalletGate";
@@ -53,6 +53,8 @@ import AuditLogViewer from "@/components/admin/AuditLogViewer";
 import { ReviewModerationQueue } from "@/components/moderation/ReviewModerationQueue";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
+import { SubmissionSearchPanel } from "@/components/search/SubmissionSearchPanel";
+import { applySubmissionFilters, type SubmissionSearchFilters } from "@/utils/submission-search.util";
 
 import DuplicateMergeModal from "@/components/admin/DuplicateMergeModal";
 import MergeHistoryViewer from "@/components/admin/MergeHistoryViewer";
@@ -229,6 +231,15 @@ export default function AdminDashboard() {
   const [submissionReason, setSubmissionReason] = useState<Record<string, string>>({});
   const [verificationFilter, setVerificationFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
   const [reportFilter, setReportFilter] = useState<"all" | "assigned-to-me" | "unassigned">("all");
+  const [submissionFilters, setSubmissionFilters] = useState<SubmissionSearchFilters>({
+    query: "",
+    status: "all",
+    submittedFrom: undefined,
+    submittedTo: undefined,
+    qualityScoreMin: undefined,
+    qualityScoreMax: undefined,
+    flaggedOnly: false,
+  });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
@@ -723,6 +734,10 @@ export default function AdminDashboard() {
   const pendingSubmissions = submissions.filter(
     (s) => s.status === "pending" || s.status === "flagged",
   );
+  const filteredSubmissions = useMemo(
+    () => applySubmissionFilters(submissions, submissionFilters),
+    [submissions, submissionFilters],
+  );
   const pendingReports = reports.filter((r) => r.status === "pending");
   const resolvedReports = reports.filter((r) => r.status !== "pending");
   const pendingProjectReports = projectReports.filter((report) => report.status === "pending");
@@ -1172,6 +1187,11 @@ export default function AdminDashboard() {
               <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
                 <Package className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
                 <p className="text-zinc-500">No project submissions to review yet.</p>
+              </div>
+            ) : filteredSubmissions.length === 0 ? (
+              <div className="text-center py-12 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
+                <Package className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                <p className="text-zinc-500">No submissions match your search criteria.</p>
               </div>
             ) : (
               <div className="space-y-4">
