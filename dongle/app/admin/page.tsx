@@ -11,9 +11,6 @@ import { toast } from "sonner";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
-import WalletStatePanel, {
-  WalletStateLoadingPanel,
-} from "@/components/wallet/WalletStatePanel";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
@@ -33,6 +30,11 @@ import {
   UserPlus,
   X,
   XCircle,
+  GitMerge,
+  Sliders,
+  FlaskConical,
+  Sparkles,
+  MapPin,
 } from "lucide-react";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
@@ -46,12 +48,28 @@ import {
   type VerificationRequest,
 } from "@/services/stellar/verification.service";
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
+import type { Project } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 import { ReviewModerationQueue } from "@/components/moderation/ReviewModerationQueue";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { SubmissionSearchPanel } from "@/components/search/SubmissionSearchPanel";
 import { applySubmissionFilters, type SubmissionSearchFilters } from "@/utils/submission-search.util";
+
+import DuplicateMergeModal from "@/components/admin/DuplicateMergeModal";
+import MergeHistoryViewer from "@/components/admin/MergeHistoryViewer";
+import EnrichmentDetailsModal from "@/components/admin/EnrichmentDetailsModal";
+import SegmentationDashboard from "@/components/admin/SegmentationDashboard";
+import SegmentFilter from "@/components/admin/SegmentFilter";
+import ExperimentAnalyticsView from "@/components/admin/ExperimentAnalyticsView";
+import { findDuplicates } from "@/services/form-deduplication";
+import { enrichFormData, type FormEnrichmentResult } from "@/services/form-enrichment";
+import {
+  getAllSegments,
+  getSegmentsForProject,
+  autoAssignSegments,
+  type SubmissionSegment,
+} from "@/services/form-segmentation";
 
 type BulkAction = "approve" | "reject" | "archive" | "assign";
 
@@ -162,8 +180,41 @@ export default function AdminDashboard() {
   });
   const [fee, setFee] = useState(1.5);
   const [activeTab, setActiveTab] = useState<
-    "verification" | "submissions" | "reports" | "claims" | "audit-log" | "spam-queue"
+    | "verification"
+    | "submissions"
+    | "reports"
+    | "claims"
+    | "audit-log"
+    | "spam-queue"
+    | "merges"
+    | "segments"
+    | "experiments"
   >("verification");
+
+  // Segmentation state
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+
+  // Deduplication & Merge modal state
+  const [mergeModalState, setMergeModalState] = useState<{
+    isOpen: boolean;
+    targetProject: Project | null;
+    sourceProject: Project | null;
+  }>({
+    isOpen: false,
+    targetProject: null,
+    sourceProject: null,
+  });
+
+  // Form Enrichment modal state
+  const [enrichmentModalState, setEnrichmentModalState] = useState<{
+    isOpen: boolean;
+    result: FormEnrichmentResult | null;
+    projectName: string;
+  }>({
+    isOpen: false,
+    result: null,
+    projectName: "",
+  });
   const [reports, setReports] = useState<ReviewReport[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
@@ -204,6 +255,49 @@ export default function AdminDashboard() {
   const reloadSubmissions = useCallback(() => {
     setSubmissions(projectSubmissionService.getAllSubmissions());
   }, []);
+
+  const handleCheckDuplicates = (submission: ProjectSubmission) => {
+    const existingProject = projectService.getProjectById(submission.projectId) || {
+      id: submission.projectId,
+      name: submission.projectName,
+      primaryCategory: "DeFi / DEX" as any,
+      description: "",
+      rating: 0,
+      reviews: 0,
+      createdAt: submission.submittedAt,
+    };
+
+    const result = findDuplicates({
+      id: submission.projectId,
+      name: submission.projectName,
+    });
+
+    if (result.candidates.length > 0) {
+      setMergeModalState({
+        isOpen: true,
+        targetProject: existingProject as Project,
+        sourceProject: result.candidates[0].project,
+      });
+    } else {
+      toast.info(`No duplicate candidates detected for "${submission.projectName}".`);
+    }
+  };
+
+  const handleEnrichSubmission = async (submission: ProjectSubmission) => {
+    const project = projectService.getProjectById(submission.projectId);
+    const result = await enrichFormData({
+      companyName: submission.projectName,
+      domainOrWebsite: project?.websiteUrl || `${submission.projectId}.org`,
+      contractAddresses: project?.contractAddresses,
+      description: project?.description,
+      githubUrl: project?.githubUrl,
+    });
+    setEnrichmentModalState({
+      isOpen: true,
+      result,
+      projectName: submission.projectName,
+    });
+  };
 
   // Load reports, reviews, verification requests, and moderation log
   useEffect(() => {
@@ -664,19 +758,6 @@ export default function AdminDashboard() {
           pagePurpose={ADMIN_PURPOSE}
           loadingMessage="Verifying wallet access..."
         />
-        {isAdminChecking || gate.state === "account-loading" ? (
-          <WalletStateLoadingPanel message="Verifying admin access..." />
-        ) : (
-          <WalletStatePanel
-            state={gate.state}
-            pagePurpose={ADMIN_PURPOSE}
-            walletNetworkLabel={gate.walletNetworkLabel}
-            publicKey={gate.publicKey}
-            onConnect={gate.connectWallet}
-            onDisconnect={gate.disconnectWallet}
-            onRetry={gate.retryAccountLoad}
-          />
-        )}
       </div>
     );
   }
@@ -808,6 +889,48 @@ export default function AdminDashboard() {
             <ScrollText className="w-4 h-4" />
             Audit Log
             {activeTab === "audit-log" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("segments")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "segments"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            Segments
+            {activeTab === "segments" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("merges")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "merges"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <GitMerge className="w-4 h-4" />
+            Duplicates & Merges
+            {activeTab === "merges" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("experiments")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "experiments"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <FlaskConical className="w-4 h-4" />
+            A/B Experiments
+            {activeTab === "experiments" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -1051,15 +1174,14 @@ export default function AdminDashboard() {
               </h2>
             </div>
 
-            <SubmissionSearchPanel
-              filters={submissionFilters}
-              submissions={filteredSubmissions}
-              filteredCount={filteredSubmissions.length}
-              totalCount={submissions.length}
-              onFiltersChange={(updates) =>
-                setSubmissionFilters((prev) => ({ ...prev, ...updates }))
-              }
-            />
+            {/* Segment Filter */}
+            <div className="pt-1">
+              <SegmentFilter
+                segments={getAllSegments()}
+                selectedSegmentId={selectedSegmentId}
+                onSelectSegment={setSelectedSegmentId}
+              />
+            </div>
 
             {submissions.length === 0 ? (
               <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
@@ -1073,14 +1195,25 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredSubmissions.map((submission) => (
+                {submissions
+                  .filter((sub) => {
+                    if (!selectedSegmentId) return true;
+                    const assigned = getSegmentsForProject(sub.projectId, sub);
+                    return assigned.some((s) => s.id === selectedSegmentId);
+                  })
+                  .map((submission) => {
+                    const assignedSegments = getSegmentsForProject(submission.projectId, submission);
+
+                    return (
                   <div
                     key={submission.id}
                     className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl"
                   >
                     <div className="flex flex-col md:flex-row justify-between gap-4">
                       <div className="flex-1">
-                        <h3 className="font-bold text-lg mb-1">{submission.projectName}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-bold text-lg">{submission.projectName}</h3>
+                        </div>
                         <p className="text-xs text-zinc-400 font-mono mb-2">{submission.projectId}</p>
                         <div className="text-xs text-zinc-500 flex items-center gap-1.5 flex-wrap mb-3">
                           <span>Submitted by:</span>
@@ -1095,11 +1228,21 @@ export default function AdminDashboard() {
                           <span className="text-zinc-300 dark:text-zinc-700">•</span>
                           <span>Quality: {submission.qualityScore}%</span>
                         </div>
-                        <span
-                          className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${SUBMISSION_STATUS_STYLES[submission.status]}`}
-                        >
-                          {submission.status}
-                        </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${SUBMISSION_STATUS_STYLES[submission.status]}`}
+                          >
+                            {submission.status}
+                          </span>
+                          {assignedSegments.map((seg) => (
+                            <span
+                              key={seg.id}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${seg.badgeBg} ${seg.badgeText}`}
+                            >
+                              {seg.name}
+                            </span>
+                          ))}
+                        </div>
                         {submission.flagReasons.length > 0 && (
                           <ul className="mt-3 text-xs text-orange-600 dark:text-orange-400 space-y-1">
                             {submission.flagReasons.map((flag) => (
@@ -1112,6 +1255,26 @@ export default function AdminDashboard() {
                             Reason: {submission.rejectionReason}
                           </p>
                         )}
+
+                        {/* Enrichment and Deduplication Action Buttons */}
+                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                          <button
+                            type="button"
+                            onClick={() => void handleEnrichSubmission(submission)}
+                            className="px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Enriched Data
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCheckDuplicates(submission)}
+                            className="px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
+                          >
+                            <GitMerge className="w-3.5 h-3.5" />
+                            Check Duplicates / Merge
+                          </button>
+                        </div>
                       </div>
 
                       {(submission.status === "pending" || submission.status === "flagged") && (
@@ -1168,7 +1331,8 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </div>
-                ))}
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -1978,7 +2142,61 @@ export default function AdminDashboard() {
         {activeTab === "spam-queue" && gate.publicKey && (
           <ReviewModerationQueue moderatorAddress={gate.publicKey} />
         )}
+
+        {activeTab === "segments" && (
+          <SegmentationDashboard
+            submissions={submissions}
+            selectedSegmentId={selectedSegmentId}
+            onSelectSegment={setSelectedSegmentId}
+          />
+        )}
+
+        {activeTab === "merges" && (
+          <MergeHistoryViewer
+            currentUserAddress={gate.publicKey || "admin_moderator"}
+          />
+        )}
+
+        {activeTab === "experiments" && (
+          <ExperimentAnalyticsView />
+        )}
       </div>
+
+      {/* Duplicate Merge Conflict Resolution Modal */}
+      {mergeModalState.isOpen && mergeModalState.targetProject && mergeModalState.sourceProject && (
+        <DuplicateMergeModal
+          isOpen={mergeModalState.isOpen}
+          targetProject={mergeModalState.targetProject}
+          sourceProject={mergeModalState.sourceProject}
+          currentUserAddress={gate.publicKey || "admin_moderator"}
+          onClose={() =>
+            setMergeModalState({
+              isOpen: false,
+              targetProject: null,
+              sourceProject: null,
+            })
+          }
+          onMergeSuccess={() => {
+            reloadSubmissions();
+          }}
+        />
+      )}
+
+      {/* Form Data Enrichment Details Modal */}
+      {enrichmentModalState.isOpen && enrichmentModalState.result && (
+        <EnrichmentDetailsModal
+          isOpen={enrichmentModalState.isOpen}
+          enrichment={enrichmentModalState.result}
+          projectName={enrichmentModalState.projectName}
+          onClose={() =>
+            setEnrichmentModalState({
+              isOpen: false,
+              result: null,
+              projectName: "",
+            })
+          }
+        />
+      )}
     </div>
   );
 }
