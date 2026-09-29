@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import LanguageSelector from "@/components/i18n/LanguageSelector";
 import { useDynamicForm } from "@/hooks/useDynamicForm";
 import { useFormKeyboardNav } from "@/hooks/useFormKeyboardNav";
+import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
 import {
   resolveFormDescription,
   resolveFormTitle,
@@ -21,7 +22,7 @@ export function DynamicFormBuilder() {
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Ref for the <form> element — used by keyboard nav and (optionally) audit
+  // Ref for the <form> element — used by keyboard nav and focus management
   const formRef = useRef<HTMLFormElement>(null);
 
   // Keyboard navigation: Enter advances fields, Escape resets the form
@@ -34,6 +35,18 @@ export function DynamicFormBuilder() {
       }
     },
   });
+
+  // Focus management: logical focus order, visible indicator, SR announcements
+  const focusMgr = useFormFocusManagement(formRef);
+
+  // When the form becomes ready, move focus to the first field
+  useEffect(() => {
+    if (form.ready) {
+      // Small delay so the DOM has finished rendering sections
+      const timer = setTimeout(() => focusMgr.focusFirstField(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [form.ready, focusMgr]);
 
   const displaySchema = useMemo(() => {
     if (viewingVersion == null) return form.schema;
@@ -51,11 +64,26 @@ export function DynamicFormBuilder() {
     setSubmitting(true);
     const result = form.submit();
     setSubmitting(false);
-    if (result.success) {
-      router.push(
-        `/forms/confirmation?c=${encodeURIComponent(result.submission.confirmationNumber)}`,
-      );
+
+    if (!result.success) {
+      // Move focus to first invalid field and announce the error count
+      setTimeout(() => {
+        focusMgr.focusNextError();
+        const count = result.errors?.length ?? 0;
+        focusMgr.announceToSR(
+          count === 1
+            ? "1 field requires attention."
+            : `${count} fields require attention.`,
+          "assertive",
+        );
+      }, 0);
+      return;
     }
+
+    focusMgr.announceToSR("Form submitted successfully.", "polite");
+    router.push(
+      `/forms/confirmation?c=${encodeURIComponent(result.submission.confirmationNumber)}`,
+    );
   };
 
   if (!form.ready) {
@@ -113,7 +141,14 @@ export function DynamicFormBuilder() {
         ) : null}
 
         {/*
-         * Keyboard navigation is wired via useFormKeyboardNav:
+         * Focus management (Issue #528):
+         *   • Focus moves logically via DOM order (natural tab order)
+         *   • :focus-visible indicator defined in globals.css
+         *   • Focus trap in modals handled by useModalFocusTrap (existing hook)
+         *   • Escape exits focus trap (handled in useModalFocusTrap)
+         *   • SR announcements via hidden aria-live regions (useFormFocusManagement)
+         *
+         * Keyboard navigation (Issue #527):
          *   Tab / Shift+Tab  — moves to next/previous field (native)
          *   Arrow keys        — handled natively by <select> elements
          *   Enter             — advances to next field; on last field focuses submit
