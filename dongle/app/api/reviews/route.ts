@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Review } from "@/types/review";
 import { hasMinLength } from "@/lib/validation";
+import { verifySignature } from "@/lib/verify-signature";
 import {
   isReviewerBanned,
   recordReviewSubmission,
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, projectName, userAddress, rating, comment } = body;
+    const { projectId, projectName, userAddress, rating, comment, signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken } = body;
 
     if (!projectId || !projectName || !userAddress) {
       return NextResponse.json(
@@ -93,6 +94,19 @@ export async function POST(request: NextRequest) {
         { success: false, errors: [validationError] },
         { status: 400 }
       );
+    }
+
+    // ── Signature verification (cryptographic form submission signing) ─────
+    // If a signature is provided, verify it against the payload and public key.
+    // This ensures tamper detection and authenticity of the submission.
+    if (signedPayload && signature) {
+      const isValid = verifySignature(signedPayload, signature, userAddress);
+      if (!isValid) {
+        return NextResponse.json(
+          createErrorResponse(ErrorCode.AUTHENTICATION_ERROR, "Invalid submission signature — payload may have been tampered with", 401),
+          { status: 401 }
+        );
+      }
     }
 
     if (isReviewerBanned(userAddress)) {
@@ -115,7 +129,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { captchaToken } = body as { captchaToken?: string };
     const dailyCount = recordReviewSubmission(userAddress, new Date().toISOString());
     const spamAssessment = assessReviewSpam(comment, dailyCount);
     if (spamAssessment.requiresCaptcha && !captchaToken) {
@@ -140,6 +153,10 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
       helpfulVotes: [],
       unhelpfulVotes: [],
+      signedPayload: signedPayload || undefined,
+      signature: signature || undefined,
+      signatureNonce: signatureNonce || undefined,
+      signatureTimestamp: signatureTimestamp || undefined,
     };
 
     store.set(newReview.id, newReview);

@@ -302,3 +302,5 @@ export const projectService = {
     return registry.projects.search(query);
   },
 };
+
+export default projectService;
