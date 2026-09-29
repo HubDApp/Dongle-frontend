@@ -1,10 +1,22 @@
-import DOMPurify from "isomorphic-dompurify";
+import DOMPurifyModule from "isomorphic-dompurify";
+const DOMPurify = (DOMPurifyModule as any).default || DOMPurifyModule;
+
+/**
+ * Interface representing the result of a detailed URL validation.
+ */
+export interface UrlValidationResult {
+  isValid: boolean;
+  normalizedUrl?: string;
+  domain?: string;
+  error?: string;
+}
 
 /**
  * HTML entity encodes characters to safely render strings in HTML attributes or text.
  * Escapes &, <, >, ", ', and `
  */
 export function encodeUrlForHtml(urlStr: string): string {
+  if (!urlStr || typeof urlStr !== "string") return "";
   return urlStr
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -18,7 +30,8 @@ export function encodeUrlForHtml(urlStr: string): string {
  * Decodes basic HTML entities and removes hidden control/whitespace characters
  * to prevent protocol obfuscation bypasses (e.g. java\0script:, javascript&#x3A;).
  */
-function decodeAndSanitizeRawString(input: string): string {
+export function decodeAndSanitizeRawString(input: string): string {
+  if (!input || typeof input !== "string") return "";
   // Strip control characters, null bytes, tabs, and line breaks
   let cleaned = input.replace(/[\x00-\x1F\x7F-\x9F\r\n\t]/g, "").trim();
 
@@ -35,9 +48,35 @@ function decodeAndSanitizeRawString(input: string): string {
 }
 
 /**
+ * Removes trailing slashes from a URL string, path, or domain.
+ * If the path is only "/", it strips the trailing slash.
+ */
+export function removeTrailingSlash(urlStr: string): string {
+  if (!urlStr || typeof urlStr !== "string") return "";
+  const trimmed = urlStr.trim();
+  // Don't strip if it's just "http://" or "https://"
+  if (/^https?:\/\/$/i.test(trimmed)) return trimmed;
+  return trimmed.replace(/\/+$/, "");
+}
+
+/**
+ * Ensures a URL string has an explicit protocol (defaulting to https://).
+ * If no scheme is present, prepends the given protocol.
+ */
+export function addProtocolIfMissing(urlStr: string, defaultProtocol = "https://"): string {
+  if (!urlStr || typeof urlStr !== "string") return "";
+  const trimmed = urlStr.trim();
+  if (/^[a-z0-9+-.]+:\/\//i.test(trimmed) || /^[a-z0-9+-.]+:$/i.test(trimmed) || /^[a-z0-9+-.]+:[^/]/i.test(trimmed)) {
+    return trimmed;
+  }
+  const cleanProtocol = defaultProtocol.endsWith("://") ? defaultProtocol : `${defaultProtocol}://`;
+  return `${cleanProtocol}${trimmed}`;
+}
+
+/**
  * Normalizes, sanitizes with DOMPurify, and validates a URL string.
  * Supports protocols: http, https. Rejects unsafe protocols (javascript:, data:, vbscript:, file:, etc.).
- * Automatically prepends https:// if no protocol is present.
+ * Automatically prepends https:// if no protocol is present and removes trailing slashes on standard root paths.
  */
 export function normalizeUrl(urlStr: string): string {
   if (!urlStr || typeof urlStr !== "string") {
@@ -97,6 +136,45 @@ export function normalizeUrl(urlStr: string): string {
   }
 
   return normalized;
+}
+
+/**
+ * Checks if a string is a valid HTTP or HTTPS URL (with or without protocol prefix).
+ * Returns true if valid, false for invalid structure, unsupported protocols, or empty input.
+ */
+export function isValidUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== "string" || !urlStr.trim()) {
+    return false;
+  }
+  try {
+    normalizeUrl(urlStr);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates a URL and returns a detailed diagnostics object.
+ */
+export function validateUrl(urlStr: string): UrlValidationResult {
+  if (!urlStr || typeof urlStr !== "string" || !urlStr.trim()) {
+    return { isValid: false, error: "URL cannot be empty" };
+  }
+  try {
+    const normalized = normalizeUrl(urlStr);
+    const domain = extractDomain(normalized);
+    return {
+      isValid: true,
+      normalizedUrl: normalized,
+      domain,
+    };
+  } catch (err: any) {
+    return {
+      isValid: false,
+      error: err?.message || "Invalid URL",
+    };
+  }
 }
 
 /**
