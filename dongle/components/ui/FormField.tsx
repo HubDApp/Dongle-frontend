@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { FieldValues, Path, UseFormRegister, UseFormRegisterReturn } from "react-hook-form";
 import { Input } from "./Input";
+import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
+import type { PasteEvent } from "@/hooks/useFormPasteDetection";
 
 interface FormFieldProps<TFieldValues extends FieldValues = FieldValues>
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name"> {
@@ -27,6 +29,19 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
     const internalRef = useRef<HTMLInputElement | null>(null);
     const [charCount, setCharCount] = useState(0);
 
+    // -----------------------------------------------------------------------
+    // Paste detection (Issue #517)
+    // -----------------------------------------------------------------------
+    const { createPasteHandler } = useFormPasteDetection({
+      onPaste: onPasteDetected,
+      preventDefaultPaste,
+    });
+
+    const handlePaste = createPasteHandler(name ?? label);
+
+    // -----------------------------------------------------------------------
+    // Character counter
+    // -----------------------------------------------------------------------
     const syncCharCount = useCallback(() => {
       if (typeof value === "string") {
         setCharCount(value.length);
@@ -74,11 +89,12 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
     const isAtLimit = Boolean(maxLength && charCount === maxLength);
     const isOverLimit = Boolean(maxLength && charCount > maxLength);
 
-    const counterClass = isOverLimit || isAtLimit
-      ? "text-red-500 font-semibold"
-      : isNearLimit
-      ? "text-amber-500 font-medium"
-      : "text-zinc-500";
+    const counterClass =
+      isOverLimit || isAtLimit
+        ? "text-red-500 font-semibold"
+        : isNearLimit
+        ? "text-amber-500 font-medium"
+        : "text-zinc-500";
 
     const displayError = error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined);
 
@@ -117,7 +133,15 @@ export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
           required={required}
           aria-required={required || undefined}
           aria-invalid={displayError || isAtLimit || isOverLimit ? true : undefined}
-          aria-describedby={[displayError ? errorId : "", maxLength && showCounter ? counterId : "", helperText ? helperId : ""].filter(Boolean).join(" ") || undefined}
+          aria-describedby={
+            [
+              displayError ? errorId : "",
+              maxLength && showCounter ? counterId : "",
+              helperText ? helperId : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className={className}
         />
         {displayError && (
