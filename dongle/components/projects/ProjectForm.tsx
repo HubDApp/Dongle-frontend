@@ -44,6 +44,13 @@ import {
 } from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
+import {
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
+  trackFormFieldChange,
+  trackFormAbandon,
+} from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
 import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -401,6 +408,10 @@ export default function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues), trackAuditValues]);
 
+  // Track field changes for completion-rate analytics.
+  const submittedRef = React.useRef(false);
+  const prevTouchedRef = React.useRef(0);
+
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
   // that fires when RHF's watch callback is passed into a memoized hook.
@@ -431,6 +442,25 @@ export default function ProjectForm({
       if (customOnSubmit) {
         return customOnSubmit(payload);
       }
+
+      const fieldCount = Object.keys(payload).filter((k) => {
+        const v = (payload as Record<string, unknown>)[k];
+        return v !== undefined && v !== null && v !== "";
+      }).length;
+
+      // Track GDPR consent on submit
+      const userId = publicKey ?? "anonymous";
+      const consentRecord = gdprService.getConsentStatus("project", projectId ?? "new", userId);
+      if (consentRecord && consentRecord.consentGiven) {
+        trackConsentGiven({
+          formType: "project",
+          formId: projectId ?? "new",
+          userId,
+          purposes: consentRecord.purposes,
+        });
+      }
+
+      trackFormSubmit({ formType: "project", fieldCount, walletAddress: publicKey });
 
       setIsSubmitting(true);
       try {
@@ -1184,6 +1214,19 @@ export default function ProjectForm({
           {mode === "edit"
             ? "By updating, you agree to have your project details updated on the Stellar network."
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
+        </p>
+
+        <GDPRConsent
+          formType="project"
+          formId={projectId ?? "new"}
+          userId={publicKey ?? "anonymous"}
+          purposes={["form_submission", "data_processing", "backup"]}
+        />
+
+        <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <Link href="/privacy-policy" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+            Privacy Policy
+          </Link>
         </p>
       </form>
       </div>
