@@ -50,6 +50,22 @@ export {
 } from "./branching";
 
 export {
+  DEFAULT_MAX_ARRAY_ITEMS,
+  addArrayItem,
+  moveArrayItemDown,
+  moveArrayItemUp,
+  removeArrayItem,
+  reorderArrayItem,
+  setArrayFieldValue,
+  toFieldValidationErrors,
+  validateArrayField,
+} from "./array-field";
+export type {
+  ArrayFieldValidationResult,
+  ArrayItemError,
+} from "./array-field";
+
+export {
   buildAnswerSummaryLabels,
   resolveFieldCopy,
   resolveFormDescription,

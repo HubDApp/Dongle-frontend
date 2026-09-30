@@ -15,7 +15,9 @@ export type FormFieldType =
   | "select"
   | "radio"
   | "checkbox"
-  | "boolean";
+  | "boolean"
+  /** Repeating list of primitive items; see `array-field.ts`. */
+  | "array";
 
 export type BranchOperator =
   | "equals"
@@ -60,6 +62,9 @@ export interface FormFieldValidation {
   min?: number;
   max?: number;
   pattern?: string;
+  /** Array fields only: bounds on the number of items, not item content. */
+  minItems?: number;
+  maxItems?: number;
   /** Localized validation / error messages keyed by rule name. */
   messages?: {
     required?: LocalizedText;
