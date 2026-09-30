@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import type { FormFieldDefinition, FormAnswers } from "@/services/form-builder";
 import { resolveFieldCopy } from "@/services/form-builder";
 import type { LocaleCode } from "@/lib/i18n/locales";
+import { ClearButton } from "@/components/ui/ClearButton";
 
 interface FormFieldInputProps {
   field: FormFieldDefinition;
@@ -123,6 +124,35 @@ export function FormFieldInput({
   const hintId = `${inputId}-hint`;
   const charId = `${inputId}-char`;
 
+  // Track focus state for showing clear button
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+
+  // Determine if field has a clearable value
+  const hasValue = useMemo(() => {
+    if (typeof value === "string") return value.length > 0;
+    if (typeof value === "number") return true;
+    if (typeof value === "boolean") return value;
+    return false;
+  }, [value]);
+
+  // Handler to clear field value and reset validation
+  const handleClear = () => {
+    // Clear the value based on field type
+    if (field.type === "number") {
+      onChange(undefined);
+    } else if (field.type === "boolean" || field.type === "checkbox") {
+      onChange(false);
+    } else {
+      onChange("");
+    }
+    
+    // Refocus the input after clearing
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   // Real-time derived inline hints
   const currentLength =
     typeof value === "string" ? value.length : 0;
@@ -150,20 +180,45 @@ export function FormFieldInput({
     "aria-describedby": ariaDescribedBy,
     className:
       "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100",
+    onFocus: () => setIsFocused(true),
+    onBlur: () => setIsFocused(false),
   };
 
   let control: React.ReactNode;
 
+  // Determine if this field type supports clear button
+  const supportsClearButton =
+    field.type === "text" ||
+    field.type === "email" ||
+    field.type === "textarea" ||
+    field.type === "number";
+
   switch (field.type) {
     case "textarea":
       control = (
-        <textarea
-          {...common}
-          rows={4}
-          placeholder={copy.placeholder}
-          value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <div className="relative">
+          <textarea
+            {...common}
+            ref={(el) => {
+              inputRef.current = el;
+            }}
+            rows={4}
+            placeholder={copy.placeholder}
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {supportsClearButton && (
+            <div className="absolute right-2 top-2">
+              <ClearButton
+                onClear={handleClear}
+                hasValue={hasValue}
+                fieldId={field.id}
+                fieldLabel={copy.label}
+                visible={isFocused || hasValue}
+              />
+            </div>
+          )}
+        </div>
       );
       break;
     case "select":
@@ -212,15 +267,31 @@ export function FormFieldInput({
       break;
     case "number":
       control = (
-        <input
-          {...common}
-          type="number"
-          placeholder={copy.placeholder}
-          value={value === undefined || value === null ? "" : String(value)}
-          onChange={(e) =>
-            onChange(e.target.value === "" ? undefined : Number(e.target.value))
-          }
-        />
+        <div className="relative">
+          <input
+            {...common}
+            ref={(el) => {
+              inputRef.current = el;
+            }}
+            type="number"
+            placeholder={copy.placeholder}
+            value={value === undefined || value === null ? "" : String(value)}
+            onChange={(e) =>
+              onChange(e.target.value === "" ? undefined : Number(e.target.value))
+            }
+          />
+          {supportsClearButton && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <ClearButton
+                onClear={handleClear}
+                hasValue={hasValue}
+                fieldId={field.id}
+                fieldLabel={copy.label}
+                visible={isFocused || hasValue}
+              />
+            </div>
+          )}
+        </div>
       );
       break;
     case "boolean":
@@ -242,24 +313,56 @@ export function FormFieldInput({
       break;
     case "email":
       control = (
-        <input
-          {...common}
-          type="email"
-          placeholder={copy.placeholder}
-          value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <div className="relative">
+          <input
+            {...common}
+            ref={(el) => {
+              inputRef.current = el;
+            }}
+            type="email"
+            placeholder={copy.placeholder}
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {supportsClearButton && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <ClearButton
+                onClear={handleClear}
+                hasValue={hasValue}
+                fieldId={field.id}
+                fieldLabel={copy.label}
+                visible={isFocused || hasValue}
+              />
+            </div>
+          )}
+        </div>
       );
       break;
     default:
       control = (
-        <input
-          {...common}
-          type="text"
-          placeholder={copy.placeholder}
-          value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <div className="relative">
+          <input
+            {...common}
+            ref={(el) => {
+              inputRef.current = el;
+            }}
+            type="text"
+            placeholder={copy.placeholder}
+            value={typeof value === "string" ? value : ""}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {supportsClearButton && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <ClearButton
+                onClear={handleClear}
+                hasValue={hasValue}
+                fieldId={field.id}
+                fieldLabel={copy.label}
+                visible={isFocused || hasValue}
+              />
+            </div>
+          )}
+        </div>
       );
   }
 

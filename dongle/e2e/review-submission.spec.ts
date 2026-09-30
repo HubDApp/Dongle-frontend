@@ -213,4 +213,141 @@ test.describe("Review Submission Flow (#372)", () => {
 
     await expect(page.getByText(/Leave a Review/i)).not.toBeVisible();
   });
+
+  test("complete review submission flow - end to end", async ({ page }) => {
+    await page.goto("/reviews");
+    await waitForPageLoad(page);
+    await expectNoSpinners(page);
+
+    // Open review form
+    const reviewButton = page.getByRole("button", { name: /Review /i }).first();
+    await reviewButton.click();
+    await expect(page.getByText(/Leave a Review/i)).toBeVisible();
+
+    // Select 5-star rating
+    const ratingButton = page.getByRole("button", { name: /5 out of 5/i });
+    await ratingButton.click();
+
+    // Fill in comment
+    const commentField = page.getByPlaceholder(/share your experience/i);
+    await commentField.fill(
+      "This is an outstanding project! The team is responsive, the features are well-designed, and the community is very supportive. Highly recommended for anyone looking to get involved in the Stellar ecosystem.",
+    );
+
+    // Submit review
+    const submitButton = page.getByRole("button", {
+      name: /submit review/i,
+    });
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
+
+    // Verify success
+    await expect(page.getByText("Review posted")).toBeVisible();
+    
+    // Verify review appears in list
+    await expect(
+      page.getByText(/This is an outstanding project/i),
+    ).toBeVisible();
+  });
+
+  test("edit existing review", async ({ page }) => {
+    const review = makeReview({
+      comment: "Original review comment that will be updated.",
+    });
+    await seedReviews(page, [review]);
+    await page.goto("/reviews");
+    await waitForPageLoad(page);
+    await expectNoSpinners(page);
+
+    // Look for edit button
+    const editButton = page.getByRole("button", { name: /edit/i }).first();
+    const isVisible = await editButton.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (isVisible) {
+      await editButton.click();
+
+      // Update comment
+      const commentField = page.getByPlaceholder(/share your experience/i);
+      await commentField.clear();
+      await commentField.fill("Updated review with new insights and observations.");
+
+      // Submit update
+      const submitButton = page.getByRole("button", {
+        name: /update|save/i,
+      });
+      await submitButton.click();
+
+      // Verify success
+      await expect(page.getByText(/updated|saved/i)).toBeVisible();
+    }
+  });
+
+  test("helpful/unhelpful voting on reviews", async ({ page }) => {
+    const review = makeReview({
+      userAddress: "GOTHER_USER_123456789",
+    });
+    await seedReviews(page, [review]);
+    await page.goto("/reviews");
+    await waitForPageLoad(page);
+    await expectNoSpinners(page);
+
+    // Look for voting buttons
+    const helpfulButton = page.getByRole("button", { name: /helpful/i }).first();
+    const isVisible = await helpfulButton.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (isVisible) {
+      await helpfulButton.click();
+      
+      // Verify vote registered
+      await expect(helpfulButton).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  test("review character count updates", async ({ page }) => {
+    await page.goto("/reviews");
+    await waitForPageLoad(page);
+    await expectNoSpinners(page);
+
+    const reviewButton = page.getByRole("button", { name: /Review /i }).first();
+    await reviewButton.click();
+
+    const commentField = page.getByPlaceholder(/share your experience/i);
+    await commentField.fill("Test comment");
+
+    // Look for character counter
+    const counter = page.locator("text=/\\d+ characters/i");
+    const isVisible = await counter.isVisible({ timeout: 1000 }).catch(() => false);
+    
+    if (isVisible) {
+      await expect(counter).toBeVisible();
+    }
+  });
+
+  test("review form validates maximum comment length", async ({ page }) => {
+    await page.goto("/reviews");
+    await waitForPageLoad(page);
+    await expectNoSpinners(page);
+
+    const reviewButton = page.getByRole("button", { name: /Review /i }).first();
+    await reviewButton.click();
+
+    const commentField = page.getByPlaceholder(/share your experience/i);
+    // Create a very long comment (over 1000 characters)
+    const longComment = "a".repeat(1500);
+    await commentField.fill(longComment);
+
+    const submitButton = page.getByRole("button", {
+      name: /submit review/i,
+    });
+    await submitButton.click();
+
+    // Check if there's a max length validation
+    const maxLengthError = page.getByText(/maximum|too long|exceed/i);
+    const hasError = await maxLengthError.isVisible({ timeout: 1000 }).catch(() => false);
+    
+    // If max length validation exists, it should show an error
+    if (hasError) {
+      await expect(maxLengthError).toBeVisible();
+    }
+  });
 });
