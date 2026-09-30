@@ -96,8 +96,8 @@ function addActivity(entry: Omit<SubmissionActivity, "id">): SubmissionActivity 
     id: generateId(),
   };
   activity.unshift(newEntry);
-  // Cap at 500 entries per submission
-  const filtered = activity.filter((a) => a.submissionId === entry.submissionId).slice(0, 500);
+  // Cap at 50 entries per submission
+  const filtered = activity.filter((a) => a.submissionId === entry.submissionId).slice(0, 50);
   const others = activity.filter((a) => a.submissionId !== entry.submissionId);
   saveActivity([...filtered, ...others]);
   return newEntry;
@@ -152,13 +152,19 @@ export const teamCollaborationService = {
     requesterAddress: string,
     newMember: Omit<TeamMember, "id" | "submissionId" | "addedAt">,
   ): { success: boolean; error?: string; member?: TeamMember } {
-    // Verify requester is owner
-    if (!this.checkPermission(submissionId, requesterAddress, "owner")) {
+    const team = loadTeam();
+    const hasTeamMembers = team.some((member) => member.submissionId === submissionId);
+    const isInitialOwner =
+      !hasTeamMembers &&
+      requesterAddress === newMember.addressOrId &&
+      newMember.role === "owner";
+
+    if (!isInitialOwner && !this.checkPermission(submissionId, requesterAddress, "owner")) {
       return { success: false, error: "Only owners can add team members" };
     }
 
     // Check if already a member
-    const existing = loadTeam().find(
+    const existing = team.find(
       (m) => m.submissionId === submissionId && m.addressOrId === newMember.addressOrId,
     );
     if (existing) {
@@ -172,7 +178,6 @@ export const teamCollaborationService = {
       addedAt: nowUTC(),
     };
 
-    const team = loadTeam();
     team.push(member);
     saveTeam(team);
 

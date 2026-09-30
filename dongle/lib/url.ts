@@ -88,12 +88,9 @@ export function normalizeUrl(urlStr: string): string {
     throw new Error("URL cannot be empty");
   }
 
-  // Prepend https:// if no protocol is present
   let cleaned = rawCleaned;
   if (!/^https?:\/\//i.test(cleaned)) {
-    // If it starts with an explicit scheme (e.g. javascript:, data:, ftp:, file:)
     if (/^[a-z0-9+-.]+:/i.test(cleaned)) {
-      // Unsafe or non-http/https protocol
       const schemeMatch = cleaned.match(/^([a-z0-9+-.]+):/i);
       const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : "";
       if (scheme !== "http" && scheme !== "https") {
@@ -111,7 +108,6 @@ export function normalizeUrl(urlStr: string): string {
     throw new Error("Invalid URL structure");
   }
 
-  // Reject unsupported / unsafe protocols (e.g., javascript:, data:, vbscript:, file:, blob:)
   const protocol = parsed.protocol.toLowerCase();
   if (protocol !== "http:" && protocol !== "https:") {
     throw new Error(`Protocol "${parsed.protocol}" is not supported. Only http and https are allowed.`);
@@ -122,7 +118,6 @@ export function normalizeUrl(urlStr: string): string {
     throw new Error("Invalid URL structure");
   }
 
-  // Standardize domain and strip standard root path slash
   let normalized = parsed.origin + parsed.pathname;
   if (normalized.endsWith("/") && parsed.pathname === "/") {
     normalized = normalized.slice(0, -1);
@@ -140,7 +135,6 @@ export function normalizeUrl(urlStr: string): string {
 
 /**
  * Checks if a string is a valid HTTP or HTTPS URL (with or without protocol prefix).
- * Returns true if valid, false for invalid structure, unsupported protocols, or empty input.
  */
 export function isValidUrl(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== "string" || !urlStr.trim()) {
@@ -203,37 +197,7 @@ export function sanitizeAndEncodeUrl(urlStr: string): string {
 }
 
 /**
- * Returns true when the URL is valid and safe (http/https only).
- * Unlike `normalizeUrl`, this never throws — it simply returns false for invalid input.
- *
- * @example
- * validateUrl("example.com")                 // true  (https:// will be prepended on normalize)
- * validateUrl("https://example.com")         // true
- * validateUrl("javascript:alert(1)")         // false
- * validateUrl("")                            // false
- * validateUrl("  ")                          // false
- * validateUrl("not a url")                   // false
- */
-export function validateUrl(urlStr: string): boolean {
-  if (!urlStr || typeof urlStr !== "string") return false;
-  try {
-    normalizeUrl(urlStr);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Extracts the hostname from a URL, preserving subdomains.
- *
- * Unlike `extractDomain`, this does NOT strip the leading `www.` prefix,
- * making it suitable for display and deduplication within the same apex domain.
- *
- * @example
- * getUrlHostname("https://www.example.com/path") // "www.example.com"
- * getUrlHostname("https://docs.example.com")     // "docs.example.com"
- * getUrlHostname("invalid")                       // ""
  */
 export function getUrlHostname(urlStr: string): string {
   try {

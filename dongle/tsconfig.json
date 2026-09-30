@@ -41,7 +41,7 @@
       "@/lib/stellar-address": ["./utils/stellar-address.util"],
       "@/lib/submission-quality": ["./utils/submission-quality.util"],
       "@/lib/transaction-progress": ["./utils/transaction-progress.util"],
-      "@/lib/url": ["./utils/url.util"],
+      "@/lib/url": ["./lib/url"],
       "@/lib/utils": ["./utils/utils.util"],
       "@/services/data-access/migration": ["./services/data-access/migration.service"],
       "@/services/data-access/MockUpdateRepository": ["./services/data-access/MockUpdateRepository.service"],

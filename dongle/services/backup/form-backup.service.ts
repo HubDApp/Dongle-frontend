@@ -173,8 +173,8 @@ export class FormBackupService {
       };
 
       backups.push(backup);
-      this.applyRetentionPolicy(backups);
-      this.persistBackups(formType, formId, backups);
+      const retained = this.applyRetentionPolicy(backups);
+      this.persistBackups(formType, formId, retained);
 
       return backup.id;
     } catch (err) {
@@ -328,8 +328,8 @@ export class FormBackupService {
       this.persistBackups(formType, formId, remaining);
 
       // Persist archived backups with retention
-      this.applyArchiveRetentionPolicy(archived);
-      this.persistArchivedBackups(formType, formId, archived);
+      const retained = this.applyArchiveRetentionPolicy(archived);
+      this.persistArchivedBackups(formType, formId, retained);
 
       return eligible.length;
     } catch (err) {

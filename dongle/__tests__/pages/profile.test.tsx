@@ -29,6 +29,7 @@ vi.mock("@/services/review/review.service", () => ({
 vi.mock("@/services/project/project.service", () => ({
   projectService: {
     getAllProjects: vi.fn(),
+    getProjectsByOwner: vi.fn(() => []),
   },
 }));
 

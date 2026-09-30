@@ -15,7 +15,7 @@ import {
 } from "@/context/wallet.context";
 import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
-import { validateStellarAddress } from "@/lib/stellar-address";
+import { validateStellarAddress, validateContractAddresses } from "@/utils/stellar-address.util";
 import {
   WalletNotConnectedError,
   NetworkMismatchError,
