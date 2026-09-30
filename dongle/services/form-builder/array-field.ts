@@ -180,7 +180,6 @@ export function validateArrayField(
       : [];
 
   const errors: ArrayItemError[] = [];
-  const maxItems = rules.maxItems ?? DEFAULT_MAX_ARRAY_ITEMS;
 
   // Length rules report at index -1: not attributable to a single row.
   if (rules.required && items.length === 0) {

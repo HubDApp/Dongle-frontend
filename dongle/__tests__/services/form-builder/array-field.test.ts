@@ -196,7 +196,8 @@ describe("validateArrayField", () => {
       tags: ["a", "bb", "cccc", "d"],
     });
 
-    expect(result.errors.map((e) => e.index)).toEqual([0, 1, 3]);
+    // Every item under 5 chars fails: "a"(1), "bb"(2), "cccc"(4), "d"(1).
+    expect(result.errors.map((e) => e.index)).toEqual([0, 1, 2, 3]);
     expect(result.valid).toBe(false);
   });
 
