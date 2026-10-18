@@ -14,6 +14,7 @@ import {
   ErrorCode,
   APIError,
 } from "@/services/error/error.service";
+import { cacheGet, cacheSet, cacheDel, CacheKey, REVIEWS_TTL_S } from "@/lib/cache";
 
 interface InMemoryReview extends Review {
   helpfulVotes: string[];
@@ -53,6 +54,14 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get("projectId");
     const userAddress = searchParams.get("userAddress");
 
+    // Serve from cache for project-scoped queries (most common case)
+    if (projectId && !userAddress) {
+      const cached = await cacheGet<Review[]>(CacheKey.reviews(projectId));
+      if (cached) {
+        return NextResponse.json(createSuccessResponse(cached));
+      }
+    }
+
     let reviews = Array.from(store.values());
 
     if (projectId) {
@@ -63,6 +72,11 @@ export async function GET(request: NextRequest) {
     }
 
     reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Populate cache for project-scoped results
+    if (projectId && !userAddress) {
+      await cacheSet(CacheKey.reviews(projectId), reviews, REVIEWS_TTL_S);
+    }
 
     return NextResponse.json(createSuccessResponse(reviews));
   } catch (error) {
@@ -160,6 +174,8 @@ export async function POST(request: NextRequest) {
     };
 
     store.set(newReview.id, newReview);
+    // Invalidate the cached reviews for this project so the next GET is fresh
+    await cacheDel(CacheKey.reviews(projectId));
     return NextResponse.json(createSuccessResponse(newReview), { status: 201 });
   } catch (error) {
     return NextResponse.json(
