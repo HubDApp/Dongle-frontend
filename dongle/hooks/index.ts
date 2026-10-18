@@ -37,6 +37,8 @@ export { useFormRecommendations } from "./useFormRecommendations";
 export { useFormExperiment } from "./useFormExperiment";
 export { useFormChangeDetection } from "./useFormChangeDetection";
 export type { UseFormChangeDetectionOptions, UseFormChangeDetectionReturn } from "./useFormChangeDetection";
+export { useSorobanQuery } from "./useSorobanQuery";
+export type { UseSorobanQueryOptions, UseSorobanQueryResult } from "./useSorobanQuery";
 export { useFormFieldDependencies } from "./useFormFieldDependencies";
 export type {
   FieldDependencyMap,
