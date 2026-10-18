@@ -14,6 +14,7 @@ import { registry } from "@/services/data-access/registry";
 import { projectMetaCache } from "@/lib/project-cache";
 import { logger } from "@/lib/logger";
 import { chunk } from "@/lib/array";
+import { cacheGet, CacheKey, PROJECT_TTL_S } from "@/lib/cache";
 
 /** Maximum project IDs to request in a single batch. */
 export const BATCH_SIZE = 100;
@@ -63,11 +64,42 @@ export async function batchFetchProjects(
     return result;
   }
 
-  // --- 2. Split remaining IDs into chunks of BATCH_SIZE ---
-  const chunks = chunk(toFetch, BATCH_SIZE);
+  // --- 2. Check Redis for IDs that missed the local cache ---
+  const redisHits: string[] = [];
+  if (typeof window === "undefined") {
+    await Promise.allSettled(
+      toFetch.map(async (id) => {
+        const redisProject = await cacheGet<Project>(CacheKey.project(id));
+        if (redisProject) {
+          result[id] = redisProject;
+          // Warm the local in-process cache
+          projectMetaCache.set(id, redisProject, PROJECT_TTL_S * 1_000);
+          redisHits.push(id);
+        }
+      }),
+    );
+  }
+
+  if (redisHits.length > 0) {
+    logger.debug(`[BatchFetch] Redis hit for ${redisHits.length}/${toFetch.length} projects`);
+  }
+
+  // Filter down to IDs still not resolved after Redis
+  const stillToFetch = toFetch.filter((id) => !(id in result));
+
+  if (stillToFetch.length === 0) {
+    const elapsed = Date.now() - startMs;
+    logger.info(
+      `[BatchFetch] All ${ids.length} projects served (${cacheHitCount} local, ${redisHits.length} Redis) in ${elapsed}ms`,
+    );
+    return result;
+  }
+
+  // --- 3. Split remaining IDs into chunks of BATCH_SIZE ---
+  const chunks = chunk(stillToFetch, BATCH_SIZE);
 
   logger.debug(
-    `[BatchFetch] Fetching ${toFetch.length} projects in ${chunks.length} batch(es) of up to ${BATCH_SIZE}`,
+    `[BatchFetch] Fetching ${stillToFetch.length} projects in ${chunks.length} batch(es) of up to ${BATCH_SIZE}`,
   );
 
   // --- 3. Fetch all chunks concurrently ---
@@ -90,7 +122,7 @@ export async function batchFetchProjects(
   }
 
   // Ensure every requested ID has an entry (null for misses)
-  for (const id of toFetch) {
+  for (const id of stillToFetch) {
     if (!(id in result)) {
       result[id] = null;
     }
@@ -98,7 +130,7 @@ export async function batchFetchProjects(
 
   const elapsed = Date.now() - startMs;
   logger.info(
-    `[BatchFetch] Fetched ${toFetch.length} projects (${cacheHitCount} from cache) in ${elapsed}ms`,
+    `[BatchFetch] Fetched ${stillToFetch.length} projects (${cacheHitCount} local cache, ${redisHits.length} Redis) in ${elapsed}ms`,
   );
 
   return result;

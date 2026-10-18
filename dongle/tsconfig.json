@@ -26,6 +26,8 @@
       "@/*": [
         "./*"
       ],
+      "@/lib/cache": ["./lib/cache"],
+      "@/lib/redis": ["./lib/redis"],
       "@/lib/admin-auth": ["./utils/admin-auth.util"],
       "@/lib/contract-validator": ["./utils/contract-validator.util"],
       "@/lib/date": ["./utils/date.util"],

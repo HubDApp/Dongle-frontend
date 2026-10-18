@@ -16,6 +16,7 @@
 import { verificationStatusCache } from "@/lib/project-cache";
 import { logger } from "@/lib/logger";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { cacheGet, CacheKey, VERIFICATION_TTL_S } from "@/lib/cache";
 
 /** How many verification status fetches to fire in parallel per wave. */
 const CONCURRENCY = 20;
@@ -72,23 +73,52 @@ export async function batchFetchVerificationStatuses(
     return result;
   }
 
-  // --- 2. Lazy-import the soroban service to avoid circular deps ---
+  // --- 2b. Check Redis for IDs that missed the local cache ---
+  const redisHits: string[] = [];
+  if (typeof window === "undefined") {
+    await Promise.allSettled(
+      toFetch.map(async (id) => {
+        const redisStatus = await cacheGet<VerificationStatus>(CacheKey.verification(id));
+        if (redisStatus) {
+          result[id] = redisStatus;
+          verificationStatusCache.set(id, redisStatus, VERIFICATION_TTL_S * 1_000);
+          redisHits.push(id);
+        }
+      }),
+    );
+  }
+
+  if (redisHits.length > 0) {
+    logger.debug(`[BatchVerification] Redis hit for ${redisHits.length}/${toFetch.length} statuses`);
+  }
+
+  const stillToFetch = toFetch.filter((id) => !(id in result));
+
+  if (stillToFetch.length === 0) {
+    const elapsed = Date.now() - startMs;
+    logger.info(
+      `[BatchVerification] All statuses resolved (${cacheHitCount} local, ${redisHits.length} Redis) in ${elapsed}ms`,
+    );
+    return result;
+  }
+
+  // --- 3. Lazy-import the soroban service to avoid circular deps ---
   const { sorobanService } = await import(
     "@/services/stellar/soroban.service"
   );
 
-  // --- 3. Fan-out in waves of CONCURRENCY to avoid flooding the RPC ---
+  // --- 4. Fan-out in waves of CONCURRENCY to avoid flooding the RPC ---
   logger.debug(
-    `[BatchVerification] Fetching ${toFetch.length} statuses (concurrency: ${CONCURRENCY})`,
+    `[BatchVerification] Fetching ${stillToFetch.length} statuses (concurrency: ${CONCURRENCY})`,
   );
 
-  for (let i = 0; i < toFetch.length; i += CONCURRENCY) {
+  for (let i = 0; i < stillToFetch.length; i += CONCURRENCY) {
     if (signal?.aborted) {
       logger.debug("[BatchVerification] Aborted mid-fetch");
       break;
     }
 
-    const wave = toFetch.slice(i, i + CONCURRENCY);
+    const wave = stillToFetch.slice(i, i + CONCURRENCY);
     const waveResults = await Promise.allSettled(
       wave.map(async (id): Promise<[string, VerificationStatus]> => {
         const status = await sorobanService.getVerificationStatus(id, signal);
@@ -112,7 +142,7 @@ export async function batchFetchVerificationStatuses(
   }
 
   // Fill in fallback "NONE" for any IDs that failed to resolve
-  for (const id of toFetch) {
+  for (const id of stillToFetch) {
     if (!(id in result)) {
       result[id] = "NONE";
     }
@@ -120,7 +150,7 @@ export async function batchFetchVerificationStatuses(
 
   const elapsed = Date.now() - startMs;
   logger.info(
-    `[BatchVerification] Fetched ${toFetch.length} statuses (${cacheHitCount} from cache) in ${elapsed}ms`,
+    `[BatchVerification] Fetched ${stillToFetch.length} statuses (${cacheHitCount} local cache, ${redisHits.length} Redis) in ${elapsed}ms`,
   );
 
   return result;
