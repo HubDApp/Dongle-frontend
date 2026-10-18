@@ -1,3 +1,4 @@
+import type { VerificationTier } from "@/types/project";
 "use client";
 import {
   ProjectReport,
@@ -1043,6 +1044,30 @@ export default function AdminDashboard() {
                         >
                           {req.status}
                         </span>
+                        {req.status === "VERIFIED" ? (
+                          <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                            Tier
+                            <select
+                              aria-label={`Verification tier for ${req.projectName}`}
+                              value={req.tier ?? "BRONZE"}
+                              onChange={async (event) => {
+                                try {
+                                  const tier = event.target.value as VerificationTier;
+                                  await verificationService.setTier(req.projectId, tier, gate.publicKey!);
+                                  await reloadVerificationRequests();
+                                  toast.success(`${req.projectName} set to ${tier.toLowerCase()}`);
+                                } catch {
+                                  toast.error("Could not update verification tier");
+                                }
+                              }}
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                            >
+                              <option value="BRONZE">Bronze</option>
+                              <option value="SILVER">Silver</option>
+                              <option value="GOLD">Gold</option>
+                            </select>
+                          </label>
+                        ) : null}
                         {req.assignedTo && (
                           <span className="text-[10px] uppercase font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-500">
                             Assigned to <AddressDisplay address={req.assignedTo} copyable={false} truncated={true} inline={true} />
@@ -1425,8 +1450,7 @@ export default function AdminDashboard() {
                                       submission.projectId,
                                       "flagged",
                                       submissionReason[submission.projectId],
-                                    )
-                                  }
+                                    )}
                                   className="flex-1 px-3 py-2 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white rounded-xl text-sm font-bold"
                                 >
                                   Flag
@@ -1437,7 +1461,6 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     </div>
-                  </div>
                     );
                   })}
               </div>

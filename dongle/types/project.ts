@@ -78,6 +78,9 @@ export type ProjectStatus =
   | "flagged"
   | "removed";
 
+export type VerificationTier = "BRONZE" | "SILVER" | "GOLD";
+export const VERIFICATION_TIERS: VerificationTier[] = ["BRONZE", "SILVER", "GOLD"];
+
 export const PROJECT_STATUSES: ProjectStatus[] = [
   "active",
   "paused",
@@ -124,6 +127,7 @@ export interface Project {
   primaryCategory: ProjectCategory;
   /** Lifecycle state; defaults to "active" when omitted. */
   status?: ProjectStatus;
+  verificationTier?: VerificationTier;
   tags?: string[];
   description: string;
   rating: number;

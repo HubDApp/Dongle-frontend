@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
@@ -15,6 +16,10 @@ import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.sche
 import { useFormConversion } from "@/hooks/useFormConversion";
 import { useFormCaptcha } from "@/hooks/useFormCaptcha";
 import { FormCaptcha } from "@/components/forms/FormCaptcha";
+import { FormAnnouncerProvider, useFormAnnouncer } from "@/components/ui/FormAnnouncer";
+import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
+import { useFormAnalytics } from "@/hooks/useFormAnalytics";
+import { useReviewDraft } from "@/hooks/useReviewDraft";
 
 interface ReviewFormProps {
   projectId: string;
@@ -28,15 +33,17 @@ interface ReviewFormProps {
       Review,
       "id" | "createdAt" | "userAddress" | "projectId" | "projectName"
     > & { captchaToken?: string },
-  ) => void;
+  ) => void | Promise<void>;
   onCancel: () => void;
 }
 
-export default function ReviewForm({
+function ReviewFormInner({
   projectId,
   projectName,
   userAddress,
   initialReview,
+  dailyReviewCount,
+  requiresCaptcha,
   onSubmit,
   onCancel,
 }: ReviewFormProps) {
@@ -79,6 +86,17 @@ export default function ReviewForm({
 
   const rating = watch("rating");
   const comment = watch("comment");
+  const { draft, saveDraft, clearDraft, dismissRecovery } = useReviewDraft(
+    projectId,
+    userAddress,
+    !initialReview,
+  );
+
+  useEffect(() => {
+    if (!isDirty || initialReview) return;
+    const timer = window.setTimeout(() => saveDraft({ rating, comment }), 3000);
+    return () => window.clearTimeout(timer);
+  }, [comment, initialReview, isDirty, rating, saveDraft]);
 
   // Form audit logging — records field changes with a timestamp, the acting
   // review author, and the server-stamped client IP.
@@ -109,10 +127,11 @@ export default function ReviewForm({
     }
 
     try {
-      onSubmit({
+      await onSubmit({
         ...data,
         captchaToken,
       });
+      clearDraft();
       conversion.trackSuccess({ project_id: projectId });
     } catch {
       conversion.trackFailure("submit_error");
@@ -150,14 +169,39 @@ export default function ReviewForm({
             size="sm"
           >
             <X className="w-5 h-5" />
+          </IconButton>
+        </div>
 
         <FormTimeEstimate
           fieldCount={2}
           completedFields={Number(Boolean(rating)) + Number(comment.trim().length > 0)}
           secondsPerField={45}
         />
-          </IconButton>
-        </div>
+
+        {!initialReview && draft ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/30">
+            <p>A saved review draft is available.</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="font-medium text-blue-700 hover:underline dark:text-blue-300"
+                onClick={() => {
+                  reset(draft.data);
+                  dismissRecovery();
+                }}
+              >
+                Recover draft
+              </button>
+              <button
+                type="button"
+                className="text-zinc-600 hover:underline dark:text-zinc-300"
+                onClick={clearDraft}
+              >
+                Discard draft
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Error summary — shown at the top whenever validation fails */}
         <FormErrorSummary
