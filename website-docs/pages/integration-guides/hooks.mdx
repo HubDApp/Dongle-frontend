@@ -1,0 +1,249 @@
+---
+title: Custom Hooks
+description: Complete reference for all Dongle custom hooks with usage examples.
+---
+
+import { Callout } from "nextra/components";
+
+# Custom Hooks
+
+Hooks are the UI-facing API for wallet, Stellar, drafts, and page state. Business logic lives in `services/`; hooks subscribe to context or call services and return UI-ready state.
+
+## Hook Selection Guide
+
+| Need | Hook |
+|------|------|
+| Connect / disconnect wallet, public key, network | `useWallet` |
+| Horizon balances / account record | `useStellarAccount` |
+| Gate a page until wallet is ready | `useWalletPageGate` |
+| Autosave a project form | `useDraft` |
+| Bookmark / unbookmark a project | `useSavedProjects` |
+| Recently viewed projects | `useRecentViews` |
+| Confirm before a destructive action | `useConfirm` |
+| Warn before leaving a dirty form | `useUnsavedChanges` |
+| Submit a Soroban tx with progress UI | `useOnChainTransaction` |
+| `/discover` URL filters (shareable) | `useDiscoverParams` |
+| Homepage / featured category filters | `useProjectFilters` |
+| Compare-tray selection | `useComparison` |
+
+---
+
+## `useWallet`
+
+**File:** `context/wallet.context.tsx` — requires `WalletProvider` in the tree.
+
+```tsx
+"use client";
+import { useWallet } from "@/context/wallet.context";
+
+const {
+  publicKey,           // string | null
+  isConnected,         // boolean
+  isConnecting,        // boolean
+  isFreighterAvailable,// null (detecting) | true | false
+  isCorrectNetwork,    // boolean
+  walletNetworkLabel,  // "Testnet" | "Mainnet" | …
+  connectWallet,
+  disconnectWallet,
+} = useWallet();
+```
+
+Polls Freighter every 2 s while connected to detect account / network changes.
+
+---
+
+## `useStellarAccount`
+
+**File:** `hooks/useStellarAccount.ts`
+
+```tsx
+"use client";
+import { useStellarAccount } from "@/hooks/useStellarAccount";
+
+const { balances, loading, error, refetch } = useStellarAccount();
+const native = balances?.find(b => b.asset_type === "native");
+```
+
+Fetches the Horizon account for the connected key. Clears when disconnected. Uses an `isMounted` ref to prevent state updates after unmount.
+
+---
+
+## `useWalletPageGate`
+
+**File:** `hooks/useWalletPageGate.ts`
+
+Maps wallet + account state into a single `state` string for `WalletStatePanel`.
+
+Priority: `freighter-missing → connecting → disconnected → wrong-network → (account checks) → ready`
+
+```tsx
+"use client";
+import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+import WalletStatePanel from "@/components/wallet/WalletStatePanel";
+
+export default function NewProjectPage() {
+  const gate = useWalletPageGate(); // pass { requireFundedAccount: true } if needed
+
+  if (gate.state !== "ready") {
+    return <WalletStatePanel {...gate} pagePurpose="Connect to submit a project." />;
+  }
+  return <ProjectForm />;
+}
+```
+
+---
+
+## `useDraft`
+
+**File:** `hooks/useDraft.ts`
+
+```tsx
+"use client";
+import { useDraft } from "@/hooks/useDraft";
+
+const { hasDraft, loadedDraft, lastSaved, saveDraft, clearDraft } = useDraft({
+  mode: "create",     // or "edit"
+  projectId: undefined,
+  autoSave: true,
+});
+```
+
+When `autoSave: true`, call `saveDraft(values)` inside a `form.watch()` subscription. Draft IDs: `new-project-draft` or `edit-project-{projectId}`. Empty forms are not persisted.
+
+---
+
+## `useSavedProjects`
+
+**File:** `hooks/useSavedProjects.ts`
+
+```tsx
+const { isProjectSaved, toggleSavedProject, canManageSavedProjects } =
+  useSavedProjects();
+```
+
+Per-wallet bookmark list. Syncs across tabs via `storage` events and a `dongle:saved-projects-changed` custom event.
+
+---
+
+## `useRecentViews`
+
+**File:** `hooks/useRecentViews.ts`
+
+```tsx
+const { recentProjects, trackView, clearHistory, hasHistory } =
+  useRecentViews(publicKey ?? undefined);
+
+useEffect(() => { trackView(projectId); }, [projectId, trackView]);
+```
+
+Stores up to 10 items. Pass `walletAddress` to scope history per account.
+
+---
+
+## `useConfirm`
+
+**File:** `hooks/useConfirm.tsx` — requires `ConfirmDialogProvider`.
+
+```tsx
+const confirm = useConfirm();
+
+const ok = await confirm({
+  title: "Delete review?",
+  description: "This action cannot be undone.",
+  confirmLabel: "Delete",
+  cancelLabel: "Keep",
+  variant: "danger",
+});
+if (ok) deleteReview();
+```
+
+Falls back to `window.confirm` when the provider is missing (tests / Storybook).
+
+---
+
+## `useUnsavedChanges`
+
+**File:** `hooks/useUnsavedChanges.ts`
+
+```tsx
+useUnsavedChanges(form.formState.isDirty, form.formState.isSubmitting);
+```
+
+Blocks tab close (`beforeunload`) and in-app anchor navigations while `isDirty && !isSubmitting`. Set `isSubmitting` to `true` during submit so the success redirect is not intercepted.
+
+---
+
+## `useOnChainTransaction`
+
+**File:** `hooks/useOnChainTransaction.ts`
+
+```tsx
+const { run, progress, retry, isInProgress } = useOnChainTransaction();
+
+<button
+  disabled={isInProgress}
+  onClick={() =>
+    void run(onPhaseChange =>
+      sorobanService.registerProject(payload, { onPhaseChange })
+    )
+  }
+>
+  Submit on-chain
+</button>
+<TransactionProgressPanel progress={progress} onRetry={() => void retry()} />
+```
+
+Phases: `idle → signing → confirming → success | failure`. `run` returns `null` on failure.
+
+---
+
+## `useDiscoverParams`
+
+**File:** `hooks/useDiscoverParams.ts` — source of truth is the **URL**.
+
+```tsx
+const { searchInput, setSearchInput, category, setCategory, clearFilters } =
+  useDiscoverParams();
+```
+
+`searchInput` is live; `searchQuery` and URL update after a 300 ms debounce. Use on `/discover` so filtered views are bookmarkable.
+
+---
+
+## `useProjectFilters`
+
+**File:** `hooks/useProjectFilters.ts` — in-memory, persists to `sessionStorage`.
+
+```tsx
+const { filtered, filters, setCategory, setSort } = useProjectFilters(6);
+```
+
+Not written to the URL. Use on the homepage or other non-shareable lists. `hydrated` is `false` during SSR to avoid a sessionStorage flash.
+
+---
+
+## `useComparison`
+
+**File:** `context/comparison.context.tsx` — requires `ComparisonProvider`.
+
+```tsx
+const { isSelected, addProject, removeProject, canAddMore } = useComparison();
+```
+
+In-memory session list, max 4 projects. Not persisted.
+
+---
+
+## Common Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `useWallet must be used within a WalletProvider` | Wrap with `<WalletProvider>` or add provider mock in tests |
+| Drafts don't save | Check `autoSave: true`; ensure `draftService.hasContent` is not returning `false` |
+| `loadedDraft` is null on first render | Initialize form in `useEffect` when `loadedDraft` becomes non-null |
+| Confirm dialog shows browser `window.confirm` | Mount `ConfirmDialogProvider` in root layout |
+| Discover search lags input | Expected — `searchInput` is live; `searchQuery` debounces 300 ms |
+
+<Callout>
+  Any hook that touches `window` or `localStorage` must have `"use client"` at the top of its consumer file. These hooks are SSR-safe by default (they guard `typeof window`), but they will not run on the server.
+</Callout>

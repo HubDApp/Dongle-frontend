@@ -1,0 +1,241 @@
+---
+title: Testing Guide
+description: Vitest unit tests, Playwright E2E, axe-core a11y, and mock factory patterns.
+---
+
+import { Callout, Tabs } from "nextra/components";
+
+# Testing Guide
+
+## Quick Reference
+
+| Layer | Runner | Location | Command |
+|-------|--------|----------|---------|
+| Unit / integration | Vitest | `dongle/__tests__/` | `npm test` |
+| Accessibility | Vitest + axe-core | `dongle/__tests__/a11y/` | `npm run test:a11y` |
+| E2E | Playwright | `dongle/e2e/` | `npm run test:e2e` |
+| Full-page a11y | pa11y-ci | Built site | `npm run a11y:audit` |
+
+```bash
+cd dongle
+npm test              # run once (CI mode)
+npm run test:watch    # watch during development
+npm run test:coverage # with V8 coverage report
+```
+
+## File Layout
+
+Mirror the source tree under `__tests__/`:
+
+```
+dongle/
+├── services/review/review.service.ts
+├── __tests__/services/review.service.test.ts
+├── components/layout/Navbar.tsx
+├── __tests__/components/Navbar.test.tsx
+└── hooks/useProjectFilters.ts
+    __tests__/hooks/useProjectFilters.test.ts
+```
+
+## Test Skeleton
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+describe("ModuleName", () => {
+  beforeEach(() => {
+    // reset mocks and localStorage
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("methodOrBehaviour", () => {
+    it("does the expected thing", () => {
+      // Arrange → Act → Assert
+    });
+  });
+});
+```
+
+## Service Tests
+
+```typescript
+import { projectService } from "@/services/project/project.service";
+import { mockProjects } from "@/data/mockProjects";
+
+it("finds a project by id", () => {
+  const project = projectService.getProjectById(mockProjects[0].id);
+  expect(project).toEqual(mockProjects[0]);
+});
+```
+
+## Mocking Modules
+
+```typescript
+const mockWallet = {
+  getPublicKey: vi.fn(),
+  signTransaction: vi.fn(),
+};
+
+vi.mock("@/services/wallet/wallet.service", () => ({
+  walletService: mockWallet,
+}));
+
+const { sorobanService } = await import("@/services/stellar/soroban.service");
+```
+
+## Mocking React Context
+
+```typescript
+import * as walletContext from "@/context/wallet.context";
+
+beforeEach(() => {
+  vi.spyOn(walletContext, "useWallet").mockReturnValue({
+    isConnected: false,
+    publicKey: null,
+    connectWallet: vi.fn(),
+    disconnectWallet: vi.fn(),
+    // …remaining fields
+  });
+});
+```
+
+## Component Tests
+
+```typescript
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+it("shows validation error for empty project name", async () => {
+  render(<NewProjectPage />);
+  await userEvent.click(screen.getByRole("button", { name: /Submit/i }));
+  expect(await screen.findByText(/project name must be at least/i)).toBeInTheDocument();
+});
+```
+
+## Hook Tests
+
+```typescript
+import { renderHook, act } from "@testing-library/react";
+
+it("filters by category", () => {
+  const { result } = renderHook(() => useProjectFilters());
+  act(() => { result.current.setCategory("DeFi / DEX"); });
+  expect(result.current.filtered.every(p => p.primaryCategory === "DeFi / DEX")).toBe(true);
+});
+```
+
+## Fake Timers
+
+```typescript
+const clock = vi.useFakeTimers();
+const promise = sorobanService.registerProject(params).catch(e => e);
+await clock.advanceTimersByTimeAsync(65_000);
+const err = await promise;
+clock.useRealTimers();
+expect((err as Error).message).toContain("Timeout waiting for transaction");
+```
+
+## Mock Factories
+
+```typescript
+// __tests__/fixtures/review.factory.ts
+let counter = 0;
+
+export function buildReview(overrides: Partial<Review> = {}) {
+  counter++;
+  return {
+    projectId:    `proj-${counter}`,
+    projectName:  `Test Project ${counter}`,
+    userAddress:  "GTEST1234567890",
+    rating:       5,
+    comment:      "A".repeat(REVIEW_CONSTRAINTS.COMMENT_MIN_LENGTH),
+    ...overrides,
+  };
+}
+
+export function resetReviewCounter() { counter = 0; }
+```
+
+## localStorage Mocking
+
+<Tabs items={["Inline mock", "vi.stubGlobal"]}>
+  <Tabs.Tab>
+    ```typescript
+    const localStorageMock = (() => {
+      let store: Record<string, string> = {};
+      return {
+        getItem:    (key: string) => store[key] ?? null,
+        setItem:    (key: string, value: string) => { store[key] = value; },
+        removeItem: (key: string) => { delete store[key]; },
+        clear:      () => { store = {}; },
+      };
+    })();
+
+    Object.defineProperty(window, "localStorage", { value: localStorageMock });
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```typescript
+    const mockStorage: Record<string, string> = {};
+
+    beforeEach(() => {
+      vi.stubGlobal("localStorage", {
+        getItem:    (key: string) => mockStorage[key] ?? null,
+        setItem:    (key: string, value: string) => { mockStorage[key] = value; },
+        removeItem: (key: string) => { delete mockStorage[key]; },
+        clear:      () => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]); },
+      });
+    });
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+## Playwright E2E
+
+```typescript
+// e2e/discover.spec.ts
+import { test, expect } from "@playwright/test";
+
+test.describe("Discover page", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/discover");
+  });
+
+  test("filters projects by category", async ({ page }) => {
+    await page.getByRole("button", { name: /DeFi/i }).click();
+    await expect(page.locator("[data-testid=project-card]")).not.toHaveCount(0);
+  });
+});
+```
+
+## Accessibility Tests
+
+```typescript
+// __tests__/a11y/Navbar.a11y.test.tsx
+import { render } from "@testing-library/react";
+import { axe } from "vitest-axe";
+
+it("Navbar has no axe violations", async () => {
+  const { container } = render(<Navbar />);
+  const results = await axe(container);
+  expect(results).toHaveNoViolations();
+});
+```
+
+## CI Coverage Thresholds
+
+Vitest is configured to fail if coverage drops below:
+
+| Metric | Threshold |
+|--------|-----------|
+| Lines | 80% |
+| Functions | 80% |
+| Branches | 80% |
+| Statements | 80% |
+
+<Callout>
+  Coverage applies to `lib/**/*.ts` and `hooks/**/*.ts`. Add new hooks and lib utilities to both those directories and the Vitest `include` config.
+</Callout>

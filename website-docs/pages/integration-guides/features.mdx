@@ -1,0 +1,142 @@
+---
+title: Features Overview
+description: i18n, real-time notifications, analytics dashboard, OAuth, and form audit logging.
+---
+
+import { Callout } from "nextra/components";
+
+# Features Overview
+
+## Internationalisation (i18n)
+
+**Supported locales:** `en`, `es`, `pt`. Default: `en`.
+
+**Framework:** Custom catalogs in `dongle/lib/i18n/messages/` (not next-intl). Use `t()` + `useTranslation()`.
+
+**Resolution order:**
+1. URL query `?lang=en|es|pt` (shareable links)
+2. `localStorage` key `dongle_locale`
+3. Default `en`
+
+Invalid `?lang` values fall back to the stored locale, then `en`, and the URL is rewritten.
+
+**UI:** `components/i18n/LanguageSelector.tsx` in the Navbar.
+
+---
+
+## Real-Time Notifications
+
+**Transport:** Server-Sent Events at `GET /api/notifications/stream`.
+
+WebSocket is not used — the app deploys as Next.js on Vercel, which fits SSE better than long-lived TCP sockets.
+
+**Auth:** OAuth session cookie, or `dongle_notify_recipient` set by `POST /api/notifications/identify`.
+
+**Event schema:**
+```json
+{
+  "id": "uuid",
+  "type": "project_verified | project_rejected | review_approved | claim_*",
+  "recipientId": "oauth:google:… or G…",
+  "createdAt": "ISO-8601",
+  "projectId": "optional",
+  "projectName": "optional"
+}
+```
+
+**Client behaviour:**
+- Navbar badge + drawer showing latest 50 events
+- Toasts auto-dismiss after 5 s; history persists until logout
+- Reconnect uses bounded exponential backoff (cap 30 s, 8 attempts)
+- Logout/unmount closes the `EventSource`
+
+**Load testing:**
+```bash
+cd dongle
+node scripts/notification-load-test.mjs
+# Optional: NOTIFY_SSE_URL=http://localhost:3000/api/notifications/stream
+```
+
+<Callout type="warning">
+  **Multi-instance production:** replace `lib/notifications/server-store.ts` with Redis pub/sub before deploying multiple instances.
+</Callout>
+
+---
+
+## Analytics Dashboard
+
+**Route:** `/analytics`  
+**API:** `GET /api/analytics?range=7d|30d|90d|all&category=…&status=…`
+
+| Metric | Calculation |
+|--------|-------------|
+| Reviews/week (trending) | Count in window × (7 / windowDays); ranked by rate then rating |
+| New projects/week | Projects with `createdAt` in last 7 days of selected range |
+| Average rating | Mean of `project.rating` in filtered set |
+| Median review count | Median of `project.reviews` |
+| Verification approval rate | `verified / (verified + rejected)`; `null` when no decided rows |
+
+**CSV export:** UTF-8 with BOM; stable English field names (unaffected by UI locale).
+
+**Daily cache:** In-process cache valid until next 00:00 UTC. `GET /api/cron/analytics` refreshes it. Stale reads also refresh on demand.
+
+---
+
+## Google / GitHub OAuth
+
+OAuth provides read-only identity for browsing. Publishing still requires Freighter.
+
+**Flow:**
+```
+GET /api/auth/oauth/{google|github}
+  → CSRF state cookie set
+  → Redirect to provider
+  → Callback validates state, exchanges code server-side
+  → Sets dongle_oauth_session JWT cookie
+```
+
+**Account linking:**
+```http
+POST /api/auth/link-wallet
+```
+Links a wallet `G…` address to an existing OAuth identity.
+
+**Local setup:**
+```env
+# dongle/.env.local
+GOOGLE_CLIENT_ID=…
+GOOGLE_CLIENT_SECRET=…
+GITHUB_CLIENT_ID=…
+GITHUB_CLIENT_SECRET=…
+AUTH_SESSION_SECRET=<random-32-chars>
+AUTH_APP_URL=http://localhost:3000
+```
+
+---
+
+## Form Audit Logging
+
+Every form interaction is appended to a searchable audit log.
+
+**Service:** `services/audit/form-audit-log.service.ts`  
+**Hook:** `hooks/useFormAuditLog.ts`
+
+```typescript
+// Record field changes
+trackValues(currentFormValues);
+
+// Record submit
+logAction("form_submitted", { formId: "project-registration" });
+```
+
+**IP stamping:** `GET /api/audit/client-ip` resolves the client IP server-side (a browser cannot read its own public IP). The client caches the stamp per page load.
+
+**Search / export:**
+```typescript
+formAuditLogService.search(query, filter);
+formAuditLogService.list(filter);
+formAuditLogService.exportCsv(filter);
+formAuditLogService.redactedList(filter); // strips PII
+```
+
+Wired into the project registration form and the review form.

@@ -1,0 +1,73 @@
+---
+title: Rate Limiting
+description: Rate limits per endpoint category and implementation guidance.
+---
+
+# Rate Limiting
+
+## Limits
+
+No rate limiting is enforced in development. Recommended production limits:
+
+| Category | Limit | Window |
+|----------|-------|--------|
+| Read operations (`GET`) | 100 requests | 1 minute |
+| Write operations (`POST` / `PUT` / `DELETE`) | 10 requests | 1 minute |
+| Admin operations | 50 requests | 1 minute |
+
+## Response Headers
+
+Every API response includes rate-limit headers:
+
+```http
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1735392000000
+```
+
+## Implementing in Production
+
+```typescript
+// middleware/rateLimit.ts
+import { NextRequest, NextResponse } from "next/server";
+
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+
+export function rateLimit(limit: number, windowMs: number) {
+  return (req: NextRequest) => {
+    const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+    const now = Date.now();
+    const key = `${ip}:${req.nextUrl.pathname}`;
+
+    let data = rateLimits.get(key);
+    if (!data || now > data.resetAt) {
+      data = { count: 0, resetAt: now + windowMs };
+    }
+
+    data.count++;
+    rateLimits.set(key, data);
+
+    if (data.count > limit) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Rate limit exceeded",
+          retryAfter: Math.ceil((data.resetAt - now) / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": String(limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(data.resetAt),
+          },
+        }
+      );
+    }
+
+    return null; // continue
+  };
+}
+```
+
+For multi-instance production, replace the in-memory `Map` with **Redis** to share rate-limit state across instances.

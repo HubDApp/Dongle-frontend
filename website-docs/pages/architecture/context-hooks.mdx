@@ -1,0 +1,66 @@
+---
+title: "ADR 0001: Context + Hooks"
+description: Why Dongle uses React Context and custom hooks instead of Redux or Zustand.
+---
+
+# ADR 0001: Context + Hooks Instead of Redux
+
+| | |
+|---|---|
+| **Status** | Accepted |
+| **Date** | 2026-08-26 |
+
+## Context
+
+Dongle is a Next.js App Router client. Global state is narrow:
+
+- Wallet connection (Freighter public key, network, connect/disconnect)
+- Confirm dialogs
+- Project comparison selections (session-scoped, max 4)
+- Feature hooks that talk to services (`useDraft`, `useSavedProjects`, `useRecentViews`)
+
+Most screens are server-friendly pages plus local form state. There is no large shared cache of normalized entities, no optimistic multiplayer sync, and no need for time-travel debugging in production.
+
+A Redux (or Zustand + slice) store would add boilerplate, another mental model, and a second source of truth next to React. The team is small.
+
+## Decision
+
+Use **React Context + custom hooks**. Three providers mount once in `app/layout.tsx`:
+
+| Provider | Hook | Owns |
+|----------|------|------|
+| `WalletProvider` | `useWallet` | Wallet lifecycle, network validation |
+| `ConfirmDialogProvider` | `useConfirm` | One shared confirmation modal |
+| `ComparisonProvider` | `useComparison` | Compare-tray (max 4 projects) |
+
+Domain logic stays in **services**. Hooks are thin adapters: they subscribe to context or localStorage, call a service, and return UI-ready state. Page-level filters own their own state (URL or `sessionStorage`).
+
+```typescript
+// Correct — hooks call services
+const { publicKey } = useWallet();          // reads context
+const drafts = draftService.getAllDrafts(); // calls service
+
+// Wrong — never do this in a component
+const raw = localStorage.getItem("dongle_wallet_state");
+```
+
+## Consequences
+
+**Positive**
+- Zero extra state library — React 19 + Next.js is sufficient
+- Easy to test: mock the context or the service, not a store
+- Clear ownership: wallet in one provider, drafts in `draftService`
+
+**Negative**
+- Context re-renders every consumer on wallet state change — keep the context shape small
+- No built-in cache layer; duplicate Horizon fetches possible if two trees call `useStellarAccount` independently
+- Cross-tree events (saved projects) use `CustomEvent` + `localStorage` rather than a store subscription
+
+## Alternatives Considered
+
+| Alternative | Why rejected |
+|-------------|-------------|
+| Redux Toolkit | Heavy for three providers; actions/reducers would wrap the same Freighter and localStorage calls already present |
+| Zustand / Jotai | Lighter than Redux, still a new API; Context already covers app-wide data |
+| TanStack Query only | Excellent for server state; does not replace wallet session or comparison tray |
+| URL as the only store | Works for Discover filters (`useDiscoverParams`); does not work for wallet keys or draft autosave |

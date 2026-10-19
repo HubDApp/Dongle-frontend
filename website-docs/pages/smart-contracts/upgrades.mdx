@@ -1,0 +1,95 @@
+---
+title: Contract Upgrades
+description: Step-by-step guide for migrating the frontend after a Soroban contract redeployment.
+---
+
+import { Callout, Steps } from "nextra/components";
+
+# Contract Upgrades
+
+When Soroban contracts are redeployed with new WASM or ABI changes, follow this runbook to migrate the frontend safely.
+
+<Steps>
+
+### Pre-upgrade checklist
+
+- [ ] New contract IDs obtained for each upgraded registry
+- [ ] Changelog reviewed for breaking ABI changes (renamed functions, type changes)
+- [ ] RPC endpoint confirmed to support the deployed network
+- [ ] Contract integration tests run against new deployment on testnet
+
+### Update environment variables
+
+```env
+# Old
+NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT=COLD...
+
+# New
+NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT=CNEW...
+```
+
+Each registry upgrades independently. Only update IDs for contracts that were redeployed.
+
+### Update frontend code (if ABI changed)
+
+| Change type | Action |
+|-------------|--------|
+| New function | Add method to `sorobanService` or a dedicated service |
+| Renamed function | Update `contract.call("new_name", ...)` |
+| New/changed args | Update `nativeToScVal` mapping and TypeScript interfaces |
+| Removed function | Remove UI entry points; add deprecation notice |
+| Storage layout change | Update read parsers; may need re-index |
+
+### (Optional) Dual-contract support during migration
+
+```typescript
+const PROJECT_REGISTRY_V1 = process.env.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT_V1;
+const PROJECT_REGISTRY_V2 = process.env.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT_V2;
+
+async function getProject(id: string): Promise<ProjectData | null> {
+  const fromV2 = await readProject(PROJECT_REGISTRY_V2, id);
+  if (fromV2) return fromV2;
+  return readProject(PROJECT_REGISTRY_V1, id);
+}
+```
+
+Remove V1 reads once all data is migrated on-chain.
+
+### Verify
+
+```bash
+cd dongle
+
+# Validate env parsing
+npm test -- __tests__/constants/contracts.test.ts
+
+# Validate soroban service mocks still pass
+npm test -- __tests__/services/soroban.service.test.ts
+
+# Manual smoke test
+npm run dev
+# Connect wallet on testnet → register a test project → confirm on Stellar explorer
+```
+
+### Roll out per environment
+
+| Network | Deploy when |
+|---------|-------------|
+| Testnet | After unit tests pass |
+| Staging | After testnet smoke tests pass |
+| Production | After staging approval (see [Deployment](/deployment)) |
+
+</Steps>
+
+## Rollback Procedure
+
+<Callout type="error">
+  Soroban contracts are **immutable**. You cannot roll back on-chain state. Migrate data forward.
+</Callout>
+
+If a new deployment breaks the frontend:
+
+1. Revert environment variables to the previous contract IDs.
+2. Redeploy frontend with the previous configuration.
+3. File an issue documenting the ABI incompatibility.
+4. Never use `--no-verify` to skip CI on rollback commits.

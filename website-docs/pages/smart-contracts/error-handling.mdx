@@ -1,0 +1,74 @@
+---
+title: Contract Error Handling
+description: Frontend error classes, contract error codes, and the graceful degradation strategy.
+---
+
+# Contract Error Handling
+
+## Frontend Error Classes
+
+| Error | Source | User-facing action |
+|-------|--------|--------------------|
+| `NetworkMismatchError` | Wrong Freighter network | Switch to correct network |
+| `"Only project owner can update…"` | Ownership check | Connect with owner wallet |
+| `"Project not found"` | Pre-tx validation | Verify project ID |
+| `"Transaction failed: …"` | `sendTransaction` ERROR status | Toast + Stellar explorer link |
+| `"Timeout waiting for transaction…"` | Polling > 60 s | Retry or check explorer |
+| `"A verification request is already pending…"` | Duplicate guard | Show current status |
+| `"Cannot approve/reject request with status…"` | Invalid state transition | Refresh status |
+
+## Handling in sorobanService
+
+### Submission errors
+
+```typescript
+if (sendResponse.status === "ERROR") {
+  throw new Error(
+    "Transaction failed: " + JSON.stringify(sendResponse.errorResult)
+  );
+}
+```
+
+### Execution errors (included but failed)
+
+```typescript
+if (last.status !== "SUCCESS") {
+  throw new Error(
+    `[SorobanService] Transaction ${hash} failed with status: ${last.status}`
+  );
+}
+```
+
+## Expected Contract Error Codes
+
+Document and map these when contract error enums are finalised:
+
+| Code | Contract | Meaning | Frontend handling |
+|------|----------|---------|-------------------|
+| `1` | Project Registry | Project already exists | Duplicate submission error |
+| `2` | Project Registry | Unauthorised (not owner) | Prompt wallet switch |
+| `3` | Review Registry | Already reviewed | Disable submit; offer update |
+| `4` | Review Registry | Invalid rating | Form validation (prevents tx) |
+| `5` | Verification Registry | Pending request exists | Show pending status |
+| `6` | Verification Registry | Insufficient fee | Prompt account funding |
+| `7` | Verification Registry | Unauthorised admin | Deny admin action |
+
+## Graceful Degradation (Development)
+
+When no wallet is connected, `registerProject` and `updateProject` return mock responses so UI flows remain testable without real contracts:
+
+```typescript
+// soroban.service.ts — dev fallback only
+return { hash: "mock_hash_" + generateId(), status: "SUCCESS" };
+```
+
+**Never rely on this in production.** Always require wallet connection for real writes.
+
+## Checklist for New Contract Calls
+
+- [ ] Validate network before building the transaction (`assertCorrectNetwork`)
+- [ ] Validate inputs client-side before submitting (avoid wasted fees)
+- [ ] Handle `sendTransaction` ERROR and polling FAILURE separately
+- [ ] Surface user-friendly messages via toast
+- [ ] Log detailed errors with `[SorobanService]` prefix
+- [ ] Return safe defaults for read failures (e.g. verification status → `"NONE"`)

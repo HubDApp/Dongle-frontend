@@ -1,0 +1,135 @@
+---
+title: Deployment
+description: Production deployment checklist, environment setup, and CI/CD pipeline for Dongle.
+---
+
+import { Steps, Callout } from "nextra/components";
+
+# Deployment
+
+## CI/CD Pipeline
+
+Every push and PR runs through four GitHub Actions workflows:
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `frontend_ci.yml` | PR / push to `main` | Lint, typecheck, unit tests, a11y, build, pa11y WCAG AA |
+| `performance.yml` | PR / push to `main` | Lighthouse CI + bundle size check |
+| `visual-regression.yml` | PR / push to `main` | Chromatic snapshot comparison |
+| `deploy-preview.yml` | PR opened / updated | Vercel preview deploy + PR comment |
+| `deploy-staging.yml` | Merge to `main` | Auto-deploy to staging + smoke tests |
+| `deploy-production.yml` | After staging passes | Manual approval gate → production deploy |
+
+## Performance Budgets
+
+The build fails if any of these thresholds are missed:
+
+| Metric | Budget |
+|--------|--------|
+| Lighthouse Performance | ≥ 90 |
+| Lighthouse Accessibility | ≥ 95 |
+| Lighthouse Best Practices | ≥ 90 |
+| First Contentful Paint | < 1.8 s |
+| Largest Contentful Paint | < 2.5 s |
+| Initial JS bundle (gzip) | < 200 KB |
+
+## Production Deployment
+
+<Steps>
+
+### Prerequisites
+
+- Node.js ≥ 20 and npm ≥ 10 available locally for smoke checks
+- Freighter wallet for manual wallet/network smoke test
+- Real Soroban contract IDs for all three registries
+- Vercel project configured with root directory set to `dongle/`
+
+### Environment setup
+
+Set these variables in Vercel → Project → Settings → Environment Variables for **Production**:
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT` | 56-char Stellar contract ID |
+| `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` | 56-char Stellar contract ID |
+| `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | 56-char Stellar contract ID |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL` | Your mainnet RPC URL |
+| `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | `Public Global Stellar Network ; September 2015` |
+
+<Callout type="warning">
+  `NEXT_PUBLIC_*` values are inlined at **build time**. Changing them requires a full redeploy.
+</Callout>
+
+### Validate config
+
+```bash
+cd dongle
+npm run validate:env
+```
+
+Fails clearly with a field-by-field report when any value is missing, malformed, or still set to the development placeholder.
+
+### Run pre-deploy checks
+
+```bash
+npm ci
+npm run lint && npm run typecheck && npm test
+npm run validate:env
+npm run build
+```
+
+### Verify deployment
+
+After deploy, run smoke tests against the production URL:
+
+```bash
+PREVIEW_URL=https://dongle.app npm run preview:smoke
+```
+
+### Manual smoke tests
+
+- [ ] Landing loads brand and CTA
+- [ ] Discover lists and filters without a wallet
+- [ ] Connect wallet → Freighter prompt → correct network badge
+- [ ] No production-config error banner (placeholder contracts rejected)
+- [ ] Review and verify pages render
+- [ ] Admin page: allowlisted wallet sees dashboard; others are gated
+
+</Steps>
+
+## Manual Production Approval
+
+The `deploy-production.yml` workflow pauses at a GitHub **Environment** gate named `production`. Configure required reviewers at:
+
+```
+GitHub repo → Settings → Environments → production → Required reviewers
+```
+
+Anyone in the required-reviewers list receives an email and must approve before the deploy proceeds.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `ENVIRONMENT CONFIGURATION ERROR` at startup | Missing / invalid env | Set vars in Vercel; run `validate:env` |
+| Config banner about placeholder contracts | Dev placeholder still inlined | Set real contract IDs and redeploy |
+| Wallet txs rejected by RPC | Passphrase / network mismatch | Align Freighter with `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` |
+| Preview smoke 404s | Wrong root directory in Vercel | Set root to `dongle/` |
+| Build OK in CI but prod broken | CI build uses permissive env | Always run `validate:env` with real env before promoting |
+
+## Vercel Configuration
+
+`dongle/vercel.json` configures a daily analytics cron:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/analytics",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}
+```
+
+The `CRON_SECRET` environment variable protects this endpoint in production.

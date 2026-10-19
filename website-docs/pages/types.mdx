@@ -1,0 +1,253 @@
+---
+title: Types Reference
+description: Core TypeScript types, Zod schemas, and type patterns used across Dongle.
+---
+
+import { Callout } from "nextra/components";
+
+# Types Reference
+
+All shared types live in `dongle/types/`. Import them via the `@/types` barrel.
+
+## Core Domain Types
+
+### `Project`
+
+```typescript
+// types/project.ts
+export interface Project {
+  id: string;
+  name: string;
+  primaryCategory: ProjectCategory;
+  tags?: string[];
+  description: string;
+  rating: number;
+  reviews: number;
+  createdAt: string;              // ISO date string
+  websiteUrl?: string;
+  githubUrl?: string;
+  logoUrl?: string;
+  docsUrl?: string;
+  auditReportUrl?: string;
+  bugBountyUrl?: string;
+  domain?: string;
+  ownerAddress?: string;          // Stellar G… public key
+  repositoryMetadata?: RepositoryMetadata;
+  contractAddresses?: string[];   // Soroban contract IDs (C…, 56 chars)
+}
+
+export const PROJECT_CATEGORIES = {
+  DEFI:           "DeFi / DEX",
+  GAMING:         "Gaming / NFT",
+  INFRASTRUCTURE: "Infrastructure",
+  PAYMENTS:       "Payments",
+  DAO:            "DAO",
+} as const;
+
+export type ProjectCategory = typeof PROJECT_CATEGORIES[keyof typeof PROJECT_CATEGORIES];
+```
+
+### `Review`
+
+```typescript
+// types/review.ts
+export interface Review {
+  id: string;
+  projectId: string;
+  projectName: string;
+  userAddress: string;    // Stellar G… public key
+  rating: number;         // 1–5 integer
+  comment: string;
+  createdAt: string;
+  helpfulVotes?: string[];
+  unhelpfulVotes?: string[];
+}
+
+export const REVIEW_CONSTRAINTS = {
+  RATING_MIN: 1,
+  RATING_MAX: 5,
+  COMMENT_MIN_LENGTH: 10,
+  COMMENT_MAX_LENGTH: 1000,
+} as const;
+```
+
+### `VerificationRequest`
+
+```typescript
+type VerificationStatus = "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
+
+interface VerificationRequest {
+  id: string;
+  projectId: string;
+  projectName: string;
+  submittedBy: string;
+  submittedAt: string;
+  status: VerificationStatus;
+  statusUpdatedAt: string;
+  statusUpdatedBy?: string;
+  rejectionReason?: string;
+  evidenceCid?: string;
+}
+```
+
+### `ProjectUpdate`
+
+```typescript
+// types/update.ts
+export const UPDATE_TYPES = {
+  RELEASE:      "Release",
+  AUDIT:        "Security Audit",
+  MILESTONE:    "Milestone",
+  ANNOUNCEMENT: "Announcement",
+} as const;
+
+export interface ProjectUpdate {
+  id: string;
+  projectId: string;
+  type: UpdateType;
+  title: string;
+  content: string;
+  version?: string;
+  publishedAt: string;
+  authorAddress: string;
+}
+```
+
+### `AuditLogEntry`
+
+```typescript
+// types/audit-log.ts
+export type AuditAction =
+  | "admin_login" | "admin_logout"
+  | "verification_approved" | "verification_rejected"
+  | "claim_submitted" | "claim_approved" | "claim_rejected"
+  | "submission_moderated" | "ownership_transferred"
+  // …and more
+
+export interface AuditLogEntry {
+  id: string;
+  actor: string;          // Stellar G… public key
+  action: AuditAction;
+  targetId: string;
+  targetLabel: string;
+  timestamp: string;      // ISO 8601
+  reason?: string;
+  metadata?: Record<string, string | number | boolean>;
+}
+```
+
+### `AppNotification`
+
+```typescript
+// types/notification.ts
+export interface AppNotification {
+  id: string;
+  recipientAddress: string;
+  type: "claim_received" | "claim_approved" | "claim_rejected";
+  title: string;
+  message?: string;
+  createdAt: string;
+  read: boolean;
+  claimRequestId: string;
+  projectId: string;
+  projectName: string;
+}
+```
+
+---
+
+## Zod Schemas
+
+### Contract and address validation
+
+```typescript
+// constants/contracts.ts
+export const ContractIdSchema = z
+  .string()
+  .regex(/^C[A-Z2-7]{55}$/, "Invalid Stellar Contract ID format");
+
+export const PublicKeySchema = z
+  .string()
+  .regex(/^G[A-Z2-7]{55}$/, "Invalid Stellar Public Key format");
+
+// Production — rejects the dev placeholder
+export const ProductionContractIdSchema = ContractIdSchema.refine(
+  (id) => id !== DEV_CONTRACT_PLACEHOLDER,
+  { message: "Development placeholder not allowed in production" }
+);
+```
+
+### Form validation example
+
+```typescript
+import { z } from "zod";
+
+const ReviewFormSchema = z.object({
+  rating:  z.number().int().min(1).max(5),
+  comment: z.string().min(10).max(1000),
+});
+
+const result = ReviewFormSchema.safeParse(formData);
+if (!result.success) {
+  for (const issue of result.error.issues) {
+    console.error(`${issue.path.join(".")}: ${issue.message}`);
+  }
+}
+```
+
+---
+
+## Type Patterns
+
+### Exhaustive switch (compile-time safety)
+
+```typescript
+function assertNever(value: never): never {
+  throw new Error(`Unexpected value: ${value}`);
+}
+
+function getCategoryColor(category: ProjectCategory): string {
+  switch (category) {
+    case "DeFi / DEX":     return "blue";
+    case "Gaming / NFT":   return "purple";
+    case "Infrastructure": return "gray";
+    case "Payments":       return "green";
+    case "DAO":            return "orange";
+    default:               return assertNever(category); // compile error if case missing
+  }
+}
+```
+
+### Type guard
+
+```typescript
+function isProjectOwner(
+  project: Project,
+  address: string
+): project is Project & { ownerAddress: string } {
+  return project.ownerAddress === address;
+}
+```
+
+### Discriminated union
+
+```typescript
+type VerificationResult =
+  | { status: "NONE" }
+  | { status: "PENDING";   submittedAt: string }
+  | { status: "VERIFIED";  verifiedAt: string; verifiedBy: string }
+  | { status: "REJECTED";  rejectedAt: string; reason: string };
+```
+
+---
+
+## Adding New Types
+
+1. Create or update the file in `dongle/types/`.
+2. Export from `dongle/types/index.ts`.
+3. Add a Zod schema in `constants/contracts.ts` if runtime validation is needed.
+4. Update this page.
+
+<Callout>
+  Use `interface` for object shapes and `const` assertions for constant maps. Avoid `any`; use `unknown` and narrow with type guards.
+</Callout>
