@@ -58,6 +58,7 @@ import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { runFormIntegrations } from "@/services/form-integrations";
+import { projectHistoryService } from "@/services/project/project-history.service";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -207,7 +208,11 @@ const EXPORT_LABELS: Record<string, string> = {
 
 type ProjectFormProps = {
   mode?: "create" | "edit";
-  initialData?: Partial<ProjectFormValues> & { category?: string };
+  initialData?: Partial<ProjectFormValues> & {
+    category?: string;
+    ownerAddress?: string;
+    createdAt?: string;
+  };
   projectId?: string;
   onSubmit?: (data: ProjectFormValues) => Promise<void>;
 };
@@ -493,6 +498,34 @@ export default function ProjectForm({
         });
 
         if (result) {
+          if (mode === "edit" && projectId) {
+            const toHistorySnapshot = (values: Partial<ProjectFormValues>) => ({
+              name: values.name ?? "",
+              primaryCategory:
+                CATEGORY_FORM_MAP[values.primaryCategory ?? ""] ??
+                values.primaryCategory ??
+                "",
+              tags: values.tags ?? [],
+              description: values.description ?? "",
+              websiteUrl: values.websiteUrl ?? "",
+              githubUrl: values.githubUrl ?? "",
+              logoUrl: values.logoUrl ?? "",
+              docsUrl: values.docsUrl ?? "",
+              auditReportUrl: values.auditReportUrl ?? "",
+              bugBountyUrl: values.bugBountyUrl ?? "",
+              contractAddresses: values.contractAddresses ?? [],
+              ownerAddress: initialData?.ownerAddress,
+              createdAt: initialData?.createdAt,
+            });
+
+            projectHistoryService.recordEdit(
+              projectId,
+              toHistorySnapshot(defaultFormValues),
+              toHistorySnapshot(cleanedPayload),
+              publicKey ?? "unknown",
+              initialData?.createdAt,
+            );
+          }
           conversion.trackSuccess({ mode, project_id: projectId ?? null });
           heatmap.captureSnapshot();
           sessionRecording.stop();
@@ -615,7 +648,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft, locale],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, locale, publicKey, initialData],
   );
 
   const onPreSubmit = useCallback(

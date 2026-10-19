@@ -26,6 +26,7 @@ import {
   XCircle,
   Package,
   Bookmark,
+  Heart,
   Activity,
   Wallet,
   Search,
@@ -460,9 +461,15 @@ export default function ProfilePage() {
                     <Bookmark className="w-6 h-6" />
                     Watchlist
                   </h2>
-                  <Badge variant="secondary">
-                    {watchlistCount}/{maxWatchlistSize}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={() => router.push("/profile/following")}>
+                      <Heart className="h-4 w-4" />
+                      Following
+                    </Button>
+                    <Badge variant="secondary">
+                      {watchlistCount}/{maxWatchlistSize}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">

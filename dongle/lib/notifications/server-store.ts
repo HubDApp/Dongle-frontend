@@ -106,6 +106,16 @@ export function markAllNotificationsRead(recipientId: string): void {
   );
 }
 
+export function markNotificationsRead(recipientId: string, notificationIds: string[]): void {
+  const ids = new Set(notificationIds);
+  history.set(
+    recipientId,
+    recipientHistory(recipientId).map((item) =>
+      ids.has(item.id) ? { ...item, read: true } : item,
+    ),
+  );
+}
+
 export function unreadCount(recipientId: string): number {
   return recipientHistory(recipientId).filter((item) => !item.read).length;
 }

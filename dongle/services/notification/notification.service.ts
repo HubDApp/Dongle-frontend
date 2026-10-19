@@ -138,6 +138,14 @@ export const notificationService = {
     saveAll(all);
   },
 
+  markReadMany(notificationIds: string[]): void {
+    const ids = new Set(notificationIds);
+    const all = loadAll().map((item) =>
+      ids.has(item.id) ? { ...item, read: true } : item,
+    );
+    saveAll(all);
+  },
+
   markAllReadForUser(recipientAddress: string): void {
     const all = loadAll().map((n) =>
       n.recipientAddress === recipientAddress ? { ...n, read: true } : n,
