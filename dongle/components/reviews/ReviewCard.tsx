@@ -12,6 +12,7 @@ import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
+import { getReviewLanguageLabel } from "@/lib/review-language";
 
 interface ReviewCardProps {
   review: Review;
@@ -63,6 +64,14 @@ export default function ReviewCard({
                   Featured
                 </span>
               )}
+              {review.language && (
+                <span
+                  title="Language automatically detected from the review text"
+                  className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {getReviewLanguageLabel(review.language)}
+                </span>
+              )}
             </div>
             <div className="text-xs text-zinc-500">{formatDate(review.createdAt, "relative")}</div>
           </div>
@@ -73,7 +82,18 @@ export default function ReviewCard({
         </div>
       </div>
 
-      <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">{review.comment}</p>
+      <div className="mb-6">
+        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">{review.comment}</p>
+        <a
+          href="https://github.com/HubDApp/Dongle-frontend/issues/18"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+          aria-label="Request an automatic translation (Issue 18)"
+        >
+          Translate
+        </a>
+      </div>
 
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">

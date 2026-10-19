@@ -47,7 +47,28 @@ describe("POST /api/reviews", () => {
     expect(data.data?.id).toBeDefined();
     expect(data.data?.rating).toBe(5);
     expect(data.data?.comment).toBe(validReview.comment);
+    expect(data.data?.language).toBe("en");
     expect(data.data?.createdAt).toBeDefined();
+  });
+
+  it("detects and stores the review language from comment text", async () => {
+    const request = new NextRequest("http://localhost/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: "proj-language",
+        projectName: "Test Project",
+        userAddress: "user-language",
+        rating: 5,
+        comment: "Este proyecto es muy bueno y fácil de usar",
+        language: "en",
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+    expect(response.status).toBe(201);
+    expect(data.data.language).toBe("es");
   });
 
   it("should reject review with missing required fields", async () => {

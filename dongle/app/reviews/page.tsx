@@ -14,6 +14,7 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { AlertTriangle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { trackReviewSubmit } from "@/lib/analytics";
+import { reviewSearchMatches } from "@/lib/review-language";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
@@ -29,6 +30,7 @@ export default function ReviewsPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [userFilter, setUserFilter] = useState<"all" | "mine">("all");
+  const [reviewSearch, setReviewSearch] = useState("");
   const [showWalletGate, setShowWalletGate] = useState(false);
 
   useEffect(() => {
@@ -209,6 +211,10 @@ export default function ReviewsPage() {
       list = list.filter((r) => r.userAddress === gate.publicKey);
     }
 
+    if (reviewSearch.trim()) {
+      list = list.filter((review) => reviewSearchMatches(review.comment, reviewSearch));
+    }
+
     switch (sortBy) {
       case "oldest":
         return list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -229,7 +235,7 @@ export default function ReviewsPage() {
       default:
         return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
-  }, [reviews, sortBy, projectFilter, ratingFilter, userFilter, gate.publicKey]);
+  }, [reviews, sortBy, projectFilter, ratingFilter, userFilter, gate.publicKey, reviewSearch]);
 
   const emptyStateMessage = useMemo(() => {
     if (reviews.length === 0) {
@@ -246,11 +252,12 @@ export default function ReviewsPage() {
     if (ratingFilter !== "all") {
       activeFilters.push(`${ratingFilter}-star rating`);
     }
+    if (reviewSearch.trim()) activeFilters.push(`text matching "${reviewSearch.trim()}"`);
     if (activeFilters.length > 0) {
       return `No reviews found matching ${activeFilters.join(" and ")}. Try adjusting your filters.`;
     }
     return "No reviews match the selected filter criteria.";
-  }, [reviews.length, userFilter, projectFilter, ratingFilter, allProjects]);
+  }, [reviews.length, userFilter, projectFilter, ratingFilter, reviewSearch, allProjects]);
 
   const topProjects = allProjects.slice(0, 6);
 
@@ -363,6 +370,17 @@ export default function ReviewsPage() {
                       : "Recent Activity"}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <label className="flex items-center gap-2">
+                      <span className="sr-only">Search reviews in any language</span>
+                      <input
+                        type="search"
+                        aria-label="Search reviews in any language"
+                        value={reviewSearch}
+                        onChange={(event) => setReviewSearch(event.target.value)}
+                        placeholder="Search reviews"
+                        className="w-40 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 dark:border-zinc-800 dark:bg-zinc-900"
+                      />
+                    </label>
                     {gate.publicKey && (
                       <div className="flex items-center gap-2">
                         <span className="text-zinc-500 whitespace-nowrap">Show:</span>

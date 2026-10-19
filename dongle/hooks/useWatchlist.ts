@@ -72,6 +72,14 @@ function emitWatchlistChanged(walletAddress: string | null) {
   );
 }
 
+function syncBookmarkMetric(projectId: string, walletAddress: string, bookmarked: boolean) {
+  void fetch("/api/social-proof/bookmarks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ projectId, walletAddress, bookmarked }),
+  }).catch(() => undefined);
+}
+
 export function useWatchlist() {
   const { publicKey, isConnected } = useWallet();
   const [watchlistIds, setWatchlistIds] = useState<string[]>(() =>
@@ -146,6 +154,7 @@ export function useWatchlist() {
 
       const next = [...watchlistIds, projectId];
       writeWatchlistIds(publicKey, next);
+      syncBookmarkMetric(projectId, publicKey, true);
       setWatchlistIds(next);
       emitWatchlistChanged(publicKey);
       notifyWatchlistEvent(projectId, "added");
@@ -159,6 +168,7 @@ export function useWatchlist() {
       if (!publicKey) return;
       const next = watchlistIds.filter((id) => id !== projectId);
       writeWatchlistIds(publicKey, next);
+      syncBookmarkMetric(projectId, publicKey, false);
       setWatchlistIds(next);
       emitWatchlistChanged(publicKey);
       notifyWatchlistEvent(projectId, "removed");

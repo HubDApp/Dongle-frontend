@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasMinLength } from "@/lib/validation";
+import { detectReviewLanguage } from "@/lib/review-language";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import {
   createSuccessResponse,
   createErrorResponse,
@@ -107,9 +109,11 @@ export async function PUT(
       ...review,
       ...(rating !== undefined ? { rating } : {}),
       ...(comment !== undefined ? { comment } : {}),
+      ...(comment !== undefined ? { language: detectReviewLanguage(comment) } : {}),
     };
 
     reviews.set(id, updated);
+    await cacheDel(CacheKey.reviews(updated.projectId));
     return NextResponse.json(createSuccessResponse(updated));
   } catch (error) {
     return NextResponse.json(

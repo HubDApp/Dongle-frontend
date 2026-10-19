@@ -8,6 +8,8 @@
 export const REALTIME_NOTIFICATION_TYPES = [
   "project_verified",
   "project_rejected",
+  "project_registered",
+  "review_submitted",
   "review_approved",
   "review_rejected",
   "verification_evidence_requested",

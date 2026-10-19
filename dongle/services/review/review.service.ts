@@ -7,6 +7,7 @@ import {
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
+import { detectReviewLanguage } from "@/lib/review-language";
 
 const STORAGE_KEY = "dongle_reviews";
 
@@ -77,7 +78,16 @@ function getLocalReviews(): Review[] {
     } else {
       createdAt = nowUTC();
     }
-    const review: Review = { id, projectId: record.projectId, projectName, userAddress: record.userAddress, rating, comment: record.comment, createdAt };
+    const review: Review = {
+      id,
+      projectId: record.projectId,
+      projectName,
+      userAddress: record.userAddress,
+      rating,
+      comment: record.comment,
+      language: typeof record.language === "string" ? record.language : detectReviewLanguage(record.comment),
+      createdAt,
+    };
     if (Array.isArray(record.helpfulVotes)) {
       review.helpfulVotes = record.helpfulVotes.filter((v): v is string => typeof v === "string");
     } else {
@@ -143,7 +153,13 @@ async function addReview(
   if (reviews.some((r) => r.userAddress === userAddress && r.projectId === review.projectId)) {
     return { success: false, errors: [{ field: "comment", message: "You have already reviewed this project" }] };
   }
-  const newReview: Review = { ...review, userAddress, id: generateId(), createdAt: new Date().toISOString() };
+  const newReview: Review = {
+    ...review,
+    language: detectReviewLanguage(review.comment),
+    userAddress,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
   if (signedPayload) {
     newReview.signedPayload = signedPayload.payload;
     newReview.signature = signedPayload.signature;
@@ -180,7 +196,11 @@ async function updateReview(
   const comment = updates.comment ?? reviews[index].comment;
   const validationErrors = validateReview(rating, comment);
   if (validationErrors.length > 0) return { success: false, errors: validationErrors };
-  reviews[index] = { ...reviews[index], ...updates };
+  reviews[index] = {
+    ...reviews[index],
+    ...updates,
+    ...(updates.comment !== undefined ? { language: detectReviewLanguage(updates.comment) } : {}),
+  };
   saveLocalReviews(reviews);
   return { success: true, data: reviews[index] };
 }

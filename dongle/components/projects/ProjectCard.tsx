@@ -13,6 +13,14 @@ import { useComparison } from "@/context/comparison.context";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { getPrefetchValue } from "@/lib/prefetch-config";
 import { highlightText } from "@/lib/utils";
+import useSWR from "swr";
+import type { SocialProofBadge, SocialProofByProject } from "@/lib/social-proof";
+
+async function fetchSocialProof(url: string): Promise<{ badges: SocialProofByProject }> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Could not load social proof badges");
+  return response.json() as Promise<{ badges: SocialProofByProject }>;
+}
 
 interface ProjectCardProps {
   project: Project;
@@ -29,9 +37,11 @@ export const ProjectCard = ({
 }: ProjectCardProps) => {
   const { addProject, removeProject, isSelected, canAddMore } = useComparison();
   const { isOnWatchlist, toggleWatchlist, canManageWatchlist } = useWatchlist();
+  const { data: socialProof } = useSWR("/api/social-proof", fetchSocialProof);
 
   const selected = isSelected(project.id);
   const isSaved = isOnWatchlist(project.id);
+  const badges: SocialProofBadge[] = (socialProof?.badges[project.id] ?? []).slice(0, 2);
 
   const handleCompareToggle = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -116,6 +126,18 @@ export const ProjectCard = ({
           className="mb-6 shrink-0"
           fallbackTextSize="text-lg"
         />
+        <div className="mb-2 flex min-h-6 flex-wrap gap-2" aria-label="Project social proof">
+          {badges.map((badge) => (
+            <span
+              key={badge.type}
+              title={badge.tooltip}
+              aria-label={`${badge.label}: ${badge.tooltip}`}
+              className="inline-flex items-center rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              {badge.label}
+            </span>
+          ))}
+        </div>
         <div className="flex justify-between items-start mb-2 px-2">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-blue-500 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">

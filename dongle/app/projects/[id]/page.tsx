@@ -1142,6 +1142,8 @@ export default function ProjectDetailPage() {
         <ClaimProjectModal
           isOpen={isClaiming}
           projectName={project?.name || ""}
+          projectId={project?.id}
+          walletAddress={gate.publicKey}
           onClose={() => setIsClaiming(false)}
           onSubmit={handleClaimSubmit}
         />

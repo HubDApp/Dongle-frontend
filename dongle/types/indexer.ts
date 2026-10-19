@@ -2,7 +2,8 @@ export type SorobanEventType =
   | "ProjectRegistered"
   | "ProjectUpdated"
   | "ReviewSubmitted"
-  | "VerificationApproved";
+  | "VerificationApproved"
+  | "VerificationRejected";
 
 export interface IndexedEvent {
   id: string;
