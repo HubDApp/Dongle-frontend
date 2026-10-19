@@ -1,5 +1,11 @@
 import { Project } from "@/types/project";
 
+export type ReviewSentiment = "positive" | "negative" | "neutral";
+
+export function isReviewSentiment(value: unknown): value is ReviewSentiment {
+  return value === "positive" || value === "negative" || value === "neutral";
+}
+
 export interface Review {
   id: string;
   projectId: string;
@@ -8,6 +14,8 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+  sentiment?: ReviewSentiment;
+  sentimentSource?: "automatic" | "admin";
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
   /** Cryptographic signature fields — present for signed submissions (#558). */
@@ -95,4 +103,3 @@ export interface ReviewReportValidationError {
 
 // Re-export Project for backward compatibility in components
 export type { Project };
-

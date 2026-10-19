@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/Card";
 import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { FormSkeleton } from "@/components/ui/FormSkeleton";
+import { fetchProjectRoadmap } from "@/services/project/roadmap.service";
 
 const EDIT_PURPOSE =
   "Connect Freighter to edit and update your project on-chain.";
@@ -40,7 +41,11 @@ export default function EditProjectPage() {
           setError("Project not found");
           return;
         }
-        setProject(projectData);
+        const roadmap = projectData.roadmapCid
+          ? await fetchProjectRoadmap(projectData.roadmapCid)
+          : null;
+        if (!active) return;
+        setProject({ ...projectData, roadmap });
       } catch (err) {
         if (!active) return;
         console.error("Error fetching data:", err);
@@ -144,6 +149,7 @@ export default function EditProjectPage() {
             docsUrl: project.docsUrl,
             auditReportUrl: project.auditReportUrl,
             bugBountyUrl: project.bugBountyUrl,
+            roadmap: project.roadmap?.milestones,
           }}
         />
       </div>

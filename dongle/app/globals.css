@@ -258,6 +258,60 @@ html.dark a:focus-visible {
   outline-color: #60a5fa;
 }
 
+html.high-contrast {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #000000;
+}
+
+html.high-contrast body,
+html.high-contrast body :where(*) {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  border-color: #000000 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html.high-contrast a {
+  text-decoration: underline !important;
+}
+
+html.high-contrast button,
+html.high-contrast [role="button"],
+html.high-contrast input,
+html.high-contrast textarea,
+html.high-contrast select {
+  border: 2px solid #000000 !important;
+}
+
+html.high-contrast input[type="checkbox"],
+html.high-contrast input[type="radio"] {
+  accent-color: #000000;
+}
+
+html.high-contrast :disabled,
+html.high-contrast [aria-disabled="true"] {
+  color: #404040 !important;
+  background-color: #e6e6e6 !important;
+  border-color: #404040 !important;
+  border-style: dashed !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+
+html.high-contrast ::placeholder {
+  color: #404040 !important;
+  opacity: 1;
+}
+
+html.high-contrast :focus-visible {
+  outline: 3px solid #000000 !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
+}
+
 /*
  * High-contrast media query — use a more prominent indicator for users
  * who have enabled forced colours / Windows High Contrast mode.

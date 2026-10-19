@@ -500,8 +500,6 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
-} satisfies Record<string, unknown>;
-
   twofa: {
     title: "Two-Factor Authentication",
     description: "Add an extra layer of security to your account by requiring a verification code in addition to your wallet connection.",

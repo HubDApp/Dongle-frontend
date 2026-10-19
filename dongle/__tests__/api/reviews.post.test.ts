@@ -47,6 +47,8 @@ describe("POST /api/reviews", () => {
     expect(data.data?.id).toBeDefined();
     expect(data.data?.rating).toBe(5);
     expect(data.data?.comment).toBe(validReview.comment);
+    expect(data.data?.sentiment).toBe("positive");
+    expect(data.data?.sentimentSource).toBe("automatic");
     expect(data.data?.createdAt).toBeDefined();
   });
 

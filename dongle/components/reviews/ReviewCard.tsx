@@ -8,7 +8,7 @@
  */
 
 import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles } from "lucide-react";
-import { Review } from "@/types/review";
+import { Review, type ReviewSentiment } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
@@ -24,6 +24,7 @@ interface ReviewCardProps {
   onReport?: (review: Review) => void;
   onFeature?: (id: string) => void;
   onUnfeature?: (id: string) => void;
+  onOverrideSentiment?: (id: string, sentiment: ReviewSentiment) => void;
 }
 
 export default function ReviewCard({
@@ -37,7 +38,17 @@ export default function ReviewCard({
   onReport,
   onFeature,
   onUnfeature,
+  onOverrideSentiment,
 }: ReviewCardProps) {
+  const sentimentPresentation = review.sentiment
+    ? {
+        positive: { emoji: "😊", label: "Positive" },
+        neutral: { emoji: "😐", label: "Neutral" },
+        negative: { emoji: "😞", label: "Negative" },
+      }[review.sentiment]
+    : null;
+  const isReviewAuthor = currentUserAddress === review.userAddress;
+
   return (
     <div
       className={`bg-white dark:bg-zinc-900 border p-6 rounded-3xl transition-all ${
@@ -72,6 +83,41 @@ export default function ReviewCard({
           <span className="text-sm font-bold text-yellow-700 dark:text-yellow-500">{review.rating}</span>
         </div>
       </div>
+
+      {!isReviewAuthor && (sentimentPresentation || (isAdmin && onOverrideSentiment)) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {sentimentPresentation && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+              aria-label={`Review sentiment: ${sentimentPresentation.label}`}
+            >
+              <span aria-hidden="true">{sentimentPresentation.emoji}</span>
+              {sentimentPresentation.label}
+              {review.sentimentSource === "admin" && (
+                <span className="ml-1 text-[10px] font-normal">(admin override)</span>
+              )}
+            </span>
+          )}
+          {isAdmin && onOverrideSentiment && (
+            <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
+              <span className="sr-only">Override review sentiment</span>
+              <select
+                aria-label={`Override sentiment for review by ${review.userAddress}`}
+                value={review.sentiment ?? ""}
+                onChange={(event) =>
+                  onOverrideSentiment(review.id, event.target.value as ReviewSentiment)
+                }
+                className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+              >
+                <option value="" disabled>Override sentiment…</option>
+                <option value="positive">Positive</option>
+                <option value="neutral">Neutral</option>
+                <option value="negative">Negative</option>
+              </select>
+            </label>
+          )}
+        </div>
+      )}
 
       <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">{review.comment}</p>
 

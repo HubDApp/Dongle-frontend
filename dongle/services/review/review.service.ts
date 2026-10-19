@@ -3,10 +3,13 @@ import {
   ReviewInput,
   REVIEW_CONSTRAINTS,
   ReviewValidationError,
+  isReviewSentiment,
 } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
+import { classifyReviewSentiment } from "@/lib/review-sentiment";
+import type { ReviewSentiment } from "@/types/review";
 
 const STORAGE_KEY = "dongle_reviews";
 
@@ -60,6 +63,7 @@ function getLocalReviews(): Review[] {
   }
   if (!Array.isArray(parsed)) return [];
   const validatedReviews: Review[] = [];
+  let migratedSentiment = false;
   for (const item of parsed) {
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
@@ -77,7 +81,21 @@ function getLocalReviews(): Review[] {
     } else {
       createdAt = nowUTC();
     }
-    const review: Review = { id, projectId: record.projectId, projectName, userAddress: record.userAddress, rating, comment: record.comment, createdAt };
+    const hasValidSentiment = isReviewSentiment(record.sentiment);
+    if (!hasValidSentiment) migratedSentiment = true;
+    const review: Review = {
+      id,
+      projectId: record.projectId,
+      projectName,
+      userAddress: record.userAddress,
+      rating,
+      comment: record.comment,
+      createdAt,
+      sentiment: hasValidSentiment
+        ? record.sentiment
+        : classifyReviewSentiment(record.comment),
+      sentimentSource: record.sentimentSource === "admin" ? "admin" : "automatic",
+    };
     if (Array.isArray(record.helpfulVotes)) {
       review.helpfulVotes = record.helpfulVotes.filter((v): v is string => typeof v === "string");
     } else {
@@ -90,6 +108,7 @@ function getLocalReviews(): Review[] {
     }
     validatedReviews.push(review);
   }
+  if (migratedSentiment) saveLocalReviews(validatedReviews);
   return validatedReviews;
 }
 
@@ -143,7 +162,14 @@ async function addReview(
   if (reviews.some((r) => r.userAddress === userAddress && r.projectId === review.projectId)) {
     return { success: false, errors: [{ field: "comment", message: "You have already reviewed this project" }] };
   }
-  const newReview: Review = { ...review, userAddress, id: generateId(), createdAt: new Date().toISOString() };
+  const newReview: Review = {
+    ...review,
+    userAddress,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+    sentiment: classifyReviewSentiment(review.comment),
+    sentimentSource: "automatic",
+  };
   if (signedPayload) {
     newReview.signedPayload = signedPayload.payload;
     newReview.signature = signedPayload.signature;
@@ -180,7 +206,16 @@ async function updateReview(
   const comment = updates.comment ?? reviews[index].comment;
   const validationErrors = validateReview(rating, comment);
   if (validationErrors.length > 0) return { success: false, errors: validationErrors };
-  reviews[index] = { ...reviews[index], ...updates };
+  reviews[index] = {
+    ...reviews[index],
+    ...updates,
+    ...(updates.comment !== undefined
+      ? {
+          sentiment: classifyReviewSentiment(updates.comment),
+          sentimentSource: "automatic" as const,
+        }
+      : {}),
+  };
   saveLocalReviews(reviews);
   return { success: true, data: reviews[index] };
 }
@@ -282,6 +317,22 @@ async function voteUnhelpful(
   return { success: true, data: reviews[index] };
 }
 
+async function overrideSentiment(
+  id: string,
+  sentiment: ReviewSentiment,
+): Promise<{ success: boolean; data?: Review; error?: string }> {
+  if (getPersistenceMode() === "api") {
+    return reviewApiService.overrideSentiment(id, sentiment);
+  }
+
+  const reviews = getLocalReviews();
+  const index = reviews.findIndex((review) => review.id === id);
+  if (index === -1) return { success: false, error: "Review not found" };
+  reviews[index] = { ...reviews[index], sentiment, sentimentSource: "admin" };
+  saveLocalReviews(reviews);
+  return { success: true, data: reviews[index] };
+}
+
 export const reviewService = {
   getReviews,
   addReview,
@@ -291,6 +342,7 @@ export const reviewService = {
   getReviewsByUser,
   voteHelpful,
   voteUnhelpful,
+  overrideSentiment,
 };
 
 export function isReviewPersistenceApi(): boolean {

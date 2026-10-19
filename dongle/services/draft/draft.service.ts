@@ -22,6 +22,7 @@ import {
   isEncrypted,
   type DecryptOptions,
 } from "@/lib/crypto-storage";
+import type { RoadmapMilestone } from "@/types/roadmap";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -41,6 +42,7 @@ export interface ProjectDraft {
     /** optional fields added by ProjectForm */
     auditReportUrl?: string;
     bugBountyUrl?: string;
+    roadmap?: RoadmapMilestone[];
   };
   lastSaved: string; // ISO timestamp
   mode: "create" | "edit";

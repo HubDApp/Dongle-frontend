@@ -68,6 +68,8 @@ export interface ProjectData {
   bugBountyUrl?: string;
   owner: string;
   createdAt: string;
+  roadmapCid?: string;
+  roadmap?: import("@/types/roadmap").ProjectRoadmap;
 }
 
 export interface ProjectRegistrationParams {
@@ -84,6 +86,7 @@ export interface ProjectRegistrationParams {
    * Empty strings are ignored.
    */
   contractAddresses?: string[];
+  roadmapCid?: string;
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
@@ -350,6 +353,7 @@ export const sorobanService = {
       nativeToScVal(
         (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
       ),
+      nativeToScVal(params.roadmapCid ?? "", { type: "string" }),
     ];
 
     const result = await executeContractTransaction(
@@ -739,6 +743,7 @@ export const sorobanService = {
           docsUrl: "https://docs.soroban-swap.com",
           auditReportUrl: "https://example.com/audit-soroban-swap.pdf",
           bugBountyUrl: "https://example.com/bounty-soroban-swap",
+          roadmapCid: "",
           owner: "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
           createdAt: "2024-11-10T00:00:00Z",
         },
@@ -890,6 +895,7 @@ export const sorobanService = {
       nativeToScVal(
         (params.contractAddresses ?? []).filter((a) => a.trim().length > 0),
       ),
+      nativeToScVal(params.roadmapCid ?? "", { type: "string" }),
     ];
 
     const result = await executeContractTransaction(
@@ -1138,4 +1144,3 @@ export const sorobanService = {
     return server;
   },
 };
-

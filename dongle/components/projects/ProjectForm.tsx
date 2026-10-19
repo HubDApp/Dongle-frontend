@@ -58,6 +58,13 @@ import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { runFormIntegrations } from "@/services/form-integrations";
+import RoadmapEditor from "@/components/projects/RoadmapEditor";
+import {
+  getMilestoneStatusChanges,
+  uploadProjectRoadmap,
+} from "@/services/project/roadmap.service";
+import { notifyWatchlistEvent } from "@/services/watchlist/watchlist-notification.service";
+import { ROADMAP_STATUSES } from "@/types/roadmap";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -142,6 +149,14 @@ const projectSchema = z
     contractAddresses: z
       .array(contractIdSchema)
       .max(5, "You can add at most 5 contract addresses"),
+    roadmap: z.array(
+      z.object({
+        title: z.string().trim().min(1, "Milestone title is required").max(120),
+        description: z.string().max(2000),
+        status: z.enum(ROADMAP_STATUSES),
+        targetDate: z.string(),
+      }),
+    ).max(30, "A roadmap can contain at most 30 milestones"),
   })
   .superRefine((data, ctx) => {
     const requirements = getFieldRequirements({
@@ -189,6 +204,7 @@ const EXPORT_FIELDS: Array<keyof ProjectFormValues> = [
   "auditReportUrl",
   "bugBountyUrl",
   "contractAddresses",
+  "roadmap",
 ];
 
 const EXPORT_LABELS: Record<string, string> = {
@@ -203,6 +219,7 @@ const EXPORT_LABELS: Record<string, string> = {
   auditReportUrl: "Audit Report URL",
   bugBountyUrl: "Bug Bounty URL",
   contractAddresses: "Contract Addresses",
+  roadmap: "Project Roadmap",
 };
 
 type ProjectFormProps = {
@@ -295,6 +312,7 @@ export default function ProjectForm({
     contractAddresses: initialData?.contractAddresses?.length
       ? initialData.contractAddresses
       : [],
+    roadmap: initialData?.roadmap ?? [],
   };
 
   const {
@@ -334,6 +352,7 @@ export default function ProjectForm({
       auditReportUrl: project.auditReportUrl ?? "",
       bugBountyUrl: project.bugBountyUrl ?? "",
       contractAddresses: project.contractAddresses?.slice(0, 5) ?? [],
+      roadmap: [],
     });
     setProjectSearchQuery("");
   };
@@ -344,7 +363,11 @@ export default function ProjectForm({
   useEffect(() => {
     if (draft.loadedDraft) {
       setDraftRestored(true);
-      reset(draft.loadedDraft);
+      reset({
+        ...defaultFormValues,
+        ...draft.loadedDraft,
+        roadmap: draft.loadedDraft.roadmap ?? defaultFormValues.roadmap,
+      });
     }
   }, [draft.loadedDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -370,6 +393,7 @@ export default function ProjectForm({
         contractAddresses: data.contractAddresses?.length
           ? data.contractAddresses
           : [],
+        roadmap: data.roadmap ?? [],
       });
       toast.success("Template loaded into the form");
     } catch {
@@ -426,7 +450,10 @@ export default function ProjectForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(watchedValues)]);
 
-  const trackedFieldCount = 10 + (watchedValues.contractAddresses?.length ?? 0);
+  const trackedFieldCount =
+    10 +
+    (watchedValues.contractAddresses?.length ?? 0) +
+    (watchedValues.roadmap?.length ? 1 : 0);
   const completedFieldCount = [
     watchedValues.name,
     watchedValues.primaryCategory,
@@ -477,7 +504,11 @@ export default function ProjectForm({
           contractAddresses: (payload.contractAddresses ?? []).filter(
             (a) => a.trim().length > 0,
           ),
+          roadmap: payload.roadmap ?? [],
         };
+        const roadmapCid = cleanedPayload.roadmap.length > 0
+          ? await uploadProjectRoadmap({ milestones: cleanedPayload.roadmap })
+          : "";
         const result = await run((onPhaseChange) => {
           // Normalize the form value (e.g. "defi") to its canonical display label
           // (e.g. "DeFi / DEX") before submitting to the contract.
@@ -485,6 +516,7 @@ export default function ProjectForm({
           const contractPayload = {
             ...cleanedPayload,
             category: canonicalCategory,
+            roadmapCid,
           };
           if (mode === "edit" && projectId) {
             return sorobanService.updateProject(projectId, contractPayload, { onPhaseChange });
@@ -493,6 +525,19 @@ export default function ProjectForm({
         });
 
         if (result) {
+          if (mode === "edit" && projectId) {
+            const changes = getMilestoneStatusChanges(
+              initialData?.roadmap ?? [],
+              cleanedPayload.roadmap,
+            );
+            for (const change of changes) {
+              notifyWatchlistEvent(
+                projectId,
+                "project_update",
+                `Roadmap milestone "${change.title}" status changed from ${change.previousStatus} to ${change.status}.`,
+              );
+            }
+          }
           conversion.trackSuccess({ mode, project_id: projectId ?? null });
           heatmap.captureSnapshot();
           sessionRecording.stop();
@@ -615,7 +660,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft, locale],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, locale, initialData],
   );
 
   const onPreSubmit = useCallback(
@@ -724,6 +769,7 @@ export default function ProjectForm({
       contractAddresses: template.data.contractAddresses?.length
         ? template.data.contractAddresses
         : [],
+      roadmap: template.data.roadmap ?? [],
     });
     setShowTemplateLibrary(false);
   };
@@ -745,6 +791,7 @@ export default function ProjectForm({
       logoUrl: initialData?.logoUrl || "",
       docsUrl: initialData?.docsUrl || "",
       contractAddresses: initialData?.contractAddresses || [],
+      roadmap: initialData?.roadmap ?? [],
     });
     setDiscardDialogOpen(false);
   };
@@ -1255,6 +1302,9 @@ export default function ProjectForm({
             }}
           />
         </div>
+
+        <RoadmapEditor control={control} />
+        </>}
 
         <FormCaptcha
           mode={captcha.mode}

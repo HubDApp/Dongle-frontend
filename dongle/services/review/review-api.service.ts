@@ -1,4 +1,9 @@
-import { Review, ReviewInput, ReviewValidationError } from "@/types/review";
+import {
+  Review,
+  ReviewInput,
+  ReviewSentiment,
+  ReviewValidationError,
+} from "@/types/review";
 
 const API_BASE = "/api/reviews";
 
@@ -63,6 +68,26 @@ export const reviewApiService = {
       return { success: true, data: data.data };
     } catch {
       return { success: false, errors: [{ field: "comment", message: "Network error. Please try again." }] };
+    }
+  },
+
+  async overrideSentiment(
+    id: string,
+    sentiment: ReviewSentiment,
+  ): Promise<{ success: boolean; data?: Review; error?: string }> {
+    try {
+      const response = await fetch(API_BASE, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, sentiment }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.data) {
+        return { success: false, error: data.error?.message ?? data.error ?? "Could not update sentiment" };
+      }
+      return { success: true, data: data.data };
+    } catch {
+      return { success: false, error: "Network error. Please try again." };
     }
   },
 

@@ -57,6 +57,7 @@ export class MockSorobanService implements ISorobanService {
       githubUrl: params.githubUrl,
       logoUrl: params.logoUrl ?? "",
       docsUrl: params.docsUrl ?? "",
+      roadmapCid: params.roadmapCid,
       owner: "GMOCKADDRESSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       createdAt: now,
     });

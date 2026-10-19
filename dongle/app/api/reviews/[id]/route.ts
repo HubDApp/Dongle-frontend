@@ -5,27 +5,12 @@ import {
   createErrorResponse,
   ErrorCode,
 } from "@/services/error/error.service";
+import { classifyReviewSentiment } from "@/lib/review-sentiment";
+import { reviewStore, type StoredReview } from "@/lib/review-store";
+import { cacheDel, CacheKey } from "@/lib/cache";
 
-interface InMemoryReview {
-  id: string;
-  projectId: string;
-  projectName: string;
-  userAddress: string;
-  rating: number;
-  comment: string;
-  createdAt: string;
-  helpfulVotes: string[];
-  unhelpfulVotes: string[];
-  signedPayload?: string;
-  signature?: string;
-  signatureNonce?: string;
-  signatureTimestamp?: string;
-}
-
-const store = new Map<string, InMemoryReview>();
-
-function getStore(): Map<string, InMemoryReview> {
-  return store;
+function getStore(): Map<string, StoredReview> {
+  return reviewStore;
 }
 
 function validateReviewInput(rating: unknown, comment: unknown): string | null {
@@ -103,13 +88,20 @@ export async function PUT(
       );
     }
 
-    const updated: InMemoryReview = {
+    const updated = {
       ...review,
       ...(rating !== undefined ? { rating } : {}),
       ...(comment !== undefined ? { comment } : {}),
+      ...(comment !== undefined
+        ? {
+            sentiment: classifyReviewSentiment(comment),
+            sentimentSource: "automatic" as const,
+          }
+        : {}),
     };
 
     reviews.set(id, updated);
+    await cacheDel(CacheKey.reviews(review.projectId));
     return NextResponse.json(createSuccessResponse(updated));
   } catch (error) {
     return NextResponse.json(

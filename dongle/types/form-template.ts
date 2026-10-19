@@ -1,3 +1,5 @@
+import type { RoadmapMilestone } from "./roadmap";
+
 /**
  * Form template types for saving, loading, and browsing project form presets.
  */
@@ -22,6 +24,7 @@ export interface FormTemplateData {
   auditReportUrl: string;
   bugBountyUrl: string;
   contractAddresses: string[];
+  roadmap?: RoadmapMilestone[];
 }
 
 export interface FormTemplate {

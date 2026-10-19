@@ -20,6 +20,8 @@ All interactions are wallet-authenticated using Freighter, providing transparent
 - **Wallet-Based Authentication**: All user actions attributed to Stellar wallet addresses
 - **Verification System**: Multi-status lifecycle (pending, verified, rejected) for project credibility
 - **Community Reviews**: 5-star rating system with detailed comments
+- **Review Sentiment**: Automatic positive, neutral, and negative sentiment classification with moderation overrides
+- **High-Contrast Accessibility**: Optional black-on-white display, visible controls, and prominent keyboard focus indicators
 - **Responsive Design**: Modern, accessible UI built with Next.js, Tailwind CSS, and Lucide icons
 
 ## Tech Stack
@@ -195,6 +197,7 @@ The canonical template lives in [`.env.example`](./.env.example). Key variables:
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth | (empty) | Google OAuth. Secrets are never `NEXT_PUBLIC_*` |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | OAuth | (empty) | GitHub OAuth. Secrets are never `NEXT_PUBLIC_*` |
 | `CRON_SECRET` | Optional | (empty) | Protects daily analytics cron |
+| `PINATA_JWT` | Roadmap publishing | (empty) | Server-only Pinata JWT for pinning roadmap JSON to IPFS |
 
 ### Contract ID Format
 

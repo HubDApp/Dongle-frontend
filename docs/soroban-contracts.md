@@ -130,6 +130,7 @@ register_project(
   github_url: Option<Symbol>,
   logo_url: Option<Symbol>,
   docs_url: Option<Symbol>,
+  roadmap_cid: String,
 ) → void
 ```
 
@@ -144,6 +145,7 @@ register_project(
 | `githubUrl` | `string` | No |
 | `logoUrl` | `string` | No |
 | `docsUrl` | `string` | No |
+| `roadmapCid` | `string` | Empty string when no roadmap is published |
 
 **Return type (frontend):**
 
@@ -167,6 +169,7 @@ update_project(
   github_url: Option<Symbol>,
   logo_url: Option<Symbol>,
   docs_url: Option<Symbol>,
+  roadmap_cid: String,
 ) → void
 ```
 
@@ -174,6 +177,13 @@ update_project(
 
 - Project exists (`getProject(projectId)`)
 - `project.owner === publicKey`
+
+The project registry contract must be upgraded to accept and store the appended
+`roadmap_cid` argument for both calls. The CID points to a JSON document pinned
+to IPFS with shape `{ "milestones": [{ "title", "description", "status", "targetDate" }] }`.
+The frontend sends an empty string when no milestones are published. Existing
+deployed registry contracts do not support this argument and must be upgraded
+before this frontend version is deployed.
 
 **Return type (frontend):** `{ hash: string; status: "SUCCESS" }`
 
@@ -201,6 +211,7 @@ interface ProjectData {
   docsUrl: string;
   owner: string;      // Stellar public key (G...)
   createdAt: string;  // ISO timestamp or ledger time
+  roadmapCid?: string; // IPFS CID for the roadmap JSON
 }
 ```
 
