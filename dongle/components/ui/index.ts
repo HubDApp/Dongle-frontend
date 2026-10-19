@@ -37,7 +37,7 @@ export { TextAreaField } from "./TextAreaField";
 export { FormSkeleton } from "./FormSkeleton";
 export type { FormSkeletonProps } from "./FormSkeleton";
 export { FormSubmissionRetry } from "./FormSubmissionRetry";
-export type { FormSubmissionRetryProps } from "./FormSubmissionRetry";
+export type { FormSubmissionError, FormSubmissionRetryProps } from "./FormSubmissionRetry";
 export { FormSubmissionProgress, useFormSubmissionProgress } from "./FormSubmissionProgress";
 export type { FormSubmissionProgressProps, SubmissionStep } from "./FormSubmissionProgress";
 export { FormValueComparison, areValuesDifferent } from "./FormValueComparison";
