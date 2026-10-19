@@ -63,6 +63,7 @@ import EnrichmentDetailsModal from "@/components/admin/EnrichmentDetailsModal";
 import SegmentationDashboard from "@/components/admin/SegmentationDashboard";
 import SegmentFilter from "@/components/admin/SegmentFilter";
 import ExperimentAnalyticsView from "@/components/admin/ExperimentAnalyticsView";
+import MLInsightsPanel from "@/components/admin/MLInsightsPanel";
 import { findDuplicates } from "@/services/form-deduplication";
 import { enrichFormData, type FormEnrichmentResult } from "@/services/form-enrichment";
 import {
@@ -190,6 +191,7 @@ export default function AdminDashboard() {
     | "merges"
     | "segments"
     | "experiments"
+    | "ml-insights"
   >("verification");
 
   // Segmentation state
@@ -969,6 +971,20 @@ export default function AdminDashboard() {
             <FlaskConical className="w-4 h-4" />
             A/B Experiments
             {activeTab === "experiments" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("ml-insights")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "ml-insights"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            ML Insights
+            {activeTab === "ml-insights" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -2290,6 +2306,8 @@ export default function AdminDashboard() {
         {activeTab === "experiments" && (
           <ExperimentAnalyticsView />
         )}
+
+        {activeTab === "ml-insights" && <MLInsightsPanel />}
       </div>
 
       {/* Duplicate Merge Conflict Resolution Modal */}

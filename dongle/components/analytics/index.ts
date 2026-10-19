@@ -6,3 +6,6 @@ export type { BarChartProps, BarChartDataPoint } from "./BarChart";
 
 export { PieChart } from "./PieChart";
 export type { PieChartProps, PieChartDataPoint } from "./PieChart";
+
+export { HeatmapViewer } from "./HeatmapViewer";
+export { default as PageHeatmapRecorder } from "./PageHeatmapRecorder";
