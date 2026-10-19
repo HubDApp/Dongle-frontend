@@ -11,6 +11,16 @@ export const UPDATE_TYPES = {
 
 export type UpdateType = typeof UPDATE_TYPES[keyof typeof UPDATE_TYPES];
 
+export const UPDATE_REACTIONS = ["👍", "❤️", "🎉", "🚀", "👀", "💡"] as const;
+
+export type UpdateReactionType = typeof UPDATE_REACTIONS[number];
+
+export interface UpdateReactionSummary {
+  updateId: string;
+  counts: Partial<Record<UpdateReactionType, number>>;
+  userReactions: UpdateReactionType[];
+}
+
 export interface ProjectUpdate {
   id: string;
   projectId: string;

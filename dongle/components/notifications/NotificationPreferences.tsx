@@ -10,7 +10,15 @@ import {
   notificationPreferencesService,
   type NotificationPreferences,
 } from "@/services/notifications/notification-preferences.service";
+import type { NotificationDevice } from "@/lib/notifications/delivery-policy";
+import { groupSimilarNotifications } from "@/lib/notifications/delivery-policy";
 import { toast } from "sonner";
+
+const BATCH_PREVIEW_EVENTS = [
+  { id: "preview-update-1", type: "project_update", recipientId: "preview", createdAt: "2026-01-01T09:00:00.000Z" },
+  { id: "preview-update-2", type: "project_update", recipientId: "preview", createdAt: "2026-01-01T09:01:00.000Z" },
+  { id: "preview-comment", type: "submission_comment", recipientId: "preview", createdAt: "2026-01-01T09:02:00.000Z" },
+];
 
 export interface NotificationPreferencesProps {
   userId: string;
@@ -23,13 +31,59 @@ export function NotificationPreferencesComponent({
     null
   );
   const [email, setEmail] = useState("");
+  const [timeZoneDraft, setTimeZoneDraft] = useState("UTC");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const prefs = notificationPreferencesService.getPreferences(userId);
     setPreferences(prefs);
     setEmail(prefs.email || "");
+    setTimeZoneDraft(prefs.quietHours.timeZone);
   }, [userId]);
+
+  const updateQuietHours = (updates: Partial<NotificationPreferences["quietHours"]>) => {
+    if (!preferences) return;
+    const updated = notificationPreferencesService.updatePreferences(userId, {
+      quietHours: { ...preferences.quietHours, ...updates },
+    });
+    setPreferences(updated);
+  };
+
+  const updateBatching = (updates: Partial<NotificationPreferences["batching"]>) => {
+    if (!preferences) return;
+    const updated = notificationPreferencesService.updatePreferences(userId, {
+      batching: { ...preferences.batching, ...updates },
+    });
+    setPreferences(updated);
+  };
+
+  const toggleDeviceSetting = (
+    device: NotificationDevice,
+    key: keyof NotificationPreferences["devices"]["desktop"],
+  ) => {
+    if (!preferences) return;
+    const updated = notificationPreferencesService.updatePreferences(userId, {
+      devices: {
+        desktop: { ...preferences.devices.desktop },
+        mobile: { ...preferences.devices.mobile },
+        [device]: {
+          ...preferences.devices[device],
+          [key]: !preferences.devices[device][key],
+        },
+      },
+    });
+    setPreferences(updated);
+  };
+
+  const saveTimeZone = () => {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timeZoneDraft });
+      updateQuietHours({ timeZone: timeZoneDraft });
+    } catch {
+      setTimeZoneDraft(preferences?.quietHours.timeZone ?? "UTC");
+      toast.error("Enter a valid IANA timezone");
+    }
+  };
 
   const handleToggleEnabled = () => {
     if (!preferences) return;
@@ -119,6 +173,164 @@ export function NotificationPreferencesComponent({
           >
             {preferences.enabled ? "Disable All" : "Enable All"}
           </Button>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold">Do not disturb</h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Silence all notification toasts on every device. Notifications remain in your inbox.
+            </p>
+          </div>
+          <Checkbox
+            aria-label="Do not disturb"
+            checked={preferences.doNotDisturb}
+            onChange={() => {
+              const updated = notificationPreferencesService.updatePreferences(userId, {
+                doNotDisturb: !preferences.doNotDisturb,
+              });
+              setPreferences(updated);
+            }}
+            disabled={!preferences.enabled}
+          />
+        </div>
+        <div className="grid gap-5 border-t border-zinc-200 pt-5 dark:border-zinc-800 sm:grid-cols-2">
+          <div>
+            <label className="flex items-center gap-3 font-medium">
+              <Checkbox
+                checked={preferences.quietHours.enabled}
+                onChange={() => updateQuietHours({ enabled: !preferences.quietHours.enabled })}
+                disabled={!preferences.enabled || preferences.doNotDisturb}
+              />
+              Quiet hours
+            </label>
+            <p className="ml-8 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Non-urgent notifications wait until quiet hours end. Urgent notifications still arrive.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                Start
+                <Input
+                  className="mt-1"
+                  type="time"
+                  value={preferences.quietHours.startTime}
+                  onChange={(event) => updateQuietHours({ startTime: event.target.value })}
+                  disabled={!preferences.enabled || !preferences.quietHours.enabled}
+                  aria-label="Quiet hours start time"
+                />
+              </label>
+              <label className="text-sm text-zinc-600 dark:text-zinc-400">
+                End
+                <Input
+                  className="mt-1"
+                  type="time"
+                  value={preferences.quietHours.endTime}
+                  onChange={(event) => updateQuietHours({ endTime: event.target.value })}
+                  disabled={!preferences.enabled || !preferences.quietHours.enabled}
+                  aria-label="Quiet hours end time"
+                />
+              </label>
+            </div>
+            <label className="mt-3 block text-sm text-zinc-600 dark:text-zinc-400">
+              Timezone
+              <Input
+                className="mt-1"
+                type="text"
+                value={timeZoneDraft}
+                onChange={(event) => setTimeZoneDraft(event.target.value)}
+                onBlur={saveTimeZone}
+                disabled={!preferences.enabled || !preferences.quietHours.enabled}
+                aria-label="Quiet hours timezone"
+                list="notification-timezones"
+              />
+              <datalist id="notification-timezones">
+                {["UTC", "America/Los_Angeles", "America/Chicago", "America/New_York", "Europe/London", "Europe/Paris", "Asia/Kolkata", "Asia/Tokyo", "Australia/Sydney"].map((zone) => (
+                  <option key={zone} value={zone} />
+                ))}
+              </datalist>
+            </label>
+          </div>
+
+          <div className="border-t border-zinc-200 pt-5 dark:border-zinc-800 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <label className="flex items-center gap-3 font-medium">
+              <Checkbox
+                checked={preferences.batching.enabled}
+                onChange={() => updateBatching({ enabled: !preferences.batching.enabled })}
+                disabled={!preferences.enabled || preferences.doNotDisturb}
+              />
+              Batch low-priority notifications
+            </label>
+            <p className="ml-8 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Send one daily digest instead of a toast for every update.
+            </p>
+            <label className="mt-4 block text-sm text-zinc-600 dark:text-zinc-400">
+              Digest time
+              <Input
+                className="mt-1"
+                type="time"
+                value={preferences.batching.digestTime}
+                onChange={(event) => updateBatching({ digestTime: event.target.value })}
+                disabled={!preferences.enabled || !preferences.batching.enabled}
+                aria-label="Daily digest time"
+              />
+            </label>
+            <label className="mt-4 flex items-center gap-3 text-sm font-medium">
+              <Checkbox
+                checked={preferences.batching.smartGrouping}
+                onChange={() => updateBatching({ smartGrouping: !preferences.batching.smartGrouping })}
+                disabled={!preferences.enabled || !preferences.batching.enabled}
+              />
+              Group similar notifications
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-6 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+          <h4 className="font-semibold">Device delivery</h4>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {(["desktop", "mobile"] as const).map((device) => (
+              <fieldset key={device} className="space-y-3">
+                <legend className="mb-2 text-sm font-medium capitalize">{device}</legend>
+                {([
+                  ["enabled", "Show notification toasts"],
+                  ["quietHours", "Apply quiet hours"],
+                  ["batchLowPriority", "Batch low-priority items"],
+                ] as const).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                    <Checkbox
+                      checked={preferences.devices[device][key]}
+                      onChange={() => toggleDeviceSetting(device, key)}
+                      disabled={!preferences.enabled || preferences.doNotDisturb}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6 border-t border-zinc-200 pt-5 dark:border-zinc-800" aria-live="polite">
+          <h4 className="font-semibold">Digest preview</h4>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            {preferences.batching.enabled
+              ? `At ${preferences.batching.digestTime} (${preferences.quietHours.timeZone}), similar activity is grouped like this:`
+              : "Turn on batching to preview your daily digest."}
+          </p>
+          {preferences.batching.enabled && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {groupSimilarNotifications(BATCH_PREVIEW_EVENTS, preferences.batching.smartGrouping).map((group, index) => (
+                <span key={`${group.type}-${index}`} className="rounded-md border border-zinc-200 px-3 py-1.5 text-sm dark:border-zinc-700">
+                  {group.count} {group.type.replaceAll("_", " ")}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Urgent mentions, verification requests, and project rejections bypass quiet hours.
+          </p>
         </div>
       </Card>
 

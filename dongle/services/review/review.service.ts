@@ -2,13 +2,19 @@ import {
   Review,
   ReviewInput,
   REVIEW_CONSTRAINTS,
+  REVIEW_OWNER_RESPONSE_EDIT_WINDOW_MS,
+  REVIEW_OWNER_RESPONSE_MAX_LENGTH,
+  ReviewOwnerResponse,
   ReviewValidationError,
 } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
+import { projectService } from "@/services/project/project.service";
+import { emitNotificationEvent } from "@/lib/notifications/emit";
 
 const STORAGE_KEY = "dongle_reviews";
+const OWNER_RESPONSES_STORAGE_KEY = "dongle_review_owner_responses";
 
 const DEV_MODE_WARN =
   "[Dongle Review Service] Using localStorage (DEV-ONLY). " +
@@ -90,12 +96,37 @@ function getLocalReviews(): Review[] {
     }
     validatedReviews.push(review);
   }
-  return validatedReviews;
+  return attachOwnerResponses(validatedReviews);
 }
 
 function saveLocalReviews(reviews: Review[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
+}
+
+function getOwnerResponses(): Record<string, ReviewOwnerResponse> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(OWNER_RESPONSES_STORAGE_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, ReviewOwnerResponse>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveOwnerResponses(responses: Record<string, ReviewOwnerResponse>): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(OWNER_RESPONSES_STORAGE_KEY, JSON.stringify(responses));
+}
+
+function attachOwnerResponses(reviews: Review[]): Review[] {
+  const responses = getOwnerResponses();
+  return reviews.map((review) => ({
+    ...review,
+    ownerResponse: responses[review.id] ?? review.ownerResponse,
+  }));
 }
 
 function warnDevMode(): void {
@@ -107,7 +138,7 @@ function warnDevMode(): void {
 async function getReviews(): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.getReviews();
+      return attachOwnerResponses(await reviewApiService.getReviews());
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -213,7 +244,7 @@ async function deleteReview(
 async function getReviewsByProject(projectId: string): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.getReviewsByProject(projectId);
+      return attachOwnerResponses(await reviewApiService.getReviewsByProject(projectId));
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -227,7 +258,7 @@ async function getReviewsByProject(projectId: string): Promise<Review[]> {
 async function getReviewsByUser(userAddress: string): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.getReviewsByUser(userAddress);
+      return attachOwnerResponses(await reviewApiService.getReviewsByUser(userAddress));
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -282,6 +313,80 @@ async function voteUnhelpful(
   return { success: true, data: reviews[index] };
 }
 
+async function addOwnerResponse(reviewId: string, text: string, ownerAddress: string): Promise<Review> {
+  const responseText = text.trim();
+  if (!responseText) throw new Error("Response cannot be empty");
+  if (responseText.length > REVIEW_OWNER_RESPONSE_MAX_LENGTH) {
+    throw new Error(`Response cannot exceed ${REVIEW_OWNER_RESPONSE_MAX_LENGTH} characters`);
+  }
+  const review = (await getReviews()).find((item) => item.id === reviewId);
+  if (!review) throw new Error("Review not found");
+  const project = projectService.getProjectById(review.projectId);
+  if (!project || project.ownerAddress !== ownerAddress) {
+    throw new Error("Only the project owner can respond to this review");
+  }
+  if (review.ownerResponse) throw new Error("A response has already been posted");
+
+  const now = new Date().toISOString();
+  const ownerResponse: ReviewOwnerResponse = {
+    text: responseText,
+    ownerAddress,
+    createdAt: now,
+    updatedAt: now,
+  };
+  saveOwnerResponses({ ...getOwnerResponses(), [reviewId]: ownerResponse });
+  void emitNotificationEvent({
+    recipientId: review.userAddress,
+    type: "review_owner_response",
+    projectId: review.projectId,
+    projectName: review.projectName,
+    reviewId: review.id,
+  });
+  return { ...review, ownerResponse };
+}
+
+async function updateOwnerResponse(reviewId: string, text: string, ownerAddress: string): Promise<Review> {
+  const responseText = text.trim();
+  if (!responseText) throw new Error("Response cannot be empty");
+  if (responseText.length > REVIEW_OWNER_RESPONSE_MAX_LENGTH) {
+    throw new Error(`Response cannot exceed ${REVIEW_OWNER_RESPONSE_MAX_LENGTH} characters`);
+  }
+  const review = (await getReviews()).find((item) => item.id === reviewId);
+  if (!review?.ownerResponse) throw new Error("Response not found");
+  if (review.ownerResponse.ownerAddress !== ownerAddress) {
+    throw new Error("Only the project owner can edit this response");
+  }
+  if (Date.now() - Date.parse(review.ownerResponse.createdAt) > REVIEW_OWNER_RESPONSE_EDIT_WINDOW_MS) {
+    throw new Error("Responses can only be edited within 24 hours");
+  }
+
+  const ownerResponse: ReviewOwnerResponse = {
+    ...review.ownerResponse,
+    text: responseText,
+    updatedAt: new Date().toISOString(),
+  };
+  saveOwnerResponses({ ...getOwnerResponses(), [reviewId]: ownerResponse });
+  return { ...review, ownerResponse };
+}
+
+async function moderateOwnerResponse(
+  reviewId: string,
+  hiddenByAdmin: boolean,
+  moderatorAddress: string,
+): Promise<Review> {
+  if (!moderatorAddress) throw new Error("Moderator identity is required");
+  const review = (await getReviews()).find((item) => item.id === reviewId);
+  if (!review?.ownerResponse) throw new Error("Response not found");
+  const ownerResponse: ReviewOwnerResponse = {
+    ...review.ownerResponse,
+    hiddenByAdmin,
+    moderatedAt: new Date().toISOString(),
+    moderatedBy: moderatorAddress,
+  };
+  saveOwnerResponses({ ...getOwnerResponses(), [reviewId]: ownerResponse });
+  return { ...review, ownerResponse };
+}
+
 export const reviewService = {
   getReviews,
   addReview,
@@ -291,6 +396,9 @@ export const reviewService = {
   getReviewsByUser,
   voteHelpful,
   voteUnhelpful,
+  addOwnerResponse,
+  updateOwnerResponse,
+  moderateOwnerResponse,
 };
 
 export function isReviewPersistenceApi(): boolean {

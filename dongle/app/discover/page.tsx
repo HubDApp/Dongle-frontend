@@ -11,7 +11,7 @@ import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
 import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
-import type { VerificationTier } from "@/types/project";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type ProjectStatus, type VerificationTier } from "@/types/project";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
@@ -19,6 +19,7 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import { milestoneService } from "@/services/project/milestone.service";
 import projectService from "@/services/project/project.service";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -33,6 +34,9 @@ function DiscoverContent() {
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
   const [verificationTierFilter, setVerificationTierFilter] = useState<VerificationTier | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
+  const [milestoneCompletionFilter, setMilestoneCompletionFilter] = useState("ALL");
+  const [milestoneRates, setMilestoneRates] = useState<Record<string, number>>({});
+  const [projectsWithMilestones, setProjectsWithMilestones] = useState<Set<string>>(new Set());
   const gate = useWalletPageGate();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
@@ -78,6 +82,24 @@ function DiscoverContent() {
     };
   }, []);
 
+  useEffect(() => {
+    const refreshMilestones = () => {
+      const projects = projectService.getDiscoverableProjects();
+      const rates: Record<string, number> = {};
+      const projectsWithMilestones = new Set<string>();
+      for (const project of projects) {
+        const milestones = milestoneService.getByProject(project.id);
+        if (milestones.length > 0) projectsWithMilestones.add(project.id);
+        rates[project.id] = milestoneService.getCompletionRate(project.id);
+      }
+      setMilestoneRates(rates);
+      setProjectsWithMilestones(projectsWithMilestones);
+    };
+    refreshMilestones();
+    window.addEventListener("dongle:project-milestones-changed", refreshMilestones);
+    return () => window.removeEventListener("dongle:project-milestones-changed", refreshMilestones);
+  }, []);
+
   const categories = projectService.getCategories();
 
   const filteredAndSortedProjects = useMemo(() => {
@@ -105,9 +127,19 @@ function DiscoverContent() {
       result = result.filter((p) => (p.status ?? "active") === statusFilter);
     }
 
+    if (milestoneCompletionFilter === "NONE") {
+      result = result.filter((project) => !projectsWithMilestones.has(project.id));
+    } else if (milestoneCompletionFilter !== "ALL") {
+      const [minimum, maximum] = milestoneCompletionFilter.split("-").map(Number);
+      result = result.filter((project) => {
+        const rate = milestoneRates[project.id] ?? 0;
+        return projectsWithMilestones.has(project.id) && rate >= minimum && rate <= maximum;
+      });
+    }
+
     result = projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationTierFilter, verificationStatuses]);
+  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationTierFilter, verificationStatuses, statusFilter, milestoneCompletionFilter, milestoneRates, projectsWithMilestones]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -169,6 +201,11 @@ function DiscoverContent() {
     });
   };
 
+  const handleMilestoneCompletionFilterChange = (value: string) => {
+    setMilestoneCompletionFilter(value);
+    trackFilter({ filterType: "milestone-completion", filterValue: value, source: "discover" });
+  };
+
   const handleTagsChange = (nextTags: string[]) => {
     setTags(nextTags);
     trackFilter({
@@ -191,6 +228,7 @@ function DiscoverContent() {
     setStatusFilter("ALL");
     setVerificationFilter("ALL");
     setVerificationTierFilter("ALL");
+    setMilestoneCompletionFilter("ALL");
   };
 
   return (
@@ -274,6 +312,22 @@ function DiscoverContent() {
                     {PROJECT_STATUS_LABELS[status]}
                   </option>
                 ))}
+              </select>
+
+              <select
+                value={milestoneCompletionFilter}
+                onChange={(event) => handleMilestoneCompletionFilterChange(event.target.value)}
+                disabled={isInitialLoading}
+                aria-label="Filter by milestone completion rate"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">All milestone progress</option>
+                <option value="NONE">No milestones</option>
+                <option value="0-24">0–24% complete</option>
+                <option value="25-49">25–49% complete</option>
+                <option value="50-74">50–74% complete</option>
+                <option value="75-99">75–99% complete</option>
+                <option value="100-100">100% complete</option>
               </select>
 
               <select

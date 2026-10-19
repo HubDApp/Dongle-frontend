@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
 import Link from "next/link";
 import { useNotifications } from "@/context/notification.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
@@ -75,6 +75,14 @@ export default function NotificationBell() {
               ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              <Link
+                href="/settings/notifications"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                onClick={() => setOpen(false)}
+              >
+                <Settings className="h-3.5 w-3.5" aria-hidden="true" />
+                Settings
+              </Link>
               <button
                 type="button"
                 className="rounded-md px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"

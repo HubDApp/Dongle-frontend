@@ -15,8 +15,21 @@ import { useWallet } from "@/context/wallet.context";
 import { useAuth } from "@/context/auth.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { notificationService } from "@/services/notification/notification.service";
+import { notificationPreferencesService, type NotificationPreferences } from "@/services/notifications/notification-preferences.service";
 import { createNotificationStream, type StreamStatus } from "@/lib/notifications/stream";
 import { parseNotificationEvent } from "@/lib/notifications/parse-event";
+import {
+  getDeliveryMode,
+  getNextDigestAt,
+  getNextQuietHoursEnd,
+  groupSimilarNotifications,
+  type NotificationDevice,
+} from "@/lib/notifications/delivery-policy";
+import {
+  loadPendingDeliveries,
+  savePendingDeliveries,
+  type PendingNotificationDelivery,
+} from "@/lib/notifications/pending-delivery";
 import {
   NOTIFICATION_HISTORY_LIMIT,
   NOTIFICATION_TOAST_MS,
@@ -67,8 +80,134 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [status, setStatus] = useState<StreamStatus>("idle");
   const [open, setOpen] = useState(false);
+  const [deliveryPreferences, setDeliveryPreferences] = useState<NotificationPreferences | null>(null);
+  const [deliveryDevice, setDeliveryDevice] = useState<NotificationDevice>("desktop");
+  const [pendingDeliveries, setPendingDeliveries] = useState<PendingNotificationDelivery[]>([]);
+  const [pendingReady, setPendingReady] = useState(false);
   const streamRef = useRef<{ close: () => void } | null>(null);
   const seenToasts = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!recipient) {
+      setDeliveryPreferences(null);
+      setPendingDeliveries([]);
+      setPendingReady(true);
+      return;
+    }
+    setPendingReady(false);
+    setDeliveryPreferences(notificationPreferencesService.getPreferences(recipient));
+    setPendingDeliveries(loadPendingDeliveries(recipient));
+    setPendingReady(true);
+  }, [recipient]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const updateDevice = () => setDeliveryDevice(media.matches ? "mobile" : "desktop");
+    updateDevice();
+    media.addEventListener("change", updateDevice);
+    return () => media.removeEventListener("change", updateDevice);
+  }, []);
+
+  useEffect(() => {
+    const onPreferencesChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId: string; preferences: NotificationPreferences }>).detail;
+      if (detail?.userId === recipient) setDeliveryPreferences(detail.preferences);
+    };
+    window.addEventListener("dongle:notification-preferences-changed", onPreferencesChanged);
+    return () => window.removeEventListener("dongle:notification-preferences-changed", onPreferencesChanged);
+  }, [recipient]);
+
+  useEffect(() => {
+    if (recipient && pendingReady) savePendingDeliveries(recipient, pendingDeliveries);
+  }, [recipient, pendingDeliveries, pendingReady]);
+
+  const showEventToast = useCallback((event: NotificationStreamEvent) => {
+    const copy = translateEvent(event, t as never);
+    toast(copy.title, { description: copy.message, duration: NOTIFICATION_TOAST_MS });
+  }, [t]);
+
+  useEffect(() => {
+    if (!recipient || !deliveryPreferences || !pendingReady) return;
+    if (!deliveryPreferences.enabled || deliveryPreferences.doNotDisturb) {
+      const remaining: PendingNotificationDelivery[] = [];
+      if (remaining.length !== pendingDeliveries.length) {
+        setPendingDeliveries(remaining);
+        savePendingDeliveries(recipient, remaining);
+      }
+      return;
+    }
+
+    if (!deliveryPreferences.devices[deliveryDevice].enabled) {
+      const remaining = pendingDeliveries.filter((item) => item.device !== deliveryDevice);
+      if (remaining.length !== pendingDeliveries.length) {
+        setPendingDeliveries(remaining);
+        savePendingDeliveries(recipient, remaining);
+      }
+      return;
+    }
+
+    const activePending = pendingDeliveries.filter((item) => item.device === deliveryDevice);
+    if (activePending.length === 0) return;
+    const dueAt = Math.min(...activePending.map((item) => Date.parse(item.dueAt)));
+    const timer = window.setTimeout(() => {
+      const now = new Date();
+      const nextPending: PendingNotificationDelivery[] = [];
+      const immediateEvents: NotificationStreamEvent[] = [];
+      const batchedEvents: NotificationStreamEvent[] = [];
+      for (const item of pendingDeliveries) {
+        if (item.device !== deliveryDevice || Date.parse(item.dueAt) > now.getTime()) {
+          nextPending.push(item);
+          continue;
+        }
+        const mode = getDeliveryMode(item.event, deliveryPreferences, deliveryDevice, now);
+        if (mode === "silent") continue;
+        if (mode === "defer") {
+          const quietEnd = getNextQuietHoursEnd(now, deliveryPreferences.quietHours);
+          const keepAsBatch = item.kind === "batch" &&
+            deliveryPreferences.batching.enabled &&
+            deliveryPreferences.devices[deliveryDevice].batchLowPriority;
+          nextPending.push({
+            ...item,
+            dueAt: keepAsBatch
+              ? getNextDigestAt(quietEnd, deliveryPreferences.batching, deliveryPreferences.quietHours.timeZone).toISOString()
+              : quietEnd.toISOString(),
+            kind: keepAsBatch ? "batch" : "defer",
+          });
+        } else if (mode === "batch" && item.kind === "defer") {
+          nextPending.push({
+            ...item,
+            dueAt: getNextDigestAt(now, deliveryPreferences.batching, deliveryPreferences.quietHours.timeZone).toISOString(),
+            kind: "batch",
+          });
+        } else if (mode === "batch") {
+          batchedEvents.push(item.event);
+        } else {
+          immediateEvents.push(item.event);
+        }
+      }
+
+      immediateEvents.forEach(showEventToast);
+      if (batchedEvents.length > 0) {
+        const groups = groupSimilarNotifications(batchedEvents, deliveryPreferences.batching.smartGrouping);
+        const description = groups.map((group) => {
+          const copy = translateEvent(group.events[0], t as never);
+          return `${group.count} ${copy.title}`;
+        }).join(" · ");
+        toast("Notification digest", { description, duration: NOTIFICATION_TOAST_MS });
+      }
+      setPendingDeliveries(nextPending);
+      savePendingDeliveries(recipient, nextPending);
+    }, Math.max(0, dueAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [
+    recipient,
+    deliveryPreferences,
+    deliveryDevice,
+    pendingDeliveries,
+    pendingReady,
+    showEventToast,
+    t,
+  ]);
 
   const loadLocal = useCallback(() => {
     if (!recipient) {
@@ -132,6 +271,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             eventId: event.id,
             recipientAddress: recipient,
             type: event.type,
+            priority: event.priority,
             title: copy.title,
             message: copy.message,
             createdAt: event.createdAt,
@@ -145,10 +285,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           loadLocal();
           if (!seenToasts.current.has(event.id)) {
             seenToasts.current.add(event.id);
-            toast(copy.title, {
-              description: copy.message,
-              duration: NOTIFICATION_TOAST_MS,
-            });
+            const preferences = deliveryPreferences ?? notificationPreferencesService.getPreferences(recipient);
+            const now = new Date();
+            const mode = getDeliveryMode(event, preferences, deliveryDevice, now);
+            if (mode === "immediate") {
+              showEventToast(event);
+            } else if (mode === "batch" || mode === "defer") {
+              const dueAt = mode === "batch"
+                ? getNextDigestAt(now, preferences.batching, preferences.quietHours.timeZone)
+                : getNextQuietHoursEnd(now, preferences.quietHours);
+              setPendingDeliveries((current) => current.some((item) => item.event.id === event.id)
+                ? current
+                : [...current, { event, dueAt: dueAt.toISOString(), device: deliveryDevice, kind: mode }]);
+            }
           }
         },
       });
@@ -160,7 +309,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       streamRef.current?.close();
       streamRef.current = null;
     };
-  }, [loadLocal, recipient, t]);
+  }, [
+    loadLocal,
+    recipient,
+    t,
+    deliveryPreferences,
+    deliveryDevice,
+    showEventToast,
+  ]);
 
   const markRead = useCallback(
     (id: string) => {

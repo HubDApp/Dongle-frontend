@@ -15,7 +15,21 @@ export interface Review {
   signature?: string;
   signatureNonce?: string;
   signatureTimestamp?: string;
+  ownerResponse?: ReviewOwnerResponse;
 }
+
+export interface ReviewOwnerResponse {
+  text: string;
+  ownerAddress: string;
+  createdAt: string;
+  updatedAt: string;
+  hiddenByAdmin?: boolean;
+  moderatedAt?: string;
+  moderatedBy?: string;
+}
+
+export const REVIEW_OWNER_RESPONSE_MAX_LENGTH = 500;
+export const REVIEW_OWNER_RESPONSE_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Shape accepted when creating a review.

@@ -186,6 +186,8 @@ export default function ProjectUpdatesPage() {
         {/* Update list with sort/filter controls */}
         <UpdateList
           updates={updates}
+              projectId={projectId}
+              userAddress={gate.publicKey}
           canManage={Boolean(isOwner)}
           onEdit={handleEditUpdate}
           onDelete={handleDeleteUpdate}

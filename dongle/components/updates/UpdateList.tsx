@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { ProjectUpdate, UpdateType, UPDATE_TYPES } from "@/types/update";
+import React, { useState, useMemo, useEffect } from "react";
+import { ProjectUpdate, UpdateReactionSummary, UpdateReactionType, UpdateType, UPDATE_REACTIONS, UPDATE_TYPES } from "@/types/update";
 import { formatDateUTC, formatRelative } from "@/lib/dates";
 import { Badge } from "@/components/ui/Badge";
-import { Megaphone, Shield, Target, Bell, Edit2, Trash2, ArrowUpDown } from "lucide-react";
+import { Megaphone, Shield, Target, Bell, Edit2, Trash2, ArrowUpDown, Heart } from "lucide-react";
+import { updateReactionService } from "@/services/update/update-reaction.service";
+import { toast } from "sonner";
 
 interface UpdateListProps {
   updates: ProjectUpdate[];
+  projectId: string;
+  userAddress?: string | null;
   canManage?: boolean;
   onEdit?: (update: ProjectUpdate) => void;
   onDelete?: (id: string) => void;
@@ -37,12 +41,31 @@ const SORT_LABELS: Record<SortOption, string> = {
 
 export default function UpdateList({
   updates,
+  projectId,
+  userAddress,
   canManage = false,
   onEdit,
   onDelete,
 }: UpdateListProps) {
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [typeFilter, setTypeFilter] = useState<UpdateType | "All">("All");
+  const [reactionSummaries, setReactionSummaries] = useState<Record<string, UpdateReactionSummary>>({});
+  const [pendingReactions, setPendingReactions] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    updateReactionService.getSummaries(
+      projectId,
+      updates.map((update) => update.id),
+      userAddress,
+    ).then((summaries) => {
+      if (cancelled) return;
+      setReactionSummaries(Object.fromEntries(summaries.map((summary) => [summary.updateId, summary])));
+    }).catch(() => {
+      if (!cancelled) toast.error("Could not load update reactions");
+    });
+    return () => { cancelled = true; };
+  }, [projectId, updates, userAddress]);
 
   const updateTypes = useMemo((): UpdateType[] => {
     const seen = new Set<UpdateType>();
@@ -78,6 +101,44 @@ export default function UpdateList({
 
     return list;
   }, [updates, sortBy, typeFilter]);
+
+  const reactionAnalytics = useMemo(() => {
+    const totals = Object.fromEntries(UPDATE_REACTIONS.map((reaction) => [reaction, 0])) as Record<UpdateReactionType, number>;
+    let mostReacted: { update: ProjectUpdate; count: number } | null = null;
+    for (const update of updates) {
+      const counts = reactionSummaries[update.id]?.counts ?? {};
+      const total = UPDATE_REACTIONS.reduce((sum, reaction) => {
+        const count = counts[reaction] ?? 0;
+        totals[reaction] += count;
+        return sum + count;
+      }, 0);
+      if (total > 0 && (!mostReacted || total > mostReacted.count)) {
+        mostReacted = { update, count: total };
+      }
+    }
+    return { totals, mostReacted };
+  }, [updates, reactionSummaries]);
+
+  const handleReaction = async (update: ProjectUpdate, reaction: UpdateReactionType) => {
+    if (!userAddress) {
+      toast.error("Connect your wallet to react to updates");
+      return;
+    }
+    const pendingKey = `${update.id}:${reaction}`;
+    setPendingReactions((current) => new Set(current).add(pendingKey));
+    try {
+      const summary = await updateReactionService.toggleReaction(projectId, update.id, reaction, userAddress);
+      setReactionSummaries((current) => ({ ...current, [update.id]: summary }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save reaction");
+    } finally {
+      setPendingReactions((current) => {
+        const next = new Set(current);
+        next.delete(pendingKey);
+        return next;
+      });
+    }
+  };
 
   if (updates.length === 0) {
     return (
@@ -148,6 +209,24 @@ export default function UpdateList({
         )}
       </div>
 
+      {canManage && updates.length > 0 && (
+        <section className="border-y border-zinc-200 py-3 dark:border-zinc-800" aria-label="Reaction analytics">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Reaction analytics</h3>
+            {UPDATE_REACTIONS.map((reaction) => (
+              <span key={reaction} className="text-sm text-zinc-600 dark:text-zinc-400" aria-label={`${reactionAnalytics.totals[reaction]} ${reaction} reactions`}>
+                {reaction} {reactionAnalytics.totals[reaction]}
+              </span>
+            ))}
+            {reactionAnalytics.mostReacted && (
+              <span className="ml-auto text-xs text-zinc-500 dark:text-zinc-400">
+                Top update: {reactionAnalytics.mostReacted.update.title} ({reactionAnalytics.mostReacted.count})
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Empty filtered state */}
       {sorted.length === 0 && (
         <div className="text-center py-8">
@@ -161,11 +240,17 @@ export default function UpdateList({
       {sorted.map((update) => {
         const Icon = UPDATE_ICONS[update.type];
         const colorClass = UPDATE_COLORS[update.type];
+        const summary = reactionSummaries[update.id];
+        const totalReactions = UPDATE_REACTIONS.reduce(
+          (total, reaction) => total + (summary?.counts[reaction] ?? 0),
+          0,
+        );
+        const isMostReacted = totalReactions > 0 && reactionAnalytics.mostReacted?.update.id === update.id;
 
         return (
           <div
             key={update.id}
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+            className={`bg-white dark:bg-zinc-900 border rounded-2xl p-6 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors ${isMostReacted ? "border-amber-400 dark:border-amber-500" : "border-zinc-200 dark:border-zinc-800"}`}
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3">
@@ -181,6 +266,11 @@ export default function UpdateList({
                     {update.version && (
                       <Badge variant="secondary" className="text-xs">
                         {update.version}
+                      </Badge>
+                    )}
+                    {isMostReacted && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Heart className="mr-1 h-3 w-3" aria-hidden="true" />Most reacted
                       </Badge>
                     )}
                   </div>
@@ -226,6 +316,29 @@ export default function UpdateList({
             <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">
               {update.content}
             </p>
+
+            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label={`Reactions for ${update.title}`}>
+              {UPDATE_REACTIONS.map((reaction) => {
+                const count = summary?.counts[reaction] ?? 0;
+                const selected = summary?.userReactions.includes(reaction) ?? false;
+                const pending = pendingReactions.has(`${update.id}:${reaction}`);
+                return (
+                  <button
+                    key={reaction}
+                    type="button"
+                    onClick={() => void handleReaction(update, reaction)}
+                    disabled={pending}
+                    aria-label={`${reaction} ${count}${count === 1 ? " reaction" : " reactions"}`}
+                    aria-pressed={selected}
+                    title={`React with ${reaction}`}
+                    className={`inline-flex min-w-14 items-center justify-center gap-1 rounded-md border px-2 py-1 text-sm transition-colors disabled:opacity-50 ${selected ? "border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
+                  >
+                    <span aria-hidden="true">{reaction}</span>
+                    <span>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         );
       })}

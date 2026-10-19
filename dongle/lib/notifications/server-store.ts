@@ -59,6 +59,7 @@ export function publishNotificationEvent(
     eventId: input.id,
     recipientAddress: input.recipientId,
     type: input.type as NotificationType,
+    priority: input.priority,
     title: input.type,
     message: undefined,
     createdAt: input.createdAt,

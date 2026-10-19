@@ -14,12 +14,16 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { AlertTriangle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { trackReviewSubmit } from "@/lib/analytics";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { downloadCsv } from "@/lib/analytics-dashboard/csv";
+import { reviewsToCsv } from "@/lib/review-export";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
 
 export default function ReviewsPage() {
   const gate = useWalletPageGate();
+  const { isAdmin } = useAdminAccess();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingReview, setIsAddingReview] = useState(false);
@@ -93,6 +97,10 @@ export default function ReviewsPage() {
         toast.error(result.error || "Failed to delete review");
       }
     }
+  };
+
+  const handleExportReviews = () => {
+    downloadCsv("dongle-reviews.csv", reviewsToCsv(sortedReviews));
   };
 
   const handleVoteHelpful = async (id: string) => {
@@ -363,6 +371,13 @@ export default function ReviewsPage() {
                       : "Recent Activity"}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <button
+                      type="button"
+                      onClick={handleExportReviews}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Export CSV
+                    </button>
                     {gate.publicKey && (
                       <div className="flex items-center gap-2">
                         <span className="text-zinc-500 whitespace-nowrap">Show:</span>
@@ -430,6 +445,7 @@ export default function ReviewsPage() {
                 <ReviewList
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
+                  isAdmin={isAdmin}
                   onEdit={handleEditReview}
                   onDelete={handleDeleteReview}
                   onVoteHelpful={handleVoteHelpful}
