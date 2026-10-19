@@ -64,6 +64,7 @@ import { reviewModerationService } from "@/services/review/review-moderation.ser
 import { updateService } from "@/services/update/update.service";
 import { abbreviateStellarAddress } from "@/lib/stellar-address";
 import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { ProjectTimeline } from "@/components/projects/ProjectTimeline";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -1135,6 +1136,11 @@ export default function ProjectDetailPage() {
               {project.contractAddresses && project.contractAddresses.length > 0 && (
                 <ContractAddressList addresses={project.contractAddresses} />
               )}
+
+              {/* Event Timeline — Issue #658 */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+                <ProjectTimeline projectId={projectId} />
+              </div>
             </div>
           </div>
         </div>

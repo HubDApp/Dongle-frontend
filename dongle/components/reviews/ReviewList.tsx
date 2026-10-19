@@ -5,6 +5,7 @@ import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { ReviewComments } from "@/components/reviews/ReviewComments";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -141,6 +142,12 @@ export default function ReviewList({
               )}
             </div>
           </div>
+
+          {/* Threaded discussion — Issue #654 */}
+          <ReviewComments
+            reviewId={review.id}
+            currentUserAddress={currentUserAddress}
+          />
         </div>
       ))}
     </div>
