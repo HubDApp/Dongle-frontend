@@ -1,0 +1,162 @@
+name: Deploy – Production
+
+# Production deployments require a manual approval from a designated reviewer
+# before Vercel promotes the build to the production alias.
+#
+# Trigger: workflow_dispatch (manual) or after deploy-staging succeeds on main.
+#
+# Required secrets:
+#   VERCEL_TOKEN
+#   VERCEL_ORG_ID
+#   VERCEL_PROJECT_ID
+#
+# Required setup:
+#   1. In your GitHub repo go to Settings → Environments → create "production".
+#   2. Under "Required reviewers" add the team or individuals who can approve.
+#   3. Optionally set "Deployment branches" to only allow main.
+
+on:
+  # Trigger automatically after staging smoke-tests pass on main.
+  workflow_run:
+    workflows: ["Deploy – Staging"]
+    types:
+      - completed
+    branches:
+      - main
+
+  # Also allow a fully manual trigger (e.g. hotfix deployments).
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual production deploy"
+        required: true
+        type: string
+
+concurrency:
+  # Serialise production deploys; never run two at the same time.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ── Guard: only continue if the triggering staging run succeeded ─────────
+  check-staging:
+    name: Check staging run status
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Confirm prerequisite
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "Staging workflow completed successfully – proceeding to approval gate."
+          else
+            echo "Manual trigger: ${{ inputs.reason }}"
+          fi
+
+  # ── Approval gate ─────────────────────────────────────────────────────────
+  # GitHub pauses here until a reviewer approves the "production" environment.
+  # Configure required reviewers at:
+  #   Settings → Environments → production → Required reviewers
+  await-approval:
+    name: Await production approval
+    needs: check-staging
+    runs-on: ubuntu-latest
+    environment: production   # <── this is what triggers the approval gate
+    steps:
+      - name: Approval granted
+        run: echo "Production deployment approved – continuing."
+
+  # ── Production deploy ─────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to production
+    needs: await-approval
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    outputs:
+      production-url: ${{ steps.deploy.outputs.production-url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build via Vercel
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Vercel (production)
+        id: deploy
+        run: |
+          PRODUCTION_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          echo "production-url=${PRODUCTION_URL}" >> "$GITHUB_OUTPUT"
+          echo "Production URL: ${PRODUCTION_URL}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Write production URL to summary
+        run: |
+          echo "### Production Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "🚀 Deployed to **${{ steps.deploy.outputs.production-url }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Triggered by @${{ github.actor }} on commit \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Post-deploy smoke test ────────────────────────────────────────────────
+  smoke-test-production:
+    name: Smoke-test production
+    needs: deploy-production
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Run production smoke tests
+        env:
+          PREVIEW_URL: ${{ needs.deploy-production.outputs.production-url }}
+        run: node scripts/preview-smoke.js
+
+      - name: Validate production environment
+        env:
+          PREVIEW_URL: ${{ needs.deploy-production.outputs.production-url }}
+          NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT }}
+          NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT }}
+          NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT }}
+          NEXT_PUBLIC_SOROBAN_RPC_URL: ${{ secrets.NEXT_PUBLIC_SOROBAN_RPC_URL }}
+          NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE: ${{ secrets.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE }}
+        run: node scripts/validate-production-env.js

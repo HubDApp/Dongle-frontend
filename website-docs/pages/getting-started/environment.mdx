@@ -1,0 +1,97 @@
+---
+title: Environment Variables
+description: Complete reference for all Dongle environment variables.
+---
+
+import { Callout } from "nextra/components";
+
+# Environment Variables
+
+Copy the template to get started:
+
+```bash
+cp dongle/.env.example dongle/.env.local
+```
+
+<Callout type="warning">
+  **Never commit `.env.local`** — it is listed in `.gitignore`. Secrets like `AUTH_SESSION_SECRET` and OAuth client secrets must never appear in `NEXT_PUBLIC_*` variables.
+</Callout>
+
+## Smart Contract Configuration
+
+| Variable | Required | Format | Description |
+|----------|----------|--------|-------------|
+| `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT` | Production | `C` + 55 base32 chars | Soroban Project Registry contract ID |
+| `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` | Production | `C` + 55 base32 chars | Soroban Review Registry contract ID |
+| `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | Production | `C` + 55 base32 chars | Soroban Verification Registry contract ID |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL` | No | HTTPS URL | Soroban RPC endpoint. Defaults to testnet. |
+| `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | No | String | Network identifier. Defaults to testnet passphrase. |
+
+### Contract ID Format
+
+```
+C[A-Z2-7]{55}   →  56 characters total, starts with C
+```
+
+Example: `CAAE7WTI3X5HZQCDT5O3EH7FVDX7VKJP3WVLVZM3NUJSQFXLW5UQ4SVQ`
+
+### Network Passphrases
+
+| Network | Passphrase |
+|---------|------------|
+| Testnet | `Test SDF Network ; September 2015` |
+| Mainnet | `Public Global Stellar Network ; September 2015` |
+
+## Authentication
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AUTH_APP_URL` | OAuth | Canonical origin for OAuth redirect callbacks |
+| `AUTH_SESSION_SECRET` | OAuth | Server-side JWT secret for session cookies |
+| `GOOGLE_CLIENT_ID` | Google OAuth | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth | Server-only; never `NEXT_PUBLIC_*` |
+| `GITHUB_CLIENT_ID` | GitHub OAuth | From GitHub Developer Settings |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth | Server-only; never `NEXT_PUBLIC_*` |
+
+## Application
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_ADMIN_ALLOWLIST` | No | Comma-separated `G…` wallet addresses for admin access. Empty = no admin UI. |
+| `NEXT_PUBLIC_REVIEW_PERSISTENCE` | No | Set to `api` for server persistence. Defaults to `localStorage`. |
+| `CRON_SECRET` | No | Guards the `/api/cron/analytics` endpoint |
+
+## Validation
+
+The application validates all variables at startup using Zod schemas (`constants/env.schema.ts`):
+
+- **Development / Test** — missing values use safe defaults; warnings are logged.
+- **Production** — all required values must be explicitly set. Invalid or placeholder values cause a startup failure with a clear field-by-field error report.
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║          ENVIRONMENT CONFIGURATION ERROR                     ║
+╚══════════════════════════════════════════════════════════════╝
+
+Environment: PRODUCTION
+
+  - NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT:
+    Development placeholder contract ID not allowed in production.
+    Deploy contracts and set real contract IDs.
+```
+
+Run validation manually:
+
+```bash
+cd dongle
+npm run validate:env
+```
+
+## Setting Up OAuth (Optional)
+
+Full read/write access requires only Freighter. OAuth provides read-only identity for browsing.
+
+1. **Google** — [Google Cloud Console](https://console.cloud.google.com/) → OAuth client (Web) → Redirect URI: `{AUTH_APP_URL}/api/auth/oauth/google/callback`
+2. **GitHub** — [Developer Settings](https://github.com/settings/developers) → OAuth App → Callback URL: `{AUTH_APP_URL}/api/auth/oauth/github/callback`
+3. Add the client ID and secret to `dongle/.env.local`.
+4. Set `AUTH_SESSION_SECRET` (any secure random string) and `AUTH_APP_URL`.

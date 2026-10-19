@@ -1,0 +1,102 @@
+---
+title: Project Registry Contract
+description: ABI, call patterns, and frontend mapping for the Project Registry Soroban contract.
+---
+
+# Project Registry Contract
+
+**Contract ID:** `DONGLE_CONTRACTS.PROJECT_REGISTRY`  
+**Service:** `dongle/services/stellar/soroban.service.ts`
+
+## Implemented Functions
+
+### `register_project`
+
+Registers a new project on-chain. Called by project owners via the Submit Project form.
+
+```
+register_project(
+  name:        Symbol,
+  category:    Symbol,
+  description: Symbol,
+  website_url: Symbol,
+  github_url:  Option<Symbol>,
+  logo_url:    Option<Symbol>,
+  docs_url:    Option<Symbol>,
+) → void
+```
+
+**Frontend `ProjectRegistrationParams` → ScVal mapping:**
+
+| Param | Type | Required |
+|-------|------|----------|
+| `name` | `string` | ✓ |
+| `category` | `string` | ✓ |
+| `description` | `string` | ✓ |
+| `websiteUrl` | `string` | ✓ |
+| `githubUrl` | `string` | — |
+| `logoUrl` | `string` | — |
+| `docsUrl` | `string` | — |
+
+**Return (frontend):** `{ hash: string; status: "SUCCESS" }`
+
+```typescript
+const result = await sorobanService.registerProject({
+  name: "Soroban Swap",
+  category: "DeFi / DEX",
+  description: "Automated market maker on Stellar.",
+  websiteUrl: "https://sorobanswap.example.com",
+}, { onPhaseChange });
+```
+
+---
+
+### `update_project`
+
+Updates an existing listing. Only the on-chain owner may call.
+
+```
+update_project(
+  project_id:  Symbol,
+  name:        Symbol,
+  category:    Symbol,
+  description: Symbol,
+  website_url: Symbol,
+  github_url:  Option<Symbol>,
+  logo_url:    Option<Symbol>,
+  docs_url:    Option<Symbol>,
+) → void
+```
+
+**Preconditions (enforced by frontend before tx):**
+- Project exists (`getProject(projectId)`)
+- `project.owner === publicKey`
+
+---
+
+## Target ABI — Read Functions
+
+These view functions are expected when the contract ships read endpoints:
+
+```
+get_project(project_id: Symbol)             → ProjectData
+list_projects(offset: u32, limit: u32)      → Vec<ProjectData>
+get_project_count()                          → u32
+```
+
+**Expected `ProjectData` shape:**
+
+```typescript
+interface ProjectData {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  websiteUrl: string;
+  githubUrl?: string;
+  logoUrl: string;
+  docsUrl: string;
+  owner: string;     // Stellar public key (G…)
+  createdAt: string; // ISO timestamp or ledger time
+}
+```

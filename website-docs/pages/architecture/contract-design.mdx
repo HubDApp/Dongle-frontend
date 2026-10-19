@@ -1,0 +1,68 @@
+---
+title: "ADR 0003: Contract Design"
+description: Why Dongle uses three dedicated Soroban registries with environment-configured IDs.
+---
+
+# ADR 0003: Split Soroban Registries + Env-Configured IDs
+
+| | |
+|---|---|
+| **Status** | Accepted |
+| **Date** | 2026-08-26 |
+
+## Context
+
+Dongle talks to three on-chain concerns: listing dApps, storing review pointers, and running the verification lifecycle. A single "god contract" would simplify the frontend (one ID, one ABI) but would couple upgrades and increase audit surface.
+
+The frontend must also run against **testnet placeholders in development** and **real IDs in production** without code edits. Wrong IDs or a mainnet/testnet mix-up would submit transactions to the wrong program.
+
+## Decision
+
+**Three dedicated Soroban contracts:**
+
+1. **Project Registry** — create/update listings, ownership, categories
+2. **Review Registry** — one review per (user, project), rating, off-chain CID
+3. **Verification Registry** — request / approve / reject / revoke, evidence CID, status
+
+The frontend never hardcodes production IDs. It reads from environment:
+
+| Env var | Purpose |
+|---------|---------|
+| `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT` | Project registry ID |
+| `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` | Review registry ID |
+| `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | Verification registry ID |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL` | RPC endpoint |
+| `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE` | Network identity |
+
+`soroban.service.ts` is the **only** module that builds transactions. UI components call hooks/services, not `Contract` directly.
+
+```typescript
+// constants/contracts.ts — Zod validation
+export const ContractIdSchema = z
+  .string()
+  .regex(/^C[A-Z2-7]{55}$/, "Invalid Stellar Contract ID format");
+```
+
+Production builds fail fast on placeholder IDs.
+
+## Consequences
+
+**Positive**
+- Registries can upgrade independently
+- Env-based IDs make testnet/mainnet and preview deploys mechanical
+- Fail-fast validation in production prevents shipping a placeholder build
+- Clear mapping to the three user journeys: list, review, verify
+
+**Negative**
+- Cross-contract reads (e.g. average rating on a project card) need multiple RPC calls or an indexer
+- More IDs to keep in sync across frontend, docs, and deploy scripts
+- Frontend must handle partial outages (reviews up, verification down)
+
+## Alternatives Considered
+
+| Alternative | Why rejected |
+|-------------|-------------|
+| Monolithic Dongle contract | Simpler client, painful upgrades, larger audits, mixed auth |
+| Backend-only writes, contracts as archive | Contradicts wallet-signed, user-visible on-chain actions |
+| Hardcoded IDs in source | Breaks preview apps; forces a frontend release for every redeploy |
+| One registry + off-chain everything | Listings would not be independently verifiable |

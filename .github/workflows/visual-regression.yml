@@ -1,0 +1,80 @@
+name: Visual Regression (Chromatic)
+
+# Runs Chromatic visual regression snapshots on every PR and push to main.
+# Chromatic compares snapshots against the accepted baseline and blocks the
+# PR if unreviewed UI changes are detected.
+#
+# Required secrets:
+#   CHROMATIC_PROJECT_TOKEN  – found in your Chromatic project settings.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "dongle/**"
+      - ".github/workflows/visual-regression.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "dongle/**"
+      - ".github/workflows/visual-regression.yml"
+
+concurrency:
+  group: visual-regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic:
+    name: Chromatic snapshot comparison
+    runs-on: ubuntu-latest
+
+    # Skip gracefully when the project token is not configured yet.
+    # Remove this condition once CHROMATIC_PROJECT_TOKEN is added to repo secrets.
+    if: ${{ vars.CHROMATIC_ENABLED == 'true' || secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Chromatic needs full git history to diff against the correct baseline.
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build for Chromatic
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Run Chromatic
+        uses: chromaui/action@latest
+        with:
+          # Chromatic action expects to run from the repo root; point it at the
+          # dongle working directory via workingDir.
+          workingDir: dongle
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          # Only fail the build for genuine regressions (not just new stories).
+          exitZeroOnChanges: false
+          # Upload even on PR branches so reviewers can approve via Chromatic UI.
+          autoAcceptChanges: "main"
+          # Chromatic Playwright mode – captures E2E screenshots as stories.
+          playwright: true
+          # How many browsers to use in parallel for snapshot capture.
+          zip: true

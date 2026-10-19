@@ -1,0 +1,40 @@
+---
+title: Component Library
+description: Overview of Dongle's UI primitive components.
+---
+
+import { Callout } from "nextra/components";
+
+# Component Library
+
+Dongle's primitive components live in `dongle/components/ui/`.
+
+<Callout>
+  **Live playground** — run `npm run dev` in `dongle/` and open [http://localhost:3000/docs/components](http://localhost:3000/docs/components) for an interactive example browser.
+</Callout>
+
+## Components
+
+| Component | Import path | Description |
+|-----------|-------------|-------------|
+| `Button` | `@/components/ui/Button` | Actions and form submits |
+| `Card` | `@/components/ui/Card` | Content grouping surface |
+| `Badge` | `@/components/ui/Badge` | Compact status labels |
+| `Input` | `@/components/ui/Input` | Text input field |
+| `FormField` | `@/components/ui/FormField` | Label + input + error wrapper |
+| `SelectField` | `@/components/ui/SelectField` | Dropdown select |
+| `TextAreaField` | `@/components/ui/TextAreaField` | Multi-line text |
+| `Spinner` | `@/components/ui/Spinner` | Loading indicator |
+| `ConfirmDialog` | `@/components/ui/ConfirmDialog` | Confirmation modal |
+| `AddressDisplay` | `@/components/ui/AddressDisplay` | Stellar address with copy |
+
+## Design Principles
+
+- **Accessible first** — every component ships with correct `aria-*` attributes, keyboard support, and focus indicators.
+- **Composable** — small, single-responsibility components that compose into larger patterns.
+- **Ref-forwarding** — `Button` and `Input` forward refs for third-party integration.
+- **No global CSS** — all styles use Tailwind utility classes for predictable overriding.
+
+## Accessibility Standard
+
+All components target **WCAG 2.1 AA**. Tests run on every PR using axe-core unit tests and pa11y-ci headless Chrome page audits.
