@@ -19,10 +19,19 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import {
+  getHealthHistory,
+  getHealthTrend,
+  getProjectHealth,
+  recordHealthSnapshots,
+  type ProjectHealth,
+} from "@/lib/project-health";
 import projectService from "@/services/project/project.service";
 import { Spinner } from "@/components/ui/Spinner";
 
 const ITEMS_PER_PAGE = 9;
+
+type HealthFilter = "ALL" | "80" | "60" | "40" | "BELOW_40";
 
 // ─── Inner component (uses useSearchParams via useDiscoverParams) ──────────────
 
@@ -33,6 +42,8 @@ function DiscoverContent() {
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
   const [verificationTierFilter, setVerificationTierFilter] = useState<VerificationTier | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>("ALL");
+  const [healthTrends, setHealthTrends] = useState<Record<string, number | null>>({});
   const gate = useWalletPageGate();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
@@ -80,6 +91,27 @@ function DiscoverContent() {
 
   const categories = projectService.getCategories();
 
+  const healthById = useMemo(() => {
+    const map: Record<string, ProjectHealth> = {};
+    for (const p of projectService.getDiscoverableProjects()) {
+      map[p.id] = getProjectHealth(p, { verificationStatus: verificationStatuses[p.id] });
+    }
+    return map;
+  }, [verificationStatuses]);
+
+  // Record this week's health snapshot for every project once verification
+  // statuses have loaded, then derive week-over-week trends for the badges.
+  useEffect(() => {
+    if (isInitialLoading) return;
+    const scores = Object.fromEntries(
+      Object.entries(healthById).map(([id, h]) => [id, h.score]),
+    );
+    recordHealthSnapshots(scores);
+    setHealthTrends(
+      Object.fromEntries(Object.keys(scores).map((id) => [id, getHealthTrend(getHealthHistory(id))])),
+    );
+  }, [healthById, isInitialLoading]);
+
   const filteredAndSortedProjects = useMemo(() => {
     let result = searchQuery
       ? projectService.searchProjects(searchQuery)
@@ -105,9 +137,19 @@ function DiscoverContent() {
       result = result.filter((p) => (p.status ?? "active") === statusFilter);
     }
 
-    result = projectService.sortProjects(result, sortBy);
+    if (healthFilter !== "ALL") {
+      result = result.filter((p) => {
+        const score = healthById[p.id]?.score ?? 0;
+        return healthFilter === "BELOW_40" ? score < 40 : score >= Number(healthFilter);
+      });
+    }
+
+    result =
+      sortBy === "health"
+        ? [...result].sort((a, b) => (healthById[b.id]?.score ?? 0) - (healthById[a.id]?.score ?? 0))
+        : projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationTierFilter, verificationStatuses]);
+  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationTierFilter, verificationStatuses, healthFilter, healthById]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -169,6 +211,11 @@ function DiscoverContent() {
     });
   };
 
+  const handleHealthFilterChange = (value: HealthFilter) => {
+    setHealthFilter(value);
+    trackFilter({ filterType: "health", filterValue: value, source: "discover" });
+  };
+
   const handleTagsChange = (nextTags: string[]) => {
     setTags(nextTags);
     trackFilter({
@@ -191,6 +238,7 @@ function DiscoverContent() {
     setStatusFilter("ALL");
     setVerificationFilter("ALL");
     setVerificationTierFilter("ALL");
+    setHealthFilter("ALL");
   };
 
   return (
@@ -308,6 +356,21 @@ function DiscoverContent() {
                 <option value="REJECTED">Rejected</option>
               </select>
 
+              {/* Health Filter */}
+              <select
+                value={healthFilter}
+                onChange={(e) => handleHealthFilterChange(e.target.value as HealthFilter)}
+                disabled={isInitialLoading}
+                aria-label="Filter by health score"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">Any health</option>
+                <option value="80">Excellent (80+)</option>
+                <option value="60">Good or better (60+)</option>
+                <option value="40">Fair or better (40+)</option>
+                <option value="BELOW_40">Poor (&lt;40)</option>
+              </select>
+
               {/* Sort */}
               <select
                 value={sortBy}
@@ -318,6 +381,7 @@ function DiscoverContent() {
                 <option value="rating">Highest Rated</option>
                 <option value="popular">Most Popular</option>
                 <option value="newest">Newest</option>
+                <option value="health">Healthiest</option>
               </select>
             </div>
           </div>
@@ -421,6 +485,8 @@ function DiscoverContent() {
                 project={project}
                 verificationStatus={verificationStatuses[project.id]}
                 highlightTerm={searchQuery}
+                health={healthById[project.id]}
+                healthTrend={healthTrends[project.id]}
               />
             ))}
           </div>

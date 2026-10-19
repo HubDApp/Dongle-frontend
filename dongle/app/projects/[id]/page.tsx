@@ -20,6 +20,8 @@ import {
 } from "@/components/reviews/RatingDistributionSummary";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
+import { ProjectHealthPanel } from "@/components/projects/ProjectHealthPanel";
+import { getProjectHealth } from "@/lib/project-health";
 import { Review,
   ReviewReport,
   ReviewReportReason } from "@/types/review";
@@ -205,6 +207,19 @@ export default function ProjectDetailPage() {
   }, [reviews, project?.rating]);
 
   const actualReviewCount = reviews.length || project?.reviews || 0;
+
+  const health = React.useMemo(
+    () =>
+      project
+        ? getProjectHealth(project, {
+            verificationStatus,
+            updates,
+            rating: actualRating,
+            reviewCount: actualReviewCount,
+          })
+        : null,
+    [project, verificationStatus, updates, actualRating, actualReviewCount],
+  );
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isOnList = project ? isOnWatchlist(project.id) : false;
@@ -967,6 +982,9 @@ export default function ProjectDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Project Health */}
+              {health && <ProjectHealthPanel projectId={project.id} health={health} />}
+
               {/* Verification Status */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
