@@ -81,6 +81,8 @@ export interface Project {
   websiteUrl?: string;
   githubUrl?: string;
   logoUrl?: string;
+  /** Optional project screenshot URLs, in display order. */
+  screenshots?: string[];
   docsUrl?: string;
   auditReportUrl?: string;
   bugBountyUrl?: string;

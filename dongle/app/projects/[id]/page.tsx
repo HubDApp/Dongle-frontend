@@ -15,7 +15,8 @@ import {
   RatingDistributionSummary,
   computeRatingDistribution,
 } from "@/components/reviews/RatingDistributionSummary";
-import ProjectImage from "@/components/projects/ProjectImage";
+import ProjectGallery from "@/components/projects/ProjectGallery";
+import ContextHelp from "@/components/ui/ContextHelp";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
 import { Review,
   ReviewReport,
@@ -99,7 +100,6 @@ export default function ProjectDetailPage() {
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
-  const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
@@ -325,10 +325,6 @@ export default function ProjectDetailPage() {
     if (reviewSort === "mine") {
       list = list.filter((r) => r.userAddress === gate.publicKey);
     }
-    if (ratingFilter !== "all") {
-      const ratingNum = parseInt(ratingFilter, 10);
-      list = list.filter((r) => r.rating === ratingNum);
-    }
     if (reviewSort === "highest") {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
@@ -339,7 +335,7 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
-  }, [reviews, reviewSort, ratingFilter, gate.publicKey]);
+  }, [reviews, reviewSort, gate.publicKey]);
 
   const projectEmptyMessage = React.useMemo(() => {
     if (reviews.length === 0) {
@@ -349,14 +345,11 @@ export default function ProjectDetailPage() {
     if (reviewSort === "mine") {
       activeFilters.push("your reviews");
     }
-    if (ratingFilter !== "all") {
-      activeFilters.push(`${ratingFilter}-star rating`);
-    }
     if (activeFilters.length > 0) {
       return `No reviews found matching ${activeFilters.join(" and ")}. Try adjusting your filter controls.`;
     }
     return "No reviews match the selected filter options.";
-  }, [reviews.length, reviewSort, ratingFilter]);
+  }, [reviews.length, reviewSort]);
 
   const handleEdit = (review: Review) => {
     setEditingReview(review);
@@ -653,12 +646,7 @@ export default function ProjectDetailPage() {
                 </div>
 
                 {/* Project Image */}
-                <ProjectImage
-                  logoUrl={project.logoUrl}
-                  name={project.name}
-                  className="mb-6"
-                  fallbackTextSize="text-4xl"
-                />
+                <ProjectGallery name={project.name} images={project.screenshots?.length ? project.screenshots : project.logoUrl ? [project.logoUrl] : []} />
 
                 {/* Description */}
                 <div className="mb-6">
@@ -811,22 +799,7 @@ export default function ProjectDetailPage() {
                     )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 text-sm">
-                      <span className="text-zinc-500 text-xs font-medium">Rating:</span>
-                      <select
-                        aria-label="Filter reviews by rating"
-                        value={ratingFilter}
-                        onChange={(e) => setRatingFilter(e.target.value)}
-                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      >
-                        <option value="all">All Ratings</option>
-                        <option value="5">5 Stars</option>
-                        <option value="4">4 Stars</option>
-                        <option value="3">3 Stars</option>
-                        <option value="2">2 Stars</option>
-                        <option value="1">1 Star</option>
-                      </select>
-                    </div>
+
                     <div className="flex items-center gap-1 text-sm">
                       <span className="text-zinc-500 text-xs font-medium">Sort:</span>
                       <select
@@ -909,6 +882,7 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
                 <ReviewList
+                  onClearFilters={() => { setReviewSort("newest"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
@@ -927,7 +901,7 @@ export default function ProjectDetailPage() {
               {/* Verification Status */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold">Verification Status</h3>
+                  <h3 className="text-lg font-bold">Verification Status <ContextHelp tip="verification" label="verification">Verification records a review of the project evidence by Dongle verifiers. It does not guarantee that a project is risk-free.</ContextHelp></h3>
                   {verificationError && (
                     <Button variant="outline" size="sm" onClick={retryVerification}>
                       Retry

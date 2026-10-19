@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import { getPrefetchValue } from "@/lib/prefetch-config";
 
 import { IconButton } from "@/components/ui/IconButton";

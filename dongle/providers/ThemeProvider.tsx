@@ -44,7 +44,11 @@ export function ThemeProvider({
 
   // Initialize theme from storage or use default
   useEffect(() => {
-    const stored = localStorage.getItem(storageKey) as Theme | null;
+    let stored: Theme | null = null;
+    try {
+      const value = localStorage.getItem(storageKey);
+      if (value === "light" || value === "dark" || value === "system") stored = value;
+    } catch { /* Storage is optional. */ }
     const initial = stored || defaultTheme;
     setThemeState(initial);
     setResolvedTheme(resolveTheme(initial));
@@ -85,12 +89,8 @@ export function ThemeProvider({
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     setResolvedTheme(resolveTheme(newTheme));
-    localStorage.setItem(storageKey, newTheme);
+    try { localStorage.setItem(storageKey, newTheme); } catch { /* Storage is optional. */ }
   };
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>

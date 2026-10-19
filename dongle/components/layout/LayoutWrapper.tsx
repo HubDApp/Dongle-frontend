@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import CommandPalette from "./CommandPalette";
 import NetworkMismatchBanner from "./NetworkMismatchBanner";
 import ProductionConfigBanner from "./ProductionConfigBanner";
 import { ComparisonFloatingButton } from "@/components/compare/ComparisonFloatingButton";
@@ -26,6 +27,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
+      <CommandPalette />
       <ProductionConfigBanner />
       <NetworkMismatchBanner />
       <main className="grow pt-16">

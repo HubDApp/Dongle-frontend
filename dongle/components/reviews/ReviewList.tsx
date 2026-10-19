@@ -5,6 +5,8 @@ import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { useEffect, useState } from "react";
+import { ratingOptions, validRating, matchesRating } from "@/lib/review-filters";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -16,6 +18,7 @@ interface ReviewListProps {
   onReport?: (review: Review) => void;
   emptyMessage?: string;
   emptyTitle?: string;
+  onClearFilters?: () => void;
 }
 
 export default function ReviewList({ 
@@ -27,20 +30,50 @@ export default function ReviewList({
   onVoteUnhelpful,
   onReport,
   emptyMessage,
-  emptyTitle
+  emptyTitle,
+  onClearFilters
 }: ReviewListProps) {
-  if (reviews.length === 0) {
+  const [rating, setRating] = useState("all");
+  useEffect(() => {
+    const sync = () => setRating(validRating(new URLSearchParams(window.location.search).get("reviewRating")));
+    sync();
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+  const changeRating = (value: string) => {
+    const next = validRating(value);
+    setRating(next);
+    const url = new URL(window.location.href);
+    if (next === "all") url.searchParams.delete("reviewRating");
+    else url.searchParams.set("reviewRating", next);
+    const destination = `${url.pathname}${url.search}${url.hash}`;
+    if (destination !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.pushState(null, "", destination);
+    }
+  };
+  const visibleReviews = reviews.filter(review => matchesRating(review.rating, rating));
+  const controls = <div className="flex flex-wrap items-center gap-3 mb-4">
+    <label className="flex items-center gap-2">Rating
+      <select aria-label="Filter reviews by rating" value={rating} onChange={e => changeRating(e.target.value)} className="rounded-lg border bg-white p-2 dark:bg-zinc-900">
+        {ratingOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
+    <span role="status">{visibleReviews.length} reviews</span>
+    <button type="button" className="underline" onClick={() => { changeRating("all"); onClearFilters?.(); }}>Clear filters</button>
+  </div>;
+  if (visibleReviews.length === 0) {
     return (
-      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
+      <div>{controls}<div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
         {emptyTitle && <p className="text-base font-bold text-zinc-700 dark:text-zinc-300 mb-1">{emptyTitle}</p>}
-        <p className="text-zinc-500">{emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
-      </div>
+        <p className="text-zinc-500">{rating !== "all" ? "No reviews match this rating range. Try clearing filters." : emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
+      </div></div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {reviews.map((review) => (
+      {controls}
+      {visibleReviews.map((review) => (
         <div 
           key={review.id}
           className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:border-zinc-300 dark:hover:border-zinc-700"

@@ -1,5 +1,6 @@
 "use client";
 
+import ContextHelp from "@/components/ui/ContextHelp";
 import React, { useState, useCallback, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -982,6 +983,7 @@ export default function ProjectForm({
           {mode === "edit"
             ? "By updating, you agree to have your project details updated on the Stellar network."
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
+          <ContextHelp tip="on-chain" label="on-chain registration" href="https://developers.stellar.org/docs/learn/fundamentals/transactions">Registration asks your Freighter wallet to sign a transaction on Stellar. Network fees apply, and a confirmed transaction becomes part of the public ledger.</ContextHelp>
         </p>
       </form>
 
