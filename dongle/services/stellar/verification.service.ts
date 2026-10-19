@@ -5,6 +5,7 @@
  */
 
 import { redactWalletAddress } from "@/utils/stellar-address.util";
+import type { VerificationTier } from "@/types/project";
 
 export type VerificationStatus = "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
 
@@ -15,6 +16,7 @@ export interface VerificationRequest {
   submittedBy: string;
   submittedAt: string;
   status: VerificationStatus;
+  tier: VerificationTier;
   statusUpdatedAt: string;
   statusUpdatedBy?: string;
   rejectionReason?: string;
@@ -33,6 +35,7 @@ class VerificationService {
     projectId: string,
     projectName: string,
     submittedBy: string,
+    tier: VerificationTier = "BRONZE",
   ): Promise<string> {
     try {
       // Check if request already exists
@@ -49,6 +52,7 @@ class VerificationService {
         submittedBy,
         submittedAt: new Date().toISOString(),
         status: "PENDING",
+        tier,
         statusUpdatedAt: new Date().toISOString(),
       };
 
@@ -345,6 +349,18 @@ class VerificationService {
     return request;
   }
 
+  async setTier(projectId: string, tier: VerificationTier, updatedBy: string): Promise<VerificationRequest> {
+    const request = await this.getVerificationRequest(projectId);
+    if (!request || request.status !== "VERIFIED") {
+      throw new Error("Only verified projects can have their tier changed");
+    }
+    request.tier = tier;
+    request.statusUpdatedAt = new Date().toISOString();
+    request.statusUpdatedBy = updatedBy;
+    await this.persistRequest(request);
+    return request;
+  }
+
   /**
    * Resets verification status for a project (admin only).
    * Allows resubmission after rejection.
@@ -424,7 +440,9 @@ class VerificationService {
         return [];
       }
       const data = localStorage.getItem(VERIFICATION_STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const requests = JSON.parse(data) as VerificationRequest[];
+      return requests.map((request) => ({ ...request, tier: request.tier ?? "BRONZE" }));
     } catch (error) {
       console.error("[VerificationService] Error loading requests:", error);
       return [];

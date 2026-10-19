@@ -655,7 +655,7 @@ export default function ProjectDetailPage() {
                       </Badge>
                       <ProjectLifecycleStatusBadge status={project.status} />
                       {verificationStatus && (
-                        <VerificationBadge status={verificationStatus} />
+                        <VerificationBadge status={verificationStatus} tier={project.verificationTier} />
                       )}
                     </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>

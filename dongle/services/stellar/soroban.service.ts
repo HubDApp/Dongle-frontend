@@ -409,7 +409,7 @@ export const sorobanService = {
    * @see {@link getVerificationStatus} to check request status
    * @see {@link getVerificationRequestStatus} for detailed status with context
    */
-  async requestVerification(projectId: string, projectName: string) {
+  async requestVerification(projectId: string, projectName: string, tier: "BRONZE" | "SILVER" | "GOLD" = "BRONZE") {
     try {
       let userAddress: string;
       try {
@@ -424,6 +424,7 @@ export const sorobanService = {
         projectId,
         projectName,
         userAddress,
+        tier,
       );
 
       console.log(

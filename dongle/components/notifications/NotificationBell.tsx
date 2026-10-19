@@ -128,11 +128,13 @@ export default function NotificationBell() {
                   </button>
                   {item.projectId ? (
                     <Link
-                      href={`/projects/${item.projectId}`}
+                      href={item.type === "project_update" && item.updateId
+                        ? `/projects/${item.projectId}/updates#${item.updateId}`
+                        : `/projects/${item.projectId}`}
                       className="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline"
                       onClick={() => setOpen(false)}
                     >
-                      {t("notifications.viewProject")}
+                      {item.type === "project_update" ? t("notifications.viewUpdate") : t("notifications.viewProject")}
                     </Link>
                   ) : null}
                 </li>

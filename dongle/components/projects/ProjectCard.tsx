@@ -122,7 +122,7 @@ export const ProjectCard = ({
               {project.primaryCategory}
             </span>
             {verificationStatus && (
-              <VerificationBadge status={verificationStatus} showIcon={false} />
+              <VerificationBadge status={verificationStatus} tier={project.verificationTier} showIcon={false} />
             )}
             <ProjectLifecycleStatusBadge status={project.status} />
           </div>

@@ -67,6 +67,8 @@ export default function ProfilePage() {
     maxWatchlistSize,
     filterByCategory,
     trendingFromWatchlist,
+    isUpdateMuted,
+    toggleMuteUpdates,
   } = useWatchlist();
   const [watchlistCategory, setWatchlistCategory] = useState("All");
   const savedSearches = useMemo(
@@ -487,11 +489,20 @@ export default function ProfilePage() {
                 {filteredWatchlist.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredWatchlist.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={project}
-                        verificationStatus={savedProjectVerificationStatuses[project.id]}
-                      />
+                      <div key={project.id}>
+                        <ProjectCard
+                          project={project}
+                          verificationStatus={savedProjectVerificationStatuses[project.id]}
+                        />
+                        <label className="mt-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                          <input
+                            type="checkbox"
+                            checked={isUpdateMuted(project.id)}
+                            onChange={() => toggleMuteUpdates(project.id)}
+                          />
+                          Mute project updates
+                        </label>
+                      </div>
                     ))}
                   </div>
                 ) : (
