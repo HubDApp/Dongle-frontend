@@ -15,6 +15,14 @@ export interface Review {
   signature?: string;
   signatureNonce?: string;
   signatureTimestamp?: string;
+  /** E2E encryption fields (#731). Present when reviewer opted in. */
+  encrypted?: boolean;
+  /** Base64(iv || AES-GCM ciphertext) of the plaintext comment. */
+  encryptedPayload?: string;
+  /** IPFS CID of the encrypted payload (optional — for on-chain anchoring). */
+  encryptedCid?: string;
+  /** Admin-wrapped copy of the per-review key (RSA-OAEP, base64). */
+  adminWrappedKey?: string;
 }
 
 /**
