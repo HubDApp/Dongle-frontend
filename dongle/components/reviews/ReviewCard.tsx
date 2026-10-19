@@ -7,11 +7,12 @@
  * button, and featured-first ordering. Featured reviews show a ⭐ badge.
  */
 
-import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles } from "lucide-react";
-import { Review, type ReviewSentiment } from "@/types/review";
+import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock } from "lucide-react";
+import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
+import { ENCRYPTED_COMMENT_SENTINEL } from "@/lib/review-encryption";
 
 interface ReviewCardProps {
   review: Review;
@@ -74,6 +75,15 @@ export default function ReviewCard({
                   Featured
                 </span>
               )}
+              {review.encrypted && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded-full font-semibold"
+                  title="This review is end-to-end encrypted"
+                >
+                  <Lock className="w-3 h-3" aria-hidden="true" />
+                  Encrypted
+                </span>
+              )}
             </div>
             <div className="text-xs text-zinc-500">{formatDate(review.createdAt, "relative")}</div>
           </div>
@@ -84,42 +94,14 @@ export default function ReviewCard({
         </div>
       </div>
 
-      {!isReviewAuthor && (sentimentPresentation || (isAdmin && onOverrideSentiment)) && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          {sentimentPresentation && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-xs font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-              aria-label={`Review sentiment: ${sentimentPresentation.label}`}
-            >
-              <span aria-hidden="true">{sentimentPresentation.emoji}</span>
-              {sentimentPresentation.label}
-              {review.sentimentSource === "admin" && (
-                <span className="ml-1 text-[10px] font-normal">(admin override)</span>
-              )}
-            </span>
-          )}
-          {isAdmin && onOverrideSentiment && (
-            <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
-              <span className="sr-only">Override review sentiment</span>
-              <select
-                aria-label={`Override sentiment for review by ${review.userAddress}`}
-                value={review.sentiment ?? ""}
-                onChange={(event) =>
-                  onOverrideSentiment(review.id, event.target.value as ReviewSentiment)
-                }
-                className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-              >
-                <option value="" disabled>Override sentiment…</option>
-                <option value="positive">Positive</option>
-                <option value="neutral">Neutral</option>
-                <option value="negative">Negative</option>
-              </select>
-            </label>
-          )}
+      {review.encrypted ? (
+        <div className="flex items-center gap-2 mb-6 text-sm text-indigo-600 dark:text-indigo-400 italic">
+          <Lock className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>{ENCRYPTED_COMMENT_SENTINEL}</span>
         </div>
+      ) : (
+        <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">{review.comment}</p>
       )}
-
-      <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">{review.comment}</p>
 
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">

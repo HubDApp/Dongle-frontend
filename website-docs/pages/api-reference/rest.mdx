@@ -1,0 +1,267 @@
+---
+title: REST API
+description: Complete reference for all Dongle REST endpoints with request/response examples.
+---
+
+import { Tabs, Callout } from "nextra/components";
+
+# REST API
+
+## Reviews
+
+### `POST /api/reviews`
+
+Create a new review for a project.
+
+**Request body**
+
+```json
+{
+  "projectId": "soroban-swap",
+  "projectName": "Soroban Swap",
+  "userAddress": "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+  "rating": 5,
+  "comment": "Excellent DeFi protocol with low fees and fast transactions!"
+}
+```
+
+| Field | Type | Required | Constraints |
+|-------|------|----------|-------------|
+| `projectId` | string | ✓ | Non-empty |
+| `projectName` | string | ✓ | Non-empty |
+| `userAddress` | string | ✓ | 56-char Stellar G-address |
+| `rating` | integer | ✓ | 1–5 inclusive |
+| `comment` | string | ✓ | 10–1000 characters |
+
+**Response `201 Created`**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "projectId": "soroban-swap",
+    "projectName": "Soroban Swap",
+    "userAddress": "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+    "rating": 5,
+    "comment": "Excellent DeFi protocol with low fees and fast transactions!",
+    "createdAt": "2026-08-27T10:30:00.000Z",
+    "helpfulVotes": [],
+    "unhelpfulVotes": []
+  }
+}
+```
+
+**Error responses**
+
+| Status | When |
+|--------|------|
+| `400` | Missing fields, invalid rating, comment too short/long |
+| `409` | User already reviewed this project |
+
+```bash
+curl -X POST http://localhost:3000/api/reviews \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "soroban-swap",
+    "projectName": "Soroban Swap",
+    "userAddress": "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+    "rating": 5,
+    "comment": "Great project with excellent documentation!"
+  }'
+```
+
+---
+
+### `GET /api/reviews`
+
+Fetch reviews, optionally filtered by project or user.
+
+**Query parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `projectId` | string | Filter by project |
+| `userAddress` | string | Filter by author wallet |
+| `page` | integer | Page number (default: 1) |
+| `limit` | integer | Items per page (default: 20, max: 100) |
+| `rating` | integer | Filter by exact rating |
+| `sortBy` | string | Sort field (default: `createdAt`) |
+| `sortOrder` | `asc` \| `desc` | Sort direction (default: `desc`) |
+
+**Response `200 OK`**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "a1b2c3d4-...",
+      "projectId": "soroban-swap",
+      "rating": 5,
+      "comment": "Excellent DeFi protocol!",
+      "createdAt": "2026-08-27T10:30:00.000Z",
+      "helpfulVotes": ["GCEZWKCA5..."],
+      "unhelpfulVotes": []
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/reviews/[id]`
+
+Fetch a single review by UUID.
+
+```bash
+curl http://localhost:3000/api/reviews/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+```
+
+---
+
+### `PUT /api/reviews/[id]`
+
+Update a review. Only the original author (`userAddress` must match) can edit.
+
+**Request body** — all fields optional except `userAddress`:
+
+```json
+{
+  "userAddress": "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+  "rating": 4,
+  "comment": "Updated: still good but found some minor issues."
+}
+```
+
+---
+
+### `DELETE /api/reviews/[id]`
+
+Delete a review. The author's address must match.
+
+```bash
+# Via query parameter
+curl -X DELETE \
+  "http://localhost:3000/api/reviews/a1b2c3d4-...?userAddress=GBRPYHIL2..."
+
+# Via request body
+curl -X DELETE http://localhost:3000/api/reviews/a1b2c3d4-... \
+  -H "Content-Type: application/json" \
+  -d '{"userAddress": "GBRPYHIL2..."}'
+```
+
+---
+
+## Admin
+
+### `POST /api/admin/auth`
+
+Authenticate as an admin and receive a JWT.
+
+```json
+{
+  "walletAddress": "GA5WBPYA5Y...",
+  "signature": "3a8b7c9d...",
+  "message": "Dongle admin authentication"
+}
+```
+
+**Response `200 OK`**
+
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresAt": "2026-08-28T10:30:00.000Z"
+}
+```
+
+Tokens expire after **24 hours**. The wallet must be listed in `NEXT_PUBLIC_ADMIN_ALLOWLIST`.
+
+### `POST /api/admin/verify`
+
+Verify that a JWT is still valid.
+
+```bash
+curl -X POST http://localhost:3000/api/admin/verify \
+  -H "Authorization: Bearer <token>"
+```
+
+### `POST /api/admin/refresh`
+
+Refresh a token before it expires.
+
+---
+
+## Drafts
+
+### `GET /api/drafts/[walletAddress]`
+
+List all project drafts saved for a wallet address.
+
+```bash
+curl http://localhost:3000/api/drafts/GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H
+```
+
+### `DELETE /api/drafts/[walletAddress]/[draftId]`
+
+Delete a specific draft.
+
+---
+
+## Batch Submissions
+
+### `POST /api/batch/submissions`
+
+Submit up to **100 forms** in a single request.
+
+```json
+{
+  "mode": "individual",
+  "items": [
+    { "id": "item-1", "data": { "name": "Project A", "category": "DeFi" } },
+    { "id": "item-2", "data": { "name": "Project B", "category": "NFT" } }
+  ]
+}
+```
+
+| `mode` | Behaviour |
+|--------|-----------|
+| `individual` | Each item processed independently; partial failures returned |
+| `atomic` | All-or-nothing; any failure rolls back the entire batch |
+
+**Response `200 OK`**
+
+```json
+{
+  "success": true,
+  "data": {
+    "mode": "individual",
+    "results": [
+      { "id": "item-1", "success": true, "data": {} },
+      { "id": "item-2", "success": true, "data": {} }
+    ],
+    "successCount": 2,
+    "failureCount": 0
+  }
+}
+```
+
+---
+
+## Analytics
+
+### `GET /api/analytics`
+
+Fetch usage metrics.
+
+**Query parameters**
+
+| Param | Values | Description |
+|-------|--------|-------------|
+| `range` | `7d` \| `30d` \| `90d` \| `all` | Time window |
+| `category` | string | Filter by project category |
+| `status` | string | Filter by verification status |
+
+Results are cached daily (refreshed at 00:00 UTC). The cron endpoint `/api/cron/analytics` forces a refresh.

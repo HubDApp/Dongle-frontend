@@ -1,0 +1,73 @@
+---
+title: Architecture Overview
+description: High-level architecture, design principles, and ADR index for Dongle.
+---
+
+# Architecture Overview
+
+## Design Philosophy
+
+Dongle is a **wallet-first, contract-native** dApp store. Every architectural decision flows from three goals:
+
+1. **On-chain truth** — project listings, reviews, and verification statuses are ultimately owned by Soroban contracts, not a central database.
+2. **Progressive decentralisation** — the MVP runs with mock data and localStorage; swapping in real contract IDs activates full on-chain behaviour without touching UI code.
+3. **Fast, accessible UI** — Next.js App Router with lazy-loaded Soroban SDK so the heavy `stellar-sdk` bundle doesn't block initial render.
+
+## Stack Overview
+
+```
+Browser
+  └── Next.js 16 (App Router)
+        ├── React 19 + Tailwind CSS 4
+        ├── Context + Custom Hooks  (state)
+        ├── Services layer           (business logic)
+        │     ├── wallet.service     → Freighter API
+        │     ├── soroban.service    → Soroban RPC
+        │     ├── review.service     → IReviewRepository
+        │     └── project.service    → IProjectRepository
+        ├── Data Access Registry     (pluggable backends)
+        │     ├── Mock*Repository    (localStorage, dev)
+        │     └── Soroban*Repository (contracts, prod)
+        └── IPFS gateways            (off-chain media)
+```
+
+## Architecture Decision Records
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [ADR 0001](/architecture/context-hooks) | Context + Hooks instead of Redux | Accepted |
+| [ADR 0002](/architecture/ipfs) | IPFS for off-chain media and evidence | Accepted |
+| [ADR 0003](/architecture/contract-design) | Split Soroban registries + env-configured IDs | Accepted |
+| [ADR 0004](/architecture/localstorage) | localStorage for client-owned MVP state | Accepted |
+
+## Key Patterns
+
+### Service → Hook → Component
+
+Business logic never lives in React components. Components call hooks; hooks call services:
+
+```
+projectService.getProjectById(id)   ← called by useProject hook
+useProject(id)                      ← called by ProjectDetailPage
+ProjectDetailPage                   ← renders UI
+```
+
+### Pluggable repositories
+
+Switching from mock to production is a single call at app init:
+
+```typescript
+// app/layout.tsx (production)
+registry.setProjectRepository(new SorobanProjectRepository());
+```
+
+### Lazy SDK loading
+
+`stellar-sdk` is ~700 KB. It is loaded on demand only when a transaction or RPC call is triggered:
+
+```typescript
+// lazy-soroban.service.ts
+const { SorobanRpc } = await import("stellar-sdk/minimal");
+```
+
+This keeps the initial JS bundle well under the 200 KB budget.

@@ -1,0 +1,71 @@
+---
+title: Button
+description: Button component props, variants, sizes, and accessibility guide.
+---
+
+# Button
+
+```tsx
+import { Button } from "@/components/ui/Button";
+```
+
+Renders a native `<button>`. Forwards a ref.
+
+## Props
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `variant` | `"primary" \| "secondary" \| "outline" \| "ghost" \| "error"` | `"primary"` | Visual style |
+| `size` | `"sm" \| "md" \| "lg"` | `"md"` | Padding and font size |
+| `isLoading` | `boolean` | `false` | Sets `disabled` and `aria-busy` |
+| `loadingText` | `string` | — | Replaces `children` while loading |
+| `hideIconWhileLoading` | `boolean` | `false` | Spinner replaces `leftIcon` |
+| `leftIcon` / `rightIcon` | `ReactNode` | — | Decorative; mark with `aria-hidden` |
+| `...rest` | `ButtonHTMLAttributes` | — | `type`, `onClick`, `disabled`, `className`, all `aria-*` |
+
+## Examples
+
+```tsx
+// Primary action
+<Button variant="primary" size="md" onClick={submit}>
+  Submit project
+</Button>
+
+// Loading state
+<Button isLoading loadingText="Saving…">
+  Save
+</Button>
+
+// Icon-only (requires aria-label)
+<Button variant="ghost" aria-label="Search" leftIcon={<SearchIcon aria-hidden />} />
+
+// Danger / error
+<Button variant="error" onClick={deleteProject}>
+  Delete project
+</Button>
+
+// Inside a form — explicit type to prevent accidental submit
+<Button type="button" variant="outline" onClick={cancel}>
+  Cancel
+</Button>
+```
+
+## Accessibility
+
+| Prop | When to use |
+|------|-------------|
+| `aria-label` | Required when there is no visible text (icon-only buttons) |
+| `aria-busy` | Applied automatically during `isLoading` |
+| `type="button"` | Use inside `<form>` unless you intend to submit |
+| `aria-expanded` / `aria-controls` | Disclosure and dropdown triggers |
+| `disabled` | Native disabled; prefer over `aria-disabled` unless you still need click handlers |
+
+## Variants Reference
+
+| Variant | Use case |
+|---------|----------|
+| `primary` | Main CTA, form submit |
+| `secondary` | Secondary action |
+| `outline` | Tertiary action, cancel |
+| `ghost` | Toolbar buttons, icon-only |
+| `error` | Destructive actions |

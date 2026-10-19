@@ -1,0 +1,105 @@
+---
+title: Stellar & Soroban Services
+description: StellarService, SorobanService, VerificationService, and lazy loader patterns.
+---
+
+import { Callout } from "nextra/components";
+
+# Stellar & Soroban Services
+
+## StellarService
+
+`services/stellar/stellar.service.ts` — Horizon REST queries and address validation.
+
+### Methods
+
+#### `getAccountInfo(address): Promise<StellarAccountInfo | null>`
+```typescript
+const account = await stellarService.getAccountInfo("GBRPYHIL2...");
+// { sequence, balances, signers } | null
+```
+
+**Error cases:**
+| Error | Cause |
+|-------|-------|
+| `INVALID_ADDRESS` | Address fails StrKey checksum |
+| `ACCOUNT_NOT_FOUND` | HTTP 404 from Horizon — account not funded |
+
+**Mock:** returns simulated 100.0 XLM balance for test addresses.  
+**Production:** queries `NEXT_PUBLIC_SOROBAN_RPC_URL` (Horizon endpoint).
+
+#### `isValidAddress(address): boolean`
+Returns `true` for a valid 56-character Stellar G-address.
+
+---
+
+## SorobanService
+
+`services/soroban/soroban.service.ts` — smart contract invocations and transaction simulations.
+
+### `callContract(params): Promise<SorobanResult>`
+
+```typescript
+const result = await sorobanService.callContract({
+  contractId: DONGLE_CONTRACTS.PROJECT_REGISTRY,
+  method: "register_project",
+  args: [nativeToScVal("My dApp"), nativeToScVal("DeFi / DEX"), ...],
+  signerAddress: publicKey,
+});
+// { success: true, result?: ScVal, txHash?: string, error?: string }
+```
+
+**Error cases:**
+| Error | Cause |
+|-------|-------|
+| `SIMULATION_FAILED` | Contract panic during simulation |
+| `USER_REJECTED` | User cancelled Freighter signature |
+| `TX_FAILED` | Transaction error code on ledger submission |
+| `Timeout waiting for transaction…` | Polling exceeded 60 s |
+
+The UI shows a four-phase progress modal: **Simulating → Awaiting Wallet Signature → Submitting → Confirmed**.
+
+<Callout>
+  `soroban.service.ts` is the **only** module that builds transactions. UI components call hooks/services, not `Contract` directly.
+</Callout>
+
+---
+
+## VerificationService
+
+`services/stellar/verification.service.ts` — verifies project Stellar addresses, domains, and `stellar.toml`.
+
+### `verifyDomainAssociation(domain, expectedAddress): Promise<VerificationResult>`
+
+```typescript
+const result = await verificationService.verifyDomainAssociation(
+  "myproject.com",
+  "GBRPYHIL2..."
+);
+// { isVerified: boolean, domain, address, checkedAt, details? }
+```
+
+**Error cases:**
+| Error | Cause |
+|-------|-------|
+| `TOML_MISSING` | `/.well-known/stellar.toml` not found |
+| `CORS_ERROR` | Domain blocks cross-origin fetches |
+| `ADDRESS_MISMATCH` | TOML does not contain the expected address |
+
+---
+
+## LazyStellarService / LazySorobanService
+
+`services/stellar/lazy-stellar.service.ts` and `lazy-soroban.service.ts`
+
+Dynamic chunk loaders for the heavy `stellar-sdk` bundle. Using lazy loading avoids shipping the full SDK on the initial page load, keeping First Contentful Paint fast.
+
+```typescript
+// Instead of top-level import:
+// import { SorobanRpc } from "stellar-sdk";
+
+// Use the lazy service — SDK loads only when first called:
+const { server } = await lazySorobanService.getServer();
+```
+
+This is handled automatically inside `soroban.service.ts`; consuming code does not need to call the lazy service directly.

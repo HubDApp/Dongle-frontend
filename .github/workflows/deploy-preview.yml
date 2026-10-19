@@ -1,0 +1,114 @@
+name: Deploy – Preview
+
+# Automatically deploys a Vercel preview for every PR targeting main.
+# Posts the preview URL back as a PR comment so reviewers can click through.
+#
+# Required secrets:
+#   VERCEL_TOKEN       – personal or team access token from vercel.com/account/tokens
+#   VERCEL_ORG_ID      – from .vercel/project.json  (orgId)
+#   VERCEL_PROJECT_ID  – from .vercel/project.json  (projectId)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "dongle/**"
+      - ".github/workflows/deploy-preview.yml"
+
+concurrency:
+  # One preview deployment per PR branch; cancel the previous run if a new
+  # push arrives before the deployment finishes.
+  group: deploy-preview-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    name: Vercel preview deployment
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write   # needed to post the preview URL comment
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.preview-url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment (preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build via Vercel
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Vercel (preview)
+        id: deploy
+        run: |
+          PREVIEW_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          echo "preview-url=${PREVIEW_URL}" >> "$GITHUB_OUTPUT"
+          echo "Preview URL: ${PREVIEW_URL}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Comment preview URL on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: vercel-preview
+          message: |
+            ## 🔍 Preview Deployment
+
+            | | |
+            |---|---|
+            | **URL** | ${{ steps.deploy.outputs.preview-url }} |
+            | **Commit** | `${{ github.sha }}` |
+            | **Branch** | `${{ github.head_ref }}` |
+
+            Deploy triggered by @${{ github.actor }}.
+
+  # Run the existing smoke-test suite against the fresh preview URL
+  smoke-test-preview:
+    name: Smoke-test preview
+    needs: deploy-preview
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Run preview smoke tests
+        env:
+          PREVIEW_URL: ${{ needs.deploy-preview.outputs.preview-url }}
+        run: node scripts/preview-smoke.js

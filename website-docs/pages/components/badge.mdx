@@ -1,0 +1,44 @@
+---
+title: Badge
+description: Badge component props, variants, and accessibility guidance.
+---
+
+# Badge
+
+```tsx
+import { Badge } from "@/components/ui/Badge";
+```
+
+Compact status label rendered as a `div`.
+
+## Props
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `variant` | `"primary" \| "secondary" \| "success" \| "warning" \| "error" \| "outline"` | `"primary"` | Colour |
+| `children` | `ReactNode` | — | Visible text; do not rely on colour alone |
+| `...rest` | `HTMLAttributes<HTMLDivElement>` | — | `role`, `aria-*` |
+
+## Examples
+
+```tsx
+<Badge variant="success">Verified</Badge>
+<Badge variant="warning">Pending</Badge>
+<Badge variant="error">Rejected</Badge>
+<Badge variant="outline">Beta</Badge>
+```
+
+## Accessibility
+
+| Scenario | Pattern |
+|----------|---------|
+| Static status label | No live region needed |
+| Updates in place (e.g. verification status changes) | Add `role="status"` |
+| Colour is the only differentiator | Always include visible text |
+
+```tsx
+// Status that updates live
+<Badge variant="warning" role="status">
+  Pending verification
+</Badge>
+```
