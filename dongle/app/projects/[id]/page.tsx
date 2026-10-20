@@ -51,6 +51,7 @@ import {
   BookmarkCheck,
   Bug,
   Calendar,
+  Milestone,
   ExternalLink,
   GitBranch,
   Globe,
@@ -77,6 +78,7 @@ import { projectService } from "@/services/project/project.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
+import ProjectMilestones from "@/components/projects/ProjectMilestones";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
 import ProjectRoadmap from "@/components/projects/ProjectRoadmap";
 import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
@@ -122,7 +124,7 @@ export default function ProjectDetailPage() {
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
-  const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
+  const [activeTab, setActiveTab] = useState<"about" | "updates" | "milestones">("about");
   const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [isChangingFollow, setIsChangingFollow] = useState(false);
@@ -816,6 +818,20 @@ export default function ProjectDetailPage() {
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
                       )}
                     </button>
+                    <button
+                      onClick={() => setActiveTab("milestones")}
+                      className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+                        activeTab === "milestones"
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                      }`}
+                    >
+                      <Milestone className="h-4 w-4" aria-hidden="true" />
+                      Milestones
+                      {activeTab === "milestones" && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+                      )}
+                    </button>
                   </div>
 
                   {activeTab === "about" && (
@@ -854,11 +870,20 @@ export default function ProjectDetailPage() {
 
                       <UpdateList
                         updates={updates}
+                        projectId={projectId}
+                        userAddress={gate.publicKey}
                         canManage={Boolean(isOwner)}
                         onEdit={handleEditUpdate}
                         onDelete={handleDeleteUpdate}
                       />
                     </div>
+                  )}
+
+                  {activeTab === "milestones" && project && (
+                    <ProjectMilestones
+                      projectId={project.id}
+                      canManage={Boolean(isOwner)}
+                    />
                   )}
                 </div>
 
@@ -1047,6 +1072,7 @@ export default function ProjectDetailPage() {
                   onClearFilters={() => { setReviewSort("newest"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
+                  isAdmin={isAdmin}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onVoteHelpful={handleVoteHelpful}

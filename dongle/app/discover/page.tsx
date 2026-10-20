@@ -12,7 +12,7 @@ import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
 import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
-import type { VerificationTier } from "@/types/project";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type ProjectStatus, type VerificationTier } from "@/types/project";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
@@ -91,6 +91,24 @@ function DiscoverContent() {
     return () => {
       controller.abort();
     };
+  }, []);
+
+  useEffect(() => {
+    const refreshMilestones = () => {
+      const projects = projectService.getDiscoverableProjects();
+      const rates: Record<string, number> = {};
+      const projectsWithMilestones = new Set<string>();
+      for (const project of projects) {
+        const milestones = milestoneService.getByProject(project.id);
+        if (milestones.length > 0) projectsWithMilestones.add(project.id);
+        rates[project.id] = milestoneService.getCompletionRate(project.id);
+      }
+      setMilestoneRates(rates);
+      setProjectsWithMilestones(projectsWithMilestones);
+    };
+    refreshMilestones();
+    window.addEventListener("dongle:project-milestones-changed", refreshMilestones);
+    return () => window.removeEventListener("dongle:project-milestones-changed", refreshMilestones);
   }, []);
 
   const categories = projectService.getCategories();
@@ -327,6 +345,22 @@ function DiscoverContent() {
                     {PROJECT_STATUS_LABELS[status]}
                   </option>
                 ))}
+              </select>
+
+              <select
+                value={milestoneCompletionFilter}
+                onChange={(event) => handleMilestoneCompletionFilterChange(event.target.value)}
+                disabled={isInitialLoading}
+                aria-label="Filter by milestone completion rate"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">All milestone progress</option>
+                <option value="NONE">No milestones</option>
+                <option value="0-24">0–24% complete</option>
+                <option value="25-49">25–49% complete</option>
+                <option value="50-74">50–74% complete</option>
+                <option value="75-99">75–99% complete</option>
+                <option value="100-100">100% complete</option>
               </select>
 
               <select

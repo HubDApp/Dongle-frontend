@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
+import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { type LocaleCode } from "@/lib/i18n/locales";

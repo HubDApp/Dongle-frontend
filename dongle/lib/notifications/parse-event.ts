@@ -26,6 +26,10 @@ export function parseNotificationEvent(raw: unknown): ParsedNotificationEvent | 
   return {
     id: record.id,
     type: record.type,
+    priority:
+      record.priority === "urgent" || record.priority === "normal" || record.priority === "low"
+        ? record.priority
+        : undefined,
     recipientId: record.recipientId,
     createdAt: record.createdAt,
     projectId: typeof record.projectId === "string" ? record.projectId : undefined,

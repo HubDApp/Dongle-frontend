@@ -4,6 +4,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 import DiscoverPage from "@/app/discover/page";
 import { mockProjects } from "@/data/mockProjects";
 import { projectService } from "@/services/project/project.service";
+import { milestoneService } from "@/services/project/milestone.service";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 
 // jsdom in the current Node version does not implement window.matchMedia, but
@@ -200,6 +201,7 @@ async function finishInitialLoad() {
 describe("Discover Page - High Risk Flows", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.removeItem("dongle_project_milestones");
   });
 
   afterEach(() => {
@@ -334,6 +336,24 @@ describe("Discover Page - High Risk Flows", () => {
       expect(deprecatedProject).toBeTruthy();
       expect(screen.getByText(deprecatedProject!.name)).toBeInTheDocument();
       expect(screen.queryByText(mockProjects[0].name)).not.toBeInTheDocument();
+    });
+
+    it("filters projects by milestone completion rate", async () => {
+      milestoneService.create(mockProjects[0].id, {
+        title: "Launch",
+        description: "",
+        targetDate: "2030-01-01",
+        status: "completed",
+      });
+      render(<DiscoverPage />);
+      await finishInitialLoad();
+
+      fireEvent.change(screen.getByLabelText(/Filter by milestone completion rate/i), {
+        target: { value: "100-100" },
+      });
+
+      expect(screen.getByText(mockProjects[0].name)).toBeInTheDocument();
+      expect(screen.queryByText(mockProjects[1].name)).not.toBeInTheDocument();
     });
 
     it("filters projects by category", async () => {

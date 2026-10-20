@@ -13,6 +13,7 @@ export const REALTIME_NOTIFICATION_TYPES = [
   "project_review_posted",
   "review_approved",
   "review_rejected",
+  "review_owner_response",
   "verification_evidence_requested",
   "submission_comment",
   "submission_mention",
@@ -35,6 +36,7 @@ export const NOTIFICATION_TYPES = [
 export type RealtimeNotificationType = (typeof REALTIME_NOTIFICATION_TYPES)[number];
 export type LegacyNotificationType = (typeof LEGACY_NOTIFICATION_TYPES)[number];
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+export type NotificationPriority = "urgent" | "normal" | "low";
 
 export const NOTIFICATION_HISTORY_LIMIT = 50;
 export const NOTIFICATION_TOAST_MS = 5000;
@@ -48,6 +50,7 @@ export interface AppNotification {
   /** Wallet address (G…) or OAuth subject used as the stream recipient. */
   recipientAddress: string;
   type: NotificationType;
+  priority?: NotificationPriority;
   title: string;
   message?: string;
   createdAt: string;
@@ -81,6 +84,7 @@ export interface CreateNotificationParams {
 export interface NotificationStreamEvent {
   id: string;
   type: string;
+  priority?: NotificationPriority;
   recipientId: string;
   projectId?: string;
   projectName?: string;

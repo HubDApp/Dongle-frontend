@@ -49,6 +49,7 @@ describe("NotificationBell", () => {
     });
     render(<NotificationBell />);
     expect(screen.getByRole("dialog", { name: /notifications/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/settings/notifications");
     expect(screen.getByText("Swap has been verified.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /mark filtered read/i }));
   });

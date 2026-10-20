@@ -1,6 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { reviewService } from "@/services/review/review.service";
 import { REVIEW_CONSTRAINTS } from "@/types/review";
+import { projectService } from "@/services/project/project.service";
+
+vi.mock("@/lib/notifications/emit", () => ({
+  emitNotificationEvent: vi.fn().mockResolvedValue(undefined),
+}));
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -16,7 +21,7 @@ Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
 describe("Review Service", () => {
   beforeEach(() => { localStorage.clear(); });
-  afterEach(() => { localStorage.clear(); });
+  afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
   describe("addReview", () => {
     it("should add a valid review", async () => {
@@ -465,6 +470,59 @@ describe("Review Service", () => {
       expect(review?.helpfulVotes).toContain("user3");
       expect(review?.unhelpfulVotes).toHaveLength(1);
       expect(review?.unhelpfulVotes).toContain("user4");
+    });
+  });
+
+  describe("owner responses", () => {
+    async function createReview() {
+      const result = await reviewService.addReview({
+        projectId: "proj1",
+        projectName: "Test Project",
+        userAddress: "reviewer",
+        rating: 4,
+        comment: "A useful review with enough detail",
+      }, "reviewer");
+      return result.data!.id;
+    }
+
+    beforeEach(() => {
+      vi.spyOn(projectService, "getProjectById").mockReturnValue({
+        id: "proj1",
+        ownerAddress: "project-owner",
+      } as never);
+    });
+
+    it("allows one 500-character response from the project owner", async () => {
+      const reviewId = await createReview();
+      const response = await reviewService.addOwnerResponse(reviewId, "Thanks for the feedback", "project-owner");
+      expect(response.ownerResponse?.text).toBe("Thanks for the feedback");
+      await expect(reviewService.addOwnerResponse(reviewId, "Another response", "project-owner"))
+        .rejects.toThrow("already been posted");
+      await expect(reviewService.addOwnerResponse(reviewId, "x".repeat(501), "project-owner"))
+        .rejects.toThrow("500 characters");
+    });
+
+    it("rejects responses from non-owners and editing after 24 hours", async () => {
+      const reviewId = await createReview();
+      await expect(reviewService.addOwnerResponse(reviewId, "Thanks for the feedback", "not-owner"))
+        .rejects.toThrow("Only the project owner");
+      await reviewService.addOwnerResponse(reviewId, "Thanks for the feedback", "project-owner");
+
+      const stored = JSON.parse(localStorage.getItem("dongle_review_owner_responses") ?? "{}");
+      stored[reviewId].createdAt = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+      localStorage.setItem("dongle_review_owner_responses", JSON.stringify(stored));
+
+      await expect(reviewService.updateOwnerResponse(reviewId, "Edited response", "project-owner"))
+        .rejects.toThrow("within 24 hours");
+    });
+
+    it("allows admin moderation to hide and restore a response", async () => {
+      const reviewId = await createReview();
+      await reviewService.addOwnerResponse(reviewId, "Thanks for the feedback", "project-owner");
+      const hidden = await reviewService.moderateOwnerResponse(reviewId, true, "admin-wallet");
+      expect(hidden.ownerResponse?.hiddenByAdmin).toBe(true);
+      const restored = await reviewService.moderateOwnerResponse(reviewId, false, "admin-wallet");
+      expect(restored.ownerResponse?.hiddenByAdmin).toBe(false);
     });
   });
 });

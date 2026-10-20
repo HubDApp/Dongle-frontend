@@ -2,6 +2,9 @@ import {
   Review,
   ReviewInput,
   REVIEW_CONSTRAINTS,
+  REVIEW_OWNER_RESPONSE_EDIT_WINDOW_MS,
+  REVIEW_OWNER_RESPONSE_MAX_LENGTH,
+  ReviewOwnerResponse,
   ReviewValidationError,
   isReviewSentiment,
 } from "@/types/review";
@@ -11,6 +14,7 @@ import { reviewApiService } from "./review-api.service";
 import { detectReviewLanguage } from "@/lib/review-language";
 
 const STORAGE_KEY = "dongle_reviews";
+const OWNER_RESPONSES_STORAGE_KEY = "dongle_review_owner_responses";
 
 const DEV_MODE_WARN =
   "[Dongle Review Service] Using localStorage (DEV-ONLY). " +
@@ -111,6 +115,31 @@ function saveLocalReviews(reviews: Review[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(reviews));
 }
 
+function getOwnerResponses(): Record<string, ReviewOwnerResponse> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(OWNER_RESPONSES_STORAGE_KEY) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, ReviewOwnerResponse>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveOwnerResponses(responses: Record<string, ReviewOwnerResponse>): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(OWNER_RESPONSES_STORAGE_KEY, JSON.stringify(responses));
+}
+
+function attachOwnerResponses(reviews: Review[]): Review[] {
+  const responses = getOwnerResponses();
+  return reviews.map((review) => ({
+    ...review,
+    ownerResponse: responses[review.id] ?? review.ownerResponse,
+  }));
+}
+
 function warnDevMode(): void {
   if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
     console.warn(DEV_MODE_WARN);
@@ -120,7 +149,7 @@ function warnDevMode(): void {
 async function getReviews(): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.getReviews();
+      return attachOwnerResponses(await reviewApiService.getReviews());
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -243,7 +272,7 @@ async function deleteReview(
 async function getReviewsByProject(projectId: string): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.getReviewsByProject(projectId);
+      return attachOwnerResponses(await reviewApiService.getReviewsByProject(projectId));
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -257,7 +286,7 @@ async function getReviewsByProject(projectId: string): Promise<Review[]> {
 async function getReviewsByUser(userAddress: string): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return await reviewApiService.getReviewsByUser(userAddress);
+      return attachOwnerResponses(await reviewApiService.getReviewsByUser(userAddress));
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);

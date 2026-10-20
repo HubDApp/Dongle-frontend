@@ -21,6 +21,7 @@ const REVIEWS_PURPOSE =
 
 export default function ReviewsPage() {
   const gate = useWalletPageGate();
+  const { isAdmin } = useAdminAccess();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingReview, setIsAddingReview] = useState(false);
@@ -94,6 +95,10 @@ export default function ReviewsPage() {
         toast.error(result.error || "Failed to delete review");
       }
     }
+  };
+
+  const handleExportReviews = () => {
+    downloadCsv("dongle-reviews.csv", reviewsToCsv(sortedReviews));
   };
 
   const handleVoteHelpful = async (id: string) => {
@@ -425,6 +430,7 @@ export default function ReviewsPage() {
                   onClearFilters={() => { setSortBy("recent"); setProjectFilter("all"); setUserFilter("all"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
+                  isAdmin={isAdmin}
                   onEdit={handleEditReview}
                   onDelete={handleDeleteReview}
                   onVoteHelpful={handleVoteHelpful}

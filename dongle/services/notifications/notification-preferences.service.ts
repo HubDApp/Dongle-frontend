@@ -21,6 +21,22 @@ export interface NotificationPreferences {
     newFollowers: boolean;
     weeklyDigest: boolean;
   };
+  doNotDisturb: boolean;
+  quietHours: {
+    enabled: boolean;
+    startTime: string;
+    endTime: string;
+    timeZone: string;
+  };
+  batching: {
+    enabled: boolean;
+    digestTime: string;
+    smartGrouping: boolean;
+  };
+  devices: {
+    desktop: { enabled: boolean; quietHours: boolean; batchLowPriority: boolean };
+    mobile: { enabled: boolean; quietHours: boolean; batchLowPriority: boolean };
+  };
   updatedAt: string;
 }
 
@@ -40,6 +56,22 @@ const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userId" | "updatedAt">
     verificationStatus: true,
     newFollowers: false,
     weeklyDigest: true,
+  },
+  doNotDisturb: false,
+  quietHours: {
+    enabled: false,
+    startTime: "22:00",
+    endTime: "08:00",
+    timeZone: "UTC",
+  },
+  batching: {
+    enabled: false,
+    digestTime: "09:00",
+    smartGrouping: true,
+  },
+  devices: {
+    desktop: { enabled: true, quietHours: true, batchLowPriority: true },
+    mobile: { enabled: true, quietHours: true, batchLowPriority: true },
   },
 };
 
@@ -61,11 +93,18 @@ class NotificationPreferencesService {
     if (!prefs) {
       prefs = {
         ...DEFAULT_PREFERENCES,
+        quietHours: {
+          ...DEFAULT_PREFERENCES.quietHours,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        },
         userId,
         updatedAt: new Date().toISOString(),
       };
       this.preferences.set(userId, prefs);
       this.saveToStorage();
+    } else {
+      prefs = this.normalizePreferences(userId, prefs);
+      this.preferences.set(userId, prefs);
     }
 
     return prefs;
@@ -89,11 +128,28 @@ class NotificationPreferencesService {
       events: updates.events
         ? { ...current.events, ...updates.events }
         : current.events,
+      quietHours: updates.quietHours
+        ? { ...current.quietHours, ...updates.quietHours }
+        : current.quietHours,
+      batching: updates.batching
+        ? { ...current.batching, ...updates.batching }
+        : current.batching,
+      devices: updates.devices
+        ? {
+            desktop: { ...current.devices.desktop, ...updates.devices.desktop },
+            mobile: { ...current.devices.mobile, ...updates.devices.mobile },
+          }
+        : current.devices,
       updatedAt: new Date().toISOString(),
     };
 
     this.preferences.set(userId, updated);
     this.saveToStorage();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("dongle:notification-preferences-changed", {
+        detail: { userId, preferences: updated },
+      }));
+    }
 
     console.log(`[notification-prefs] Updated preferences for ${userId}`);
 
@@ -208,7 +264,7 @@ class NotificationPreferencesService {
       if (stored) {
         const prefsArray: NotificationPreferences[] = JSON.parse(stored);
         this.preferences = new Map(
-          prefsArray.map((pref) => [pref.userId, pref])
+          prefsArray.map((pref) => [pref.userId, this.normalizePreferences(pref.userId, pref)])
         );
         console.log(
           `[notification-prefs] Loaded ${this.preferences.size} preferences from storage`
@@ -217,6 +273,26 @@ class NotificationPreferencesService {
     } catch (error) {
       console.error("[notification-prefs] Failed to load from storage:", error);
     }
+  }
+
+  private normalizePreferences(
+    userId: string,
+    value: Partial<NotificationPreferences>,
+  ): NotificationPreferences {
+    return {
+      ...DEFAULT_PREFERENCES,
+      ...value,
+      userId,
+      channels: { ...DEFAULT_PREFERENCES.channels, ...value.channels },
+      events: { ...DEFAULT_PREFERENCES.events, ...value.events },
+      quietHours: { ...DEFAULT_PREFERENCES.quietHours, ...value.quietHours },
+      batching: { ...DEFAULT_PREFERENCES.batching, ...value.batching },
+      devices: {
+        desktop: { ...DEFAULT_PREFERENCES.devices.desktop, ...value.devices?.desktop },
+        mobile: { ...DEFAULT_PREFERENCES.devices.mobile, ...value.devices?.mobile },
+      },
+      updatedAt: value.updatedAt ?? new Date().toISOString(),
+    };
   }
 
   /**
