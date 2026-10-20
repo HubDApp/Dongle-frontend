@@ -22,6 +22,7 @@ export const reviewFormSchema = z.object({
       `Comment cannot exceed ${REVIEW_CONSTRAINTS.COMMENT_MAX_LENGTH} characters`
     )
     .transform((val) => val.trim()),
+  encrypt: z.boolean().optional().default(false),
 });
 
 export type ReviewFormData = z.infer<typeof reviewFormSchema>;

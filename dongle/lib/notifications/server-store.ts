@@ -65,6 +65,7 @@ export function publishNotificationEvent(
     read: false,
     projectId: input.projectId,
     projectName: input.projectName,
+    updateId: input.updateId,
     reviewId: input.reviewId,
   };
 
@@ -103,6 +104,16 @@ export function markAllNotificationsRead(recipientId: string): void {
   history.set(
     recipientId,
     recipientHistory(recipientId).map((item) => ({ ...item, read: true })),
+  );
+}
+
+export function markNotificationsRead(recipientId: string, notificationIds: string[]): void {
+  const ids = new Set(notificationIds);
+  history.set(
+    recipientId,
+    recipientHistory(recipientId).map((item) =>
+      ids.has(item.id) ? { ...item, read: true } : item,
+    ),
   );
 }
 

@@ -7,6 +7,8 @@ export interface RepositoryMetadata {
   host: "github" | "gitlab" | "bitbucket";
   owner: string;
   repo: string;
+  name?: string;
+  homepage?: string;
   stars?: number;
   forks?: number;
   license?: string;

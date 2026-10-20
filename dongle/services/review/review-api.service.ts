@@ -1,4 +1,4 @@
-import { Review, ReviewValidationError } from "@/types/review";
+import { Review, ReviewInput, ReviewValidationError } from "@/types/review";
 
 const API_BASE = "/api/reviews";
 
@@ -18,7 +18,7 @@ export const reviewApiService = {
   },
 
   async addReview(
-    review: Omit<Review, "id" | "createdAt">,
+    review: ReviewInput,
     userAddress: string,
     signedPayload?: { payload: string; signature: string; nonce: string; timestamp: string },
   ): Promise<{ success: boolean; data?: Review; errors?: ReviewValidationError[] }> {
@@ -29,6 +29,13 @@ export const reviewApiService = {
         body.signature = signedPayload.signature;
         body.signatureNonce = signedPayload.nonce;
         body.signatureTimestamp = signedPayload.timestamp;
+      }
+      // Pass through E2E encryption fields if present (#731)
+      if (review.encrypted) {
+        body.encrypted = review.encrypted;
+        body.encryptedPayload = review.encryptedPayload;
+        body.encryptedCid = review.encryptedCid;
+        body.adminWrappedKey = review.adminWrappedKey;
       }
       const response = await fetch(API_BASE, {
         method: "POST",

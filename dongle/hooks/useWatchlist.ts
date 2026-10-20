@@ -11,10 +11,25 @@ import {
 } from "@/services/watchlist/watchlist-notification.service";
 
 const STORAGE_PREFIX = "dongle_watchlist:";
+const MUTED_STORAGE_PREFIX = "dongle_watchlist_muted:";
 const WATCHLIST_EVENT = "dongle:watchlist-changed";
 
 function getStorageKey(walletAddress: string) {
   return `${STORAGE_PREFIX}${walletAddress}`;
+}
+
+function getMutedStorageKey(walletAddress: string) {
+  return `${MUTED_STORAGE_PREFIX}${walletAddress}`;
+}
+
+function readMutedProjectIds(walletAddress: string | null): string[] {
+  if (typeof window === "undefined" || !walletAddress) return [];
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(getMutedStorageKey(walletAddress)) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function readWatchlistIds(walletAddress: string | null): string[] {
@@ -62,6 +77,9 @@ export function useWatchlist() {
   const [watchlistIds, setWatchlistIds] = useState<string[]>(() =>
     readWatchlistIds(publicKey),
   );
+  const [mutedProjectIds, setMutedProjectIds] = useState<string[]>(() =>
+    readMutedProjectIds(publicKey),
+  );
 
   useEffect(() => {
     const id = setTimeout(() => setWatchlistIds(readWatchlistIds(publicKey)), 0);
@@ -69,11 +87,17 @@ export function useWatchlist() {
   }, [publicKey]);
 
   useEffect(() => {
+    const id = setTimeout(() => setMutedProjectIds(readMutedProjectIds(publicKey)), 0);
+    return () => clearTimeout(id);
+  }, [publicKey]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
 
     const handleStorage = (event: StorageEvent) => {
-      if (!publicKey || event.key !== getStorageKey(publicKey)) return;
-      setWatchlistIds(readWatchlistIds(publicKey));
+      if (!publicKey) return;
+      if (event.key === getStorageKey(publicKey)) setWatchlistIds(readWatchlistIds(publicKey));
+      if (event.key === getMutedStorageKey(publicKey)) setMutedProjectIds(readMutedProjectIds(publicKey));
     };
 
     const handleChanged = (event: Event) => {
@@ -93,6 +117,23 @@ export function useWatchlist() {
   const isOnWatchlist = useCallback(
     (projectId: string) => watchlistIds.includes(projectId),
     [watchlistIds],
+  );
+
+  const isUpdateMuted = useCallback(
+    (projectId: string) => mutedProjectIds.includes(projectId),
+    [mutedProjectIds],
+  );
+
+  const toggleMuteUpdates = useCallback(
+    (projectId: string) => {
+      if (!publicKey) return;
+      const next = isUpdateMuted(projectId)
+        ? mutedProjectIds.filter((id) => id !== projectId)
+        : [...mutedProjectIds, projectId];
+      localStorage.setItem(getMutedStorageKey(publicKey), JSON.stringify(next));
+      setMutedProjectIds(next);
+    },
+    [isUpdateMuted, mutedProjectIds, publicKey],
   );
 
   const addToWatchlist = useCallback(
@@ -162,9 +203,10 @@ export function useWatchlist() {
   const triggerNotification = useCallback(
     (projectId: string, type: WatchlistNotificationType, message: string) => {
       if (!isOnWatchlist(projectId)) return;
+      if (type === "project_update" && isUpdateMuted(projectId)) return;
       notifyWatchlistEvent(projectId, type, message);
     },
-    [isOnWatchlist],
+    [isOnWatchlist, isUpdateMuted],
   );
 
   return useMemo(
@@ -175,6 +217,8 @@ export function useWatchlist() {
       watchlistCount: watchlistIds.length,
       maxWatchlistSize: MAX_WATCHLIST_SIZE,
       isOnWatchlist,
+      isUpdateMuted,
+      toggleMuteUpdates,
       addToWatchlist,
       removeFromWatchlist,
       toggleWatchlist,
@@ -190,6 +234,8 @@ export function useWatchlist() {
       isConnected,
       watchlistIds,
       isOnWatchlist,
+      isUpdateMuted,
+      toggleMuteUpdates,
       addToWatchlist,
       removeFromWatchlist,
       toggleWatchlist,

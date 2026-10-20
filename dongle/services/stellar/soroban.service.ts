@@ -15,14 +15,26 @@ import {
 } from "@/context/wallet.context";
 import { type ProjectCategory, PROJECT_CATEGORIES } from "@/types/project";
 import type { TransactionPhase } from "@/lib/transaction-progress";
-import { validateStellarAddress } from "@/lib/stellar-address";
+import { validateStellarAddress, validateContractAddresses } from "@/utils/stellar-address.util";
 import {
   WalletNotConnectedError,
   NetworkMismatchError,
   TransactionFailedError,
   ContractCallError,
 } from "@/lib/errors";
-import type { ISorobanService } from "./soroban.interface";
+import type {
+  ISorobanService,
+  SorobanTransactionOptions,
+  TransactionPhaseHandler,
+} from "./soroban.interface";
+
+// Re-export the shared option types and the errors thrown by this service so
+// consumers (and the lazy wrapper) can import them from one place.
+export type {
+  SorobanTransactionOptions,
+  TransactionPhaseHandler,
+} from "./soroban.interface";
+export { WalletNotConnectedError, NetworkMismatchError } from "@/lib/errors";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, {
   timeout: 15000,
@@ -316,6 +328,17 @@ export const sorobanService = {
       throw new WalletNotConnectedError();
     }
 
+    // Service-side validation: reject structurally invalid contract IDs before
+    // spending a transaction fee.  The form already validates client-side, but
+    // this guard catches any callers that bypass the form layer.
+    const contractErrors = validateContractAddresses(params.contractAddresses ?? []);
+    if (contractErrors.length > 0) {
+      const detail = contractErrors
+        .map((e) => `[${e.index}] "${e.value}": ${e.error}`)
+        .join("; ");
+      throw new ContractCallError(`Invalid contract address(es): ${detail}`);
+    }
+
     const args = [
       nativeToScVal(params.name),
       nativeToScVal(params.category),
@@ -386,7 +409,7 @@ export const sorobanService = {
    * @see {@link getVerificationStatus} to check request status
    * @see {@link getVerificationRequestStatus} for detailed status with context
    */
-  async requestVerification(projectId: string, projectName: string) {
+  async requestVerification(projectId: string, projectName: string, tier: "BRONZE" | "SILVER" | "GOLD" = "BRONZE") {
     try {
       let userAddress: string;
       try {
@@ -401,6 +424,7 @@ export const sorobanService = {
         projectId,
         projectName,
         userAddress,
+        tier,
       );
 
       console.log(
@@ -843,6 +867,15 @@ export const sorobanService = {
     if (!project) throw new ContractCallError("Project not found");
     if (project.owner !== publicKey) {
       throw new ContractCallError("Only project owner can update the project");
+    }
+
+    // Service-side contract address validation
+    const contractErrors = validateContractAddresses(params.contractAddresses ?? []);
+    if (contractErrors.length > 0) {
+      const detail = contractErrors
+        .map((e) => `[${e.index}] "${e.value}": ${e.error}`)
+        .join("; ");
+      throw new ContractCallError(`Invalid contract address(es): ${detail}`);
     }
 
     const args = [

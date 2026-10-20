@@ -1,0 +1,106 @@
+{
+  "index": {
+    "title": "Welcome",
+    "type": "page",
+    "display": "hidden"
+  },
+  "getting-started": {
+    "title": "Getting Started",
+    "type": "menu",
+    "items": {
+      "quickstart": { "title": "Quick Start" },
+      "setup": { "title": "Setup Guide" },
+      "environment": { "title": "Environment Variables" },
+      "wallet": { "title": "Wallet Setup" }
+    }
+  },
+  "api-reference": {
+    "title": "API Reference",
+    "type": "menu",
+    "items": {
+      "overview": { "title": "Overview" },
+      "rest": { "title": "REST API" },
+      "graphql": { "title": "GraphQL API" },
+      "authentication": { "title": "Authentication" },
+      "errors": { "title": "Error Reference" },
+      "rate-limiting": { "title": "Rate Limiting" }
+    }
+  },
+  "components": {
+    "title": "Component Library",
+    "type": "menu",
+    "items": {
+      "overview": { "title": "Overview" },
+      "button": { "title": "Button" },
+      "card": { "title": "Card" },
+      "badge": { "title": "Badge" },
+      "input": { "title": "Input" }
+    }
+  },
+  "service-contracts": {
+    "title": "Service Contracts",
+    "type": "menu",
+    "items": {
+      "overview": { "title": "Architecture" },
+      "project-services": { "title": "Project Services" },
+      "review-services": { "title": "Review Services" },
+      "wallet-service": { "title": "Wallet Service" },
+      "draft-services": { "title": "Draft Services" },
+      "stellar-services": { "title": "Stellar & Soroban" }
+    }
+  },
+  "integration-guides": {
+    "title": "Integration Guides",
+    "type": "menu",
+    "items": {
+      "wallet-integration": { "title": "Freighter Wallet" },
+      "hooks": { "title": "Custom Hooks" },
+      "features": { "title": "Features Overview" },
+      "typescript-sdk": { "title": "TypeScript SDK" },
+      "python-sdk": { "title": "Python SDK" }
+    }
+  },
+  "smart-contracts": {
+    "title": "Smart Contract Specs",
+    "type": "menu",
+    "items": {
+      "overview": { "title": "Overview" },
+      "project-registry": { "title": "Project Registry" },
+      "review-registry": { "title": "Review Registry" },
+      "verification-registry": { "title": "Verification Registry" },
+      "error-handling": { "title": "Error Handling" },
+      "upgrades": { "title": "Contract Upgrades" }
+    }
+  },
+  "architecture": {
+    "title": "Architecture",
+    "type": "menu",
+    "items": {
+      "overview": { "title": "Overview" },
+      "context-hooks": { "title": "ADR 0001: Context + Hooks" },
+      "ipfs": { "title": "ADR 0002: IPFS Storage" },
+      "contract-design": { "title": "ADR 0003: Contract Design" },
+      "localstorage": { "title": "ADR 0004: localStorage" }
+    }
+  },
+  "types": {
+    "title": "Types Reference",
+    "type": "page"
+  },
+  "testing": {
+    "title": "Testing Guide",
+    "type": "page"
+  },
+  "deployment": {
+    "title": "Deployment",
+    "type": "page"
+  },
+  "contributing": {
+    "title": "Contributing",
+    "type": "page"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "type": "page"
+  }
+}

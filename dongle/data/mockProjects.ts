@@ -1,6 +1,5 @@
 import { Project, PROJECT_CATEGORIES } from "@/types/project";
 import { extractDomain } from "@/lib/url";
-
 // Helper to generate deterministic but seemingly random dates
 const generateDate = (index: number) => {
   const baseDate = new Date("2023-01-01T00:00:00Z").getTime();
@@ -55,6 +54,7 @@ const baseProjects: Partial<Project>[] = [
     description: "Instant cross-border payments powered by Stellar.",
     rating: 4.6,
     reviews: 175,
+    status: "deprecated",
     websiteUrl: "https://xlm-pay.example.com",
   },
   {
@@ -75,6 +75,7 @@ const baseProjects: Partial<Project>[] = [
     description: "A censorship-resistant social network powered by Soroban.",
     rating: 4.1,
     reviews: 32,
+    status: "paused",
     websiteUrl: "https://stellar-social.example.com",
   },
   {
@@ -94,6 +95,7 @@ const baseProjects: Partial<Project>[] = [
     description: "No-code platform to mint and manage Stellar tokens.",
     rating: 4.4,
     reviews: 88,
+    status: "archived",
     websiteUrl: "https://token-forge.example.com",
     githubUrl: "https://github.com/example/token-forge",
     docsUrl: "https://docs.token-forge.example.com",
@@ -105,14 +107,15 @@ const baseProjects: Partial<Project>[] = [
     description: "Maximize your returns with automated yield farming strategies.",
     rating: 4.3,
     reviews: 112,
+    status: "flagged",
     websiteUrl: "https://yield-farm.example.com",
     githubUrl: "https://github.com/example/yield-farm",
   },
 ];
 
 // Generate 50+ projects by duplicating and modifying base projects
-export const mockProjects: Project[] = Array.from({ length: 60 }).map(
-  (_, i) => {
+export const mockProjects: Project[] = [
+  ...Array.from({ length: 60 }).map((_, i) => {
     const base = baseProjects[i % baseProjects.length];
     const iteration = Math.floor(i / baseProjects.length);
 
@@ -133,6 +136,7 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
         base.reviews! + Math.floor(Math.cos(i) * 50) + iteration * 10,
       ),
       createdAt: generateDate(i),
+      status: base.status ?? "active",
       websiteUrl: base.websiteUrl,
       githubUrl: base.githubUrl,
       logoUrl: base.logoUrl,
@@ -143,5 +147,22 @@ export const mockProjects: Project[] = Array.from({ length: 60 }).map(
       contractAddresses: base.contractAddresses,
       ownerAddress: base.ownerAddress || `GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890${i.toString().padStart(4, '0')}ABCDEFGHIJKLMNOPQR`,
     };
+  }),
+  {
+    id: "proj-no-request",
+    name: "Project Without Verification Request",
+    primaryCategory: PROJECT_CATEGORIES.DEFI,
+    tags: ["Validation"],
+    description: "A valid project that exists but has no verification request yet.",
+    rating: 4.9,
+    reviews: 11,
+    createdAt: new Date("2024-01-15T00:00:00Z").toISOString(),
+    status: "active",
+    websiteUrl: "https://proj-no-request.example.com",
+    githubUrl: "https://github.com/example/proj-no-request",
+    docsUrl: "https://docs.proj-no-request.example.com",
+    domain: "proj-no-request.example.com",
+    contractAddresses: [],
+    ownerAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
   },
-);
+] as Project[];

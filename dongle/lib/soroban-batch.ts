@@ -1,4 +1,4 @@
-import { rpc } from "stellar-sdk";
+import { rpc, xdr } from "stellar-sdk";
 import { SOROBAN_CONFIG } from "@/constants/contracts";
 
 const server = new rpc.Server(SOROBAN_CONFIG.RPC_URL, { timeout: 15_000 });
@@ -8,7 +8,7 @@ const DEBOUNCE_MS = 50;
 
 interface PendingRequest {
   contractId: string;
-  key: string;
+  key: xdr.ScVal;
   resolve: (value: rpc.Api.LedgerEntryResult | null) => void;
   reject: (reason: unknown) => void;
 }
@@ -54,7 +54,7 @@ function scheduleBatch() {
  */
 export function batchGetContractData(
   contractId: string,
-  key: string,
+  key: xdr.ScVal,
 ): Promise<rpc.Api.LedgerEntryResult | null> {
   return new Promise((resolve, reject) => {
     pendingBatch.push({ contractId, key, resolve, reject });

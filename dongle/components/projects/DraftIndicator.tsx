@@ -24,24 +24,6 @@ interface DraftIndicatorProps {
   onDiscard: () => void;
 }
 
-function formatLastSaved(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffMs / 60_000);
-
-  if (diffSecs < 10) return "just now";
-  if (diffMins < 1) return `${diffSecs}s ago`;
-  if (diffMins < 60) return `${diffMins}m ago`;
-
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
 export function DraftIndicator({
   hasDraft,
   lastSaved,

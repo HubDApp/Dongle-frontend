@@ -101,6 +101,27 @@ OAuth users may discover, browse, search, and read reviews. Publishing (reviews,
 3. Put IDs and secrets in `dongle/.env.local` (see `.env.example`). Never commit them.
 4. Set `AUTH_SESSION_SECRET` and `AUTH_APP_URL`.
 
+## 5. Form audit logging (#559)
+
+Every form interaction is appended to a searchable audit log with a timestamp,
+the acting user identity, and the client IP.
+
+- **Service:** `dongle/services/audit/form-audit-log.service.ts` — append-only
+  `localStorage` log; sibling of the admin mutation log with the same
+  retention/redaction conventions.
+- **Hook:** `dongle/hooks/useFormAuditLog.ts` — `trackValues()` diffs form state
+  and records a `field_change` per changed field; `logAction()` records submits.
+- **IP stamping:** `GET /api/audit/client-ip` resolves the client IP server-side
+  from proxy headers (a browser cannot read its own public IP). The client
+  caches the stamp per page load; `dongle/lib/request-ip.ts` is shared with the
+  anomaly-detection IP hash endpoint.
+- **Search/export:** `formAuditLogService.search(query, filter)`,
+  `list(filter)`, `exportCsv(filter)`, `redactedList(filter)`.
+- Wired into the project registration/edit form (`project-form`) and the review
+  form (`review-form`).
+
+See [dongle/FORM_AUDIT_LOGGING.md](../dongle/FORM_AUDIT_LOGGING.md).
+
 ## Environment variables
 
 | Variable | Client? | Purpose |

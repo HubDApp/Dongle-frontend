@@ -52,7 +52,7 @@ export function useProjectMetadata(id: string | null | undefined): UseProjectMet
       return project;
     },
     {
-      revalidateInterval: 300_000, // 5 minutes
+      refreshInterval: 300_000, // 5 minutes
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       dedupingInterval: 60_000, // 1 minute deduping
@@ -70,9 +70,11 @@ export function useProjectMetadata(id: string | null | undefined): UseProjectMet
   }
 
   return {
-    project: data,
+    project: data ?? null,
     isLoading: isLoading || isValidating,
     error: error || null,
-    refresh: () => mutate(),
+    refresh: async () => {
+      await mutate();
+    },
   };
 }

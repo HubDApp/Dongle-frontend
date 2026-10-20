@@ -14,6 +14,7 @@ export {
 
 export {
   track,
+  getRecordedEvents,
   withWalletFingerprint,
   __setAnalyticsTransportForTests,
   __resetAnalyticsForTests,
@@ -29,4 +30,60 @@ export {
   trackProjectSubmit,
   trackVerificationRequest,
   trackReviewSubmit,
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
+  trackFormFieldChange,
+  trackFormAbandon,
+  trackFormBackupCreated,
+  trackFormBackupRestored,
+  trackFormBackupFailed,
+  trackFormBackupRetentionCleaned,
+  trackFormArchiveCreated,
+  trackFormArchiveRestored,
+  trackFormArchiveSearch,
+  trackFormArchiveDeleted,
+  trackFormArchiveRetentionCleaned,
+  trackConsentGiven,
+  trackConsentWithdrawn,
+  trackDataExport,
+  trackDataDeletionRequested,
+  trackDataDeletionCompleted,
 } from "./events";
+
+// Issue #522 & #523: form analytics aggregation
+export {
+  getFormAnalyticsAggregates,
+  resetFormAnalyticsData,
+} from "./form-aggregator";
+export type {
+  FieldInteractionStats,
+  ValidationPerfStats,
+  FormSubmissionStats,
+  FormAnalyticsAggregates,
+} from "./form-aggregator";
+
+// Issue #706: funnel and engagement analysis
+export { FUNNELS, computeFunnel, averageTimeOnPage } from "./funnels";
+export type { FunnelDefinition, FunnelStepResult } from "./funnels";
+
+// Issue #715: UTM capture and acquisition attribution
+export {
+  parseUtm,
+  buildTouchPoint,
+  captureAttribution,
+  getAttribution,
+  getAttributionRecords,
+  markEngaged,
+  recordConversion,
+  computeAttributionMetrics,
+  toAttributionCsv,
+  buildSampleAttributionRecords,
+} from "./attribution";
+export type {
+  UtmParams,
+  TouchPoint,
+  AttributionRecord,
+  AttributionState,
+  AttributionMetric,
+} from "./attribution";

@@ -1,0 +1,8 @@
+# Local environment overrides — copy from .env.example, never commit
+.env
+
+# Node modules if anyone runs npm install inside local-dev/
+node_modules/
+
+# Seed script log output
+*.log

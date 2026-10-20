@@ -1,0 +1,121 @@
+---
+title: Setup Guide
+description: Dependency installation, platform-specific notes, and troubleshooting.
+---
+
+import { Callout, Tabs } from "nextra/components";
+
+# Setup Guide
+
+## Prerequisites
+
+| Requirement | Version |
+|-------------|---------|
+| Node.js | 20.x LTS (pinned in `.nvmrc`) |
+| npm | ≥ 10.x |
+| Freighter | Latest |
+
+## Installation
+
+```bash
+cd dongle
+npm install
+```
+
+<Callout>
+  Use `npm ci` in CI environments — it respects the exact lockfile instead of resolving ranges.
+</Callout>
+
+## Platform Notes
+
+This project uses native Rolldown bindings for faster builds. `npm install` resolves the correct platform variant automatically:
+
+| Platform | Package |
+|----------|---------|
+| macOS (Apple Silicon) | `@rolldown/binding-darwin-arm64` |
+| macOS (Intel) | `@rolldown/binding-darwin-x64` |
+| Linux (x64) | `@rolldown/binding-linux-x64-gnu` |
+| Windows (x64) | `@rolldown/binding-win32-x64` |
+
+## Troubleshooting
+
+### `Cannot find module '@rolldown/binding-*'`
+
+The native binding for your platform was not installed.
+
+<Tabs items={["Windows", "macOS (Apple Silicon)", "macOS (Intel)", "Linux"]}>
+  <Tabs.Tab>
+    ```bash
+    npm install --no-save @rolldown/binding-win32-x64
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    npm install --no-save @rolldown/binding-darwin-arm64
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    npm install --no-save @rolldown/binding-darwin-x64
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    npm install --no-save @rolldown/binding-linux-x64-gnu
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+Or try a clean install:
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Build tools missing
+
+<Tabs items={["macOS", "Windows", "Ubuntu/Debian", "Fedora/RHEL"]}>
+  <Tabs.Tab>
+    ```bash
+    xcode-select --install
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    Install **Visual Studio Build Tools** with the C++ workload, or run:
+    ```bash
+    npm install -g windows-build-tools
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    sudo apt-get install build-essential python3
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    sudo dnf install gcc-c++ make python3
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+### `npm install` hangs or times out
+
+```bash
+# Increase timeout
+npm install --fetch-timeout=120000
+
+# Clear cache
+npm cache clean --force && npm install
+```
+
+Ensure you have at least **1 GB** free disk space.
+
+## Verifying Installation
+
+```bash
+npm ls          # check dependency tree
+npm test        # run unit tests
+npm run lint    # ESLint
+npm run build   # production build
+```

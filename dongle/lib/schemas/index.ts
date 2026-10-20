@@ -16,3 +16,8 @@ export {
   type EmailSetupFormData,
   type BackupCodesFormData,
 } from "./twofa.schema";
+export {
+  updateFormSchema,
+  type UpdateFormData,
+  UPDATE_CONSTRAINTS,
+} from "./update.schema";

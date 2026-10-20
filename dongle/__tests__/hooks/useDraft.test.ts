@@ -11,10 +11,42 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useDraft } from "@/hooks/useDraft";
 import { draftService } from "@/services/draft/draft.service";
+import { draftApiService } from "@/services/draft/draft-api.service";
 import type { ProjectDraft } from "@/services/draft/draft.service";
+
+// ---------------------------------------------------------------------------
+// Mock DraftApiService (jsdom cannot fetch relative URLs)
+// ---------------------------------------------------------------------------
+
+vi.mock("@/services/draft/draft-api.service", () => ({
+  draftApiService: {
+    getDraft: vi.fn(),
+    saveDraft: vi.fn(),
+    deleteDraft: vi.fn(),
+  },
+}));
+
+const getDraftRemoteMock = vi.mocked(draftApiService.getDraft);
+const saveDraftRemoteMock = vi.mocked(draftApiService.saveDraft);
+const deleteDraftRemoteMock = vi.mocked(draftApiService.deleteDraft);
+
+// ---------------------------------------------------------------------------
+// Mock BroadcastChannel
+// ---------------------------------------------------------------------------
+
+const broadcastPostMessage = vi.fn();
+const broadcastClose = vi.fn();
+
+class BroadcastChannelMock {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  postMessage = broadcastPostMessage;
+  close = broadcastClose;
+}
+
+vi.stubGlobal("BroadcastChannel", BroadcastChannelMock);
 
 // ---------------------------------------------------------------------------
 // Mock localStorage
@@ -33,44 +65,19 @@ const localStorageMock = (() => {
 Object.defineProperty(window, "localStorage", { value: localStorageMock });
 
 // ---------------------------------------------------------------------------
-// Spy on DraftService remote methods (keep sync methods intact)
-// ---------------------------------------------------------------------------
-
-// We spy on the remote methods directly on the singleton instance
-// so that sync methods (saveDraft, getDraftForProject, hasContent, etc.) keep working.
-const saveDraftRemoteMock = vi.spyOn(draftService, "saveDraftRemote");
-const getDraftRemoteMock = vi.spyOn(draftService, "getDraftRemote");
-const deleteDraftRemoteMock = vi.spyOn(draftService, "deleteDraftRemote");
-
-// ---------------------------------------------------------------------------
-// Mock BroadcastChannel
-// ---------------------------------------------------------------------------
-
-const broadcastPostMessage = vi.fn();
-const broadcastClose = vi.fn();
-
-class BroadcastChannelMock {
-  onmessage: ((event: MessageEvent) => void) | null = null;
-  postMessage = broadcastPostMessage;
-  close = broadcastClose;
-}
-
-vi.stubGlobal("BroadcastChannel", BroadcastChannelMock);
-
-// ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const WALLET = "GBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX123456";
+const WALLET = "GBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
 const DRAFT_ID_CREATE = "new-project-draft";
 
 const filledData: ProjectDraft["data"] = {
   name: "My DApp",
   primaryCategory: "defi",
-  tags: ["stellar"],
-  description: "A great project",
-  websiteUrl: "https://example.com",
-  githubUrl: "",
+  tags: ["soroban"],
+  description: "A test project description",
+  websiteUrl: "https://mydapp.com",
+  githubUrl: "https://github.com/mydapp",
   logoUrl: "",
   docsUrl: "",
 };
@@ -86,12 +93,16 @@ const emptyData: ProjectDraft["data"] = {
   docsUrl: "",
 };
 
-function makeRemoteDraft(overrides?: Partial<ProjectDraft>): ProjectDraft {
+/** Build a stored draft fixture with a lastSaved timestamp. */
+function makeDraft(
+  data: ProjectDraft["data"],
+  overrides: Partial<ProjectDraft> = {}
+): ProjectDraft {
   return {
     id: DRAFT_ID_CREATE,
+    data,
     mode: "create",
-    lastSaved: "2026-08-25T08:00:00.000Z",
-    data: filledData,
+    lastSaved: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -107,22 +118,10 @@ describe("useDraft – localStorage-only (no walletAddress)", () => {
       localStorageMock.clear();
       vi.useFakeTimers();
       vi.clearAllMocks();
-      getDraftRemoteMock.mockResolvedValue(null);
     });
     afterEach(() => {
       vi.useRealTimers();
     });
-
-describe("useDraft hook", () => {
-  beforeEach(() => {
-    localStorageMock.clear();
-    vi.clearAllTimers();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
 
     it("does not save when data is empty", () => {
       const { result } = renderHook(() => useDraft({ mode: "create" }));
@@ -131,9 +130,6 @@ describe("useDraft hook", () => {
       expect(result.current.hasDraft).toBe(false);
     });
 
-    it("should save draft when user types in fields", () => {
-      vi.useFakeTimers();
-      
     it("sets isSaving=false after async save completes", async () => {
       const { result } = renderHook(() => useDraft({ mode: "create" }));
       act(() => { result.current.saveDraft(filledData); });
@@ -153,14 +149,6 @@ describe("useDraft hook", () => {
       expect(saveSpy).toHaveBeenCalledTimes(1);
       saveSpy.mockRestore();
     });
-
-    it("should save draft when user types in fields", async () => {
-      const { result } = renderHook(() =>
-        useDraft({ mode: "create", autoSave: true })
-      );
-      expect(createResult.current.draftId).toBe("new-project-draft");
-      expect(editResult.current.draftId).toBe("edit-project-abc");
-    });
   });
 
   // Tests that need real timers for async mount effects
@@ -168,21 +156,8 @@ describe("useDraft hook", () => {
     beforeEach(() => {
       localStorageMock.clear();
       vi.clearAllMocks();
-      getDraftRemoteMock.mockResolvedValue(null);
     });
 
-      // Wait for debounce
-      act(() => {
-        vi.advanceTimersByTime(1000);
-      // Flush autosave debounce
-      await act(async () => {
-        vi.runAllTimers();
-      });
-    });
-
-      expect(result.current.hasDraft).toBe(true);
-      expect(result.current.lastSaved).toBeTruthy();
-      
     it("clears draft state after deleteDraft", async () => {
       draftService.saveDraft({ id: DRAFT_ID_CREATE, mode: "create", data: filledData });
       const { result } = renderHook(() => useDraft({ mode: "create" }));
@@ -202,15 +177,18 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
       localStorageMock.clear();
       vi.useFakeTimers();
       vi.clearAllMocks();
+      // Default: no remote draft (404) so the hook falls back to localStorage
+      getDraftRemoteMock.mockResolvedValue({
+        ok: false,
+        status: 404,
+        error: "not found",
+      });
     });
     afterEach(() => {
       vi.useRealTimers();
     });
 
-    it("should debounce autosave to prevent excessive saves", () => {
-      vi.useFakeTimers();
-      const saveSpy = vi.spyOn(draftService, "saveDraft");
-
+    it("should debounce autosave to prevent excessive saves", async () => {
       const { result } = renderHook(() =>
         useDraft({ mode: "create", walletAddress: WALLET })
       );
@@ -226,26 +204,32 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
     });
 
     it("sets saveError and falls back to localStorage when remote save fails", async () => {
-      saveDraftRemoteMock.mockResolvedValueOnce(null);
-      getDraftRemoteMock.mockResolvedValue(null);
-
-      // Fast-forward time
-      act(() => {
-        vi.advanceTimersByTime(1000);
+      saveDraftRemoteMock.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        error: "server error",
       });
+
+      const { result } = renderHook(() =>
+        useDraft({ mode: "create", walletAddress: WALLET })
+      );
 
       act(() => { result.current.saveDraft(filledData); });
       await act(async () => { vi.advanceTimersByTime(2000); });
 
-      vi.useRealTimers();
-      saveSpy.mockRestore();
+      expect(result.current.saveError).toBe("Could not sync to server; saved locally.");
+      expect(result.current.hasDraft).toBe(true);
     });
   });
 
   describe("Acceptance Criteria: Restored drafts are clearly indicated", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.clearAllMocks();
+    });
+
     it("should load existing draft on mount", async () => {
-      // Pre-populate a draft
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "Existing Project",
         primaryCategory: "defi",
         tags: ["soroban"],
@@ -256,28 +240,24 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      // Draft exists remotely
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
         useDraft({ mode: "create", walletAddress: WALLET })
       );
 
-      // Flush the deferred state update
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
-      expect(result.current.hasDraft).toBe(true);
       expect(result.current.loadedDraft).toEqual(draftData);
       expect(result.current.lastSaved).toBeTruthy();
     });
 
     it("should provide lastSaved timestamp for UI display", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "Test Project",
         primaryCategory: "defi",
         tags: [],
@@ -288,19 +268,16 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
         useDraft({ mode: "create", walletAddress: WALLET })
       );
 
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
       expect(result.current.lastSaved).toBeTruthy();
       expect(typeof result.current.lastSaved).toBe("string");
@@ -312,8 +289,14 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
   });
 
   describe("Acceptance Criteria: Users can clear saved drafts", () => {
+    beforeEach(() => {
+      localStorageMock.clear();
+      vi.clearAllMocks();
+      deleteDraftRemoteMock.mockResolvedValue({ ok: true, data: { success: true } });
+    });
+
     it("should delete draft when clearDraft is called", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "To Be Deleted",
         primaryCategory: "defi",
         tags: [],
@@ -324,10 +307,9 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
@@ -335,14 +317,7 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
       );
       await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
-      // Flush deferred mount state
       await act(async () => {
-        vi.runAllTimers();
-      });
-
-      expect(result.current.hasDraft).toBe(true);
-
-      act(() => {
         result.current.clearDraft();
       });
 
@@ -351,7 +326,7 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
     });
 
     it("should delete draft when deleteDraft is called", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "To Be Deleted",
         primaryCategory: "defi",
         tags: [],
@@ -362,26 +337,23 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "new-project-draft",
-        data: draftData,
-        mode: "create",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData),
       });
 
       const { result } = renderHook(() =>
         useDraft({ mode: "create", walletAddress: WALLET })
       );
 
-      await act(async () => {
-        vi.runAllTimers();
-      });
+      await waitFor(() => expect(result.current.hasDraft).toBe(true));
 
-      act(() => {
+      await act(async () => {
         result.current.deleteDraft();
       });
 
       expect(broadcastPostMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "DRAFT_SAVED", draftId: DRAFT_ID_CREATE })
+        expect.objectContaining({ type: "DRAFT_DELETED", draftId: DRAFT_ID_CREATE })
       );
     });
   });
@@ -393,7 +365,7 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
     });
 
     it("should load project-specific draft for edit mode", async () => {
-      const draftData = {
+      const draftData: ProjectDraft["data"] = {
         name: "Edit Mode Project",
         primaryCategory: "defi",
         tags: [],
@@ -404,21 +376,19 @@ describe("useDraft – remote-first (walletAddress provided)", () => {
         docsUrl: "",
       };
 
-      draftService.saveDraft({
-        id: "edit-project-project-456",
-        data: draftData,
-        mode: "edit",
-        projectId: "project-456",
+      getDraftRemoteMock.mockResolvedValue({
+        ok: true,
+        data: makeDraft(draftData, {
+          id: "edit-project-project-456",
+          mode: "edit",
+          projectId: "project-456",
+        }),
       });
 
       const { result } = renderHook(() =>
-        useDraft({ mode: "create", walletAddress: WALLET })
+        useDraft({ mode: "edit", projectId: "project-456", walletAddress: WALLET })
       );
       await waitFor(() => expect(result.current.hasDraft).toBe(true));
-
-      await act(async () => {
-        vi.runAllTimers();
-      });
 
       expect(result.current.hasDraft).toBe(true);
       expect(result.current.loadedDraft?.name).toBe("Edit Mode Project");

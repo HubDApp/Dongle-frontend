@@ -1,0 +1,83 @@
+---
+title: Review Registry Contract
+description: Target ABI, call patterns, and constraints for the Review Registry Soroban contract.
+---
+
+import { Callout } from "nextra/components";
+
+# Review Registry Contract
+
+**Contract ID:** `DONGLE_CONTRACTS.REVIEW_REGISTRY`  
+**Current backend:** `reviewService` (localStorage)  
+**Target service:** `sorobanService` or a dedicated `reviewContractService`
+
+<Callout>
+  Review contract calls are **planned**. The frontend is wired for them; activate by setting `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` to a real deployed contract ID.
+</Callout>
+
+## Target ABI
+
+```
+submit_review(
+  project_id:  Symbol,
+  rating:      u32,          // 1–5
+  comment_cid: Symbol,       // IPFS CID for full review text
+) → ReviewId
+
+update_review(
+  review_id:   Symbol,
+  rating:      u32,
+  comment_cid: Symbol,
+) → void
+
+delete_review(review_id: Symbol) → void
+
+get_review(review_id: Symbol)                                → Review
+get_reviews_by_project(project_id: Symbol, offset: u32, limit: u32) → Vec<Review>
+get_aggregate_rating(project_id: Symbol)                     → { average: u32, count: u32 }
+has_reviewed(project_id: Symbol, reviewer: Address)          → bool
+```
+
+## Expected Types
+
+```typescript
+interface OnChainReview {
+  id: string;
+  projectId: string;
+  userAddress: string;
+  rating: number;        // 1–5 integer
+  commentCid: string;    // IPFS content address
+  createdAt: string;
+  updatedAt?: string;
+}
+```
+
+**Validation constraints** (from `types/review.ts`):
+
+```typescript
+REVIEW_CONSTRAINTS = {
+  RATING_MIN: 1,
+  RATING_MAX: 5,
+  COMMENT_MIN_LENGTH: 10,
+  COMMENT_MAX_LENGTH: 1000,
+}
+```
+
+## Call Patterns
+
+| Action | Pattern | Notes |
+|--------|---------|-------|
+| Submit review | Single signed invoke | Upload comment to IPFS first; pass CID to contract |
+| Update review | Single signed invoke | One review per user per project enforced on-chain |
+| Read reviews | Read-only simulate (no sign) | Paginate with `offset` / `limit` |
+| Aggregate rating | Read-only simulate | Displayed on project cards |
+
+## Frontend Integration Flow (Target)
+
+```
+1. Validate review locally (reviewService.validateReview)
+2. Upload comment JSON to IPFS  →  receive CID
+3. Build submit_review(project_id, rating, comment_cid)
+4. Sign + submit + poll for SUCCESS
+5. Re-fetch get_aggregate_rating(project_id) to update UI
+```

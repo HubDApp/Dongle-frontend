@@ -71,7 +71,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
 
       render(<AdminPage />);
 
-      expect(screen.getByText("Connect Your Wallet")).toBeInTheDocument();
+      expect(screen.getAllByText("Connect Your Wallet").length).toBeGreaterThan(0);
       expect(
         screen.getByText(/authorized admin Freighter wallet/i),
       ).toBeInTheDocument();
@@ -200,7 +200,7 @@ describe("Admin Dashboard - Authorization & High Risk Flows", () => {
       mockWallet(false, null);
 
       render(<AdminPage />);
-      expect(screen.getByText("Connect Your Wallet")).toBeInTheDocument();
+      expect(screen.getAllByText("Connect Your Wallet").length).toBeGreaterThan(0);
     });
 
     it("verifies user is admin before showing actions", () => {

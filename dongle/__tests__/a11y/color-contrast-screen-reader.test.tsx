@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { axe, type AxeResults } from "vitest-axe";
+import { axe } from "vitest-axe";
+import type { AxeResults } from "axe-core";
 import "@/__tests__/lib/axe-matchers";
 import {
   testA11y,
@@ -16,9 +17,9 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { FormField } from "@/components/ui/FormField";
 import { Card } from "@/components/ui/Card";
-import { NetworkMismatchBanner } from "@/components/layout/NetworkMismatchBanner";
+import NetworkMismatchBanner from "@/components/layout/NetworkMismatchBanner";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
-import { OfflineBanner } from "@/components/ui/OfflineBanner";
+import OfflineBanner from "@/components/ui/OfflineBanner";
 import React from "react";
 
 const BRAND_COLORS: ColorContrastPair[] = [
@@ -91,11 +92,11 @@ describe("Color Contrast - WCAG AA Compliance", () => {
   it("Badge variants contrast with readable text colors", () => {
     render(
       <div aria-label="Badges section">
-        <Badge variant="default">Standard</Badge>
+        <Badge variant="primary">Standard</Badge>
         <Badge variant="success">Approved</Badge>
         <Badge variant="warning">Pending</Badge>
         <Badge variant="error">Rejected</Badge>
-        <Badge variant="info">Info</Badge>
+        <Badge variant="secondary">Info</Badge>
       </div>,
     );
 
@@ -143,22 +144,18 @@ describe("Screen Reader Simulation - ARIA & Live Regions", () => {
   it("VerificationBadge has accessible name via aria-label or aria-labelledby", () => {
     render(
       <div>
-        <VerificationBadge status="VERIFIED" projectName="Soroban Swap" />
+        <VerificationBadge status="VERIFIED" />
       </div>,
     );
   });
 
   it("OfflineBanner announces via role=status aria-live", () => {
-    render(<OfflineBanner isOffline />);
+    render(<OfflineBanner isOnline={false} />);
   });
 
   it("NetworkMismatchBanner exposes status to assistive tech", () => {
     render(
-      <NetworkMismatchBanner
-        expectedNetwork="Testnet"
-        actualNetwork="Public Network"
-        onDismiss={() => {}}
-      />,
+      <NetworkMismatchBanner />,
     );
   });
 
@@ -192,7 +189,7 @@ describe("Screen Reader Simulation - ARIA & Live Regions", () => {
       <ConfirmDialog
         isOpen
         title="Remove project submission?"
-        message="Once removed, the submission cannot be recovered."
+        description="Once removed, the submission cannot be recovered."
         confirmLabel="Remove submission"
         cancelLabel="Keep it"
         onConfirm={() => {}}

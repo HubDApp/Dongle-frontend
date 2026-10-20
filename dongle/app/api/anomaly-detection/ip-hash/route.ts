@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { extractClientIP, hashClientIP } from "@/lib/request-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,9 @@ function extractClientIP(request: NextRequest): string {
     return cfConnectingIP;
   }
 
-  // Fallback to NextRequest's internal IP (may not always be reliable)
-  return request.ip || "unknown";
+  // NextRequest no longer exposes a client IP directly; callers must rely on
+  // the proxy headers above. Fall back to a sentinel when none are present.
+  return "unknown";
 }
 
 /**
@@ -55,7 +57,7 @@ function extractClientIP(request: NextRequest): string {
 export async function GET(request: NextRequest) {
   try {
     const clientIP = extractClientIP(request);
-    const ipHash = hashIP(clientIP);
+    const ipHash = hashClientIP(clientIP);
 
     return NextResponse.json({
       ipHash,

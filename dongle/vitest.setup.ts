@@ -15,6 +15,44 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+// jsdom does not implement IntersectionObserver; components that lazy-load
+// content on scroll (e.g. LazyProjectCard) crash without a stub. The stub
+// reports every observed target as immediately visible so lazy content renders.
+class IntersectionObserverMock {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin: string = "";
+  readonly thresholds: ReadonlyArray<number> = [];
+
+  constructor(private callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+
+  observe(target: Element): void {
+    const entry = {
+      isIntersecting: true,
+      target,
+      intersectionRatio: 1,
+      time: 0,
+      boundingClientRect: target.getBoundingClientRect(),
+      intersectionRect: target.getBoundingClientRect(),
+      rootBounds: null,
+    } as unknown as IntersectionObserverEntry;
+    this.callback([entry], this as unknown as IntersectionObserver);
+  }
+
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  Object.defineProperty(globalThis, "IntersectionObserver", {
+    writable: true,
+    configurable: true,
+    value: IntersectionObserverMock,
+  });
+}
+
 Object.defineProperty(navigator, "clipboard", {
   value: {
     writeText: vi.fn().mockResolvedValue(undefined),

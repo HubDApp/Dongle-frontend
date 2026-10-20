@@ -57,6 +57,7 @@ describe("Navbar active navigation", () => {
         connectWallet: vi.fn(),
         disconnectWallet: vi.fn(),
         isConnecting: false,
+        retryAccountLoad: vi.fn(),
       },
     });
   });
@@ -108,6 +109,7 @@ describe("Navbar active navigation", () => {
         connectWallet: vi.fn(),
         disconnectWallet: vi.fn(),
         isConnecting: false,
+        retryAccountLoad: vi.fn(),
       },
     });
 

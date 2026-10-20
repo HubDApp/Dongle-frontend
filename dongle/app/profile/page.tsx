@@ -26,6 +26,7 @@ import {
   XCircle,
   Package,
   Bookmark,
+  Heart,
   Activity,
   Wallet,
   Search,
@@ -67,6 +68,8 @@ export default function ProfilePage() {
     maxWatchlistSize,
     filterByCategory,
     trendingFromWatchlist,
+    isUpdateMuted,
+    toggleMuteUpdates,
   } = useWatchlist();
   const [watchlistCategory, setWatchlistCategory] = useState("All");
   const savedSearches = useMemo(
@@ -189,19 +192,6 @@ export default function ProfilePage() {
               pagePurpose={PROFILE_PURPOSE}
               loadingMessage="Loading your profile..."
             />
-            {gate.state === "account-loading" ? (
-              <WalletStateLoadingPanel message="Loading your profile..." />
-            ) : (
-              <WalletStatePanel
-                state={gate.state}
-                pagePurpose={PROFILE_PURPOSE}
-                walletNetworkLabel={gate.walletNetworkLabel}
-                publicKey={gate.publicKey}
-                onConnect={gate.connectWallet}
-                onDisconnect={gate.disconnectWallet}
-                onRetry={gate.retryAccountLoad}
-              />
-            )}
           </div>
         </main>
       </LayoutWrapper>
@@ -473,9 +463,15 @@ export default function ProfilePage() {
                     <Bookmark className="w-6 h-6" />
                     Watchlist
                   </h2>
-                  <Badge variant="secondary">
-                    {watchlistCount}/{maxWatchlistSize}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={() => router.push("/profile/following")}>
+                      <Heart className="h-4 w-4" />
+                      Following
+                    </Button>
+                    <Badge variant="secondary">
+                      {watchlistCount}/{maxWatchlistSize}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -500,11 +496,20 @@ export default function ProfilePage() {
                 {filteredWatchlist.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {filteredWatchlist.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={project}
-                        verificationStatus={savedProjectVerificationStatuses[project.id]}
-                      />
+                      <div key={project.id}>
+                        <ProjectCard
+                          project={project}
+                          verificationStatus={savedProjectVerificationStatuses[project.id]}
+                        />
+                        <label className="mt-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                          <input
+                            type="checkbox"
+                            checked={isUpdateMuted(project.id)}
+                            onChange={() => toggleMuteUpdates(project.id)}
+                          />
+                          Mute project updates
+                        </label>
+                      </div>
                     ))}
                   </div>
                 ) : (

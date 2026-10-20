@@ -14,6 +14,7 @@ function gateWith(
     connectWallet: overrides.connectWallet ?? vi.fn(),
     disconnectWallet: overrides.disconnectWallet ?? vi.fn(),
     isConnecting: overrides.isConnecting ?? false,
+    retryAccountLoad: overrides.retryAccountLoad ?? vi.fn(),
   };
 }
 

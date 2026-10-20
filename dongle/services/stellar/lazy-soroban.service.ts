@@ -68,7 +68,7 @@ export const lazySorobanService = {
   async registerProject(
     data: ProjectData,
     options?: SorobanTransactionOptions
-  ): Promise<boolean> {
+  ) {
     const service = await loadSorobanService();
     return service.registerProject(data, options);
   },
@@ -80,7 +80,7 @@ export const lazySorobanService = {
     projectId: string,
     data: ProjectData,
     options?: SorobanTransactionOptions
-  ): Promise<boolean> {
+  ) {
     const service = await loadSorobanService();
     return service.updateProject(projectId, data, options);
   },
@@ -88,38 +88,9 @@ export const lazySorobanService = {
   /**
    * Request verification for a project
    */
-  async requestVerification(
-    projectId: string,
-    requestedBy: string,
-    options?: SorobanTransactionOptions
-  ): Promise<boolean> {
+  async requestVerification(projectId: string, projectName: string) {
     const service = await loadSorobanService();
-    return service.requestVerification(projectId, requestedBy, options);
-  },
-
-  /**
-   * Verify a project (admin only)
-   */
-  async verifyProject(
-    projectId: string,
-    verifiedBy: string,
-    options?: SorobanTransactionOptions
-  ): Promise<boolean> {
-    const service = await loadSorobanService();
-    return service.verifyProject(projectId, verifiedBy, options);
-  },
-
-  /**
-   * Reject a verification request (admin only)
-   */
-  async rejectVerification(
-    projectId: string,
-    rejectedBy: string,
-    reason: string,
-    options?: SorobanTransactionOptions
-  ): Promise<boolean> {
-    const service = await loadSorobanService();
-    return service.rejectVerification(projectId, rejectedBy, reason, options);
+    return service.requestVerification(projectId, projectName);
   },
 };
 

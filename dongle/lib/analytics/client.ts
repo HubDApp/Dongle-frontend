@@ -85,6 +85,22 @@ class HttpTransport implements AnalyticsTransport {
   }
 }
 
+const MAX_RECORDED_EVENTS = 1000;
+const recordedEvents: AnalyticsEvent[] = [];
+
+/** Keeps the most recent events in memory for on-device dashboards. */
+class MemoryTransport implements AnalyticsTransport {
+  send(event: AnalyticsEvent): void {
+    recordedEvents.push(event);
+    if (recordedEvents.length > MAX_RECORDED_EVENTS) recordedEvents.shift();
+  }
+}
+
+/** Snapshot of events emitted in this tab, oldest first. */
+export function getRecordedEvents(): AnalyticsEvent[] {
+  return [...recordedEvents];
+}
+
 class CompositeTransport implements AnalyticsTransport {
   constructor(private readonly transports: AnalyticsTransport[]) {}
 
@@ -104,7 +120,7 @@ let transport: AnalyticsTransport | null = null;
 function getTransport(): AnalyticsTransport {
   if (transport) return transport;
 
-  const transports: AnalyticsTransport[] = [new ConsoleTransport()];
+  const transports: AnalyticsTransport[] = [new ConsoleTransport(), new MemoryTransport()];
   const ingest = getIngestUrl();
   if (ingest) {
     transports.push(new HttpTransport(ingest));

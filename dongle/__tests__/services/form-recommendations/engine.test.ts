@@ -220,7 +220,7 @@ describe("privacy", () => {
 
   it.each([
     "user@example.com",
-    "SB7777777777777777777777777777777777777777777777777777777",
+    "SB777777777777777777777777777777777777777777777777777777",
     "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
     "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig",
   ])("never learns the sensitive value %s", (value) => {

@@ -141,7 +141,7 @@ describe("Keyboard Navigation - Interactive Components", () => {
         <ConfirmDialog
           isOpen
           title="Delete project?"
-          message="This action cannot be undone."
+          description="This action cannot be undone."
           confirmLabel="Delete"
           cancelLabel="Cancel"
           onCancel={onCancel}
@@ -168,7 +168,7 @@ describe("Keyboard Navigation - Interactive Components", () => {
         <ConfirmDialog
           isOpen
           title="Confirm"
-          message="msg"
+          description="msg"
           confirmLabel="Ok"
           cancelLabel="Cancel"
           onCancel={onCancel}
@@ -229,11 +229,9 @@ describe("Keyboard Navigation - Interactive Components", () => {
       const user = userEvent.setup();
 
       render(
-        <SafeExternalLink
-          href="https://docs.example.com"
-          externalLabel=" (opens in a new tab)"
-        >
+        <SafeExternalLink href="https://docs.example.com">
           View project website
+          <span className="sr-only"> (opens in a new tab)</span>
           <ExternalLink aria-hidden="true" />
         </SafeExternalLink>,
       );
@@ -305,7 +303,7 @@ describe("Keyboard Navigation - Interactive Components", () => {
         <TagInput
           id="tags"
           label="Tags"
-          value={["stellar", "defi"]}
+          tags={["stellar", "defi"]}
           onChange={onChange}
           placeholder="Add a tag"
         />,

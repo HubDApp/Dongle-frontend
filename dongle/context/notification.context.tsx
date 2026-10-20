@@ -22,8 +22,10 @@ import {
   NOTIFICATION_TOAST_MS,
   isKnownNotificationType,
   type AppNotification,
+  type NotificationType,
   type NotificationStreamEvent,
 } from "@/types/notification";
+import { shouldToastNotification } from "@/lib/notifications/filters";
 
 interface NotificationContextValue {
   items: AppNotification[];
@@ -32,6 +34,7 @@ interface NotificationContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
   markRead: (id: string) => void;
+  markReadMany: (ids: string[]) => void;
   markAllRead: () => void;
 }
 
@@ -50,6 +53,7 @@ function translateEvent(
   const messageKey = `notifications.messages.${type}` as const;
   const params = {
     projectName: event.projectName ?? event.projectId ?? "",
+    updateTitle: event.updateTitle ?? "",
     ...(event.messageParams ?? {}),
   };
   return {
@@ -137,11 +141,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             read: false,
             projectId: event.projectId,
             projectName: event.projectName,
+            updateId: event.updateId,
             reviewId: event.reviewId,
           };
           notificationService.upsert(notification);
           loadLocal();
-          if (!seenToasts.current.has(event.id)) {
+          if (!seenToasts.current.has(event.id) && shouldToastNotification(event.type as NotificationType)) {
             seenToasts.current.add(event.id);
             toast(copy.title, {
               description: copy.message,
@@ -186,11 +191,26 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     });
   }, [loadLocal, recipient]);
 
+  const markReadMany = useCallback(
+    (ids: string[]) => {
+      if (!recipient || ids.length === 0) return;
+      notificationService.markReadMany(ids);
+      loadLocal();
+      void fetch("/api/notifications", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+    },
+    [loadLocal, recipient],
+  );
+
   const unread = Math.max(0, items.filter((item) => !item.read).length);
 
   const value = useMemo(
-    () => ({ items, unread, status, open, setOpen, markRead, markAllRead }),
-    [items, unread, status, open, markRead, markAllRead],
+    () => ({ items, unread, status, open, setOpen, markRead, markReadMany, markAllRead }),
+    [items, unread, status, open, markRead, markReadMany, markAllRead],
   );
 
   return (
@@ -205,6 +225,7 @@ const NOTIFICATION_FALLBACK: NotificationContextValue = {
   open: false,
   setOpen: () => {},
   markRead: () => {},
+  markReadMany: () => {},
   markAllRead: () => {},
 };
 

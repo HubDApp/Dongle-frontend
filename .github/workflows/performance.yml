@@ -52,6 +52,8 @@ jobs:
         run: npm run test:bundle
 
       - name: Run Lighthouse CI
+        # Asserts: performance > 90, accessibility > 95, best-practices > 90,
+        #          FCP < 1800ms, LCP < 2500ms, CLS < 0.1, initial JS < 200KB
         run: npm run test:lighthouse
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
@@ -63,3 +65,17 @@ jobs:
           name: lighthouse-report
           path: dongle/lhci-report
           if-no-files-found: ignore
+
+      - name: Write budget summary
+        if: always()
+        run: |
+          echo "### Performance Budget Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Budget | Measured |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|--------|----------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Performance score | ≥ 90 | see Lighthouse report |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Accessibility score | ≥ 95 | see Lighthouse report |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Best practices score | ≥ 90 | see Lighthouse report |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| First Contentful Paint | < 1.8 s | see Lighthouse report |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Largest Contentful Paint | < 2.5 s | see Lighthouse report |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Initial JS bundle (gzip) | < 200 KB | see bundle check |" >> "$GITHUB_STEP_SUMMARY"

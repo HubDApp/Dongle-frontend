@@ -31,7 +31,7 @@ function GoogleMark() {
   );
 }
 
-function GithubMark() {
+function GitHubMark() {
   return (
     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path
@@ -207,7 +207,7 @@ function LoginMenuInner() {
             variant="ghost"
             size="sm"
             className="w-full justify-start"
-            leftIcon={<GithubMark />}
+            leftIcon={<GitHubMark />}
             aria-label={t("auth.signInWithGitHub")}
             onClick={() => startOAuth("github")}
           >

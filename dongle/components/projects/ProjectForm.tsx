@@ -35,11 +35,23 @@ import { FormExportMenu } from "@/components/ui/FormExportMenu";
 import { FormValueComparison } from "@/components/ui/FormValueComparison";
 import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
+import { useFormAuditLog } from "@/hooks/useFormAuditLog";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
-import { CATEGORY_FORM_OPTIONS, CATEGORY_FORM_MAP } from "@/types/project";
+import {
+  CATEGORY_DISPLAY_TO_FORM,
+  CATEGORY_FORM_OPTIONS,
+  CATEGORY_FORM_MAP,
+} from "@/types/project";
 import type { Project } from "@/types/project";
 import { trackProjectSubmit } from "@/lib/analytics";
+import {
+  trackFormSubmit,
+  trackFormSubmitSuccess,
+  trackFormSubmitError,
+  trackFormFieldChange,
+  trackFormAbandon,
+} from "@/lib/analytics";
 import { isValidSorobanContractId } from "@/lib/stellar-address";
 import { isBlank } from "@/lib/string";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -47,6 +59,7 @@ import { logger } from "@/lib/logger";
 import { ProjectFormContext } from "@/context/project-form.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { runFormIntegrations } from "@/services/form-integrations";
+import { projectHistoryService } from "@/services/project/project-history.service";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -196,7 +209,11 @@ const EXPORT_LABELS: Record<string, string> = {
 
 type ProjectFormProps = {
   mode?: "create" | "edit";
-  initialData?: Partial<ProjectFormValues> & { category?: string };
+  initialData?: Partial<ProjectFormValues> & {
+    category?: string;
+    ownerAddress?: string;
+    createdAt?: string;
+  };
   projectId?: string;
   onSubmit?: (data: ProjectFormValues) => Promise<void>;
 };
@@ -230,6 +247,14 @@ export default function ProjectForm({
   const { publicKey } = useWallet();
   const { t, locale } = useTranslation();
 
+  // Form audit logging — records every field change with a timestamp, the
+  // acting wallet identity, and the server-stamped client IP.
+  const { trackValues: trackAuditValues, logAction: logAuditAction } = useFormAuditLog({
+    formId: "project-form",
+    formType: mode === "edit" ? "project-edit" : "project-create",
+    actor: publicKey,
+  });
+
   // Draft management – passes wallet address so drafts sync to the server
   const draft = useDraft({
     mode,
@@ -238,6 +263,29 @@ export default function ProjectForm({
     walletAddress: publicKey,
   });
   const [draftRestored, setDraftRestored] = React.useState(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+
+  const formType = mode === "edit" ? "project-edit" : "project-submission";
+  const conversion = useFormConversion({
+    formId: "project-form",
+    formType,
+  });
+  const captcha = useFormCaptcha({ action: "project_submit" });
+  const heatmap = useFormHeatmap({ formId: "project-form", formType });
+  const sessionRecording = useFormSessionRecording({
+    formId: "project-form",
+    formType,
+    autoStart: false,
+  });
+
+  const bindFormRef = useCallback(
+    (node: HTMLFormElement | null) => {
+      heatmap.formRef(node);
+      sessionRecording.formRef(node);
+    },
+    [heatmap.formRef, sessionRecording.formRef],
+  );
 
   const defaultFormValues: ProjectFormValues = {
     name: initialData?.name || "",
@@ -261,6 +309,7 @@ export default function ProjectForm({
     control,
     formState: { errors, isDirty },
     reset,
+    trigger,
     watch,
     getValues,
     setValue,
@@ -268,6 +317,32 @@ export default function ProjectForm({
     resolver: zodResolver(projectSchema),
     defaultValues: defaultFormValues,
   });
+
+  const nameField = register("name");
+  const matchingProjects = projectSearchQuery.trim().length >= 2
+    ? projectService.getAllProjects().filter((project) => {
+        const query = projectSearchQuery.trim().toLowerCase();
+        return [project.name, project.websiteUrl, project.githubUrl]
+          .some((value) => value?.toLowerCase().includes(query));
+      }).slice(0, 5)
+    : [];
+
+  const selectExistingProject = (project: Project) => {
+    reset({
+      name: project.name,
+      primaryCategory: CATEGORY_DISPLAY_TO_FORM[project.primaryCategory] ?? "",
+      tags: project.tags ?? [],
+      description: project.description ?? "",
+      websiteUrl: project.websiteUrl ?? "",
+      githubUrl: project.githubUrl ?? "",
+      logoUrl: project.logoUrl ?? "",
+      docsUrl: project.docsUrl ?? "",
+      auditReportUrl: project.auditReportUrl ?? "",
+      bugBountyUrl: project.bugBountyUrl ?? "",
+      contractAddresses: project.contractAddresses?.slice(0, 5) ?? [],
+    });
+    setProjectSearchQuery("");
+  };
 
 
 
@@ -310,12 +385,18 @@ export default function ProjectForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
+  // Issue #521, #522, #523: form analytics
+  const formAnalytics = useFormAnalytics({
+    formId: mode === "edit" ? "project-edit" : "project-submit",
+    fieldCount: EXPORT_FIELDS.length,
+    isDirty,
+  });
+
   // Watch form values for checklist and auto-save.
   // react-hook-form's watch() is intentionally used here for live value access.
   // The React Compiler flags it as non-memoizable, but this component does not
   // rely on memoization of watchedValues — it's read-only for the checklist
   // and the draft autosave effect below.
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedValues = watch();
   const fieldRequirements = getFieldRequirements({
     primaryCategory: watchedValues.primaryCategory,
@@ -332,6 +413,16 @@ export default function ProjectForm({
     if (rule.required) return base;
     return optionalFallback ? `${base} (Optional)` : base;
   };
+
+  // Audit each field change (baseline is captured on the first render).
+  useEffect(() => {
+    trackAuditValues(watchedValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(watchedValues), trackAuditValues]);
+
+  // Track field changes for completion-rate analytics.
+  const submittedRef = React.useRef(false);
+  const prevTouchedRef = React.useRef(0);
 
   // Auto-save draft when form changes — derive from watchedValues instead of
   // a watch() subscription to avoid the react-hooks/incompatible-library warning
@@ -364,7 +455,27 @@ export default function ProjectForm({
         return customOnSubmit(payload);
       }
 
+      const fieldCount = Object.keys(payload).filter((k) => {
+        const v = (payload as Record<string, unknown>)[k];
+        return v !== undefined && v !== null && v !== "";
+      }).length;
+
+      // Track GDPR consent on submit
+      const userId = publicKey ?? "anonymous";
+      const consentRecord = gdprService.getConsentStatus("project", projectId ?? "new", userId);
+      if (consentRecord && consentRecord.consentGiven) {
+        trackConsentGiven({
+          formType: "project",
+          formId: projectId ?? "new",
+          userId,
+          purposes: consentRecord.purposes,
+        });
+      }
+
+      trackFormSubmit({ formType: "project", fieldCount, walletAddress: publicKey });
+
       setIsSubmitting(true);
+      void formEventsService.emit("FORM_SUBMIT_START", { payload }, projectId);
       try {
         // Strip any blank entries left in the contractAddresses list
         const cleanedPayload = {
@@ -388,6 +499,37 @@ export default function ProjectForm({
         });
 
         if (result) {
+          if (mode === "edit" && projectId) {
+            const toHistorySnapshot = (values: Partial<ProjectFormValues>) => ({
+              name: values.name ?? "",
+              primaryCategory:
+                CATEGORY_FORM_MAP[values.primaryCategory ?? ""] ??
+                values.primaryCategory ??
+                "",
+              tags: values.tags ?? [],
+              description: values.description ?? "",
+              websiteUrl: values.websiteUrl ?? "",
+              githubUrl: values.githubUrl ?? "",
+              logoUrl: values.logoUrl ?? "",
+              docsUrl: values.docsUrl ?? "",
+              auditReportUrl: values.auditReportUrl ?? "",
+              bugBountyUrl: values.bugBountyUrl ?? "",
+              contractAddresses: values.contractAddresses ?? [],
+              ownerAddress: initialData?.ownerAddress,
+              createdAt: initialData?.createdAt,
+            });
+
+            projectHistoryService.recordEdit(
+              projectId,
+              toHistorySnapshot(defaultFormValues),
+              toHistorySnapshot(cleanedPayload),
+              publicKey ?? "unknown",
+              initialData?.createdAt,
+            );
+          }
+          conversion.trackSuccess({ mode, project_id: projectId ?? null });
+          heatmap.captureSnapshot();
+          sessionRecording.stop();
           if (mode !== "edit") {
             const qualityScore = computeQualityScore(cleanedPayload);
             try {
@@ -407,7 +549,7 @@ export default function ProjectForm({
                 existingNames,
               );
 
-              projectSubmissionService.recordSubmission({
+              const subRecord = projectSubmissionService.recordSubmission({
                 projectId: generateProjectIdFromName(cleanedPayload.name),
                 projectName: cleanedPayload.name,
                 submittedBy,
@@ -494,6 +636,9 @@ export default function ProjectForm({
           operation: mode === "edit" ? "updateProject" : "registerProject",
           userAction: mode === "edit" ? "updating a project" : "registering a project",
         }, error);
+        conversion.trackFailure(
+          error instanceof Error ? error.name || "Error" : "unknown",
+        );
         trackProjectSubmit({
           success: false,
           mode,
@@ -504,7 +649,7 @@ export default function ProjectForm({
         setIsSubmitting(false);
       }
     },
-    [customOnSubmit, mode, projectId, reset, router, run, draft, locale],
+    [customOnSubmit, mode, projectId, reset, router, run, draft, locale, publicKey, initialData],
   );
 
   const onPreSubmit = useCallback(
@@ -549,13 +694,30 @@ export default function ProjectForm({
         return;
       }
 
-      void executeSubmit(payload);
+      // Track submission attempt (issue #521)
+      const hasErrors = Object.keys(errors).length > 0;
+      void formAnalytics.wrapSubmit(
+        async (p) => executeSubmit(p as ProjectFormValues & { domain?: string }),
+        { hasErrors }
+      )(payload);
     },
     [executeSubmit, mode, projectId, experiment],
   );
 
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    void handleSubmit(onPreSubmit)(event);
+  const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    conversion.trackSubmitAttempt();
+    setCaptchaError(null);
+
+    const token = await captcha.runCaptcha();
+    const validation = captcha.validateOnSubmit(token);
+    if (!validation.valid) {
+      setCaptchaError(validation.message);
+      conversion.trackFailure("captcha_failed");
+      return;
+    }
+
+    void handleSubmit(onPreSubmit)();
   };
 
   const handleExportPdf = () => {
@@ -621,14 +783,40 @@ export default function ProjectForm({
     setDiscardDialogOpen(false);
   };
 
+  const goToSection = async (sectionIndex: number) => {
+    if (sectionIndex <= activeSection) {
+      setActiveSection(sectionIndex);
+      return;
+    }
+
+    for (let index = activeSection; index < sectionIndex; index += 1) {
+      const isValid = await trigger([...formSections[index].fields]);
+      if (!isValid) {
+        setActiveSection(index);
+        return;
+      }
+    }
+
+    setActiveSection(sectionIndex);
+  };
+
+  const goToNextSection = () => {
+    void goToSection(Math.min(activeSection + 1, formSections.length - 1));
+  };
+
+  const goToPreviousSection = () => {
+    setActiveSection((section) => Math.max(section - 1, 0));
+  };
+
   return (
     <ProjectFormContext.Provider
       value={{
         mode,
         projectId,
         isSubmitting,
+        // eslint-disable-next-line react-hooks/incompatible-library
         watchField: (name) => watch(name),
-        formErrors: errors as Record<string, any>,
+        formErrors: errors as Record<string, unknown>,
       }}
     >
     <ErrorBoundary
@@ -662,9 +850,30 @@ export default function ProjectForm({
               : "Onboard your dApp to the Dongle ecosystem."}
           </p>
         </div>
+        {mode === "edit" && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsHistoryModalOpen(true)}
+            leftIcon={<HistoryIcon className="w-4 h-4" />}
+          >
+            View History
+          </Button>
+        )}
       </div>
 
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <div className="relative">
+      <form
+        ref={bindFormRef}
+        onSubmit={handleFormSubmit}
+        onFocusCapture={() => conversion.trackStart()}
+        className="space-y-6"
+      >
+        <FormHeatmapOverlay
+          cells={heatmap.cells}
+          problemAreas={heatmap.problemAreas}
+          visible={showHeatmap}
+        />
         {draftRestored && (
           <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
@@ -733,6 +942,43 @@ export default function ProjectForm({
           }}
         />
 
+        <nav aria-label="Project form progress" className="mb-8">
+          <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+            {formSections.map((section, index) => {
+              const isCurrent = activeSection === index;
+              const isComplete = index < activeSection;
+
+              return (
+                <li key={section.title}>
+                  <button
+                    type="button"
+                    onClick={() => void goToSection(index)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={`w-full border-t-2 pt-3 text-left transition-colors ${
+                      isCurrent
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : isComplete
+                        ? "border-green-500 text-green-600 dark:text-green-400"
+                        : "border-zinc-200 text-zinc-400 dark:border-zinc-700 dark:text-zinc-500"
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold uppercase tracking-wide">
+                      Step {index + 1}
+                    </span>
+                    <span className="mt-1 block text-sm font-medium sm:text-base">
+                      {section.title}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+            {formSections[activeSection].description}
+          </p>
+        </nav>
+
+        {activeSection === 0 && <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             label="Project Name"
@@ -740,6 +986,16 @@ export default function ProjectForm({
             placeholder="e.g. Soroban Swap"
             maxLength={50}
             {...register("name")}
+            onFocus={formAnalytics.fieldHandlers("name").onFocus}
+            onChange={(e) => {
+              formAnalytics.fieldHandlers("name").onChange(e);
+              register("name").onChange(e);
+            }}
+            onBlur={(e) => {
+              formAnalytics.fieldHandlers("name").onBlur(e);
+              register("name").onBlur(e);
+              formAnalytics.recordFieldValidation("name", !errors.name, errors.name?.message);
+            }}
             error={errors.name?.message}
             helperText={t("projectForm.hints.name")}
           />
@@ -773,15 +1029,37 @@ export default function ProjectForm({
           placeholder="What does your project do? Keep it concise and engaging."
           maxLength={500}
           {...register("description")}
+          onFocus={formAnalytics.fieldHandlers("description").onFocus}
+          onChange={(e) => {
+            formAnalytics.fieldHandlers("description").onChange(e);
+            register("description").onChange(e);
+          }}
+          onBlur={(e) => {
+            formAnalytics.fieldHandlers("description").onBlur(e);
+            register("description").onBlur(e);
+            formAnalytics.recordFieldValidation("description", !errors.description, errors.description?.message);
+          }}
           error={errors.description?.message}
           helperText={t("projectForm.hints.description")}
         />
+        </>}
 
+        {activeSection === 1 && <>
         <FormField
           label="Project Website"
           required={fieldRequirements.websiteUrl.required}
           placeholder="https://yourproject.com"
           {...register("websiteUrl")}
+          onFocus={formAnalytics.fieldHandlers("websiteUrl").onFocus}
+          onChange={(e) => {
+            formAnalytics.fieldHandlers("websiteUrl").onChange(e);
+            register("websiteUrl").onChange(e);
+          }}
+          onBlur={(e) => {
+            formAnalytics.fieldHandlers("websiteUrl").onBlur(e);
+            register("websiteUrl").onBlur(e);
+            formAnalytics.recordFieldValidation("websiteUrl", !errors.websiteUrl, errors.websiteUrl?.message);
+          }}
           error={errors.websiteUrl?.message}
           helperText={t("projectForm.hints.websiteUrl")}
         />
@@ -831,7 +1109,9 @@ export default function ProjectForm({
             helperText={t("projectForm.hints.bugBountyUrl")}
           />
         </div>
+        </>}
 
+        {activeSection === 2 && <>
         {/* Contract Addresses */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -865,6 +1145,17 @@ export default function ProjectForm({
                 field.onChange(next);
               };
 
+              /** Uppercase + trim on blur for a clean UX */
+              const handleBlur = (index: number) => {
+                const current = addresses[index];
+                if (current && current.trim()) {
+                  const next = addresses.map((a, i) =>
+                    i === index ? a.trim().toUpperCase() : a,
+                  );
+                  field.onChange(next);
+                }
+              };
+
               const handleRemove = (index: number) => {
                 field.onChange(addresses.filter((_, i) => i !== index));
               };
@@ -882,33 +1173,98 @@ export default function ProjectForm({
                     </button>
                   ) : (
                     <>
-                      {addresses.map((addr, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              value={addr}
-                              onChange={(e) => handleChange(index, e.target.value)}
-                              placeholder="CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                              aria-label={`Contract address ${index + 1}`}
-                              className="w-full font-mono text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors"
-                            />
-                            {errors.contractAddresses?.[index]?.message && (
-                              <p className="mt-1 text-sm text-red-500 dark:text-red-400">
-                                {errors.contractAddresses[index].message}
+                      {addresses.map((addr, index) => {
+                        const fieldError = errors.contractAddresses?.[index]?.message;
+                        const charCount = addr.length;
+                        const isComplete = charCount === 56;
+                        const hasValue = charCount > 0;
+
+                        // Inline validity: only show green when all 56 chars entered and no error
+                        const showValid = isComplete && !fieldError;
+                        const showInvalid = hasValue && fieldError;
+
+                        return (
+                          <div key={index} className="flex items-start gap-2">
+                            <div className="flex-1 space-y-1">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={addr}
+                                  onChange={(e) => handleChange(index, e.target.value)}
+                                  onBlur={() => handleBlur(index)}
+                                  placeholder="CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                                  aria-label={`Contract address ${index + 1}`}
+                                  aria-invalid={!!fieldError}
+                                  aria-describedby={
+                                    fieldError
+                                      ? `contract-error-${index}`
+                                      : `contract-counter-${index}`
+                                  }
+                                  maxLength={56}
+                                  spellCheck={false}
+                                  autoComplete="off"
+                                  className={`w-full font-mono text-sm bg-zinc-50 dark:bg-zinc-900 border rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 transition-colors ${
+                                    showInvalid
+                                      ? "border-red-400 dark:border-red-600 focus:ring-red-500/20"
+                                      : showValid
+                                      ? "border-green-400 dark:border-green-600 focus:ring-green-500/20"
+                                      : "border-zinc-200 dark:border-zinc-800 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400"
+                                  }`}
+                                />
+
+                                {/* Inline validity indicator */}
+                                {hasValue && (
+                                  <span
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold"
+                                    aria-hidden="true"
+                                  >
+                                    {showValid ? (
+                                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    ) : showInvalid ? (
+                                      <AlertCircle className="w-4 h-4 text-red-500" />
+                                    ) : (
+                                      <span className="text-zinc-400 tabular-nums">
+                                        {charCount}/56
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Char counter (assistive text) */}
+                              <p
+                                id={`contract-counter-${index}`}
+                                className="text-xs text-zinc-400 dark:text-zinc-500 tabular-nums"
+                                aria-live="polite"
+                              >
+                                {charCount === 0
+                                  ? "56 characters required"
+                                  : `${charCount} / 56`}
                               </p>
-                            )}
+
+                              {/* Field error */}
+                              {fieldError && (
+                                <p
+                                  id={`contract-error-${index}`}
+                                  role="alert"
+                                  className="text-xs text-red-500 dark:text-red-400"
+                                >
+                                  {fieldError}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemove(index)}
+                              aria-label={`Remove contract address ${index + 1}`}
+                              className="mt-2 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(index)}
-                            aria-label={`Remove contract address ${index + 1}`}
-                            className="mt-1 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       {addresses.length < 5 && (
                         <button
@@ -932,6 +1288,44 @@ export default function ProjectForm({
               );
             }}
           />
+        </div>
+
+        <FormCaptcha
+          mode={captcha.mode}
+          challenge={captcha.challenge}
+          accessibleAnswer={captcha.accessibleAnswer}
+          onAnswerChange={captcha.setAccessibleAnswer}
+          onUseAccessible={captcha.useAccessibleAlternative}
+          onRequestChallenge={captcha.requestChallenge}
+          loading={captcha.loading}
+          error={captchaError}
+        />
+
+        <FormSessionRecordingControls
+          consented={sessionRecording.consented}
+          onEnable={sessionRecording.enableRecording}
+          onDisable={sessionRecording.disableRecording}
+          recordings={sessionRecording.recordings}
+          playing={sessionRecording.playing}
+          playbackFrame={sessionRecording.playbackFrame}
+          onPlay={(rec) => sessionRecording.startPlayback(rec)}
+          onStopPlayback={sessionRecording.stopPlayback}
+        />
+
+        <div className="flex items-center justify-between gap-2 text-xs text-zinc-500">
+          <button
+            type="button"
+            className="underline"
+            onClick={() => {
+              heatmap.captureSnapshot();
+              setShowHeatmap((v) => !v);
+            }}
+          >
+            {showHeatmap ? "Hide" : "Show"} interaction heatmap
+          </button>
+          <span>
+            Scroll depth: {Math.round((heatmap.snapshot?.maxScrollDepth ?? 0) * 100)}%
+          </span>
         </div>
 
         <Button
@@ -985,7 +1379,22 @@ export default function ProjectForm({
             : "By submitting, you agree to have your project details stored on the Stellar network. A small transaction fee will be required for on-chain registration."}
           <ContextHelp tip="on-chain" label="on-chain registration" href="https://developers.stellar.org/docs/learn/fundamentals/transactions">Registration asks your Freighter wallet to sign a transaction on Stellar. Network fees apply, and a confirmed transaction becomes part of the public ledger.</ContextHelp>
         </p>
+
+        <GDPRConsent
+          formType="project"
+          formId={projectId ?? "new"}
+          userId={publicKey ?? "anonymous"}
+          purposes={["form_submission", "data_processing", "backup"]}
+        />
+
+        <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <Link href="/privacy-policy" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">
+            Privacy Policy
+          </Link>
+        </p>
+        </>}
       </form>
+      </div>
 
       <ConfirmDialog
         isOpen={duplicateWarning.isOpen}

@@ -1,2 +1,11 @@
-export { default as AnalyticsProvider } from "./AnalyticsProvider";
-export { default as AnalyticsRoot } from "./AnalyticsRoot";
+export { LineChart } from "./LineChart";
+export type { LineChartProps, LineChartDataPoint } from "./LineChart";
+
+export { BarChart } from "./BarChart";
+export type { BarChartProps, BarChartDataPoint } from "./BarChart";
+
+export { PieChart } from "./PieChart";
+export type { PieChartProps, PieChartDataPoint } from "./PieChart";
+
+export { HeatmapViewer } from "./HeatmapViewer";
+export { default as PageHeatmapRecorder } from "./PageHeatmapRecorder";

@@ -5,12 +5,19 @@ import {
   useParams,
   useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
+import { projectStatusService } from "@/services/project/project-status.service";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
+import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import {
   RatingDistributionSummary,
   computeRatingDistribution,
@@ -18,6 +25,8 @@ import {
 import ProjectGallery from "@/components/projects/ProjectGallery";
 import ContextHelp from "@/components/ui/ContextHelp";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
+import { ProjectHealthPanel } from "@/components/projects/ProjectHealthPanel";
+import { getProjectHealth } from "@/lib/project-health";
 import { Review,
   ReviewReport,
   ReviewReportReason } from "@/types/review";
@@ -44,22 +53,26 @@ import {
   ExternalLink,
   GitBranch,
   Globe,
+  Heart,
   Info,
+  History,
   Megaphone,
   MessageSquare,
   Shield,
+  ShieldCheck,
   Star,
   UserPlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
+import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBanner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { useProjectFollowing } from "@/hooks/useProjectFollowing";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";
-import { abbreviateStellarAddress } from "@/lib/stellar-address";
-import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { projectService } from "@/services/project/project.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -70,6 +83,7 @@ import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
 import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
+import { emitProjectFollowingEvent } from "@/lib/project-following/emit";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -108,6 +122,14 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
   const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [isChangingFollow, setIsChangingFollow] = useState(false);
+  const {
+    isFollowing,
+    followerCount,
+    setFollowing,
+  } = useProjectFollowing(projectId);
+  // Track the most recent claim for this wallet + project (for the status banner)
+  const [latestClaim, setLatestClaim] = useState<ReturnType<typeof projectClaimService.getLatestRequestForUser>>(null);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -166,6 +188,16 @@ export default function ProjectDetailPage() {
     };
   }, [projectId, gate.publicKey]);
 
+  useEffect(() => {
+    if (!gate.publicKey || !project) {
+      setLatestClaim(null);
+      return;
+    }
+    setLatestClaim(
+      projectClaimService.getLatestRequestForUser(project.id, gate.publicKey),
+    );
+  }, [gate.publicKey, project]);
+
   const retryVerification = React.useCallback(() => {
     setVerificationError(null);
     setVerificationStatus(null);
@@ -188,6 +220,19 @@ export default function ProjectDetailPage() {
   }, [reviews, project?.rating]);
 
   const actualReviewCount = reviews.length || project?.reviews || 0;
+
+  const health = React.useMemo(
+    () =>
+      project
+        ? getProjectHealth(project, {
+            verificationStatus,
+            updates,
+            rating: actualRating,
+            reviewCount: actualReviewCount,
+          })
+        : null,
+    [project, verificationStatus, updates, actualRating, actualReviewCount],
+  );
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isOnList = project ? isOnWatchlist(project.id) : false;
@@ -275,6 +320,10 @@ export default function ProjectDetailPage() {
 
     if (result.success) {
       toast.success("Claim request submitted successfully");
+      // Refresh the status banner
+      setLatestClaim(
+        projectClaimService.getLatestRequestForUser(project.id, gate.publicKey),
+      );
     } else {
       const errorMsg = result.errors?.[0]?.message || "Failed to submit claim request";
       toast.error(errorMsg);
@@ -429,6 +478,13 @@ export default function ProjectDetailPage() {
       });
 
       setReviews(await reviewService.getReviewsByProject(projectId));
+      if (!editingReview) {
+        void emitProjectFollowingEvent(gate.publicKey, {
+          projectId: project.id,
+          type: "project_review_posted",
+          rating: data.rating,
+        });
+      }
       setIsAddingReview(false);
       setEditingReview(null);
     } catch (error) {
@@ -498,6 +554,10 @@ export default function ProjectDetailPage() {
         },
         gate.publicKey
       );
+      void emitProjectFollowingEvent(gate.publicKey, {
+        projectId: project.id,
+        type: "project_update_posted",
+      });
       toast.success("Update published successfully");
     }
 
@@ -538,6 +598,18 @@ export default function ProjectDetailPage() {
   };
 
   const approvedExternalUrls = project ? getApprovedProjectUrls(project) : [];
+
+  const handleToggleFollowing = async () => {
+    setIsChangingFollow(true);
+    try {
+      await setFollowing(projectId, !isFollowing);
+      toast.success(isFollowing ? "Project unfollowed" : "Following project");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update project follow status");
+    } finally {
+      setIsChangingFollow(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -580,6 +652,7 @@ export default function ProjectDetailPage() {
 
   return (
     <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <PageHeatmapRecorder page="project_detail" />
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
           <button
@@ -593,6 +666,27 @@ export default function ProjectDetailPage() {
           {/* Verification Status Banner */}
           <ProjectStatusBanner status={verificationStatus} />
 
+          {/* Unclaimed project notice — shown when no owner is registered */}
+          {!project.ownerAddress && !isOwner && (
+            <UnclaimedProjectBanner
+              projectName={project.name}
+              onClaim={() => {
+                if (gate.state !== "ready") {
+                  // Go to the full claim page — it handles wallet gating
+                  router.push(`/projects/${projectId}/claim`);
+                  return;
+                }
+                setIsClaiming(true);
+              }}
+              className="mb-2"
+            />
+          )}
+
+          {/* Claim status banner — shown only to the wallet that submitted a claim */}
+          {latestClaim && (
+            <ClaimStatusBanner claim={latestClaim} className="mb-2" />
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-8">
@@ -604,8 +698,9 @@ export default function ProjectDetailPage() {
                       <Badge variant="primary">
                         {project.primaryCategory}
                       </Badge>
+                      <ProjectLifecycleStatusBadge status={project.status} />
                       {verificationStatus && (
-                        <VerificationBadge status={verificationStatus} />
+                        <VerificationBadge status={verificationStatus} tier={project.verificationTier} />
                       )}
                     </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>
@@ -634,15 +729,31 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant={isOnList ? "secondary" : "outline"}
-                    onClick={handleToggleWatchlist}
-                    disabled={!project}
-                    leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                    className="shrink-0"
-                  >
-                    {isOnList ? "On Watchlist" : "Add to Watchlist"}
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    <Button
+                      variant={isOnList ? "secondary" : "outline"}
+                      onClick={handleToggleWatchlist}
+                      disabled={!project}
+                      leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                    >
+                      {isOnList ? "On Watchlist" : "Add to Watchlist"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/projects/${projectId}/history`)}
+                      leftIcon={<History className="w-4 h-4" />}
+                    >
+                      Version history
+                    </Button>
+                    <Button
+                      variant={isFollowing ? "secondary" : "outline"}
+                      onClick={() => void handleToggleFollowing()}
+                      isLoading={isChangingFollow}
+                      leftIcon={<Heart className="w-4 h-4" fill={isFollowing ? "currentColor" : "none"} />}
+                    >
+                      {isFollowing ? "Unfollow" : "Follow"} · {followerCount}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Project Image */}
@@ -898,6 +1009,9 @@ export default function ProjectDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Project Health */}
+              {health && <ProjectHealthPanel projectId={project.id} health={health} />}
+
               {/* Verification Status */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -938,7 +1052,44 @@ export default function ProjectDetailPage() {
                     </span>
                     <span className="font-bold">{project.primaryCategory}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Status
+                    </span>
+                    <ProjectLifecycleStatusBadge status={project.status} />
+                  </div>
                 </div>
+              </div>
+
+              {/* Lifecycle Status */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+                <h3 className="text-lg font-bold mb-4">Lifecycle Status</h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                  Current status:{" "}
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                    {getProjectStatusLabel(project.status)}
+                  </span>
+                </p>
+                {canManageStatus ? (
+                  <label className="block">
+                    <span className="sr-only">Update project status</span>
+                    <select
+                      value={project.status ?? "active"}
+                      onChange={(e) => handleStatusChange(e.target.value as ProjectStatus)}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      {PROJECT_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {PROJECT_STATUS_LABELS[status]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                    Only the project owner or an admin can update this status.
+                  </p>
+                )}
               </div>
 
               {/* Actions */}
@@ -959,19 +1110,35 @@ export default function ProjectDetailPage() {
                   >
                     Request Verification
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      if (gate.state !== "ready") {
-                        setShowWalletGate(true);
-                        return;
-                      }
-                      setIsClaiming(true);
-                    }}
-                  >
-                    Claim Ownership
-                  </Button>
+                  {/* Claim button — hidden for project owners; shows pending state if already submitted */}
+                  {!isOwner && (
+                    latestClaim?.status === "pending" ? (
+                      <Button
+                        variant="outline"
+                        className="w-full text-yellow-600 border-yellow-300 dark:border-yellow-800 dark:text-yellow-400 cursor-default opacity-80"
+                        disabled
+                      >
+                        <ShieldCheck className="w-4 h-4 mr-2" aria-hidden="true" />
+                        Claim Pending Review
+                      </Button>
+                    ) : latestClaim?.status === "approved" ? null : (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          if (gate.state !== "ready") {
+                            // Navigate to dedicated claim page — it handles the wallet gate
+                            router.push(`/projects/${projectId}/claim`);
+                            return;
+                          }
+                          setIsClaiming(true);
+                        }}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" aria-hidden="true" />
+                        Claim Ownership
+                      </Button>
+                    )
+                  )}
                   <Button
                     variant="outline"
                     className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
@@ -1003,9 +1170,11 @@ export default function ProjectDetailPage() {
               {project.ownerAddress && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                   <h3 className="text-lg font-bold mb-4">Owner</h3>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono break-all">
-                    {abbreviateStellarAddress(project.ownerAddress)}
-                  </p>
+                  <SnsAddressDisplay
+                    address={project.ownerAddress}
+                    truncated={false}
+                    className="text-sm break-all"
+                  />
                 </div>
               )}
 
@@ -1013,6 +1182,9 @@ export default function ProjectDetailPage() {
               {project.contractAddresses && project.contractAddresses.length > 0 && (
                 <ContractAddressList addresses={project.contractAddresses} />
               )}
+
+              {/* Bridge Information (Issue #726) */}
+              <BridgeInfoCard bridge={project.bridge} />
             </div>
           </div>
         </div>

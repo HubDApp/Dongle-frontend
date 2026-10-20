@@ -1,4 +1,9 @@
-import { Review, REVIEW_CONSTRAINTS, ReviewValidationError } from "@/types/review";
+import {
+  Review,
+  ReviewInput,
+  REVIEW_CONSTRAINTS,
+  ReviewValidationError,
+} from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
@@ -114,7 +119,7 @@ async function getReviews(): Promise<Review[]> {
 }
 
 async function addReview(
-  review: Omit<Review, "id" | "createdAt">,
+  review: ReviewInput,
   userAddress: string,
   signedPayload?: { payload: string; signature: string; nonce: string; timestamp: string },
 ): Promise<{ success: boolean; data?: Review; errors?: ReviewValidationError[] }> {
@@ -144,6 +149,13 @@ async function addReview(
     newReview.signature = signedPayload.signature;
     newReview.signatureNonce = signedPayload.nonce;
     newReview.signatureTimestamp = signedPayload.timestamp;
+  }
+  // Persist E2E encryption fields (#731)
+  if (review.encrypted) {
+    newReview.encrypted = review.encrypted;
+    newReview.encryptedPayload = review.encryptedPayload;
+    newReview.encryptedCid = review.encryptedCid;
+    newReview.adminWrappedKey = review.adminWrappedKey;
   }
   saveLocalReviews([newReview, ...reviews]);
   return { success: true, data: newReview };
