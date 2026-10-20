@@ -7,6 +7,8 @@ export interface Review {
   userAddress: string;
   rating: number;
   comment: string;
+  /** Detected language code, or `und` when the text is too short/ambiguous. */
+  language?: string;
   createdAt: string;
   language?: string;
   isVerifiedReviewer?: boolean;

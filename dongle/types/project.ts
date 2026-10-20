@@ -138,6 +138,10 @@ export interface Project {
   description: string;
   rating: number;
   reviews: number;
+  /** Aggregate bookmark total provided by the project catalog or metrics service. */
+  bookmarkCount?: number;
+  /** Admin-curated flag supplied by the project catalog. */
+  isFeatured?: boolean;
   createdAt: string; // ISO date string
   websiteUrl?: string;
   githubUrl?: string;

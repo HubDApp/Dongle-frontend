@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Info, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { cn } from "@/lib/utils";
 import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
+import { OwnershipVerificationPanel } from "@/components/projects/OwnershipVerificationPanel";
 import {
   ClaimProofType,
   PROJECT_CLAIM_CONSTRAINTS,
@@ -19,20 +20,12 @@ const PROOF_GUIDANCE: Record<
   { placeholder: string; hint: string }
 > = {
   website: {
-    placeholder:
-      "e.g. https://yourdomain.com/.well-known/dongle-ownership.txt  (paste the public file URL)",
-    hint:
-      'Add a publicly accessible file at <strong>/.well-known/dongle-ownership.txt</strong> ' +
-      'with the content <code>dongle-owner: YOUR_STELLAR_ADDRESS</code>, then paste the URL above. ' +
-      "Admins will fetch the file to verify ownership. No secrets are exposed.",
+    placeholder: "e.g. https://yourdomain.com",
+    hint: "Verify this domain with the generated DNS TXT or Stellar.toml token above, then enter the verified domain here.",
   },
   repository: {
-    placeholder:
-      "e.g. https://github.com/your-org/your-repo/blob/main/DONGLE_OWNERSHIP.md",
-    hint:
-      "Add a file named <strong>DONGLE_OWNERSHIP.md</strong> (or <strong>DONGLE_OWNERSHIP.txt</strong>) " +
-      "to the root of your repository containing your Stellar address, then paste the direct file URL above. " +
-      "The file must be visible without authentication.",
+    placeholder: "e.g. https://github.com/your-org/your-repo",
+    hint: "Verify this repository by adding the generated token to its root dongle-verify.txt file, then enter the repository URL here.",
   },
   admin_review: {
     placeholder:
@@ -49,6 +42,8 @@ const PROOF_GUIDANCE: Record<
 interface ClaimProjectModalProps {
   isOpen: boolean;
   projectName: string;
+  projectId?: string;
+  walletAddress?: string | null;
   onClose: () => void;
   onSubmit: (data: {
     proofType: string;
@@ -60,6 +55,8 @@ interface ClaimProjectModalProps {
 export function ClaimProjectModal({
   isOpen,
   projectName,
+  projectId,
+  walletAddress,
   onClose,
   onSubmit,
 }: ClaimProjectModalProps) {
@@ -67,6 +64,10 @@ export function ClaimProjectModal({
   const [proofValue, setProofValue] = useState("");
   const [explanation, setExplanation] = useState("");
   const [error, setError] = useState("");
+  const [ownershipVerified, setOwnershipVerified] = useState(false);
+  const handleVerificationStatus = useCallback((verified: boolean) => {
+    setOwnershipVerified(verified);
+  }, []);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const initialFocusRef = useRef<HTMLSelectElement>(null);
@@ -79,6 +80,7 @@ export function ClaimProjectModal({
       setProofValue("");
       setExplanation("");
       setError("");
+      setOwnershipVerified(false);
     }, 0);
     return () => clearTimeout(id);
   }, [isOpen]);
@@ -97,6 +99,10 @@ export function ClaimProjectModal({
     }
     if (!proofValue.trim()) {
       setError("Please provide proof details.");
+      return;
+    }
+    if (projectId && walletAddress && proofType !== "admin_review" && !ownershipVerified) {
+      setError("Verify ownership with DNS, GitHub, or Stellar.toml before submitting this claim.");
       return;
     }
     onSubmit({ proofType, proofValue, explanation });
@@ -139,6 +145,13 @@ export function ClaimProjectModal({
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {projectId && walletAddress && (
+            <OwnershipVerificationPanel
+              projectId={projectId}
+              walletAddress={walletAddress}
+              onVerifiedChange={handleVerificationStatus}
+            />
+          )}
           {/* Proof type selector */}
           <div className="space-y-1.5">
             <label

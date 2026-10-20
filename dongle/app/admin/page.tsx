@@ -17,6 +17,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
 import {
   AlertCircle,
+  Activity,
   Archive,
   CheckCheck,
   CheckCircle,
@@ -51,6 +52,7 @@ import {
 import { ReviewReport, ModerationAction, Review } from "@/types/review";
 import type { Project } from "@/types/project";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
+import { EventProcessingMonitor } from "@/components/admin/EventProcessingMonitor";
 import { ReviewModerationQueue } from "@/components/moderation/ReviewModerationQueue";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";

@@ -46,6 +46,24 @@ export default function ReviewList({
     );
   }
 
+  const filteredReviews = languageFilter === "all"
+    ? reviews
+    : reviews.filter((review) => (review.language ?? "und") === languageFilter);
+  const languageGroups = new Map<string, Review[]>();
+  for (const review of filteredReviews) {
+    const language = review.language && review.language in REVIEW_LANGUAGES ? review.language : "und";
+    const group = languageGroups.get(language) ?? [];
+    group.push(review);
+    languageGroups.set(language, group);
+  }
+  const groupEntries = [...languageGroups.entries()].sort(([languageA], [languageB]) => {
+    if (showPreferredFirst && preferredLanguage) {
+      if (languageA === preferredLanguage) return -1;
+      if (languageB === preferredLanguage) return 1;
+    }
+    return 0;
+  });
+
   return (
     <div className="space-y-4">
       {controls}
@@ -62,6 +80,14 @@ export default function ReviewList({
               <div>
                 <div className="font-bold flex items-center gap-2">
                   <AddressDisplay address={review.userAddress} copyable={true} truncated={true} inline={true} />
+                  {review.language && (
+                    <span
+                      title="Language automatically detected from the review text"
+                      className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    >
+                      {getReviewLanguageLabel(review.language)}
+                    </span>
+                  )}
                   {currentUserAddress === review.userAddress && (
                     <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full uppercase">You</span>
                   )}
@@ -77,9 +103,20 @@ export default function ReviewList({
             </div>
           </div>
 
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
-            {review.comment}
-          </p>
+          <div className="mb-6">
+            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              {review.comment}
+            </p>
+            <a
+              href="https://github.com/HubDApp/Dongle-frontend/issues/18"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+              aria-label="Request an automatic translation (Issue 18)"
+            >
+              Translate
+            </a>
+          </div>
 
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -157,6 +194,8 @@ export default function ReviewList({
             currentUserAddress={currentUserAddress}
           />
         </div>
+          ))}
+        </section>
       ))}
     </div>
   );

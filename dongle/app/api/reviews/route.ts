@@ -54,11 +54,23 @@ export async function GET(request: NextRequest) {
     if (projectId && !userAddress) {
       const cached = await cacheGet<Review[]>(CacheKey.reviews(projectId));
       if (cached) {
-        return NextResponse.json(createSuccessResponse(cached));
+        const withLanguage = cached.map((review) => ({
+          ...review,
+          language: review.language ?? detectReviewLanguage(review.comment),
+        }));
+        if (cached.some((review) => !review.language)) {
+          await cacheSet(CacheKey.reviews(projectId), withLanguage, REVIEWS_TTL_S);
+        }
+        return NextResponse.json(createSuccessResponse(withLanguage));
       }
     }
 
-    let reviews = Array.from(store.values());
+    let reviews = Array.from(store.values()).map((review) => {
+      if (review.language) return review;
+      const migrated = { ...review, language: detectReviewLanguage(review.comment) };
+      store.set(review.id, migrated);
+      return migrated;
+    });
 
     if (projectId) {
       reviews = reviews.filter((r) => r.projectId === projectId);
@@ -175,6 +187,7 @@ export async function POST(request: NextRequest) {
       userAddress,
       rating,
       comment,
+      language: detectReviewLanguage(comment),
       createdAt: new Date().toISOString(),
       language: typeof language === "string"
         ? language.toLowerCase().split("-")[0]
