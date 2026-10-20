@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { WalletProvider } from "@/context/wallet.context";
 import { ConfirmDialogProvider } from "@/hooks/useConfirm";
@@ -51,13 +52,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the nonce injected by middleware so Next.js internal scripts
+  // (e.g. hydration bootstrap) are permitted by the CSP.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
+      <head>
+        {/* Expose nonce to Next.js script handling */}
+        {nonce && <meta name="csp-nonce" content={nonce} />}
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning

@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -38,12 +39,46 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/** Access token TTL is 15 min; refresh 2 min before expiry. */
+const REFRESH_BEFORE_MS = 2 * 60 * 1000;
+const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
+
 function AuthProviderInner({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const { publicKey, isConnected } = useWallet();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      void silentRefresh();
+    }, ACCESS_TOKEN_TTL_MS - REFRESH_BEFORE_MS);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const silentRefresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        scheduleRefresh();
+      } else {
+        // Suspicious activity or expired — force sign-out
+        setUser(null);
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        if (body.error === "Suspicious activity detected") {
+          toast.error("Session terminated due to suspicious activity. Please sign in again.");
+        }
+      }
+    } catch {
+      // Network error — try again on next refresh cycle
+    }
+  }, [scheduleRefresh]);
 
   const refresh = useCallback(async () => {
     try {
@@ -54,16 +89,20 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       }
       const body = (await res.json()) as { user: AuthUser | null };
       setUser(body.user);
+      if (body.user) scheduleRefresh();
     } catch (error) {
       console.error("[auth] session restore failed", error);
       setUser(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scheduleRefresh]);
 
   useEffect(() => {
     void refresh();
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
   }, [refresh]);
 
   useEffect(() => {
@@ -96,6 +135,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   }, [linkWalletIfNeeded]);
 
   const signOut = useCallback(async () => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     setUser(null);
   }, []);

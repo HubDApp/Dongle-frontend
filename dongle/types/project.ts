@@ -4,6 +4,7 @@
  */
 
 import { RepositoryMetadata } from "./repository";
+import type { BridgeConfig } from "./bridge";
 
 export const PROJECT_CATEGORIES = {
   DEFI: "DeFi / DEX",
@@ -116,6 +117,11 @@ export function isProjectActive(status?: ProjectStatus): boolean {
   return getProjectStatus(status) === "active";
 }
 
+export interface ProjectImage {
+  url: string;
+  caption?: string;
+}
+
 /**
  * Canonical Project interface.
  * Use `primaryCategory` everywhere — it holds the display-label form of the
@@ -132,15 +138,23 @@ export interface Project {
   description: string;
   rating: number;
   reviews: number;
+  /** Aggregate bookmark total provided by the project catalog or metrics service. */
+  bookmarkCount?: number;
+  /** Admin-curated flag supplied by the project catalog. */
+  isFeatured?: boolean;
   createdAt: string; // ISO date string
   websiteUrl?: string;
   githubUrl?: string;
   logoUrl?: string;
+  /** Optional project screenshots; the Soroban registry currently stores only logoUrl. */
+  images?: ProjectImage[];
   docsUrl?: string;
   auditReportUrl?: string;
   bugBountyUrl?: string;
   domain?: string;
   ownerAddress?: string;
+  /** IPFS CID for the project's roadmap JSON; referenced by the registry contract. */
+  roadmapCid?: string;
   repositoryMetadata?: RepositoryMetadata; // Cached repository metadata
   /**
    * Optional list of Soroban contract IDs associated with this project.
@@ -148,6 +162,11 @@ export interface Project {
    * followed by 55 base-32 characters (A-Z, 2-7), total length 56.
    */
   contractAddresses?: string[];
+  /**
+   * Optional cross-chain bridge information (Issue #726). Only present for
+   * projects that expose bridge routes between chains.
+   */
+  bridge?: BridgeConfig;
 }
 
 export type ClaimProofType = "website" | "repository" | "admin_review";

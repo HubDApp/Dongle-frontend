@@ -53,6 +53,7 @@ function countFilledFields(data: FormTemplateData): number {
   if (data.bugBountyUrl?.trim()) count++;
   if ((data.tags ?? []).length > 0) count++;
   if ((data.contractAddresses ?? []).some((a) => a.trim())) count++;
+  if ((data.roadmap ?? []).length > 0) count++;
   return count;
 }
 
@@ -84,7 +85,13 @@ function inferCategory(primaryCategory: string): FormTemplateCategory {
 
 export const formTemplateService = {
   getBuiltInTemplates(): FormTemplate[] {
-    return BUILT_IN_FORM_TEMPLATES.map((t) => ({ ...t, data: { ...t.data } }));
+    return BUILT_IN_FORM_TEMPLATES.map((t) => ({
+      ...t,
+      data: {
+        ...t.data,
+        roadmap: t.data.roadmap?.map((milestone) => ({ ...milestone })),
+      },
+    }));
   },
 
   getUserTemplates(walletAddress: string): FormTemplate[] {
@@ -100,7 +107,15 @@ export const formTemplateService = {
 
   getTemplateById(id: string, walletAddress?: string): FormTemplate | null {
     const builtIn = BUILT_IN_FORM_TEMPLATES.find((t) => t.id === id);
-    if (builtIn) return { ...builtIn, data: { ...builtIn.data } };
+    if (builtIn) {
+      return {
+        ...builtIn,
+        data: {
+          ...builtIn.data,
+          roadmap: builtIn.data.roadmap?.map((milestone) => ({ ...milestone })),
+        },
+      };
+    }
     if (!walletAddress) return null;
     return readUserTemplates(walletAddress).find((t) => t.id === id) ?? null;
   },
@@ -185,6 +200,7 @@ export const formTemplateService = {
         ...data,
         tags: [...(data.tags ?? [])],
         contractAddresses: [...(data.contractAddresses ?? [])],
+        roadmap: data.roadmap?.map((milestone) => ({ ...milestone })),
       },
       isBuiltIn: false,
       walletAddress,

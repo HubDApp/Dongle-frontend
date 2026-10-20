@@ -6,10 +6,16 @@ import {
   replayHistoricalEvents,
   resetEventStore,
 } from "@/services/indexer/event-store.service";
+import { SorobanEventListener } from "@/services/indexer/soroban-listener.service";
+import { processSorobanEvent } from "@/services/indexer/event-processor.service";
+import { resetSorobanQueueForTests } from "@/services/indexer/event-queue.service";
+import { listNotifications, resetNotificationBusForTests } from "@/lib/notifications/server-store";
 
 describe("indexer services", () => {
   beforeEach(() => {
     resetEventStore();
+    resetSorobanQueueForTests();
+    resetNotificationBusForTests();
   });
 
   it("stores and queries events", () => {
@@ -36,6 +42,55 @@ describe("indexer services", () => {
     ]);
     expect(replayed).toHaveLength(1);
     expect(queryEvents().total).toBe(1);
+  });
+
+  it("queries Soroban RPC and resumes from the last successfully indexed ledger", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    let fail = true;
+    const listener = new SorobanEventListener({
+      rpcUrl: "https://rpc.example",
+      contractId: "C123",
+      initialLedger: 0,
+      fetcher: async (_input, init) => {
+        requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        if (fail) {
+          fail = false;
+          return new Response("RPC unavailable", { status: 503 });
+        }
+        return Response.json({
+          result: {
+            events: [{
+              eventType: "VerificationRejected",
+              ledger: 42,
+              txHash: "tx42",
+              payload: { projectId: "p1" },
+            }],
+          },
+        });
+      },
+    });
+
+    await expect(listener.poll()).rejects.toThrow("RPC events fetch failed: 503");
+    expect(listener.getLastLedger()).toBe(0);
+    await expect(listener.poll()).resolves.toBe(1);
+    expect(requestBody?.method).toBe("getEvents");
+    expect((requestBody?.params as { startLedger: number }).startLedger).toBe(1);
+    expect(listener.getLastLedger()).toBe(42);
+    expect(queryEvents({ eventType: "VerificationRejected" }).total).toBe(1);
+  });
+
+  it("notifies only addresses included in the on-chain event payload", async () => {
+    await processSorobanEvent({
+      type: "ReviewSubmitted",
+      ledger: 42,
+      txHash: "tx42",
+      contractId: "C123",
+      payload: { projectId: "p1", owner: "GOWNER", submitterAddress: "GSUBMITTER" },
+    });
+
+    expect(listNotifications("GOWNER")).toHaveLength(1);
+    expect(listNotifications("GSUBMITTER")).toHaveLength(1);
+    expect(listNotifications("GUNRELATED")).toHaveLength(0);
   });
 
   it("opens circuit after repeated failures", async () => {

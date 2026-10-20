@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Review } from "@/types/review";
+import { Review, isReviewSentiment } from "@/types/review";
 import { hasMinLength } from "@/lib/validation";
 import { verifySignature } from "@/lib/verify-signature";
 import {
@@ -15,13 +15,9 @@ import {
   APIError,
 } from "@/services/error/error.service";
 import { cacheGet, cacheSet, cacheDel, CacheKey, REVIEWS_TTL_S } from "@/lib/cache";
+import { getReviewStore } from "@/lib/review-store";
 
-interface InMemoryReview extends Review {
-  helpfulVotes: string[];
-  unhelpfulVotes: string[];
-}
-
-const store = new Map<string, InMemoryReview>();
+const store = getReviewStore();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -58,11 +54,23 @@ export async function GET(request: NextRequest) {
     if (projectId && !userAddress) {
       const cached = await cacheGet<Review[]>(CacheKey.reviews(projectId));
       if (cached) {
-        return NextResponse.json(createSuccessResponse(cached));
+        const withLanguage = cached.map((review) => ({
+          ...review,
+          language: review.language ?? detectReviewLanguage(review.comment),
+        }));
+        if (cached.some((review) => !review.language)) {
+          await cacheSet(CacheKey.reviews(projectId), withLanguage, REVIEWS_TTL_S);
+        }
+        return NextResponse.json(createSuccessResponse(withLanguage));
       }
     }
 
-    let reviews = Array.from(store.values());
+    let reviews = Array.from(store.values()).map((review) => {
+      if (review.language) return review;
+      const migrated = { ...review, language: detectReviewLanguage(review.comment) };
+      store.set(review.id, migrated);
+      return migrated;
+    });
 
     if (projectId) {
       reviews = reviews.filter((r) => r.projectId === projectId);
@@ -71,6 +79,12 @@ export async function GET(request: NextRequest) {
       reviews = reviews.filter((r) => r.userAddress === userAddress);
     }
 
+    for (const review of reviews) {
+      if (!isReviewSentiment(review.sentiment)) {
+        review.sentiment = classifyReviewSentiment(review.comment);
+        review.sentimentSource = "automatic";
+      }
+    }
     reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Populate cache for project-scoped results
@@ -90,19 +104,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, projectName, userAddress, rating, comment, signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken } = body;
+    const {
+      projectId, projectName, userAddress, rating, comment,
+      signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken,
+      // E2E encryption fields (#731)
+      encrypted, encryptedPayload, encryptedCid, adminWrappedKey,
+    } = body;
 
     if (!projectId || !projectName || !userAddress) {
       return NextResponse.json(
-        {
-          success: false,
-          errors: [{ field: "comment", message: "Missing required fields" }],
-        },
+        { success: false, errors: [{ field: "comment", message: "Missing required fields" }] },
         { status: 400 }
       );
     }
 
-    const validationError = validateReviewInput(rating, comment);
+    // For encrypted reviews the comment is the sentinel — skip length validation.
+    const validationError = encrypted
+      ? validateReviewInput(rating, "placeholder comment") // rating-only check
+      : validateReviewInput(rating, comment);
     if (validationError) {
       return NextResponse.json(
         { success: false, errors: [validationError] },
@@ -110,9 +129,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Encrypted reviews must supply an encryptedPayload.
+    if (encrypted && !encryptedPayload) {
+      return NextResponse.json(
+        { success: false, errors: [{ field: "comment", message: "encryptedPayload is required for encrypted reviews" }] },
+        { status: 400 }
+      );
+    }
+
     // ── Signature verification (cryptographic form submission signing) ─────
     // If a signature is provided, verify it against the payload and public key.
     // This ensures tamper detection and authenticity of the submission.
+    let isVerifiedReviewer = false;
     if (signedPayload && signature) {
       const isValid = verifySignature(signedPayload, signature, userAddress);
       if (!isValid) {
@@ -121,6 +149,7 @@ export async function POST(request: NextRequest) {
           { status: 401 }
         );
       }
+      isVerifiedReviewer = true;
     }
 
     if (isReviewerBanned(userAddress)) {
@@ -157,20 +186,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const newReview: InMemoryReview = {
+    const newReview: Review = {
       id: generateId(),
       projectId,
       projectName,
       userAddress,
       rating,
       comment,
+      language: detectReviewLanguage(comment),
       createdAt: new Date().toISOString(),
+      language: typeof language === "string"
+        ? language.toLowerCase().split("-")[0]
+        : request.headers.get("accept-language")?.split(",")[0]?.split("-")[0]?.toLowerCase(),
+      isVerifiedReviewer,
       helpfulVotes: [],
       unhelpfulVotes: [],
       signedPayload: signedPayload || undefined,
       signature: signature || undefined,
       signatureNonce: signatureNonce || undefined,
       signatureTimestamp: signatureTimestamp || undefined,
+      // E2E encryption (#731)
+      encrypted: encrypted === true ? true : undefined,
+      encryptedPayload: encryptedPayload || undefined,
+      encryptedCid: encryptedCid || undefined,
+      adminWrappedKey: adminWrappedKey || undefined,
     };
 
     store.set(newReview.id, newReview);
@@ -185,3 +224,49 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const token = await getAdminTokenFromCookie();
+    const admin = token ? await verifyAdminToken(token) : null;
+    if (!admin || !isAdminAllowed(admin.publicKey)) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.AUTHENTICATION_ERROR, "Admin authentication required", 401),
+        { status: 401 },
+      );
+    }
+
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.VALIDATION_ERROR, "A review ID and valid sentiment are required", 400),
+        { status: 400 },
+      );
+    }
+    const { id, sentiment } = body as { id?: unknown; sentiment?: unknown };
+    if (typeof id !== "string" || !id || !isReviewSentiment(sentiment)) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.VALIDATION_ERROR, "A review ID and valid sentiment are required", 400),
+        { status: 400 },
+      );
+    }
+
+    const review = store.get(id);
+    if (!review) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.NOT_FOUND, "Review not found", 404),
+        { status: 404 },
+      );
+    }
+
+    review.sentiment = sentiment;
+    review.sentimentSource = "admin";
+    await cacheDel(CacheKey.reviews(review.projectId));
+    return NextResponse.json(createSuccessResponse(review));
+  } catch (error) {
+    console.error("[Reviews API] Failed to override review sentiment:", error);
+    return NextResponse.json(
+      createErrorResponse(ErrorCode.INTERNAL_ERROR, "Could not update review sentiment", 500),
+      { status: 500 },
+    );
+  }
+}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-export type SortBy = "rating" | "newest" | "popular";
+export type SortBy = "rating" | "newest" | "popular" | "health";
 
 export interface DiscoverParams {
   /** The raw (unDebounced) value shown in the search input */
@@ -31,7 +31,7 @@ export interface DiscoverParamsActions {
 }
 
 const DEBOUNCE_MS = 300;
-const VALID_SORTS: SortBy[] = ["rating", "newest", "popular"];
+const VALID_SORTS: SortBy[] = ["rating", "newest", "popular", "health"];
 const ALL_CATEGORIES_SENTINEL = "All";
 
 function parseSort(raw: string | null): SortBy {

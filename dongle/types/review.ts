@@ -1,5 +1,11 @@
 import { Project } from "@/types/project";
 
+export type ReviewSentiment = "positive" | "negative" | "neutral";
+
+export function isReviewSentiment(value: unknown): value is ReviewSentiment {
+  return value === "positive" || value === "negative" || value === "neutral";
+}
+
 export interface Review {
   id: string;
   projectId: string;
@@ -7,7 +13,11 @@ export interface Review {
   userAddress: string;
   rating: number;
   comment: string;
+  /** Detected language code, or `und` when the text is too short/ambiguous. */
+  language?: string;
   createdAt: string;
+  language?: string;
+  isVerifiedReviewer?: boolean;
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
   /** Cryptographic signature fields — present for signed submissions (#558). */
@@ -15,7 +25,14 @@ export interface Review {
   signature?: string;
   signatureNonce?: string;
   signatureTimestamp?: string;
-  ownerResponse?: ReviewOwnerResponse;
+  /** E2E encryption fields (#731). Present when reviewer opted in. */
+  encrypted?: boolean;
+  /** Base64(iv || AES-GCM ciphertext) of the plaintext comment. */
+  encryptedPayload?: string;
+  /** IPFS CID of the encrypted payload (optional — for on-chain anchoring). */
+  encryptedCid?: string;
+  /** Admin-wrapped copy of the per-review key (RSA-OAEP, base64). */
+  adminWrappedKey?: string;
 }
 
 export interface ReviewOwnerResponse {
@@ -109,4 +126,3 @@ export interface ReviewReportValidationError {
 
 // Re-export Project for backward compatibility in components
 export type { Project };
-

@@ -103,9 +103,6 @@ export async function createAdminToken(publicKey: string): Promise<string> {
     .setJti(nonce)
     .sign(await getSecretKey());
 
-  // Store nonce for replay protection
-  storeNonce(nonce, now + TOKEN_MAX_AGE_SECONDS);
-
   return token;
 }
 
@@ -131,11 +128,49 @@ export async function refreshAdminToken(token: string): Promise<string | null> {
 
   // Mark old nonce as used (consumed by refresh)
   if (payload.nonce) {
-    usedNonces.set(payload.nonce as string, Date.now());
+    storeNonce(payload.nonce as string, Date.now());
   }
 
   // Issue a new token
   return createAdminToken(payload.publicKey as string);
+}
+
+// ─── Pending 2FA Token (Issue #728) ───────────────────────────────────────────
+
+/** Lifetime of a pending (awaiting-2FA) admin token, in seconds. */
+export const PENDING_2FA_MAX_AGE_SECONDS = 5 * 60;
+
+/**
+ * Issue a short-lived token proving the admin passed the allowlist check but
+ * has not yet completed 2FA. Verified by the 2FA completion route.
+ */
+export async function createPending2FAToken(publicKey: string): Promise<string> {
+  const nonce = crypto.randomUUID();
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({ publicKey, nonce, stage: "pending_2fa" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt(now)
+    .setExpirationTime(`${PENDING_2FA_MAX_AGE_SECONDS}s`)
+    .setJti(nonce)
+    .sign(await getSecretKey());
+}
+
+export interface Pending2FAPayload extends JWTPayload {
+  publicKey: string;
+  stage: string;
+}
+
+/** Verify a pending-2FA token and return its payload (or null). */
+export async function verifyPending2FAToken(
+  token: string,
+): Promise<Pending2FAPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, await getSecretKey());
+    if (payload.stage !== "pending_2fa") return null;
+    return payload as Pending2FAPayload;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Cookie Helpers ───────────────────────────────────────────────────────────

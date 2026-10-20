@@ -1,0 +1,71 @@
+---
+title: "ADR 0002: IPFS Storage"
+description: Why Dongle uses IPFS as the off-chain blob layer for media and evidence.
+---
+
+# ADR 0002: IPFS for Off-Chain Media and Evidence
+
+| | |
+|---|---|
+| **Status** | Accepted |
+| **Date** | 2026-08-26 |
+
+## Context
+
+On-chain Stellar/Soroban storage is expensive and poorly suited to images, long-form reviews, and verification evidence (audit PDFs, screenshots). The product still needs those blobs to be:
+
+1. **Content-addressed** — a CID proves the file has not been swapped
+2. **Publicly fetchable** in the browser without Dongle running a media CDN
+3. **Referenced from contracts** as a short string (CID / URI), not as raw bytes
+
+A conventional REST API (`POST /uploads`) would re-centralise media and make takedowns and URL rot the platform's problem.
+
+The Next.js app already allows IPFS and Arweave hostnames in `next.config.ts` image remote patterns.
+
+## Decision
+
+Treat **IPFS (and compatible content-addressed storage) as the off-chain blob layer**. Contracts and the UI store **CIDs / `ipfs://` URIs**, not vendor URLs.
+
+Frontend responsibilities:
+
+- Render images through Next.js `<Image>` using public gateways listed in `next.config.ts`
+- Accept user-supplied HTTP(S) URLs during MVP while the upload pipeline is incomplete
+- Prefer CIDs for reviews, logos, and verification evidence once the upload flow lands
+- Never embed large payloads in Soroban contract arguments
+
+```typescript
+// next.config.ts — allowed IPFS gateways
+remotePatterns: [
+  { protocol: "https", hostname: "**.ipfs.io" },
+  { protocol: "https", hostname: "**.ipfs.dweb.link" },
+  { protocol: "https", hostname: "gateway.pinata.cloud" },
+  { protocol: "https", hostname: "arweave.net" },
+  // …
+]
+```
+
+## Consequences
+
+**Positive**
+- Media integrity: the CID in the contract matches the bytes the gateway returns
+- Gateways are swappable; pinning can move without rewriting listings
+- Aligns with the goal of a decentralised app store
+
+**Negative**
+- Gateway latency and availability are worse than a first-party CDN
+- Files vanish if nobody pins them
+- Next.js image optimisation still proxies through our server
+
+**Follow-up**
+- Add an explicit upload helper (web3.storage / Pinata / NFT.Storage) instead of asking users to paste gateway URLs
+- Document a gateway fallback list if `ipfs.io` is rate-limited
+- Keep Arweave as a sibling option for permanent evidence
+
+## Alternatives Considered
+
+| Alternative | Why rejected |
+|-------------|-------------|
+| First-party REST + S3 | Fast and familiar, but listings become Dongle-hosted; breaks content-address story |
+| On-chain only | Impractical for images and PDFs; would blow contract size and fees |
+| Arweave only | Strong permanence, weaker ecosystem for mutable dApp logos; higher cost floor |
+| Files in git / GitHub | Acceptable for OSS logos in MVP; not suitable for user reviews or verification packets |

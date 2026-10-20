@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -27,6 +27,7 @@ import {
 } from "@/types/project";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date";
+import { OwnershipVerificationPanel } from "@/components/projects/OwnershipVerificationPanel";
 
 // ── Proof-type guidance ────────────────────────────────────────────────────
 
@@ -36,26 +37,24 @@ const PROOF_GUIDANCE: Record<
 > = {
   website: {
     title: "Website / Domain Proof",
-    hint: "Prove ownership by placing a verification file on your domain.",
-    placeholder:
-      "https://yourdomain.com/.well-known/dongle-ownership.txt",
+    hint: "First verify your domain with DNS TXT or Stellar.toml using the token above.",
+    placeholder: "Verified domain or Stellar.toml URL",
     steps: [
-      'Create a file at <code class="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">/.well-known/dongle-ownership.txt</code> on your server.',
-      'The file must contain exactly: <code class="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">dongle-owner: YOUR_STELLAR_G_ADDRESS</code>',
-      "The file must be publicly accessible (no authentication).",
-      "Paste the direct URL to the file in the field below.",
+      "Publish the generated token using DNS TXT or /.well-known/stellar.toml as shown above.",
+      "Select Verify now or wait for automatic verification.",
+      "After the status shows Verified, enter the public domain in the field below.",
+      "An admin will review the claim and transfer ownership after approval.",
     ],
   },
   repository: {
     title: "Repository Proof",
-    hint: "Prove ownership by committing a verification file to the project repository.",
-    placeholder:
-      "https://github.com/your-org/your-repo/blob/main/DONGLE_OWNERSHIP.md",
+    hint: "Verify the GitHub repository with its generated dongle-verify.txt token first.",
+    placeholder: "https://github.com/owner/repository",
     steps: [
-      'Add a file named <code class="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">DONGLE_OWNERSHIP.md</code> (or <code class="bg-amber-100 dark:bg-amber-900/30 px-1 rounded">.txt</code>) to the root of your repository.',
-      "The file should contain your Stellar address and a brief statement of ownership.",
-      "The file must be on the default branch and publicly viewable.",
-      "Paste the direct link to the file in the field below.",
+      "Add dongle-verify.txt with the generated token to the root of the public repository.",
+      "The file must be on the repository's default branch.",
+      "Select Verify now or wait for automatic verification.",
+      "After the status shows Verified, enter the repository URL below.",
     ],
   },
   admin_review: {
@@ -172,6 +171,10 @@ export default function ClaimProjectPage() {
   const [fieldError, setFieldError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [ownershipVerified, setOwnershipVerified] = useState(false);
+  const handleVerificationStatus = useCallback((verified: boolean) => {
+    setOwnershipVerified(verified);
+  }, []);
 
   // Load project
   useEffect(() => {
@@ -206,6 +209,10 @@ export default function ClaimProjectPage() {
       return;
     }
     if (!gate.publicKey || !project) return;
+    if (proofType !== "admin_review" && !ownershipVerified) {
+      toast.error("Verify ownership with DNS, GitHub, or Stellar.toml before submitting this claim.");
+      return;
+    }
 
     setIsSubmitting(true);
     const result = projectClaimService.createRequest(
@@ -317,6 +324,15 @@ export default function ClaimProjectPage() {
               </Button>
             </div>
           </div>
+          {gate.publicKey && (
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-white px-6 dark:border-zinc-800 dark:bg-zinc-900">
+              <OwnershipVerificationPanel
+                projectId={project.id}
+                walletAddress={gate.publicKey}
+                onVerifiedChange={handleVerificationStatus}
+              />
+            </div>
+          )}
         </div>
       </main>
     );
@@ -352,6 +368,14 @@ export default function ClaimProjectPage() {
             . No private keys or secrets are required.
           </p>
         </div>
+
+        {gate.publicKey && (
+          <OwnershipVerificationPanel
+            projectId={project.id}
+            walletAddress={gate.publicKey}
+            onVerifiedChange={handleVerificationStatus}
+          />
+        )}
 
         {/* Existing claim status */}
         {existingClaim && !canResubmit && (

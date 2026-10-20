@@ -1,0 +1,157 @@
+---
+title: Contributing
+description: Commit conventions, pull request template, code style, and review checklist.
+---
+
+import { Callout } from "nextra/components";
+
+# Contributing
+
+## Getting Started
+
+```bash
+git clone https://github.com/HubDApp/Dongle-frontend.git
+cd Dongle-frontend/dongle
+npm install
+git checkout -b feat/your-feature
+npm run dev
+```
+
+## Commit Message Format
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+<type>(<optional scope>): <short description>
+
+[optional body]
+
+[optional footer: Closes #123]
+```
+
+### Types
+
+| Type | When |
+|------|------|
+| `feat` | New feature or user-facing capability |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Formatting, no logic change |
+| `refactor` | Code change that neither fixes nor adds |
+| `test` | Adding or updating tests |
+| `chore` | Tooling, dependencies, CI |
+| `perf` | Performance improvement |
+
+### Scopes
+
+Use the area of the codebase: `wallet`, `soroban`, `reviews`, `verify`, `discover`, `admin`, `ci`.
+
+### Examples
+
+```
+feat(soroban): add update_project contract call
+fix(wallet): handle Freighter disconnect during signing
+docs: add testing guide with Vitest patterns
+test(reviews): add duplicate review rejection cases
+chore(deps): bump stellar-sdk to 13.3.0
+```
+
+**Rules:** imperative mood ("add feature" not "added"), ≤ 72 chars, no trailing period, issue reference in footer.
+
+## Pull Request Template
+
+```markdown
+## Summary
+- 
+
+## Related Issues
+Closes #
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation
+- [ ] Refactor / test / chore
+
+## Test Plan
+- [ ] `npm test` passes
+- [ ] `npm run lint` passes (zero warnings)
+- [ ] `npm run typecheck` passes
+- [ ] `npm run build` succeeds
+- [ ] Manual testing steps: 1.
+
+## Screenshots
+<!-- Before / after for UI changes -->
+```
+
+## Code Style
+
+### TypeScript
+
+- Strict typing — avoid `any`; use `unknown` and narrow with type guards.
+- Use the `@/` path alias for all imports within `dongle/`.
+- Prefer `interface` for object shapes; use `const` assertions for constant maps.
+- Colocate shared types in `dongle/types/`.
+
+### React / Next.js
+
+- Functional components and hooks only.
+- `"use client"` at the top of every client component file.
+- Forms use `react-hook-form` + Zod schemas via `@hookform/resolvers`.
+- Toasts via `sonner`.
+
+### File Naming
+
+| Item | Convention | Example |
+|------|------------|---------|
+| Components | PascalCase | `ProjectForm.tsx` |
+| Services | `*.service.ts` | `review.service.ts` |
+| Hooks | `use*.ts` | `useProjectFilters.ts` |
+| Utils | `*.util.ts` | `date.util.ts` |
+| Tests | `*.test.ts(x)` | `review.service.test.ts` |
+| Constants | SCREAMING_SNAKE_CASE | `DONGLE_CONTRACTS` |
+
+## Review Checklist
+
+### Tests
+- [ ] New logic has unit tests in `dongle/__tests__/`
+- [ ] Edge cases covered (validation failures, empty states, auth checks)
+- [ ] `npm test` passes locally
+
+### Types
+- [ ] No new `any` types without justification
+- [ ] `npm run typecheck` passes
+
+### Linting
+- [ ] `npm run lint` passes with zero warnings
+- [ ] No commented-out code or debug `console.log` in production paths
+
+### Functionality
+- [ ] Works without wallet (read-only flows)
+- [ ] Wallet-gated actions show clear prompts when disconnected
+- [ ] Network mismatch handled with toast and banner
+
+### Security
+- [ ] No secrets committed
+- [ ] Admin routes respect `NEXT_PUBLIC_ADMIN_ALLOWLIST`
+- [ ] User input validated before contract calls
+
+### Performance Red Flags
+
+| Flag | Action |
+|------|--------|
+| Unbounded list render (100+ items) | Add pagination or virtual scrolling |
+| Synchronous `localStorage` in render | Move to `useEffect` or service layer |
+| Multiple contract calls in a loop | Batch or parallelise with limits |
+| Large dependency added without justification | Check bundle impact |
+
+## Pre-commit Checklist
+
+```bash
+cd dongle
+npm test && npm run lint && npm run typecheck
+```
+
+<Callout>
+  Run `node scripts/setup-git-hooks.mjs` once after cloning to configure the pre-commit hook that enforces file naming conventions.
+</Callout>

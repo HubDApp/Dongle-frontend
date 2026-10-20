@@ -29,6 +29,7 @@ export default function Navbar() {
   const navLinks = [
     { href: "/discover", label: t("nav.discover") },
     { href: "/reviews", label: t("nav.reviews") },
+    { href: "/lists", label: "Lists" },
     { href: "/verify", label: t("nav.verify") },
     { href: "/analytics", label: t("nav.analytics") },
     { href: "/projects/new", label: t("nav.submitProject") },

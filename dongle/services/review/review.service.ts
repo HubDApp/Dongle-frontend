@@ -6,12 +6,12 @@ import {
   REVIEW_OWNER_RESPONSE_MAX_LENGTH,
   ReviewOwnerResponse,
   ReviewValidationError,
+  isReviewSentiment,
 } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
-import { projectService } from "@/services/project/project.service";
-import { emitNotificationEvent } from "@/lib/notifications/emit";
+import { detectReviewLanguage } from "@/lib/review-language";
 
 const STORAGE_KEY = "dongle_reviews";
 const OWNER_RESPONSES_STORAGE_KEY = "dongle_review_owner_responses";
@@ -66,6 +66,7 @@ function getLocalReviews(): Review[] {
   }
   if (!Array.isArray(parsed)) return [];
   const validatedReviews: Review[] = [];
+  let migratedSentiment = false;
   for (const item of parsed) {
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
@@ -83,7 +84,16 @@ function getLocalReviews(): Review[] {
     } else {
       createdAt = nowUTC();
     }
-    const review: Review = { id, projectId: record.projectId, projectName, userAddress: record.userAddress, rating, comment: record.comment, createdAt };
+    const review: Review = {
+      id,
+      projectId: record.projectId,
+      projectName,
+      userAddress: record.userAddress,
+      rating,
+      comment: record.comment,
+      language: typeof record.language === "string" ? record.language : detectReviewLanguage(record.comment),
+      createdAt,
+    };
     if (Array.isArray(record.helpfulVotes)) {
       review.helpfulVotes = record.helpfulVotes.filter((v): v is string => typeof v === "string");
     } else {
@@ -96,7 +106,8 @@ function getLocalReviews(): Review[] {
     }
     validatedReviews.push(review);
   }
-  return attachOwnerResponses(validatedReviews);
+  if (migratedSentiment) saveLocalReviews(validatedReviews);
+  return validatedReviews;
 }
 
 function saveLocalReviews(reviews: Review[]): void {
@@ -174,12 +185,25 @@ async function addReview(
   if (reviews.some((r) => r.userAddress === userAddress && r.projectId === review.projectId)) {
     return { success: false, errors: [{ field: "comment", message: "You have already reviewed this project" }] };
   }
-  const newReview: Review = { ...review, userAddress, id: generateId(), createdAt: new Date().toISOString() };
+  const newReview: Review = {
+    ...review,
+    language: detectReviewLanguage(review.comment),
+    userAddress,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
   if (signedPayload) {
     newReview.signedPayload = signedPayload.payload;
     newReview.signature = signedPayload.signature;
     newReview.signatureNonce = signedPayload.nonce;
     newReview.signatureTimestamp = signedPayload.timestamp;
+  }
+  // Persist E2E encryption fields (#731)
+  if (review.encrypted) {
+    newReview.encrypted = review.encrypted;
+    newReview.encryptedPayload = review.encryptedPayload;
+    newReview.encryptedCid = review.encryptedCid;
+    newReview.adminWrappedKey = review.adminWrappedKey;
   }
   saveLocalReviews([newReview, ...reviews]);
   return { success: true, data: newReview };
@@ -211,7 +235,11 @@ async function updateReview(
   const comment = updates.comment ?? reviews[index].comment;
   const validationErrors = validateReview(rating, comment);
   if (validationErrors.length > 0) return { success: false, errors: validationErrors };
-  reviews[index] = { ...reviews[index], ...updates };
+  reviews[index] = {
+    ...reviews[index],
+    ...updates,
+    ...(updates.comment !== undefined ? { language: detectReviewLanguage(updates.comment) } : {}),
+  };
   saveLocalReviews(reviews);
   return { success: true, data: reviews[index] };
 }
@@ -269,6 +297,58 @@ async function getReviewsByUser(userAddress: string): Promise<Review[]> {
   return getLocalReviews().filter((r) => r.userAddress === userAddress);
 }
 
+async function searchReviews(params: Record<string, string | number | boolean | undefined>) {
+  if (getPersistenceMode() === "api") {
+    try {
+      return await reviewApiService.searchReviews(params);
+    } catch {
+      if (typeof window !== "undefined") {
+        console.warn(DEV_MODE_WARN);
+      }
+    }
+  }
+
+  warnDevMode();
+  const reviews = getLocalReviews();
+  const all = reviews.filter((review) => {
+    const search = String(params.q ?? "").trim().toLowerCase();
+    if (!search) return true;
+    return review.comment.toLowerCase().includes(search);
+  });
+
+  const ratingMin = params.ratingMin !== undefined ? Number(params.ratingMin) : undefined;
+  const ratingMax = params.ratingMax !== undefined ? Number(params.ratingMax) : undefined;
+  const verifiedOnly = params.verifiedOnly === true;
+  const language = typeof params.language === "string" ? params.language.toLowerCase() : undefined;
+  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const pageSize = Math.max(1, Number(params.pageSize ?? 20) || 20);
+
+  const filtered = all.filter((review) => {
+    if (ratingMin !== undefined && review.rating < ratingMin) return false;
+    if (ratingMax !== undefined && review.rating > ratingMax) return false;
+    if (verifiedOnly && review.isVerifiedReviewer !== true) return false;
+    if (language && review.language && review.language.toLowerCase() !== language) return false;
+    return true;
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageResults = filtered.slice((page - 1) * pageSize, page * pageSize).map((review) => ({
+    ...review,
+    score: 1,
+    highlights: [],
+  }));
+
+  return {
+    results: pageResults,
+    total,
+    page,
+    pageSize,
+    totalPages,
+    suggestions: [],
+  };
+}
+
 async function voteHelpful(
   id: string,
   userAddress: string,
@@ -313,78 +393,20 @@ async function voteUnhelpful(
   return { success: true, data: reviews[index] };
 }
 
-async function addOwnerResponse(reviewId: string, text: string, ownerAddress: string): Promise<Review> {
-  const responseText = text.trim();
-  if (!responseText) throw new Error("Response cannot be empty");
-  if (responseText.length > REVIEW_OWNER_RESPONSE_MAX_LENGTH) {
-    throw new Error(`Response cannot exceed ${REVIEW_OWNER_RESPONSE_MAX_LENGTH} characters`);
-  }
-  const review = (await getReviews()).find((item) => item.id === reviewId);
-  if (!review) throw new Error("Review not found");
-  const project = projectService.getProjectById(review.projectId);
-  if (!project || project.ownerAddress !== ownerAddress) {
-    throw new Error("Only the project owner can respond to this review");
-  }
-  if (review.ownerResponse) throw new Error("A response has already been posted");
-
-  const now = new Date().toISOString();
-  const ownerResponse: ReviewOwnerResponse = {
-    text: responseText,
-    ownerAddress,
-    createdAt: now,
-    updatedAt: now,
-  };
-  saveOwnerResponses({ ...getOwnerResponses(), [reviewId]: ownerResponse });
-  void emitNotificationEvent({
-    recipientId: review.userAddress,
-    type: "review_owner_response",
-    projectId: review.projectId,
-    projectName: review.projectName,
-    reviewId: review.id,
-  });
-  return { ...review, ownerResponse };
-}
-
-async function updateOwnerResponse(reviewId: string, text: string, ownerAddress: string): Promise<Review> {
-  const responseText = text.trim();
-  if (!responseText) throw new Error("Response cannot be empty");
-  if (responseText.length > REVIEW_OWNER_RESPONSE_MAX_LENGTH) {
-    throw new Error(`Response cannot exceed ${REVIEW_OWNER_RESPONSE_MAX_LENGTH} characters`);
-  }
-  const review = (await getReviews()).find((item) => item.id === reviewId);
-  if (!review?.ownerResponse) throw new Error("Response not found");
-  if (review.ownerResponse.ownerAddress !== ownerAddress) {
-    throw new Error("Only the project owner can edit this response");
-  }
-  if (Date.now() - Date.parse(review.ownerResponse.createdAt) > REVIEW_OWNER_RESPONSE_EDIT_WINDOW_MS) {
-    throw new Error("Responses can only be edited within 24 hours");
+async function overrideSentiment(
+  id: string,
+  sentiment: ReviewSentiment,
+): Promise<{ success: boolean; data?: Review; error?: string }> {
+  if (getPersistenceMode() === "api") {
+    return reviewApiService.overrideSentiment(id, sentiment);
   }
 
-  const ownerResponse: ReviewOwnerResponse = {
-    ...review.ownerResponse,
-    text: responseText,
-    updatedAt: new Date().toISOString(),
-  };
-  saveOwnerResponses({ ...getOwnerResponses(), [reviewId]: ownerResponse });
-  return { ...review, ownerResponse };
-}
-
-async function moderateOwnerResponse(
-  reviewId: string,
-  hiddenByAdmin: boolean,
-  moderatorAddress: string,
-): Promise<Review> {
-  if (!moderatorAddress) throw new Error("Moderator identity is required");
-  const review = (await getReviews()).find((item) => item.id === reviewId);
-  if (!review?.ownerResponse) throw new Error("Response not found");
-  const ownerResponse: ReviewOwnerResponse = {
-    ...review.ownerResponse,
-    hiddenByAdmin,
-    moderatedAt: new Date().toISOString(),
-    moderatedBy: moderatorAddress,
-  };
-  saveOwnerResponses({ ...getOwnerResponses(), [reviewId]: ownerResponse });
-  return { ...review, ownerResponse };
+  const reviews = getLocalReviews();
+  const index = reviews.findIndex((review) => review.id === id);
+  if (index === -1) return { success: false, error: "Review not found" };
+  reviews[index] = { ...reviews[index], sentiment, sentimentSource: "admin" };
+  saveLocalReviews(reviews);
+  return { success: true, data: reviews[index] };
 }
 
 export const reviewService = {
@@ -394,11 +416,10 @@ export const reviewService = {
   deleteReview,
   getReviewsByProject,
   getReviewsByUser,
+  searchReviews,
   voteHelpful,
   voteUnhelpful,
-  addOwnerResponse,
-  updateOwnerResponse,
-  moderateOwnerResponse,
+  overrideSentiment,
 };
 
 export function isReviewPersistenceApi(): boolean {

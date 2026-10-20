@@ -267,6 +267,11 @@ class VerificationService {
       await this.persistRequest(request);
 
       const { emitNotificationEvent } = await import("@/lib/notifications/emit");
+      const { emitProjectFollowingEvent } = await import("@/lib/project-following/emit");
+      void emitProjectFollowingEvent(approvedBy, {
+        projectId: request.projectId,
+        type: "project_verification_changed",
+      });
       void emitNotificationEvent({
         type: "project_verified",
         recipientId: request.submittedBy,
@@ -311,6 +316,11 @@ class VerificationService {
       await this.persistRequest(request);
 
       const { emitNotificationEvent } = await import("@/lib/notifications/emit");
+      const { emitProjectFollowingEvent } = await import("@/lib/project-following/emit");
+      void emitProjectFollowingEvent(rejectedBy, {
+        projectId: request.projectId,
+        type: "project_verification_changed",
+      });
       void emitNotificationEvent({
         type: "project_rejected",
         recipientId: request.submittedBy,

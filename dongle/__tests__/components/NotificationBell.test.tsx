@@ -24,6 +24,7 @@ describe("NotificationBell", () => {
       open: false,
       setOpen: vi.fn(),
       markRead: vi.fn(),
+      markReadMany: vi.fn(),
       markAllRead: vi.fn(),
     });
   });
@@ -43,12 +44,13 @@ describe("NotificationBell", () => {
       open: true,
       setOpen,
       markRead: vi.fn(),
+      markReadMany: vi.fn(),
       markAllRead: vi.fn(),
     });
     render(<NotificationBell />);
     expect(screen.getByRole("dialog", { name: /notifications/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /settings/i })).toHaveAttribute("href", "/settings/notifications");
     expect(screen.getByText("Swap has been verified.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /mark all as read/i }));
+    fireEvent.click(screen.getByRole("button", { name: /mark filtered read/i }));
   });
 });
