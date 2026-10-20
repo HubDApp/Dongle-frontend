@@ -9,6 +9,8 @@ interface ProjectImageProps {
   logoUrl?: string;
   /** Project name – used for the alt text and letter-avatar fallback */
   name: string;
+  /** Description for screenshots; defaults to the project logo label. */
+  alt?: string;
   /** Extra Tailwind classes for the outer wrapper */
   className?: string;
   /** Text size class for the fallback letter (e.g. "text-lg" or "text-4xl") */
@@ -27,6 +29,7 @@ interface ProjectImageProps {
 export const ProjectImage = ({
   logoUrl,
   name,
+  alt = `${name} logo`,
   className = "",
   fallbackTextSize = "text-4xl",
 }: ProjectImageProps) => {
@@ -59,7 +62,7 @@ export const ProjectImage = ({
       {showImage ? (
         <Image
           src={imageUrl}
-          alt={`${name} logo`}
+          alt={alt}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 66vw, 50vw"
           className="object-contain p-2"
@@ -73,7 +76,7 @@ export const ProjectImage = ({
       ) : (
         <div
           role={logoUrl ? "img" : undefined}
-          aria-label={logoUrl ? `${name} logo unavailable` : undefined}
+          aria-label={logoUrl ? `${alt} unavailable` : undefined}
           className={`absolute inset-0 flex items-center justify-center text-zinc-300 dark:text-zinc-700 font-bold ${fallbackTextSize}`}
         >
           {logoUrl && imgError ? (
