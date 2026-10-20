@@ -18,6 +18,7 @@ import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProj
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import { cn } from "@/lib/utils";
 import {
   getHealthHistory,
@@ -243,6 +244,7 @@ function DiscoverContent() {
 
   return (
     <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <PageHeatmapRecorder page="discovery" />
       <div className="container mx-auto px-4">
         {/* Header & Controls */}
         <div className="mb-12">

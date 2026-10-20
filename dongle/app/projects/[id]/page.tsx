@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import {
   RatingDistributionSummary,
   computeRatingDistribution,
@@ -623,6 +624,7 @@ export default function ProjectDetailPage() {
 
   return (
     <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <PageHeatmapRecorder page="project_detail" />
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
           <button
