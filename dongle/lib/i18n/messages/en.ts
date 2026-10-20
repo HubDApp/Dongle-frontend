@@ -315,6 +315,7 @@ export const en = {
     open: "Open notifications",
     close: "Close notifications",
     viewProject: "View project",
+    viewUpdate: "View update",
     viewReview: "View review",
     live: "Live",
     connecting: "Connecting…",
@@ -352,9 +353,7 @@ export const en = {
     types: {
       project_verified: "Project verified",
       project_rejected: "Project rejected",
-      project_update_posted: "Project update",
-      project_verification_changed: "Verification changed",
-      project_review_posted: "New project review",
+      project_update: "Project update",
       review_approved: "Review approved",
       review_rejected: "Review rejected",
       verification_evidence_requested: "Verification evidence requested",
@@ -373,6 +372,7 @@ export const en = {
       review_approved: "Your review of {projectName} was approved.",
       review_rejected: "Your review of {projectName} was rejected.",
       verification_evidence_requested: "Additional evidence is requested for {projectName}.",
+      project_update: "{projectName} posted an update: {updateTitle}.",
       project_submitted: "Your project {projectName} has been submitted for review.",
       claim_received: "Your claim for {projectName} was submitted.",
       claim_approved: "Your claim for {projectName} was approved.",
@@ -532,7 +532,6 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
-} satisfies Record<string, unknown>;
 
   twofa: {
     title: "Two-Factor Authentication",
@@ -591,6 +590,6 @@ export const en = {
     submissionRequirementOn: "2FA required for form submissions",
     submissionRequirementOff: "2FA no longer required for form submissions",
   },
-} as const;
+} satisfies Record<string, unknown>;
 
 export type Messages = typeof en;

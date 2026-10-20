@@ -30,6 +30,8 @@ export function parseNotificationEvent(raw: unknown): ParsedNotificationEvent | 
     createdAt: record.createdAt,
     projectId: typeof record.projectId === "string" ? record.projectId : undefined,
     projectName: typeof record.projectName === "string" ? record.projectName : undefined,
+    updateId: typeof record.updateId === "string" ? record.updateId : undefined,
+    updateTitle: typeof record.updateTitle === "string" ? record.updateTitle : undefined,
     reviewId: typeof record.reviewId === "string" ? record.reviewId : undefined,
     messageKey: typeof record.messageKey === "string" ? record.messageKey : undefined,
     messageParams:

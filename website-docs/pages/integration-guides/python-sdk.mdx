@@ -1,0 +1,93 @@
+---
+title: Python SDK
+description: Install and use the dongle-api Python package.
+---
+
+# Python SDK
+
+## Installation
+
+```bash
+pip install dongle-api
+```
+
+## Quick Start
+
+```python
+from dongle_api import FormApiClient
+
+client = FormApiClient(
+    base_url="https://api.dongle.example.com",
+    api_key="YOUR_API_KEY",
+)
+
+# Create a submission
+result = client.create_submission({
+    "projectName": "My Project",
+    "category": "defi",
+    "description": "Project description",
+})
+
+# Get reviews
+reviews = client.get_reviews({
+    "projectId": "project-123",
+    "page": 1,
+    "limit": 20,
+})
+```
+
+## Context Manager
+
+```python
+with FormApiClient(base_url="...", api_key="...") as client:
+    reviews = client.get_reviews({"projectId": "soroban-swap"})
+```
+
+## Error Handling
+
+```python
+from dongle_api import FormApiError
+
+try:
+    client.create_submission(data)
+except FormApiError as e:
+    print(f"{e.status_code}: {e.message}")
+```
+
+## Batch Submissions
+
+```python
+result = client.batch_submit({
+    "mode": "individual",
+    "items": [
+        {"id": "item-1", "data": {"projectName": "Alpha", "category": "defi"}},
+        {"id": "item-2", "data": {"projectName": "Beta",  "category": "nft"}},
+    ],
+})
+print(f"Success: {result['successCount']}, Failed: {result['failureCount']}")
+```
+
+## Pagination
+
+```python
+reviews = client.get_reviews({"page": 1, "limit": 20})
+pagination = reviews["pagination"]
+
+while pagination["hasMore"]:
+    reviews = client.get_reviews({"page": pagination["page"] + 1, "limit": 20})
+    pagination = reviews["pagination"]
+```
+
+## Full API Reference
+
+See `sdks/python/README.md` in the repository.
+
+## Other SDKs
+
+| Language | Package | Docs |
+|----------|---------|------|
+| TypeScript | `@dongle/form-api-client` | [TypeScript SDK](/integration-guides/typescript-sdk) |
+| Python | `dongle-api` | This page |
+| Go | `github.com/dongle/go-sdk` | `sdks/go/README.md` |
+| Ruby | `dongle-api` gem | `sdks/ruby/README.md` |
+| Java | `com.dongle:dongle-api` | `sdks/java/README.md` |

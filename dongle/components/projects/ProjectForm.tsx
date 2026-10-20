@@ -1390,6 +1390,7 @@ export default function ProjectForm({
             Privacy Policy
           </Link>
         </p>
+        </>}
       </form>
       </div>
 

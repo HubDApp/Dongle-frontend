@@ -150,6 +150,13 @@ async function addReview(
     newReview.signatureNonce = signedPayload.nonce;
     newReview.signatureTimestamp = signedPayload.timestamp;
   }
+  // Persist E2E encryption fields (#731)
+  if (review.encrypted) {
+    newReview.encrypted = review.encrypted;
+    newReview.encryptedPayload = review.encryptedPayload;
+    newReview.encryptedCid = review.encryptedCid;
+    newReview.adminWrappedKey = review.adminWrappedKey;
+  }
   saveLocalReviews([newReview, ...reviews]);
   return { success: true, data: newReview };
 }

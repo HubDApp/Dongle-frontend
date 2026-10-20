@@ -65,6 +65,7 @@ export function publishNotificationEvent(
     read: false,
     projectId: input.projectId,
     projectName: input.projectName,
+    updateId: input.updateId,
     reviewId: input.reviewId,
   };
 

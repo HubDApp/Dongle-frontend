@@ -4,6 +4,7 @@
  */
 
 import { RepositoryMetadata } from "./repository";
+import type { BridgeConfig } from "./bridge";
 
 export const PROJECT_CATEGORIES = {
   DEFI: "DeFi / DEX",
@@ -78,6 +79,9 @@ export type ProjectStatus =
   | "flagged"
   | "removed";
 
+export type VerificationTier = "BRONZE" | "SILVER" | "GOLD";
+export const VERIFICATION_TIERS: VerificationTier[] = ["BRONZE", "SILVER", "GOLD"];
+
 export const PROJECT_STATUSES: ProjectStatus[] = [
   "active",
   "paused",
@@ -113,6 +117,11 @@ export function isProjectActive(status?: ProjectStatus): boolean {
   return getProjectStatus(status) === "active";
 }
 
+export interface ProjectImage {
+  url: string;
+  caption?: string;
+}
+
 /**
  * Canonical Project interface.
  * Use `primaryCategory` everywhere — it holds the display-label form of the
@@ -124,6 +133,7 @@ export interface Project {
   primaryCategory: ProjectCategory;
   /** Lifecycle state; defaults to "active" when omitted. */
   status?: ProjectStatus;
+  verificationTier?: VerificationTier;
   tags?: string[];
   description: string;
   rating: number;
@@ -132,6 +142,8 @@ export interface Project {
   websiteUrl?: string;
   githubUrl?: string;
   logoUrl?: string;
+  /** Optional project screenshots; the Soroban registry currently stores only logoUrl. */
+  images?: ProjectImage[];
   docsUrl?: string;
   auditReportUrl?: string;
   bugBountyUrl?: string;
@@ -144,6 +156,11 @@ export interface Project {
    * followed by 55 base-32 characters (A-Z, 2-7), total length 56.
    */
   contractAddresses?: string[];
+  /**
+   * Optional cross-chain bridge information (Issue #726). Only present for
+   * projects that expose bridge routes between chains.
+   */
+  bridge?: BridgeConfig;
 }
 
 export type ClaimProofType = "website" | "repository" | "admin_review";

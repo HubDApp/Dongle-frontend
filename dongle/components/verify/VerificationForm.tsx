@@ -28,6 +28,7 @@ const verificationSchema = z.object({
   projectId: z
     .string()
     .min(3, "Project ID or Domain must be at least 3 characters"),
+  tier: z.enum(["BRONZE", "SILVER", "GOLD"]),
 });
 
 type VerificationFormValues = z.infer<typeof verificationSchema>;
@@ -50,6 +51,7 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
     resolver: zodResolver(verificationSchema),
     defaultValues: {
       projectId: "",
+      tier: "BRONZE",
     },
   });
   const projectId = useWatch({ control, name: "projectId" });
@@ -92,7 +94,7 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
       });
     }
 
-    const promise = sorobanService.requestVerification(data.projectId, data.projectId);
+    const promise = sorobanService.requestVerification(data.projectId, data.projectId, data.tier);
 
     toast.promise(promise, {
       loading: "Submitting verification request...",
@@ -116,8 +118,7 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
         trackFormSubmitError({ formType: "verification", fieldCount: 1, errorCode: err instanceof Error ? err.name || "Error" : "unknown" });
         return `Request failed: ${err.message}`;
       },
-      { hasErrors }
-    )(data).catch(() => {
+    }).catch(() => {
       setIsSubmitting(false);
     });
   };
@@ -202,6 +203,21 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
           }}
           error={errors.projectId?.message}
         />
+
+        <div>
+          <label htmlFor="verification-tier" className="mb-2 block text-sm font-medium">
+            Verification tier
+          </label>
+          <select
+            id="verification-tier"
+            {...register("tier")}
+            className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <option value="BRONZE">Bronze: basic contract verification (1x base fee)</option>
+            <option value="SILVER">Silver: third-party audit (2x base fee)</option>
+            <option value="GOLD">Gold: multiple audits, KYC, and GitHub verification (3x base fee)</option>
+          </select>
+        </div>
 
         <GDPRConsent
           formType="verification"

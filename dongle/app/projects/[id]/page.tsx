@@ -6,6 +6,9 @@ import {
   useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
 import { projectStatusService } from "@/services/project/project-status.service";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Badge } from "@/components/ui/Badge";
@@ -14,12 +17,15 @@ import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import {
   RatingDistributionSummary,
   computeRatingDistribution,
 } from "@/components/reviews/RatingDistributionSummary";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
+import { ProjectHealthPanel } from "@/components/projects/ProjectHealthPanel";
+import { getProjectHealth } from "@/lib/project-health";
 import { Review,
   ReviewReport,
   ReviewReportReason } from "@/types/review";
@@ -65,8 +71,7 @@ import { useWatchlist } from "@/hooks/useWatchlist";
 import { useProjectFollowing } from "@/hooks/useProjectFollowing";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";
-import { abbreviateStellarAddress } from "@/lib/stellar-address";
-import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { projectService } from "@/services/project/project.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -215,6 +220,19 @@ export default function ProjectDetailPage() {
   }, [reviews, project?.rating]);
 
   const actualReviewCount = reviews.length || project?.reviews || 0;
+
+  const health = React.useMemo(
+    () =>
+      project
+        ? getProjectHealth(project, {
+            verificationStatus,
+            updates,
+            rating: actualRating,
+            reviewCount: actualReviewCount,
+          })
+        : null,
+    [project, verificationStatus, updates, actualRating, actualReviewCount],
+  );
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isOnList = project ? isOnWatchlist(project.id) : false;
@@ -641,6 +659,7 @@ export default function ProjectDetailPage() {
 
   return (
     <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <PageHeatmapRecorder page="project_detail" />
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
           <button
@@ -688,7 +707,7 @@ export default function ProjectDetailPage() {
                       </Badge>
                       <ProjectLifecycleStatusBadge status={project.status} />
                       {verificationStatus && (
-                        <VerificationBadge status={verificationStatus} />
+                        <VerificationBadge status={verificationStatus} tier={project.verificationTier} />
                       )}
                     </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>
@@ -1016,6 +1035,9 @@ export default function ProjectDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Project Health */}
+              {health && <ProjectHealthPanel projectId={project.id} health={health} />}
+
               {/* Verification Status */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -1174,9 +1196,11 @@ export default function ProjectDetailPage() {
               {project.ownerAddress && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                   <h3 className="text-lg font-bold mb-4">Owner</h3>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono break-all">
-                    {abbreviateStellarAddress(project.ownerAddress)}
-                  </p>
+                  <SnsAddressDisplay
+                    address={project.ownerAddress}
+                    truncated={false}
+                    className="text-sm break-all"
+                  />
                 </div>
               )}
 
@@ -1184,6 +1208,9 @@ export default function ProjectDetailPage() {
               {project.contractAddresses && project.contractAddresses.length > 0 && (
                 <ContractAddressList addresses={project.contractAddresses} />
               )}
+
+              {/* Bridge Information (Issue #726) */}
+              <BridgeInfoCard bridge={project.bridge} />
             </div>
           </div>
         </div>

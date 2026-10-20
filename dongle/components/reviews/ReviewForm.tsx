@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useId, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { useFormAuditLog } from "@/hooks/useFormAuditLog";
-import { X, Star } from "lucide-react";
+import { X, Star, Lock, ShieldAlert } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
@@ -15,6 +16,16 @@ import { reviewFormSchema, type ReviewFormData } from "@/lib/schemas/review.sche
 import { useFormConversion } from "@/hooks/useFormConversion";
 import { useFormCaptcha } from "@/hooks/useFormCaptcha";
 import { FormCaptcha } from "@/components/forms/FormCaptcha";
+import { FormAnnouncerProvider, useFormAnnouncer } from "@/components/ui/FormAnnouncer";
+import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
+import { useFormAnalytics } from "@/hooks/useFormAnalytics";
+import { useReviewDraft } from "@/hooks/useReviewDraft";
+import {
+  deriveKeyFromWallet,
+  encryptReview,
+  wrapKeyForAdmin,
+  ENCRYPTED_COMMENT_SENTINEL,
+} from "@/lib/review-encryption";
 
 interface ReviewFormProps {
   projectId: string;
@@ -28,21 +39,25 @@ interface ReviewFormProps {
       Review,
       "id" | "createdAt" | "userAddress" | "projectId" | "projectName"
     > & { captchaToken?: string },
-  ) => void;
+  ) => void | Promise<void>;
   onCancel: () => void;
 }
 
-export default function ReviewForm({
+function ReviewFormInner({
   projectId,
   projectName,
   userAddress,
   initialReview,
+  dailyReviewCount,
+  requiresCaptcha,
   onSubmit,
   onCancel,
 }: ReviewFormProps) {
   const ratingLabelId = useId();
   const ratingGroupId = useId();
+  const encryptCheckboxId = useId();
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [encryptError, setEncryptError] = useState<string | null>(null);
 
   const conversion = useFormConversion({
     formId: `review-form-${projectId}`,
@@ -79,6 +94,18 @@ export default function ReviewForm({
 
   const rating = watch("rating");
   const comment = watch("comment");
+  const encrypt = watch("encrypt");
+  const { draft, saveDraft, clearDraft, dismissRecovery } = useReviewDraft(
+    projectId,
+    userAddress,
+    !initialReview,
+  );
+
+  useEffect(() => {
+    if (!isDirty || initialReview) return;
+    const timer = window.setTimeout(() => saveDraft({ rating, comment }), 3000);
+    return () => window.clearTimeout(timer);
+  }, [comment, initialReview, isDirty, rating, saveDraft]);
 
   // Form audit logging — records field changes with a timestamp, the acting
   // review author, and the server-stamped client IP.
@@ -95,6 +122,7 @@ export default function ReviewForm({
   const onSubmitForm = async (data: ReviewFormData) => {
     conversion.trackSubmitAttempt();
     setCaptchaError(null);
+    setEncryptError(null);
 
     let captchaToken: string | undefined;
     if (requiresCaptcha) {
@@ -109,12 +137,38 @@ export default function ReviewForm({
     }
 
     try {
-      onSubmit({
-        ...data,
+      let submissionComment = data.comment;
+      let encryptedPayload: string | undefined;
+      let adminWrappedKey: string | undefined;
+
+      if (data.encrypt) {
+        // Derive key from wallet — this will prompt the user to sign in Freighter.
+        const key = await deriveKeyFromWallet(userAddress, projectId);
+        encryptedPayload = await encryptReview(data.comment, key);
+        // Replace comment with sentinel so the plaintext is never stored.
+        submissionComment = ENCRYPTED_COMMENT_SENTINEL;
+        // Attempt to wrap key for admin decryption (no-op until master key is configured).
+        adminWrappedKey = (await wrapKeyForAdmin(key)) ?? undefined;
+      }
+
+      await onSubmit({
+        rating: data.rating,
+        comment: submissionComment,
         captchaToken,
+        ...(data.encrypt && {
+          encrypted: true,
+          encryptedPayload,
+          adminWrappedKey,
+        }),
       });
+      clearDraft();
       conversion.trackSuccess({ project_id: projectId });
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Submission failed";
+      // Surface encryption-specific errors distinctly.
+      if (data.encrypt && msg.toLowerCase().includes("sign")) {
+        setEncryptError("Wallet signature required to encrypt — please approve the request in Freighter.");
+      }
       conversion.trackFailure("submit_error");
     }
   };
@@ -150,14 +204,39 @@ export default function ReviewForm({
             size="sm"
           >
             <X className="w-5 h-5" />
+          </IconButton>
+        </div>
 
         <FormTimeEstimate
           fieldCount={2}
           completedFields={Number(Boolean(rating)) + Number(comment.trim().length > 0)}
           secondsPerField={45}
         />
-          </IconButton>
-        </div>
+
+        {!initialReview && draft ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950/30">
+            <p>A saved review draft is available.</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="font-medium text-blue-700 hover:underline dark:text-blue-300"
+                onClick={() => {
+                  reset(draft.data);
+                  dismissRecovery();
+                }}
+              >
+                Recover draft
+              </button>
+              <button
+                type="button"
+                className="text-zinc-600 hover:underline dark:text-zinc-300"
+                onClick={clearDraft}
+              >
+                Discard draft
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Error summary — shown at the top whenever validation fails */}
         <FormErrorSummary
@@ -253,6 +332,52 @@ export default function ReviewForm({
           </div>
         </div>
 
+        {/* Encryption opt-in (#731) — only available for new reviews */}
+        {!initialReview && (
+          <div className="space-y-3">
+            <label
+              htmlFor={encryptCheckboxId}
+              className="flex items-center gap-3 cursor-pointer select-none"
+            >
+              <div className="relative flex items-center">
+                <input
+                  id={encryptCheckboxId}
+                  type="checkbox"
+                  {...register("encrypt")}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-6 rounded-full bg-zinc-200 dark:bg-zinc-700 peer-checked:bg-indigo-600 transition-colors" />
+                <div className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white shadow transition-transform peer-checked:translate-x-4" />
+              </div>
+              <span className="flex items-center gap-1.5 text-sm font-medium">
+                <Lock className="w-4 h-4 text-indigo-500" aria-hidden="true" />
+                Encrypt this review
+              </span>
+            </label>
+
+            {encrypt && (
+              <div
+                role="note"
+                aria-live="polite"
+                className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800 dark:bg-amber-950/30"
+              >
+                <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                <div className="space-y-1 text-amber-800 dark:text-amber-300">
+                  <p className="font-semibold">Encrypted reviews are not searchable.</p>
+                  <p>Your review will be encrypted with a key derived from your wallet. Only you (by reconnecting your wallet) and platform admins can read it. The encrypted content is stored on-chain; if you lose access to this wallet the review cannot be recovered.</p>
+                  <p>Submitting will ask Freighter to sign a key-derivation message — no funds are moved.</p>
+                </div>
+              </div>
+            )}
+
+            {encryptError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {encryptError}
+              </p>
+            )}
+          </div>
+        )}
+
         {requiresCaptcha && (
           <FormCaptcha
             mode={captcha.mode}
@@ -280,10 +405,10 @@ export default function ReviewForm({
             className="flex-1 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
             {isSubmitting
-              ? "Submitting..."
+              ? (encrypt ? "Encrypting & submitting..." : "Submitting...")
               : initialReview
                 ? "Update Review"
-                : "Post Review"}
+                : (encrypt ? "Encrypt & Post Review" : "Post Review")}
           </button>
         </div>
       </form>

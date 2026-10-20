@@ -18,6 +18,7 @@ export const REALTIME_NOTIFICATION_TYPES = [
   "submission_mention",
   "submission_shared",
   "submission_team_change",
+  "project_update",
 ] as const;
 
 export const LEGACY_NOTIFICATION_TYPES = [
@@ -54,6 +55,8 @@ export interface AppNotification {
   claimRequestId?: string;
   projectId?: string;
   projectName?: string;
+  updateId?: string;
+  updateTitle?: string;
   reviewId?: string;
   /** Provider event id used for deduplication when present. */
   eventId?: string;
@@ -67,6 +70,8 @@ export interface CreateNotificationParams {
   claimRequestId?: string;
   projectId?: string;
   projectName?: string;
+  updateId?: string;
+  updateTitle?: string;
   reviewId?: string;
   eventId?: string;
   id?: string;

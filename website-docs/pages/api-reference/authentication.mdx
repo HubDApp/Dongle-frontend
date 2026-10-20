@@ -1,0 +1,98 @@
+---
+title: Authentication
+description: Wallet address authentication, admin JWT tokens, and OAuth sessions.
+---
+
+import { Callout } from "nextra/components";
+
+# Authentication
+
+Dongle has three authentication mechanisms:
+
+| Mechanism | Who uses it | Write access |
+|-----------|-------------|--------------|
+| Wallet address | Regular users | ✓ |
+| Admin JWT | Allowlisted admin wallets | ✓ (admin routes) |
+| OAuth session | Google / GitHub users | Read-only |
+
+## Wallet Address Authentication
+
+Most write operations authenticate by verifying that the `userAddress` in the request body is a valid Stellar G-address. Full cryptographic signature verification is planned for production.
+
+```json
+{
+  "userAddress": "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+  "rating": 5,
+  "comment": "Great project!"
+}
+```
+
+**Validation rules:**
+- Must start with `G`
+- Must be exactly 56 characters
+- Must be valid Stellar StrKey base32 checksum
+
+## Admin JWT Authentication
+
+Admin endpoints require a Bearer token issued by `POST /api/admin/auth`.
+
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Obtaining a token
+
+```bash
+curl -X POST http://localhost:3000/api/admin/auth \
+  -H "Content-Type: application/json" \
+  -d '{
+    "walletAddress": "GA5WBPYA5Y4WAHXBCJNLQ66VCUCUHM65EPOREO6X22NHBZXGIHED56Y7",
+    "signature": "<freighter-signature>",
+    "message": "Dongle admin authentication"
+  }'
+```
+
+The wallet address must appear in `NEXT_PUBLIC_ADMIN_ALLOWLIST`. Tokens expire after **24 hours** and can be refreshed via `POST /api/admin/refresh`.
+
+<Callout type="warning">
+  If `NEXT_PUBLIC_ADMIN_ALLOWLIST` is empty, no admin UI or admin routes are accessible.
+</Callout>
+
+## OAuth Authentication
+
+OAuth provides read-only identity for browsing. Publishing requires Freighter.
+
+**Supported providers:** Google, GitHub
+
+**Flow:**
+
+```
+GET /api/auth/oauth/{google|github}
+  → Sets httpOnly CSRF state cookie
+  → Redirects to provider
+  → Provider redirects back to /api/auth/oauth/{provider}/callback
+  → Server validates state, exchanges code
+  → Sets dongle_oauth_session JWT cookie
+```
+
+**Account linking** — link a wallet to an OAuth identity:
+
+```http
+POST /api/auth/link-wallet
+```
+
+Identities are scoped as `oauth:{provider}:{providerId}`. Emails are not merged across providers.
+
+## Session Management
+
+| Session type | Cookie | Scope |
+|---|---|---|
+| Admin | `Authorization` header JWT | 24h, server-side |
+| OAuth | `dongle_oauth_session` httpOnly cookie | Browser session |
+| Wallet | `dongle_wallet_state` in localStorage | Persists across tabs |
+
+Logout:
+
+```http
+POST /api/auth/logout
+```

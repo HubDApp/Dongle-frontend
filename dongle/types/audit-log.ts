@@ -24,7 +24,13 @@ export type AuditAction =
   | "claim_submitted"
   | "claim_approved"
   | "claim_rejected"
-  | "ownership_transferred";
+  | "ownership_transferred"
+  | "admin_2fa_enabled"
+  | "admin_2fa_disabled"
+  | "admin_2fa_verified"
+  | "admin_2fa_recovery_used"
+  | "admin_2fa_method_added"
+  | "admin_2fa_method_removed";
 
 /** Human-readable labels for each action. */
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
@@ -46,6 +52,12 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   claim_approved: "Claim Approved",
   claim_rejected: "Claim Rejected",
   ownership_transferred: "Ownership Transferred",
+  admin_2fa_enabled: "Admin 2FA Enabled",
+  admin_2fa_disabled: "Admin 2FA Disabled",
+  admin_2fa_verified: "Admin 2FA Verified",
+  admin_2fa_recovery_used: "Admin 2FA Recovery Used",
+  admin_2fa_method_added: "Admin 2FA Method Added",
+  admin_2fa_method_removed: "Admin 2FA Method Removed",
 };
 
 /**

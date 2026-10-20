@@ -53,6 +53,7 @@ function translateEvent(
   const messageKey = `notifications.messages.${type}` as const;
   const params = {
     projectName: event.projectName ?? event.projectId ?? "",
+    updateTitle: event.updateTitle ?? "",
     ...(event.messageParams ?? {}),
   };
   return {
@@ -140,6 +141,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             read: false,
             projectId: event.projectId,
             projectName: event.projectName,
+            updateId: event.updateId,
             reviewId: event.reviewId,
           };
           notificationService.upsert(notification);

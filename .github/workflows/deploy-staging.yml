@@ -1,0 +1,109 @@
+name: Deploy – Staging
+
+# Automatically deploys to the Vercel staging environment on every push to main
+# (i.e. after a PR is merged). Smoke-tests the deployment before marking it
+# successful so a broken staging deploy is immediately visible.
+#
+# Required secrets (same as deploy-preview.yml):
+#   VERCEL_TOKEN
+#   VERCEL_ORG_ID
+#   VERCEL_PROJECT_ID
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "dongle/**"
+      - ".github/workflows/deploy-staging.yml"
+
+concurrency:
+  # Only one staging deploy at a time; new pushes to main cancel the previous
+  # in-progress run.
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    outputs:
+      staging-url: ${{ steps.deploy.outputs.staging-url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Staging uses the "preview" Vercel environment so it inherits staging
+      # env vars (DATABASE_URL, API keys, etc.) configured in the Vercel dashboard.
+      - name: Pull Vercel environment (staging/preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build via Vercel
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Vercel (staging)
+        id: deploy
+        run: |
+          STAGING_URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          echo "staging-url=${STAGING_URL}" >> "$GITHUB_OUTPUT"
+          echo "Staging URL: ${STAGING_URL}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Write staging URL to summary
+        run: |
+          echo "### Staging Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Deployed to **${{ steps.deploy.outputs.staging-url }}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Triggered by commit \`${{ github.sha }}\` pushed by @${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+
+  # Smoke-test the fresh staging deployment before the job chain completes.
+  smoke-test-staging:
+    name: Smoke-test staging
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./dongle
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+
+      - name: Run staging smoke tests
+        env:
+          PREVIEW_URL: ${{ needs.deploy-staging.outputs.staging-url }}
+        run: node scripts/preview-smoke.js

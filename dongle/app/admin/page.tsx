@@ -1,3 +1,4 @@
+import type { VerificationTier } from "@/types/project";
 "use client";
 import {
   ProjectReport,
@@ -62,6 +63,7 @@ import EnrichmentDetailsModal from "@/components/admin/EnrichmentDetailsModal";
 import SegmentationDashboard from "@/components/admin/SegmentationDashboard";
 import SegmentFilter from "@/components/admin/SegmentFilter";
 import ExperimentAnalyticsView from "@/components/admin/ExperimentAnalyticsView";
+import MLInsightsPanel from "@/components/admin/MLInsightsPanel";
 import { findDuplicates } from "@/services/form-deduplication";
 import { enrichFormData, type FormEnrichmentResult } from "@/services/form-enrichment";
 import {
@@ -189,6 +191,7 @@ export default function AdminDashboard() {
     | "merges"
     | "segments"
     | "experiments"
+    | "ml-insights"
   >("verification");
 
   // Segmentation state
@@ -822,12 +825,19 @@ export default function AdminDashboard() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
-        <header className="mb-12">
+        <header className="mb-6">
           <h1 className="text-4xl font-black mb-2 tracking-tight">ADMIN DASHBOARD</h1>
           <p className="text-zinc-500 dark:text-zinc-400">
             Manage ecosystem verification, review reports, and system parameters.
           </p>
         </header>
+
+        <nav aria-label="Admin sections" className="flex flex-wrap gap-2 mb-8">
+          <a href="/admin/reports" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Reports</a>
+          <a href="/admin/audit-logs" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Audit Logs</a>
+          <a href="/admin/batch" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Batch Ops</a>
+          <a href="/admin/settings/notifications" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Notifications</a>
+        </nav>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-4 mb-8 border-b border-zinc-200 dark:border-zinc-800">
@@ -971,6 +981,20 @@ export default function AdminDashboard() {
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
+          <button
+            onClick={() => setActiveTab("ml-insights")}
+            className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
+              activeTab === "ml-insights"
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            ML Insights
+            {activeTab === "ml-insights" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
+            )}
+          </button>
         </div>
 
         {activeTab === "verification" && (
@@ -1043,6 +1067,30 @@ export default function AdminDashboard() {
                         >
                           {req.status}
                         </span>
+                        {req.status === "VERIFIED" ? (
+                          <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                            Tier
+                            <select
+                              aria-label={`Verification tier for ${req.projectName}`}
+                              value={req.tier ?? "BRONZE"}
+                              onChange={async (event) => {
+                                try {
+                                  const tier = event.target.value as VerificationTier;
+                                  await verificationService.setTier(req.projectId, tier, gate.publicKey!);
+                                  await reloadVerificationRequests();
+                                  toast.success(`${req.projectName} set to ${tier.toLowerCase()}`);
+                                } catch {
+                                  toast.error("Could not update verification tier");
+                                }
+                              }}
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
+                            >
+                              <option value="BRONZE">Bronze</option>
+                              <option value="SILVER">Silver</option>
+                              <option value="GOLD">Gold</option>
+                            </select>
+                          </label>
+                        ) : null}
                         {req.assignedTo && (
                           <span className="text-[10px] uppercase font-bold px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-500">
                             Assigned to <AddressDisplay address={req.assignedTo} copyable={false} truncated={true} inline={true} />
@@ -1425,8 +1473,7 @@ export default function AdminDashboard() {
                                       submission.projectId,
                                       "flagged",
                                       submissionReason[submission.projectId],
-                                    )
-                                  }
+                                    )}
                                   className="flex-1 px-3 py-2 bg-orange-500/10 text-orange-600 hover:bg-orange-500 hover:text-white rounded-xl text-sm font-bold"
                                 >
                                   Flag
@@ -1437,7 +1484,6 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     </div>
-                  </div>
                     );
                   })}
               </div>
@@ -2267,6 +2313,8 @@ export default function AdminDashboard() {
         {activeTab === "experiments" && (
           <ExperimentAnalyticsView />
         )}
+
+        {activeTab === "ml-insights" && <MLInsightsPanel />}
       </div>
 
       {/* Duplicate Merge Conflict Resolution Modal */}

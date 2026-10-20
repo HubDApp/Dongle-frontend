@@ -1,0 +1,82 @@
+---
+title: API Overview
+description: Base URLs, response format, and conventions for the Dongle API.
+---
+
+import { Callout } from "nextra/components";
+
+# API Overview
+
+The Dongle API provides RESTful and GraphQL endpoints for managing project reviews, verification requests, user data, webhooks, and batch operations. All endpoints accept and return JSON.
+
+## Base URLs
+
+| Environment | URL |
+|-------------|-----|
+| Development | `http://localhost:3000` |
+| Production | `https://dongle.app` |
+
+## Response Format
+
+All endpoints return a consistent JSON envelope:
+
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+Errors always set `success: false`:
+
+```json
+{
+  "success": false,
+  "error": "Human-readable message",
+  "errors": [
+    { "field": "rating", "message": "Must be between 1 and 5" }
+  ]
+}
+```
+
+## HTTP Status Codes
+
+| Code | Meaning |
+|------|---------|
+| `200 OK` | Successful GET / PUT / DELETE |
+| `201 Created` | Successful POST |
+| `400 Bad Request` | Validation error or malformed JSON |
+| `401 Unauthorized` | Missing or invalid auth token |
+| `403 Forbidden` | Insufficient permissions |
+| `404 Not Found` | Resource does not exist |
+| `409 Conflict` | Duplicate resource (e.g. review already exists) |
+| `429 Too Many Requests` | Rate limit exceeded |
+| `500 Internal Server Error` | Unexpected server error |
+
+## Endpoint Categories
+
+| Category | Base Path | Description |
+|----------|-----------|-------------|
+| Reviews | `/api/reviews` | Project ratings and reviews |
+| Admin | `/api/admin` | Admin authentication and management |
+| Drafts | `/api/drafts` | Project draft persistence |
+| Batch | `/api/batch` | Bulk form submission |
+| Webhooks | `/api/form-webhooks` | Outbound webhook dispatch and retry |
+| Analytics | `/api/analytics` | Usage metrics and dashboards |
+| Events | `/api/events` | Server-Sent Events and Kafka bridge |
+| Notifications | `/api/notifications` | SSE notification stream |
+| Auth | `/api/auth` | OAuth and wallet linking |
+| Anomaly Detection | `/api/anomaly-detection` | Fraud and bot detection |
+
+## OpenAPI Spec
+
+A machine-readable OpenAPI 3.0 spec is auto-generated at runtime:
+
+```bash
+curl http://localhost:3000/api/openapi | jq
+```
+
+Import into Postman:
+1. Download the spec: `curl http://localhost:3000/api/openapi > dongle-api.json`
+2. Postman → Import → Upload `dongle-api.json`
+3. Set environment variables: `baseUrl`, `userAddress`, `adminToken`

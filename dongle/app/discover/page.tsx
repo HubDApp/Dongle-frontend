@@ -11,17 +11,28 @@ import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
 import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import type { VerificationTier } from "@/types/project";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRecentViews } from "@/hooks/useRecentViews";
 import { RecentlyViewedProjects } from "@/components/projects/RecentlyViewedProjects";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import { cn } from "@/lib/utils";
+import {
+  getHealthHistory,
+  getHealthTrend,
+  getProjectHealth,
+  recordHealthSnapshots,
+  type ProjectHealth,
+} from "@/lib/project-health";
 import projectService from "@/services/project/project.service";
 import { Spinner } from "@/components/ui/Spinner";
 
 const ITEMS_PER_PAGE = 9;
+
+type HealthFilter = "ALL" | "80" | "60" | "40" | "BELOW_40";
 
 // ─── Inner component (uses useSearchParams via useDiscoverParams) ──────────────
 
@@ -30,7 +41,10 @@ function DiscoverContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
+  const [verificationTierFilter, setVerificationTierFilter] = useState<VerificationTier | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>("ALL");
+  const [healthTrends, setHealthTrends] = useState<Record<string, number | null>>({});
   const gate = useWalletPageGate();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
@@ -78,6 +92,27 @@ function DiscoverContent() {
 
   const categories = projectService.getCategories();
 
+  const healthById = useMemo(() => {
+    const map: Record<string, ProjectHealth> = {};
+    for (const p of projectService.getDiscoverableProjects()) {
+      map[p.id] = getProjectHealth(p, { verificationStatus: verificationStatuses[p.id] });
+    }
+    return map;
+  }, [verificationStatuses]);
+
+  // Record this week's health snapshot for every project once verification
+  // statuses have loaded, then derive week-over-week trends for the badges.
+  useEffect(() => {
+    if (isInitialLoading) return;
+    const scores = Object.fromEntries(
+      Object.entries(healthById).map(([id, h]) => [id, h.score]),
+    );
+    recordHealthSnapshots(scores);
+    setHealthTrends(
+      Object.fromEntries(Object.keys(scores).map((id) => [id, getHealthTrend(getHealthHistory(id))])),
+    );
+  }, [healthById, isInitialLoading]);
+
   const filteredAndSortedProjects = useMemo(() => {
     let result = searchQuery
       ? projectService.searchProjects(searchQuery)
@@ -95,13 +130,27 @@ function DiscoverContent() {
       result = result.filter((p) => verificationStatuses[p.id] === verificationFilter);
     }
 
+    if (verificationTierFilter !== "ALL") {
+      result = result.filter((p) => p.verificationTier === verificationTierFilter);
+    }
+
     if (statusFilter !== "ALL") {
       result = result.filter((p) => (p.status ?? "active") === statusFilter);
     }
 
-    result = projectService.sortProjects(result, sortBy);
+    if (healthFilter !== "ALL") {
+      result = result.filter((p) => {
+        const score = healthById[p.id]?.score ?? 0;
+        return healthFilter === "BELOW_40" ? score < 40 : score >= Number(healthFilter);
+      });
+    }
+
+    result =
+      sortBy === "health"
+        ? [...result].sort((a, b) => (healthById[b.id]?.score ?? 0) - (healthById[a.id]?.score ?? 0))
+        : projectService.sortProjects(result, sortBy);
     return result;
-  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationStatuses]);
+  }, [searchQuery, selectedCategories, tags, sortBy, verificationFilter, verificationTierFilter, verificationStatuses, healthFilter, healthById]);
 
   const filteredCount = filteredAndSortedProjects.length;
   const visibleCount = page * ITEMS_PER_PAGE;
@@ -163,6 +212,11 @@ function DiscoverContent() {
     });
   };
 
+  const handleHealthFilterChange = (value: HealthFilter) => {
+    setHealthFilter(value);
+    trackFilter({ filterType: "health", filterValue: value, source: "discover" });
+  };
+
   const handleTagsChange = (nextTags: string[]) => {
     setTags(nextTags);
     trackFilter({
@@ -184,10 +238,13 @@ function DiscoverContent() {
     clearFilters();
     setStatusFilter("ALL");
     setVerificationFilter("ALL");
+    setVerificationTierFilter("ALL");
+    setHealthFilter("ALL");
   };
 
   return (
     <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <PageHeatmapRecorder page="discovery" />
       <div className="container mx-auto px-4">
         {/* Header & Controls */}
         <div className="mb-12">
@@ -269,6 +326,18 @@ function DiscoverContent() {
                 ))}
               </select>
 
+              <select
+                value={verificationTierFilter}
+                onChange={(event) => setVerificationTierFilter(event.target.value as VerificationTier | "ALL")}
+                aria-label="Filter by verification tier"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="ALL">All tiers</option>
+                <option value="BRONZE">Bronze</option>
+                <option value="SILVER">Silver</option>
+                <option value="GOLD">Gold</option>
+              </select>
+
               <div className="h-8 w-px bg-zinc-200 dark:bg-zinc-800 hidden lg:block mx-2" />
 
               {/* Verification Filter */}
@@ -289,6 +358,21 @@ function DiscoverContent() {
                 <option value="REJECTED">Rejected</option>
               </select>
 
+              {/* Health Filter */}
+              <select
+                value={healthFilter}
+                onChange={(e) => handleHealthFilterChange(e.target.value as HealthFilter)}
+                disabled={isInitialLoading}
+                aria-label="Filter by health score"
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-transparent rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="ALL">Any health</option>
+                <option value="80">Excellent (80+)</option>
+                <option value="60">Good or better (60+)</option>
+                <option value="40">Fair or better (40+)</option>
+                <option value="BELOW_40">Poor (&lt;40)</option>
+              </select>
+
               {/* Sort */}
               <select
                 value={sortBy}
@@ -299,6 +383,7 @@ function DiscoverContent() {
                 <option value="rating">Highest Rated</option>
                 <option value="popular">Most Popular</option>
                 <option value="newest">Newest</option>
+                <option value="health">Healthiest</option>
               </select>
             </div>
           </div>
@@ -402,6 +487,8 @@ function DiscoverContent() {
                 project={project}
                 verificationStatus={verificationStatuses[project.id]}
                 highlightTerm={searchQuery}
+                health={healthById[project.id]}
+                healthTrend={healthTrends[project.id]}
               />
             ))}
           </div>
@@ -437,101 +524,6 @@ function DiscoverContent() {
     </main>
   );
 }
-           </div>
-         </div>
-
-         {/* Recently Viewed - Show above main content */}
-         {hasHistory && (
-           <div className="mb-8">
-             <RecentlyViewedProjects
-               projects={recentProjects.slice(0, 5)}
-               compact
-               onClear={async () => {
-                 const ok = await confirm({
-                   title: "Clear viewing history",
-                   description: "This will permanently remove your recently viewed projects. This action cannot be undone.",
-                   confirmLabel: "Clear History",
-                   cancelLabel: "Cancel",
-                   variant: "danger",
-                 });
-                 if (ok) clearHistory();
-               }}
-             />
-           </div>
-         )}
-
-         {/* Result count */}
-         {(filteredCount > 0 || isFetchingStatuses) && (
-           <div className="flex items-center justify-between mb-6">
-             <div className="text-sm text-zinc-500 dark:text-zinc-400">
-               <span className="font-semibold text-zinc-900 dark:text-zinc-100">
-                 {filteredCount}
-               </span>{" "}
-               project{filteredCount === 1 ? "" : "s"} found
-               {(searchQuery || selectedCategories.length > 0 || tags.length > 0) && (
-                 <span className="text-zinc-400 dark:text-zinc-500">
-                   {" "}
-                   matching your filters
-                 </span>
-               )}
-             </div>
-             {(selectedCategories.length > 0 || tags.length > 0 || searchQuery) && (
-               <Button
-                 variant="ghost"
-                 size="sm"
-                 onClick={clearFilters}
-                 className="text-sm"
-               >
-                 Reset all
-               </Button>
-             )}
-           </div>
-         )}
-
-         {/* Projects grid */}
-         {filteredCount > 0 ? (
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {visibleProjects.map((project) => (
-               <LazyProjectCard
-                 key={project.id}
-                 project={project}
-                 verificationStatus={verificationStatuses[project.id]}
-                 highlightTerm={searchQuery}
-               />
-             ))}
-           </div>
-         ) : (
-           <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
-             <Filter className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-             <h3 className="text-xl font-bold mb-2">No projects found</h3>
-             <p className="text-zinc-500">
-               Try adjusting your search or filters to find what you&apos;re
-               looking for.
-             </p>
-             <Button variant="outline" className="mt-6" onClick={clearFilters}>
-               Clear Filters
-             </Button>
-           </div>
-         )}
-
-         {/* Load More */}
-         {!isLoadingMore && hasMore && visibleProjects.length > 0 && (
-           <div className="flex justify-center mt-10">
-             <Button
-               variant="secondary"
-               size="lg"
-               onClick={handleLoadMore}
-               isLoading={isLoadingMore}
-               className="w-full sm:w-auto min-w-50"
-             >
-               {!isLoadingMore && "Load More Projects"}
-             </Button>
-           </div>
-         )}
-       </div>
-     </main>
-   );
- }
 
 // ─── Page export — Suspense boundary required by useSearchParams ───────────────
 

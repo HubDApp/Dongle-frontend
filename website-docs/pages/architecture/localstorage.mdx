@@ -1,0 +1,73 @@
+---
+title: "ADR 0004: localStorage"
+description: Why Dongle uses localStorage for client-owned MVP state instead of a backend or Redux Persist.
+---
+
+# ADR 0004: localStorage for Client-Owned MVP State
+
+| | |
+|---|---|
+| **Status** | Accepted |
+| **Date** | 2026-08-26 |
+
+## Context
+
+Several features need to survive a page refresh **before** the matching contract or API is the system of record:
+
+- Wallet session restore (`dongle_wallet_state`)
+- Review drafts and submitted reviews in development (`dongle_reviews`)
+- Project form autosave (`dongle_project_drafts`)
+- Saved projects (per wallet) and recently viewed projects
+- Discover filter snapshot (`sessionStorage`: `dongle_project_filters`)
+
+A backend would give cross-device sync but would also duplicate the future contract state. Cookies don't map well to Freighter-based auth. IndexedDB is better for large binary data which is not stored locally.
+
+## Decision
+
+Use **`localStorage` (and `sessionStorage` for ephemeral UI)** as the persistence layer, behind services — never from components calling `localStorage` ad hoc.
+
+| Key | Owner | Persists tab close | Wallet-scoped |
+|-----|-------|-------------------|---------------|
+| `dongle_wallet_state` | `WalletProvider` | Yes | Current key |
+| `dongle_reviews` | `review.service` | Yes | Address in record |
+| `dongle_project_drafts` | `draft.service` | Yes | No (device drafts) |
+| `dongle_saved_projects:{G…}` | `useSavedProjects` | Yes | Yes |
+| `dongle_recent_views` | `recent-views.service` | Yes | Optional |
+| `dongle_project_filters` | `useProjectFilters` | **No** (`sessionStorage`) | No |
+
+**Rules:**
+
+1. All reads/writes go through a service or hook — never direct `localStorage` in components.
+2. Guard `typeof window === "undefined"` — return empty defaults on the server.
+3. `JSON.parse` failures wipe or ignore the key; never crash the tree.
+4. Do not store secret keys, seed phrases, or signed XDR long-term.
+5. Production on-chain writes **replace** the matching localStorage collection when contracts are live.
+
+Wallet restore still **re-validates** with Freighter (`isConnected` / `getPublicKey`) instead of trusting the stored flag alone.
+
+## Consequences
+
+**Positive**
+- Autosave, saved projects, and reviews work offline in the prototype
+- No backend required for UX spikes
+- Easy to inspect in DevTools and mock in Vitest
+
+**Negative**
+- Clearing site data destroys reviews, drafts, and saved lists
+- No cross-device or cross-browser sync
+- Storage readable by any script on the origin (XSS risk — keep payloads non-sensitive)
+- Quota (~5 MB) sufficient for JSON, not for media (media belongs on IPFS)
+
+**Follow-up**
+- Migrate reviews and verification out of localStorage when registries are the write path
+- Keep drafts and "saved for later" local even after contracts ship (they are user-device preferences)
+
+## Alternatives Considered
+
+| Alternative | Why rejected |
+|-------------|-------------|
+| REST / API database now | Duplicates future contract state; requires auth beyond wallet; delays on-chain roadmap |
+| IndexedDB | Better for large blobs; unnecessary for small JSON; harder to debug and SSR-guard |
+| Cookies | Sent on every request; wrong for megabytes of reviews; not how Freighter sessions work |
+| Redux Persist | Depends on Redux (see ADR 0001); still serialises to localStorage anyway |
+| No persistence | Drafts and wallet reconnect would reset on every refresh — unacceptable UX |

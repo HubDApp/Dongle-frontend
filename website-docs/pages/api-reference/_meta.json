@@ -1,0 +1,8 @@
+{
+  "overview": "Overview",
+  "rest": "REST API",
+  "graphql": "GraphQL API",
+  "authentication": "Authentication",
+  "errors": "Error Reference",
+  "rate-limiting": "Rate Limiting"
+}

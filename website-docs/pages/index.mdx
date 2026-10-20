@@ -1,0 +1,59 @@
+---
+title: Dongle Documentation
+description: The complete reference for the Dongle decentralized app store and review platform built on Stellar and Soroban.
+---
+
+import { Cards, Card } from "nextra/components";
+
+# Welcome to Dongle Docs
+
+Dongle is a decentralized app store and community review platform for the Stellar ecosystem. Browse projects, submit your dApp, get verified on-chain, and integrate using our REST API, GraphQL API, and multi-language SDKs.
+
+## Quick Navigation
+
+<Cards>
+  <Card title="🚀 Quick Start" href="/getting-started/quickstart" arrow />
+  <Card title="🔌 REST API" href="/api-reference/rest" arrow />
+  <Card title="🌐 GraphQL API" href="/api-reference/graphql" arrow />
+  <Card title="🧩 Components" href="/components/overview" arrow />
+  <Card title="⛓️ Smart Contracts" href="/smart-contracts/overview" arrow />
+  <Card title="🔑 Wallet Integration" href="/integration-guides/wallet-integration" arrow />
+  <Card title="🪝 Custom Hooks" href="/integration-guides/hooks" arrow />
+  <Card title="📐 Service Contracts" href="/service-contracts/overview" arrow />
+</Cards>
+
+## What is Dongle?
+
+Dongle solves the problem of **trust and discoverability** in the Stellar ecosystem. Users can:
+
+- **Discover Projects** — browse a comprehensive catalog of Stellar/Soroban dApps
+- **Submit Projects** — register your dApp for community discovery and verification
+- **Request Verification** — submit for community or admin on-chain verification
+- **Leave Reviews** — wallet-authenticated 5-star ratings to prevent spam
+- **Track Status** — monitor verification requests and community feedback
+
+All write interactions are signed by the user's [Freighter](https://freighter.app/) wallet, giving every action transparent on-chain attribution.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Styling | Tailwind CSS 4 |
+| Wallet | Freighter (`@stellar/freighter-api`) |
+| Blockchain | Stellar SDK + Soroban |
+| Forms | react-hook-form + Zod |
+| Testing | Vitest + React Testing Library + Playwright |
+| State | React Context + Custom Hooks |
+| Language | TypeScript (strict mode) |
+
+## Repo Structure
+
+```
+/
+├── dongle/          # Main Next.js application
+├── docs/            # Architecture docs and ADRs
+├── website-docs/    # This documentation site
+├── sdks/            # Multi-language SDK implementations
+└── .github/         # CI/CD workflows
+```
