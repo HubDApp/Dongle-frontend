@@ -1,0 +1,106 @@
+---
+title: Freighter Wallet Integration
+description: Connect Freighter, sign transactions, validate networks, and handle every error case.
+---
+
+import { Steps, Callout, Tabs } from "nextra/components";
+
+# Freighter Wallet Integration
+
+Dongle uses [Freighter](https://freighter.app/) as its primary Stellar wallet. All write actions — submitting projects, leaving reviews, requesting verification — require a connected Freighter account.
+
+## Key Files
+
+| File | Role |
+|------|------|
+| `services/wallet/wallet.service.ts` | Low-level Freighter API calls |
+| `context/wallet.context.tsx` | React Context — wallet state, network validation, UI |
+| `services/stellar/soroban.service.ts` | Transaction building and signing pipeline |
+
+## Connecting a Wallet
+
+```tsx
+"use client";
+import { useWallet } from "@/context/wallet.context";
+
+export function ConnectButton() {
+  const { isConnected, isConnecting, connectWallet, publicKey } = useWallet();
+
+  return isConnected ? (
+    <span>{publicKey}</span>
+  ) : (
+    <button onClick={() => void connectWallet()} disabled={isConnecting}>
+      {isConnecting ? "Connecting…" : "Connect Wallet"}
+    </button>
+  );
+}
+```
+
+## Silent Reconnect
+
+On page load, `WalletProvider` calls `walletService.getPublicKey()` — which reads the previously-approved address **without** showing a popup. This restores the session after a page refresh.
+
+## Signing a Transaction
+
+```typescript
+// Everything below runs inside soroban.service.ts — you don't call this directly.
+const signedXdr = await walletService.signTransaction(
+  unsignedTxXdr,
+  EXPECTED_NETWORK_PASSPHRASE
+);
+```
+
+The full signing pipeline runs as:
+
+```
+getPublicKey() → assertCorrectNetwork() → getAccount() →
+Contract.call() → prepareTransaction() → signTransaction() →
+sendTransaction() → pollTransaction()
+```
+
+## Network Validation
+
+Every transaction asserts the wallet is on the expected network:
+
+```typescript
+async function assertCorrectNetwork() {
+  const passphrase = await walletService.getNetworkPassphrase();
+  if (passphrase !== EXPECTED_NETWORK_PASSPHRASE) {
+    throw new NetworkMismatchError(passphrase);
+  }
+}
+```
+
+`EXPECTED_NETWORK_PASSPHRASE` reads from `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`. A mismatch shows an in-app warning banner.
+
+## Error Handling
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| `NetworkMismatchError` | Wallet on wrong network | Switch Freighter to correct network |
+| `"Freighter is not installed"` | Extension missing | Direct user to [freighter.app](https://freighter.app/) |
+| `"Wallet connection failed"` | User rejected popup | Show retry prompt |
+| `"Transaction signing failed"` | User rejected sign | Show retry prompt |
+| `"Timeout waiting for transaction…"` | Polling exceeded 60 s | Show Stellar explorer link |
+
+## Debugging
+
+Open the browser console and run:
+
+```javascript
+// Check current state
+const ws = (await import('/services/wallet/wallet.service.js')).walletService;
+console.log({
+  available: await ws.isFreighterAvailable(),
+  connected: await ws.isConnected(),
+  network:   await ws.getNetworkPassphrase(),
+  key:       await ws.getPublicKey(),
+});
+```
+
+## Network Reference
+
+| Network | Passphrase | RPC URL |
+|---------|------------|---------|
+| Testnet | `Test SDF Network ; September 2015` | `https://soroban-testnet.stellar.org:443` |
+| Mainnet | `Public Global Stellar Network ; September 2015` | Your mainnet RPC |

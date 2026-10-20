@@ -4,9 +4,12 @@ import {
   consumeOAuthStateCookie,
   createSessionToken,
   setSessionCookie,
+  setRefreshTokenCookie,
   type OAuthProvider,
 } from "@/lib/auth/session";
 import { upsertOAuthUser } from "@/lib/auth/users";
+import { createDeviceSession } from "@/lib/auth/device-sessions";
+import { extractClientIP } from "@/lib/request-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +54,23 @@ export async function GET(
     }
 
     const user = upsertOAuthUser(profile);
-    const token = await createSessionToken(user);
+
+    const ip = extractClientIP(request as Parameters<typeof extractClientIP>[0]);
+    const ua = request.headers.get("user-agent") ?? "";
+    const acceptLang = request.headers.get("accept-language") ?? "";
+
+    const { sessionId, refreshToken } = await createDeviceSession({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      ua,
+      acceptLang,
+      ipAddress: ip,
+    });
+
+    const token = await createSessionToken(user, sessionId);
     await setSessionCookie(token);
+    await setRefreshTokenCookie(refreshToken);
 
     const dest = parsedState.returnTo.startsWith("/") ? parsedState.returnTo : "/";
     const redirect = new URL(dest, origin);

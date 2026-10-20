@@ -1,0 +1,72 @@
+---
+title: Service Architecture
+description: The pluggable data access layer and service-layer conventions.
+---
+
+# Service Architecture
+
+## Layered Design
+
+```
+[ Freighter / Horizon / Soroban RPC ]
+                  ↑
+           services/*              ← all business logic lives here
+                  ↑
+   Context providers (wallet, confirm, comparison)
+                  ↑
+              Custom hooks          ← thin adapters returning UI-ready state
+                  ↑
+           Pages / Components
+```
+
+UI components never call `localStorage`, Freighter, or Soroban directly. They call hooks, which call services.
+
+## Pluggable Data Access Layer
+
+Services delegate data fetching to abstraction interfaces registered in `DataAccessRegistry`:
+
+```typescript
+import { registry } from "@/services/data-access/registry";
+
+// Development / test
+registry.setProjectRepository(new MockProjectRepository());
+
+// Production (future)
+registry.setProjectRepository(new SorobanProjectRepository());
+```
+
+**Interfaces:**
+
+| Interface | Methods |
+|-----------|---------|
+| `IProjectRepository` | `getAll()`, `getById(id)`, `getByCategory(category)`, `search(query)` |
+| `IReviewRepository` | `getByProjectId(projectId)`, `add(review)`, `vote(reviewId, voteType)` |
+| `IUpdateRepository` | `getByProjectId(projectId)`, `add(update)` |
+
+## Mock vs Production
+
+| Mode | Backend | Data source |
+|------|---------|-------------|
+| Development | `Mock*Repository` | In-memory or AES-256 encrypted `localStorage` |
+| Production | `Soroban*Repository` | Soroban RPC smart contracts + Horizon REST |
+
+Switching modes only requires swapping the registered repository — no UI code changes.
+
+## Persistence Strategy
+
+Client-owned state is persisted in `localStorage` (see [ADR 0004](/architecture/localstorage)):
+
+| Key | Owner | Scoped by wallet |
+|-----|-------|-----------------|
+| `dongle_wallet_state` | `WalletProvider` | Current key |
+| `dongle_reviews` | `review.service` | Includes address |
+| `dongle_project_drafts` | `draft.service` | No (device drafts) |
+| `dongle_saved_projects:{G…}` | `useSavedProjects` | Yes |
+| `dongle_recent_views` | `recent-views.service` | Optional |
+| `dongle_project_filters` | `useProjectFilters` | No (sessionStorage) |
+
+**Rules:**
+1. All reads/writes go through a service or hook — never direct `localStorage` calls in components.
+2. Guard `typeof window === "undefined"` for SSR safety.
+3. JSON parse failures wipe or ignore the key; never crash the component tree.
+4. Do not store secret keys, seed phrases, or signed XDR long-term.

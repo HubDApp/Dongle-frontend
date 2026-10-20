@@ -1,0 +1,84 @@
+---
+title: Wallet Setup
+description: Install Freighter, configure testnet, and fund your account.
+---
+
+import { Steps, Callout } from "nextra/components";
+
+# Wallet Setup
+
+Dongle uses [Freighter](https://freighter.app/) as its primary Stellar wallet. Read-only browsing works without a wallet; all write actions (submitting projects, leaving reviews, verification) require a connected Freighter account.
+
+<Steps>
+
+### Install Freighter
+
+Download from [freighter.app](https://freighter.app/). Available for Chrome, Firefox, Safari, and Edge.
+
+### Create or import an account
+
+Open Freighter and create a new Stellar account, or import an existing one with your secret key.
+
+### Switch to Testnet
+
+For local development the app defaults to Stellar Testnet. Open Freighter settings and select **Network: Testnet**.
+
+### Fund your account
+
+Testnet accounts start empty. Fund yours with [Friendbot](https://laboratory.stellar.org/#account-creator):
+
+1. Copy your public key (`G…`) from Freighter.
+2. Paste it into Friendbot and click **Get Lumens**.
+3. Wait ~10 seconds — your account now has 10,000 XLM.
+
+### Connect in Dongle
+
+Click **Connect Wallet** in the app header and approve the Freighter popup.
+
+</Steps>
+
+## Connection Flow
+
+```
+Click "Connect Wallet"
+  → walletService.isConnected()      // check extension
+  → walletService.requestAccess()    // Freighter popup
+  → Returns public key (G...)
+  → WalletContext stores address
+  → UI re-renders as connected
+```
+
+**Silent reconnect** — on page load the context reads the previously approved address without a popup.
+
+## Network Validation
+
+Before every transaction the app verifies Freighter is on the expected network:
+
+```typescript
+async function assertCorrectNetwork(): Promise<void> {
+  const passphrase = await walletService.getNetworkPassphrase();
+  if (passphrase !== EXPECTED_NETWORK_PASSPHRASE) {
+    throw new NetworkMismatchError(passphrase);
+  }
+}
+```
+
+A mismatch shows a clear in-app banner telling the user which network to switch to.
+
+## Troubleshooting
+
+| Symptom | Solution |
+|---------|---------|
+| "Connect Wallet" does nothing | Ensure Freighter is installed and unlocked |
+| "Wrong network" error | Switch Freighter to Testnet in extension settings |
+| "Account not found" (404) | Fund your testnet account with Friendbot |
+| Wallet disconnects immediately | Check browser console; Freighter may be locked |
+| Transaction hangs at "Preparing" | RPC endpoint may be down — verify `NEXT_PUBLIC_SOROBAN_RPC_URL` |
+
+<Callout type="info">
+  For debugging, open the browser console and run:
+
+  ```javascript
+  (await import('/services/wallet/wallet.service.js')).walletService.isConnected()
+  ```
+</Callout>

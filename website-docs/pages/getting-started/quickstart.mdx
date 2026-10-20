@@ -1,0 +1,84 @@
+---
+title: Quick Start
+description: Get Dongle running locally in three steps.
+---
+
+import { Steps, Callout, Tabs } from "nextra/components";
+
+# Quick Start
+
+Get the Dongle frontend up and running in three steps.
+
+<Callout type="info">
+  You need **Node.js ≥ 20** and the **Freighter** browser extension installed before starting.
+</Callout>
+
+<Steps>
+
+### Clone and install
+
+```bash
+git clone https://github.com/HubDApp/Dongle-frontend.git
+cd Dongle-frontend/dongle
+npm install
+```
+
+> **Windows users:** if you see native binding errors, see the [Setup Guide](/getting-started/setup).
+
+### Configure environment
+
+```bash
+cp .env.example .env.local
+```
+
+For local development the defaults work without changes. See [Environment Variables](/getting-started/environment) for the full reference.
+
+### Start the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The server hot-reloads as you edit.
+
+</Steps>
+
+## Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
+| `npm run lint` | ESLint (zero warnings) |
+| `npm run typecheck` | TypeScript type check |
+| `npm test` | Run all unit tests |
+| `npm run test:watch` | Watch mode |
+| `npm run test:e2e` | Playwright end-to-end tests |
+| `npm run test:a11y` | axe-core accessibility tests |
+| `npm run audit` | Security dependency audit |
+| `npm run build:analyze` | Bundle analyser |
+
+## Quality Checks
+
+Run these before opening a pull request:
+
+```bash
+npm run lint && npm run typecheck && npm test && npm run build
+```
+
+## Interactive Docs
+
+After starting the dev server, the built-in component playground is available at:
+
+```
+http://localhost:3000/docs/components
+```
+
+## API Explorer
+
+The built-in Swagger UI is at:
+
+```
+http://localhost:3000/api/docs
+```

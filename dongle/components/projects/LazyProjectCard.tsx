@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useLazyLoad } from "@/hooks/useIntersectionObserver";
 import type { Project } from "@/types/project";
 import type { VerificationStatus } from "./VerificationBadge";
+import type { ProjectHealth } from "@/lib/project-health";
 
 const ProjectCardDynamic = dynamic(
   () => import("./ProjectCard").then((mod) => mod.ProjectCard),
@@ -20,6 +21,8 @@ interface LazyProjectCardProps {
   project: Project;
   verificationStatus?: VerificationStatus;
   highlightTerm?: string;
+  health?: ProjectHealth;
+  healthTrend?: number | null;
 }
 
 /**
@@ -30,6 +33,8 @@ export function LazyProjectCard({
   project,
   verificationStatus,
   highlightTerm,
+  health,
+  healthTrend,
 }: LazyProjectCardProps) {
   const { ref, isIntersecting } = useLazyLoad<HTMLDivElement>({
     rootMargin: "200px",
@@ -44,6 +49,8 @@ export function LazyProjectCard({
             project={project}
             verificationStatus={verificationStatus}
             highlightTerm={highlightTerm}
+            health={health}
+            healthTrend={healthTrend}
             showCompareCheckbox={false}
           />
         </Suspense>

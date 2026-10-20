@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { isAdminAllowed, createAdminToken, setAdminTokenCookie } from "@/lib/admin-auth";
+import {
+  isAdminAllowed,
+  createAdminToken,
+  setAdminTokenCookie,
+  createPending2FAToken,
+} from "@/lib/admin-auth";
+import { adminTwoFAService } from "@/services/admin-twofa";
 import { ADMIN_TOKEN_MAX_AGE_SECONDS } from "@/constants/timeouts";
 
 export async function POST(request: Request) {
@@ -22,6 +28,19 @@ export async function POST(request: Request) {
         `[admin-access] DENIED login for ${publicKey.slice(0, 8)}...${publicKey.slice(-4)} at ${new Date().toISOString()}`,
       );
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    }
+
+    // If the admin has 2FA enabled, require a second factor before issuing a
+    // full session (Issue #728). A short-lived pending token is returned so the
+    // client can complete verification without re-sending the public key.
+    const twoFAEnabled = await adminTwoFAService.isEnabled(publicKey);
+    if (twoFAEnabled) {
+      const methods = await adminTwoFAService.getEnabledMethods(publicKey);
+      const pendingToken = await createPending2FAToken(publicKey);
+      return NextResponse.json(
+        { success: false, twoFactorRequired: true, methods, pendingToken },
+        { status: 401 },
+      );
     }
 
     const token = await createAdminToken(publicKey);

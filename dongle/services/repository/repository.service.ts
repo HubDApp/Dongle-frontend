@@ -5,6 +5,72 @@
 
 import { RepositoryMetadata } from "@/types/repository";
 import { parseRepositoryUrl } from "@/lib/repository";
+import type { RepositoryValidationResult } from "@/types/repository";
+
+export class RepositoryImportError extends Error {
+  constructor(message: string, public readonly code: "invalid-url" | "private-or-not-found" | "rate-limited" | "unavailable") {
+    super(message);
+    this.name = "RepositoryImportError";
+  }
+}
+
+async function fetchGitHubImport(url: string): Promise<RepositoryMetadata> {
+  const parsed = parseRepositoryUrl(url);
+  if (!parsed || parsed.host !== "github") {
+    throw new RepositoryImportError("Enter a valid github.com owner/repository URL.", "invalid-url");
+  }
+
+  const { owner, repo } = parsed;
+  let response: Response;
+  try {
+    response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, {
+      headers: { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+    });
+  } catch {
+    throw new RepositoryImportError("GitHub could not be reached. Check your connection and try again.", "unavailable");
+  }
+
+  if (response.status === 404 || response.status === 401) {
+    throw new RepositoryImportError(
+      "Repository not found or private. GitHub import supports public repositories only.",
+      "private-or-not-found",
+    );
+  }
+  if (response.status === 403 || response.status === 429) {
+    throw new RepositoryImportError("GitHub API rate limit reached. Try again later.", "rate-limited");
+  }
+  if (!response.ok) {
+    throw new RepositoryImportError(`GitHub returned an error (${response.status}).`, "unavailable");
+  }
+
+  const data = await response.json() as {
+    name: string;
+    html_url: string;
+    homepage?: string | null;
+    stargazers_count: number;
+    forks_count: number;
+    license?: { spdx_id?: string; name?: string } | null;
+    updated_at: string;
+    description?: string | null;
+    language?: string | null;
+    topics?: string[];
+  };
+  return {
+    url: data.html_url,
+    host: "github",
+    owner,
+    repo,
+    name: data.name,
+    homepage: data.homepage || undefined,
+    stars: data.stargazers_count,
+    forks: data.forks_count,
+    license: data.license?.spdx_id || data.license?.name,
+    lastUpdate: data.updated_at,
+    description: data.description ?? undefined,
+    language: data.language ?? undefined,
+    topics: data.topics ?? [],
+  };
+}
 
 /**
  * Fetch repository metadata from GitHub
@@ -35,6 +101,8 @@ async function fetchGitHubMetadata(
       host: "github",
       owner,
       repo,
+      name: data.name,
+      homepage: data.homepage || undefined,
       stars: data.stargazers_count,
       forks: data.forks_count,
       license: data.license?.spdx_id || data.license?.name,
@@ -134,6 +202,10 @@ async function fetchBitbucketMetadata(
  * Repository service for fetching metadata
  */
 export const repositoryService = {
+  async fetchGitHubImport(url: string): Promise<RepositoryMetadata> {
+    return fetchGitHubImport(url);
+  },
+
   /**
    * Fetch repository metadata from URL
    */

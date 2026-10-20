@@ -1,0 +1,79 @@
+---
+title: Smart Contract Overview
+description: Three Soroban registry contracts powering the Dongle protocol.
+---
+
+import { Callout } from "nextra/components";
+
+# Smart Contract Overview
+
+The Dongle protocol uses three dedicated Soroban contracts on Stellar:
+
+| Contract | Env Variable | Purpose |
+|----------|--------------|---------|
+| **Project Registry** | `NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT` | Register and manage dApp listings |
+| **Review Registry** | `NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT` | On-chain ratings and review references |
+| **Verification Registry** | `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` | Verification request lifecycle |
+
+## Configuration
+
+`dongle/constants/contracts.ts` is the single source of truth:
+
+```typescript
+export const DONGLE_CONTRACTS = {
+  PROJECT_REGISTRY:     parsedEnv.NEXT_PUBLIC_PROJECT_REGISTRY_CONTRACT,
+  REVIEW_REGISTRY:      parsedEnv.NEXT_PUBLIC_REVIEW_REGISTRY_CONTRACT,
+  VERIFICATION_REGISTRY: parsedEnv.NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT,
+};
+
+export const SOROBAN_CONFIG = {
+  RPC_URL:            parsedEnv.NEXT_PUBLIC_SOROBAN_RPC_URL,
+  NETWORK_PASSPHRASE: parsedEnv.NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE,
+};
+```
+
+Contract IDs are validated with Zod: `C` + 55 base32 chars. Production builds fail closed if any ID is missing or still set to the placeholder.
+
+## Implementation Status
+
+| Contract | On-chain calls | Current backend |
+|----------|----------------|-----------------|
+| Project Registry | `register_project`, `update_project` | `sorobanService` (wallet-fallback mocks in dev) |
+| Review Registry | Planned | `reviewService` (localStorage) |
+| Verification Registry | Planned | `verificationService` (localStorage) |
+
+<Callout type="info">
+  The frontend is fully wired to call these contracts. The mock fallbacks are only active when the environment uses placeholder contract IDs. Swap in real IDs and the live calls activate automatically.
+</Callout>
+
+## Shared Call Patterns
+
+All write operations follow the same pipeline in `soroban.service.ts`:
+
+```
+1. walletService.getPublicKey()          → get signer
+2. assertCorrectNetwork()                → verify Freighter network
+3. server.getAccount(publicKey)          → fetch sequence number
+4. Contract(id).call(method, ...args)    → build invoke operation
+5. server.prepareTransaction()           → simulate + set footprint
+6. walletService.signTransaction(xdr)    → user signs in Freighter
+7. server.sendTransaction()              → submit to ledger
+8. pollTransaction(hash, timeout=60s)    → wait for SUCCESS
+```
+
+### Single vs Batch Calls
+
+| Pattern | When | Example |
+|---------|------|---------|
+| Single invoke | One user-initiated state change | `register_project` |
+| Read-only simulate | Fetch on-chain data without signing | Contract view calls |
+| Batch (multi-op tx) | Atomic multi-step writes | Pay verification fee + submit request |
+
+Reviews and verification evidence are stored off-chain on IPFS. Contracts store only the content-addressed reference (CID) and aggregated state.
+
+## Network Reference
+
+| Network | Passphrase | RPC |
+|---------|------------|-----|
+| Testnet | `Test SDF Network ; September 2015` | `https://soroban-testnet.stellar.org:443` |
+| Mainnet | `Public Global Stellar Network ; September 2015` | Your mainnet RPC |

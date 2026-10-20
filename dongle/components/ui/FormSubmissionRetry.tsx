@@ -1,14 +1,26 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AlertCircle, RefreshCw, X, ShieldAlert, WifiOff, AlertTriangle } from "lucide-react";
 import { Button } from "./Button";
+
+export type FormSubmissionError = Error | string | {
+  success?: false;
+  message?: string;
+  code?: string;
+  statusCode?: number;
+  error?: {
+    message?: string;
+    code?: string;
+    statusCode?: number;
+  };
+};
 
 export interface FormSubmissionRetryProps {
   /**
    * The error message or error object.
    */
-  error?: Error | string | null;
+  error?: FormSubmissionError | null;
   /**
    * Function to call when user clicks retry.
    */
@@ -35,6 +47,8 @@ export interface FormSubmissionRetryProps {
    * Optional callback when user dismisses or cancels retry.
    */
   onDismiss?: () => void;
+  /** Automatically dismiss the error after this many milliseconds. Disabled when omitted or set to 0. */
+  autoDismissMs?: number;
   /**
    * Additional container classes.
    */
@@ -44,13 +58,17 @@ export interface FormSubmissionRetryProps {
 /**
  * Parses raw error into informative human-readable diagnosis and actionable advice.
  */
-function getErrorDetails(error?: Error | string | null): {
+function getErrorDetails(error?: FormSubmissionError | null): {
   type: "rejection" | "network" | "validation" | "general";
   headline: string;
   description: string;
   icon: React.ReactNode;
 } {
-  const rawMsg = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const rawMsg = error instanceof Error
+    ? error.message
+    : typeof error === "string"
+    ? error
+    : error?.error?.message ?? error?.message ?? "";
   const lower = rawMsg.toLowerCase();
 
   if (
@@ -117,9 +135,26 @@ export function FormSubmissionRetry({
   isRetrying = false,
   title,
   onDismiss,
+  autoDismissMs = 0,
   className = "",
 }: FormSubmissionRetryProps) {
   const [internalRetryCount, setInternalRetryCount] = useState(0);
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    setIsVisible(true);
+  }, [error]);
+
+  useEffect(() => {
+    if (!isVisible || autoDismissMs <= 0 || isRetrying || error == null) return;
+
+    const timeout = setTimeout(() => {
+      setIsVisible(false);
+      onDismiss?.();
+    }, autoDismissMs);
+
+    return () => clearTimeout(timeout);
+  }, [autoDismissMs, error, isRetrying, isVisible, onDismiss]);
 
   // Support controlled or uncontrolled retryCount
   const currentCount = controlledRetryCount !== undefined ? controlledRetryCount : internalRetryCount;
@@ -127,6 +162,13 @@ export function FormSubmissionRetry({
   const retriesRemaining = Math.max(0, maxRetries - currentCount);
 
   const errorDiagnosis = getErrorDetails(error);
+
+  if (!isVisible) return null;
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+    onDismiss?.();
+  };
 
   const handleRetry = async () => {
     if (isMaxReached || isRetrying) return;
@@ -179,7 +221,7 @@ export function FormSubmissionRetry({
         {onDismiss && (
           <button
             type="button"
-            onClick={onDismiss}
+            onClick={handleDismiss}
             aria-label="Dismiss error notice"
             className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
           >

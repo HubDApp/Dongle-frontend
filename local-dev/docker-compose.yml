@@ -1,0 +1,172 @@
+---
+# Dongle local development stack
+#
+# Services:
+#   stellar    - Stellar Quickstart (local standalone network, Soroban-enabled)
+#   ipfs       - Kubo IPFS node with HTTP API and gateway
+#   redis      - Redis 7 (notifications, rate-limit, session cache)
+#   postgres   - PostgreSQL 16 (future backend persistence)
+#
+# Usage:
+#   make start    — pull images and start all services
+#   make stop     — stop and remove containers (volumes preserved)
+#   make seed     — deploy contracts and seed test data
+#   make clean    — stop containers AND remove all volumes
+#   make logs     — tail logs for all services
+#   make status   — show container health status
+#
+# Prerequisites: Docker Desktop ≥ 24 / Docker Engine ≥ 24 + Compose v2
+
+version: "3.9"
+
+# ── Named volumes ────────────────────────────────────────────────────────────
+volumes:
+  stellar-data:
+    driver: local
+  ipfs-data:
+    driver: local
+  ipfs-staging:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+# ── Shared network ───────────────────────────────────────────────────────────
+networks:
+  dongle-net:
+    driver: bridge
+
+# ── Services ─────────────────────────────────────────────────────────────────
+services:
+
+  # ── Stellar Quickstart (standalone local network with Soroban RPC) ─────────
+  stellar:
+    image: stellar/quickstart:latest
+    container_name: dongle-stellar
+    networks:
+      - dongle-net
+    ports:
+      # Horizon REST API
+      - "8000:8000"
+      # Soroban RPC
+      - "8001:8001"
+      # Friendbot (fund accounts)
+      - "8002:8002"
+    environment:
+      # Run a fully local standalone network — no SDF network connectivity needed
+      STELLAR_NETWORK: standalone
+      # Enable Soroban RPC so contract calls work
+      ENABLE_SOROBAN_RPC: "true"
+      # Friendbot funds accounts with 10 000 XLM each
+      ENABLE_FRIENDBOT: "true"
+      # Faster ledger close for development (1 second instead of 5)
+      STELLAR_CORE_CATCHUP_COMPLETE: "false"
+    volumes:
+      - stellar-data:/opt/stellar
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8000/
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Kubo IPFS node ─────────────────────────────────────────────────────────
+  ipfs:
+    image: ipfs/kubo:v0.29.0
+    container_name: dongle-ipfs
+    networks:
+      - dongle-net
+    ports:
+      # HTTP API (used by seed script and app to add/cat files)
+      - "5001:5001"
+      # Public gateway (browse content at http://localhost:8080/ipfs/<CID>)
+      - "8080:8080"
+      # Swarm (libp2p peer connections — not needed locally, but exposed for debugging)
+      - "4001:4001"
+    environment:
+      # Allow API and gateway from any origin (local dev only)
+      IPFS_PATH: /data/ipfs
+    volumes:
+      - ipfs-data:/data/ipfs
+      - ipfs-staging:/export
+    command:
+      - daemon
+      - --migrate=true
+      - --agent-version-suffix=docker
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://localhost:5001/api/v0/id
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  # ── Redis 7 ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: dongle-redis
+    networks:
+      - dongle-net
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command:
+      - redis-server
+      - --save
+      - "60"
+      - "1"
+      - --loglevel
+      - warning
+      - --requirepass
+      - "${REDIS_PASSWORD:-dongle_dev_redis}"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - -a
+        - "${REDIS_PASSWORD:-dongle_dev_redis}"
+        - ping
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  # ── PostgreSQL 16 (reserved for future backend persistence) ───────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: dongle-postgres
+    networks:
+      - dongle-net
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: "${POSTGRES_USER:-dongle}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-dongle_dev_pass}"
+      POSTGRES_DB: "${POSTGRES_DB:-dongle_dev}"
+      # Speed up development — not suitable for production
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=C"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Init scripts run once on first start (alphabetical order)
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-dongle} -d ${POSTGRES_DB:-dongle_dev}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s

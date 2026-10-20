@@ -1,11 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
-import { ReviewComments } from "@/components/reviews/ReviewComments";
+import { reviewAnalyticsService } from "@/services/review/review-analytics.service";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -30,6 +31,10 @@ export default function ReviewList({
   emptyMessage,
   emptyTitle
 }: ReviewListProps) {
+  useEffect(() => {
+    reviewAnalyticsService.recordViews(reviews.map((review) => review.id));
+  }, [reviews]);
+
   if (reviews.length === 0) {
     return (
       <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">

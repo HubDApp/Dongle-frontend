@@ -309,6 +309,7 @@ export const en = {
     title: "Notifications",
     empty: "No notifications yet",
     markAllRead: "Mark all as read",
+    markFilteredRead: "Mark filtered read",
     markRead: "Mark as read",
     unread: "{count} unread",
     open: "Open notifications",
@@ -321,6 +322,34 @@ export const en = {
     reconnecting: "Reconnecting…",
     offline: "Offline — retrying",
     toastDismissed: "Notification dismissed",
+    unreadOnly: "Unread only",
+    today: "Today",
+    thisWeek: "This week",
+    exportFiltered: "Export filtered notifications as JSON",
+    filters: "Filters and categories",
+    shownCount: "{count} shown",
+    filterType: "Type",
+    allTypes: "All types",
+    verification: "Verification",
+    review: "Review",
+    update: "Update",
+    system: "System",
+    priority: "Priority",
+    allPriorities: "All priorities",
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+    readStatus: "Read status",
+    all: "All",
+    unreadStatus: "Unread",
+    readStatusValue: "Read",
+    categories: "Categories",
+    critical: "Critical",
+    important: "Important",
+    informational: "Informational",
+    from: "From",
+    to: "To",
+    noMatches: "No notifications match these filters.",
     types: {
       project_verified: "Project verified",
       project_rejected: "Project rejected",
@@ -337,6 +366,9 @@ export const en = {
     messages: {
       project_verified: "{projectName} has been verified.",
       project_rejected: "{projectName} was rejected.",
+      project_update_posted: "{projectName} posted a new update.",
+      project_verification_changed: "The verification status for {projectName} changed.",
+      project_review_posted: "{projectName} received a new review (at least {rating} stars).",
       review_approved: "Your review of {projectName} was approved.",
       review_rejected: "Your review of {projectName} was rejected.",
       verification_evidence_requested: "Additional evidence is requested for {projectName}.",
@@ -500,7 +532,6 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
-} satisfies Record<string, unknown>;
 
   twofa: {
     title: "Two-Factor Authentication",
@@ -559,6 +590,6 @@ export const en = {
     submissionRequirementOn: "2FA required for form submissions",
     submissionRequirementOff: "2FA no longer required for form submissions",
   },
-} as const;
+} satisfies Record<string, unknown>;
 
 export type Messages = typeof en;

@@ -1,0 +1,131 @@
+---
+title: TypeScript SDK
+description: Install and use the @dongle/form-api-client package.
+---
+
+# TypeScript / JavaScript SDK
+
+## Installation
+
+```bash
+npm install @dongle/form-api-client
+```
+
+## Quick Start
+
+```typescript
+import { createClient } from "@dongle/form-api-client";
+
+const client = createClient({
+  baseUrl: "https://api.dongle.example.com",
+  apiKey: "YOUR_API_KEY",
+});
+
+// Create a submission
+const result = await client.createSubmission({
+  projectName: "My Project",
+  category: "defi",
+  description: "Project description",
+});
+
+// Get reviews
+const reviews = await client.getReviews({
+  projectId: "project-123",
+  page: 1,
+  limit: 20,
+});
+```
+
+## Error Handling
+
+```typescript
+import { FormApiError } from "@dongle/form-api-client";
+
+try {
+  await client.createSubmission(data);
+} catch (error) {
+  if (error instanceof FormApiError) {
+    console.error(`${error.statusCode}: ${error.message}`);
+  }
+}
+```
+
+## Pagination
+
+All list methods return paginated results:
+
+```typescript
+const { data, pagination } = await client.getReviews({ page: 1, limit: 20 });
+// pagination: { page, limit, total, totalPages, hasMore }
+
+// Fetch next page
+if (pagination.hasMore) {
+  const next = await client.getReviews({ page: pagination.page + 1, limit: 20 });
+}
+```
+
+## Filtering & Sorting
+
+```typescript
+const reviews = await client.getReviews({
+  projectId: "soroban-swap",
+  rating: 5,
+  sortBy: "createdAt",
+  sortOrder: "desc",
+});
+```
+
+## Batch Submissions
+
+```typescript
+const batchResult = await client.batchSubmit({
+  mode: "individual",
+  items: [
+    { id: "item-1", data: { projectName: "Alpha", category: "defi" } },
+    { id: "item-2", data: { projectName: "Beta",  category: "nft"  } },
+  ],
+});
+
+console.log(`Success: ${batchResult.successCount}, Failed: ${batchResult.failureCount}`);
+```
+
+## Webhook Integration
+
+```typescript
+// Send a signed webhook
+const delivery = await client.sendWebhook({
+  url: "https://your-server.com/webhook",
+  event: "review.created",
+  data: { reviewId: "abc", projectId: "soroban-swap" },
+  maxAttempts: 5,
+});
+
+console.log("Delivery ID:", delivery.deliveryId);
+
+// Monitor webhook status
+const status = await client.getWebhookStatus();
+console.log("Pending:", status.statistics.pendingCount);
+```
+
+## Verify Incoming Webhooks
+
+```typescript
+import { verifyWebhookSignature } from "@dongle/form-api-client";
+
+// In your Express / Next.js webhook handler:
+const isValid = verifyWebhookSignature({
+  payload: req.body,
+  signature: req.headers["x-dongle-signature"],
+  secret: process.env.WEBHOOK_SECRET,
+  timestampHeader: req.headers["x-dongle-timestamp"],
+  toleranceSeconds: 300, // reject replays older than 5 min
+});
+
+if (!isValid) {
+  return res.status(401).json({ error: "Invalid signature" });
+}
+```
+
+## Full API Reference
+
+See `packages/form-api-client/README.md` in the repository for the complete method list.

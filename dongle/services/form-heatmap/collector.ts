@@ -3,6 +3,7 @@
  */
 
 import { DEFAULT_CONFIG, STORAGE_KEY, createConfig } from "./config";
+import { currentDevice } from "./types";
 import type {
   ClickEvent,
   HeatmapConfig,
@@ -270,6 +271,7 @@ export class HeatmapCollector {
       formId: this.formId,
       formType: this.formType,
       sessionId: this.sessionId,
+      device: currentDevice(),
       clicks: [...this.clicks],
       scrollDepth: [...this.scrollSamples],
       maxScrollDepth: this.maxScrollDepth(),
