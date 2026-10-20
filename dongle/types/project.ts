@@ -4,6 +4,7 @@
  */
 
 import { RepositoryMetadata } from "./repository";
+import type { BridgeConfig } from "./bridge";
 
 export const PROJECT_CATEGORIES = {
   DEFI: "DeFi / DEX",
@@ -155,6 +156,11 @@ export interface Project {
    * followed by 55 base-32 characters (A-Z, 2-7), total length 56.
    */
   contractAddresses?: string[];
+  /**
+   * Optional cross-chain bridge information (Issue #726). Only present for
+   * projects that expose bridge routes between chains.
+   */
+  bridge?: BridgeConfig;
 }
 
 export type ClaimProofType = "website" | "repository" | "admin_review";
