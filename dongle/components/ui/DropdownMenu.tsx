@@ -119,8 +119,8 @@ export const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenu
       >
         {children}
       </button>
-    ),
-  );
+    );
+  },
 );
 DropdownMenuItem.displayName = "DropdownMenuItem";
 

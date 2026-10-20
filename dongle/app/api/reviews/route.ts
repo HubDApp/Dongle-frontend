@@ -15,15 +15,9 @@ import {
   APIError,
 } from "@/services/error/error.service";
 import { cacheGet, cacheSet, cacheDel, CacheKey, REVIEWS_TTL_S } from "@/lib/cache";
-import { classifyReviewSentiment } from "@/lib/review-sentiment";
-import {
-  getAdminTokenFromCookie,
-  isAdminAllowed,
-  verifyAdminToken,
-} from "@/lib/admin-auth";
-import { reviewStore } from "@/lib/review-store";
+import { getReviewStore } from "@/lib/review-store";
 
-const store = reviewStore;
+const store = getReviewStore();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -60,17 +54,23 @@ export async function GET(request: NextRequest) {
     if (projectId && !userAddress) {
       const cached = await cacheGet<Review[]>(CacheKey.reviews(projectId));
       if (cached) {
-        for (const review of cached) {
-          if (!isReviewSentiment(review.sentiment)) {
-            review.sentiment = classifyReviewSentiment(review.comment);
-            review.sentimentSource = "automatic";
-          }
+        const withLanguage = cached.map((review) => ({
+          ...review,
+          language: review.language ?? detectReviewLanguage(review.comment),
+        }));
+        if (cached.some((review) => !review.language)) {
+          await cacheSet(CacheKey.reviews(projectId), withLanguage, REVIEWS_TTL_S);
         }
-        return NextResponse.json(createSuccessResponse(cached));
+        return NextResponse.json(createSuccessResponse(withLanguage));
       }
     }
 
-    let reviews = Array.from(store.values());
+    let reviews = Array.from(store.values()).map((review) => {
+      if (review.language) return review;
+      const migrated = { ...review, language: detectReviewLanguage(review.comment) };
+      store.set(review.id, migrated);
+      return migrated;
+    });
 
     if (projectId) {
       reviews = reviews.filter((r) => r.projectId === projectId);
@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
     // ── Signature verification (cryptographic form submission signing) ─────
     // If a signature is provided, verify it against the payload and public key.
     // This ensures tamper detection and authenticity of the submission.
+    let isVerifiedReviewer = false;
     if (signedPayload && signature) {
       const isValid = verifySignature(signedPayload, signature, userAddress);
       if (!isValid) {
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
           { status: 401 }
         );
       }
+      isVerifiedReviewer = true;
     }
 
     if (isReviewerBanned(userAddress)) {
@@ -191,9 +193,12 @@ export async function POST(request: NextRequest) {
       userAddress,
       rating,
       comment,
-      sentiment: classifyReviewSentiment(comment),
-      sentimentSource: "automatic",
+      language: detectReviewLanguage(comment),
       createdAt: new Date().toISOString(),
+      language: typeof language === "string"
+        ? language.toLowerCase().split("-")[0]
+        : request.headers.get("accept-language")?.split(",")[0]?.split("-")[0]?.toLowerCase(),
+      isVerifiedReviewer,
       helpfulVotes: [],
       unhelpfulVotes: [],
       signedPayload: signedPayload || undefined,

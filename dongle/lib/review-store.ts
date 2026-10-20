@@ -5,11 +5,8 @@ export interface StoredReview extends Review {
   unhelpfulVotes: string[];
 }
 
-const globalForReviews = globalThis as typeof globalThis & {
-  dongleReviewStore?: Map<string, StoredReview>;
-};
+const reviews = new Map<string, StoredReview>();
 
-export const reviewStore =
-  globalForReviews.dongleReviewStore ?? new Map<string, StoredReview>();
-
-globalForReviews.dongleReviewStore = reviewStore;
+export function getReviewStore(): Map<string, StoredReview> {
+  return reviews;
+}

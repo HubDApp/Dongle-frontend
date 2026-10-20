@@ -6,6 +6,9 @@ import {
   useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
 import { projectStatusService } from "@/services/project/project-status.service";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Badge } from "@/components/ui/Badge";
@@ -14,12 +17,16 @@ import { Spinner } from "@/components/ui/Spinner";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import ReviewList from "@/components/reviews/ReviewList";
 import ReviewForm from "@/components/reviews/ReviewForm";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import {
   RatingDistributionSummary,
   computeRatingDistribution,
 } from "@/components/reviews/RatingDistributionSummary";
-import ProjectImage from "@/components/projects/ProjectImage";
+import ProjectGallery from "@/components/projects/ProjectGallery";
+import ContextHelp from "@/components/ui/ContextHelp";
 import { RepositoryMetadata } from "@/components/projects/RepositoryMetadata";
+import { ProjectHealthPanel } from "@/components/projects/ProjectHealthPanel";
+import { getProjectHealth } from "@/lib/project-health";
 import { Review,
   ReviewReport,
   ReviewReportReason,
@@ -47,7 +54,9 @@ import {
   ExternalLink,
   GitBranch,
   Globe,
+  Heart,
   Info,
+  History,
   Megaphone,
   MessageSquare,
   Shield,
@@ -61,10 +70,10 @@ import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBa
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { useProjectFollowing } from "@/hooks/useProjectFollowing";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";
-import { abbreviateStellarAddress } from "@/lib/stellar-address";
-import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { projectService } from "@/services/project/project.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -76,7 +85,7 @@ import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
 import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
-import { getPositiveSentimentPercentage } from "@/lib/review-sentiment";
+import { emitProjectFollowingEvent } from "@/lib/project-following/emit";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -108,8 +117,6 @@ export default function ProjectDetailPage() {
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
-  const [ratingFilter, setRatingFilter] = useState<string>("all");
-  const [sentimentFilter, setSentimentFilter] = useState<"all" | ReviewSentiment>("all");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
@@ -118,6 +125,12 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
   const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [isChangingFollow, setIsChangingFollow] = useState(false);
+  const {
+    isFollowing,
+    followerCount,
+    setFollowing,
+  } = useProjectFollowing(projectId);
   // Track the most recent claim for this wallet + project (for the status banner)
   const [latestClaim, setLatestClaim] = useState<ReturnType<typeof projectClaimService.getLatestRequestForUser>>(null);
 
@@ -210,6 +223,19 @@ export default function ProjectDetailPage() {
   }, [reviews, project?.rating]);
 
   const actualReviewCount = reviews.length || project?.reviews || 0;
+
+  const health = React.useMemo(
+    () =>
+      project
+        ? getProjectHealth(project, {
+            verificationStatus,
+            updates,
+            rating: actualRating,
+            reviewCount: actualReviewCount,
+          })
+        : null,
+    [project, verificationStatus, updates, actualRating, actualReviewCount],
+  );
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isOnList = project ? isOnWatchlist(project.id) : false;
@@ -355,13 +381,6 @@ export default function ProjectDetailPage() {
     if (reviewSort === "mine") {
       list = list.filter((r) => r.userAddress === gate.publicKey);
     }
-    if (ratingFilter !== "all") {
-      const ratingNum = parseInt(ratingFilter, 10);
-      list = list.filter((r) => r.rating === ratingNum);
-    }
-    if (sentimentFilter !== "all") {
-      list = list.filter((review) => review.sentiment === sentimentFilter);
-    }
     if (reviewSort === "highest") {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
@@ -372,7 +391,7 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
-  }, [reviews, reviewSort, ratingFilter, sentimentFilter, gate.publicKey]);
+  }, [reviews, reviewSort, gate.publicKey]);
 
   const projectEmptyMessage = React.useMemo(() => {
     if (reviews.length === 0) {
@@ -382,17 +401,11 @@ export default function ProjectDetailPage() {
     if (reviewSort === "mine") {
       activeFilters.push("your reviews");
     }
-    if (ratingFilter !== "all") {
-      activeFilters.push(`${ratingFilter}-star rating`);
-    }
-    if (sentimentFilter !== "all") {
-      activeFilters.push(`${sentimentFilter} sentiment`);
-    }
     if (activeFilters.length > 0) {
       return `No reviews found matching ${activeFilters.join(" and ")}. Try adjusting your filter controls.`;
     }
     return "No reviews match the selected filter options.";
-  }, [reviews.length, reviewSort, ratingFilter, sentimentFilter]);
+  }, [reviews.length, reviewSort]);
 
   const handleEdit = (review: Review) => {
     setEditingReview(review);
@@ -487,6 +500,13 @@ export default function ProjectDetailPage() {
       });
 
       setReviews(await reviewService.getReviewsByProject(projectId));
+      if (!editingReview) {
+        void emitProjectFollowingEvent(gate.publicKey, {
+          projectId: project.id,
+          type: "project_review_posted",
+          rating: data.rating,
+        });
+      }
       setIsAddingReview(false);
       setEditingReview(null);
     } catch (error) {
@@ -556,6 +576,10 @@ export default function ProjectDetailPage() {
         },
         gate.publicKey
       );
+      void emitProjectFollowingEvent(gate.publicKey, {
+        projectId: project.id,
+        type: "project_update_posted",
+      });
       toast.success("Update published successfully");
     }
 
@@ -596,6 +620,18 @@ export default function ProjectDetailPage() {
   };
 
   const approvedExternalUrls = project ? getApprovedProjectUrls(project) : [];
+
+  const handleToggleFollowing = async () => {
+    setIsChangingFollow(true);
+    try {
+      await setFollowing(projectId, !isFollowing);
+      toast.success(isFollowing ? "Project unfollowed" : "Following project");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update project follow status");
+    } finally {
+      setIsChangingFollow(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -638,6 +674,7 @@ export default function ProjectDetailPage() {
 
   return (
     <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <PageHeatmapRecorder page="project_detail" />
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
           <button
@@ -714,24 +751,35 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant={isOnList ? "secondary" : "outline"}
-                    onClick={handleToggleWatchlist}
-                    disabled={!project}
-                    leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                    className="shrink-0"
-                  >
-                    {isOnList ? "On Watchlist" : "Add to Watchlist"}
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    <Button
+                      variant={isOnList ? "secondary" : "outline"}
+                      onClick={handleToggleWatchlist}
+                      disabled={!project}
+                      leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                    >
+                      {isOnList ? "On Watchlist" : "Add to Watchlist"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/projects/${projectId}/history`)}
+                      leftIcon={<History className="w-4 h-4" />}
+                    >
+                      Version history
+                    </Button>
+                    <Button
+                      variant={isFollowing ? "secondary" : "outline"}
+                      onClick={() => void handleToggleFollowing()}
+                      isLoading={isChangingFollow}
+                      leftIcon={<Heart className="w-4 h-4" fill={isFollowing ? "currentColor" : "none"} />}
+                    >
+                      {isFollowing ? "Unfollow" : "Follow"} · {followerCount}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Project Image */}
-                <ProjectImage
-                  logoUrl={project.logoUrl}
-                  name={project.name}
-                  className="mb-6"
-                  fallbackTextSize="text-4xl"
-                />
+                <ProjectGallery name={project.name} images={project.screenshots?.length ? project.screenshots : project.logoUrl ? [project.logoUrl] : []} />
 
                 {/* Description */}
                 <div className="mb-6">
@@ -886,22 +934,7 @@ export default function ProjectDetailPage() {
                     )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 text-sm">
-                      <span className="text-zinc-500 text-xs font-medium">Rating:</span>
-                      <select
-                        aria-label="Filter reviews by rating"
-                        value={ratingFilter}
-                        onChange={(e) => setRatingFilter(e.target.value)}
-                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      >
-                        <option value="all">All Ratings</option>
-                        <option value="5">5 Stars</option>
-                        <option value="4">4 Stars</option>
-                        <option value="3">3 Stars</option>
-                        <option value="2">2 Stars</option>
-                        <option value="1">1 Star</option>
-                      </select>
-                    </div>
+
                     <div className="flex items-center gap-1 text-sm">
                       <span className="text-zinc-500 text-xs font-medium">Sentiment:</span>
                       <select
@@ -1011,6 +1044,7 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
                 <ReviewList
+                  onClearFilters={() => { setReviewSort("newest"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEdit}
@@ -1030,10 +1064,13 @@ export default function ProjectDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Project Health */}
+              {health && <ProjectHealthPanel projectId={project.id} health={health} />}
+
               {/* Verification Status */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold">Verification Status</h3>
+                  <h3 className="text-lg font-bold">Verification Status <ContextHelp tip="verification" label="verification">Verification records a review of the project evidence by Dongle verifiers. It does not guarantee that a project is risk-free.</ContextHelp></h3>
                   {verificationError && (
                     <Button variant="outline" size="sm" onClick={retryVerification}>
                       Retry
@@ -1188,9 +1225,11 @@ export default function ProjectDetailPage() {
               {project.ownerAddress && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                   <h3 className="text-lg font-bold mb-4">Owner</h3>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono break-all">
-                    {abbreviateStellarAddress(project.ownerAddress)}
-                  </p>
+                  <SnsAddressDisplay
+                    address={project.ownerAddress}
+                    truncated={false}
+                    className="text-sm break-all"
+                  />
                 </div>
               )}
 
@@ -1198,6 +1237,9 @@ export default function ProjectDetailPage() {
               {project.contractAddresses && project.contractAddresses.length > 0 && (
                 <ContractAddressList addresses={project.contractAddresses} />
               )}
+
+              {/* Bridge Information (Issue #726) */}
+              <BridgeInfoCard bridge={project.bridge} />
             </div>
           </div>
         </div>
@@ -1205,6 +1247,8 @@ export default function ProjectDetailPage() {
         <ClaimProjectModal
           isOpen={isClaiming}
           projectName={project?.name || ""}
+          projectId={project?.id}
+          walletAddress={gate.publicKey}
           onClose={() => setIsClaiming(false)}
           onSubmit={handleClaimSubmit}
         />

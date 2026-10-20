@@ -149,7 +149,8 @@ export default function EditProjectPage() {
             docsUrl: project.docsUrl,
             auditReportUrl: project.auditReportUrl,
             bugBountyUrl: project.bugBountyUrl,
-            roadmap: project.roadmap?.milestones,
+            ownerAddress: project.owner,
+            createdAt: project.createdAt,
           }}
         />
       </div>

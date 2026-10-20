@@ -114,6 +114,29 @@ describe("ReviewList Empty State", () => {
     expect(screen.getByText("No Matching Reviews")).toBeInTheDocument();
     expect(screen.getByText("No reviews found matching project 'Project Alpha'.")).toBeInTheDocument();
   });
+
+  it("groups mixed-language reviews and filters by language", () => {
+    const { container } = render(
+      <ReviewList
+        reviews={[
+          { ...mockReviews[0], language: "es" },
+          { ...mockReviews[1], language: "en" },
+        ]}
+        currentUserAddress={null}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: /🇪🇸 Spanish/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /🇬🇧 English/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: /Filter reviews by language/i }), {
+      target: { value: "es" },
+    });
+    expect(screen.getByText("Excellent DeFi app!")).toBeInTheDocument();
+    expect(screen.queryByText("Needs work.")).not.toBeInTheDocument();
+    expect(container.querySelectorAll("a[href*='issues/18']")).toHaveLength(1);
+  });
 });
 
 describe("ReviewsPage Sorting and Filtering Controls", () => {

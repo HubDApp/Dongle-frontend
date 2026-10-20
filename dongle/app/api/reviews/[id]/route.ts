@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasMinLength } from "@/lib/validation";
+import { detectReviewLanguage } from "@/lib/review-language";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import {
   createSuccessResponse,
   createErrorResponse,
   ErrorCode,
 } from "@/services/error/error.service";
-import { classifyReviewSentiment } from "@/lib/review-sentiment";
-import { reviewStore, type StoredReview } from "@/lib/review-store";
-import { cacheDel, CacheKey } from "@/lib/cache";
+import { getReviewStore } from "@/lib/review-store";
 
-function getStore(): Map<string, StoredReview> {
-  return reviewStore;
+function getStore(): Map<string, InMemoryReview> {
+  return getReviewStore();
 }
 
 function validateReviewInput(rating: unknown, comment: unknown): string | null {
@@ -92,16 +92,11 @@ export async function PUT(
       ...review,
       ...(rating !== undefined ? { rating } : {}),
       ...(comment !== undefined ? { comment } : {}),
-      ...(comment !== undefined
-        ? {
-            sentiment: classifyReviewSentiment(comment),
-            sentimentSource: "automatic" as const,
-          }
-        : {}),
+      ...(comment !== undefined ? { language: detectReviewLanguage(comment) } : {}),
     };
 
     reviews.set(id, updated);
-    await cacheDel(CacheKey.reviews(review.projectId));
+    await cacheDel(CacheKey.reviews(updated.projectId));
     return NextResponse.json(createSuccessResponse(updated));
   } catch (error) {
     return NextResponse.json(

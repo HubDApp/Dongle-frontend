@@ -48,6 +48,28 @@ Unknown types are ignored (HTTP 202, not stored). Duplicate `id` values are drop
 
 **Emit:** `POST /api/notifications/events` and `lib/notifications/emit.ts`. Verification approve/reject/evidence-request publish events. Production multi-instance deploys must replace `lib/notifications/server-store.ts` with Redis pub/sub.
 
+## Soroban event monitoring
+
+**Worker:** Start the long-running listener with `cd dongle && npm run indexer:worker`. Configure `SOROBAN_RPC_URL`, `SOROBAN_CONTRACT_ID`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `INDEXER_NOTIFICATION_URL` (the app's `/api/events/notifications` endpoint), and a shared `INDEXER_NOTIFICATION_TOKEN`. The worker calls Soroban RPC `getEvents` over HTTP, decodes contract event topics and values, queues events in Redis, stores per-contract ledger checkpoints, indexes them, and emits recipient-scoped SSE notifications. Supported event names include `ProjectRegistered`, `ProjectUpdated`, `ReviewSubmitted`, `VerificationApproved`, and `VerificationRejected`.
+
+For a fresh installation the worker starts at the current ledger; set `SOROBAN_START_LEDGER` to backfill from a specific ledger. Subsequent restarts use the Redis checkpoint.
+
+Soroban RPC exposes event queries over HTTP rather than a WebSocket subscription, so the listener polls at a bounded interval and retries from its last processed ledger after RPC/processing failures. Run one worker per contract unless a distributed queue consumer lock is configured. Redis is required to share queue and checkpoint state between the worker and the Next.js deployment; without it, local development uses process memory only.
+
+**Health:** `GET /api/events/health` reports listener configuration, worker heartbeat, latest/indexed ledger, queue depth, and processing lag. The admin dashboard's Events tab refreshes this status every 15 seconds.
+
+## Project social proof
+
+`GET /api/social-proof` returns each project's daily badge set. It uses weekly review velocity for category top-10 trending, a minimum 4.5 rating and 20 reviews for Highly rated, 51+ unique wallet bookmarks for the bookmark badge, and a seven-day creation window for New. Featured IDs are admin-curated in the server-side `SOCIAL_PROOF_FEATURED_PROJECT_IDS` environment variable. The result is cached until 00:00 UTC; bookmark identities are stored as unique project/wallet pairs in Redis when configured.
+
+## Ownership verification
+
+The claim page and project-detail claim modal support DNS TXT (`dongle-verify=[token]`), a root GitHub `dongle-verify.txt` file, and Stellar `/.well-known/stellar.toml`. Stellar.toml verification requires matching `HOME_DOMAIN`, the claimant wallet in `ACCOUNTS`, and `DONGLE_VERIFY` set to the issued token. Tokens and statuses expire after 90 days; pending records are checked every 15 seconds, and owners see a re-verification prompt within 14 days of expiry. Configure Upstash Redis for shared production records; without it the service uses process-local memory. Manual admin review remains available as a fallback.
+
+## Multilingual reviews
+
+Review creation and edits detect and store one of 15 supported language codes (`en`, `es`, `fr`, `de`, `pt`, `it`, `nl`, `ru`, `ar`, `hi`, `zh`, `ja`, `ko`, `tr`, `sv`). Review lists group mixed-language content, allow language filtering, and can prioritize the browser language. Search folds diacritics and transliterates Cyrillic text; comments remain searchable in their native script. The Translate link points to the planned Issue #18 work and does not translate content yet.
+
 **Load test (100 clients):**
 
 ```bash

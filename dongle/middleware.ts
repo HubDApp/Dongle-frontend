@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { classifyRequest } from "@/services/rate-limit/config";
+import { apiRateLimiter, rateLimitResponse } from "@/services/rate-limit";
+import { applyRateLimitHeaders } from "@/services/rate-limit/headers";
 
 /**
  * Generates a cryptographically random nonce for CSP.
@@ -47,11 +50,9 @@ function buildCsp(nonce: string): string {
     .join("; ");
 }
 
-export function middleware(request: NextRequest): NextResponse {
-  const nonce = generateNonce();
-  const csp = buildCsp(nonce);
-
-  const response = NextResponse.next({
+/** Build the passthrough response, forwarding the CSP nonce to server code. */
+function buildNextResponse(request: NextRequest, nonce: string): NextResponse {
+  return NextResponse.next({
     request: {
       headers: new Headers({
         ...Object.fromEntries(request.headers.entries()),
@@ -60,8 +61,10 @@ export function middleware(request: NextRequest): NextResponse {
       }),
     },
   });
+}
 
-  // Apply CSP and static security headers on every response
+/** Apply CSP + static security headers to a response in-place. */
+function applySecurityHeaders(response: NextResponse, csp: string): void {
   response.headers.set("Content-Security-Policy", csp);
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
@@ -75,7 +78,78 @@ export function middleware(request: NextRequest): NextResponse {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",
   );
+}
 
+/**
+ * Deterministic, non-reversible hash of an IP (FNV-style). Pure JS so it works
+ * in the Edge runtime without Node crypto.
+ */
+function hashIp(ip: string): string {
+  let hash = 0;
+  for (let i = 0; i < ip.length; i++) {
+    hash = (hash << 5) - hash + ip.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return `ip_${Math.abs(hash).toString(16).slice(0, 8)}`;
+}
+
+/** Resolve the client IP from proxy headers (first entry of x-forwarded-for). */
+function clientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return (
+    request.headers.get("x-real-ip") ||
+    request.headers.get("cf-connecting-ip") ||
+    "unknown"
+  );
+}
+
+/** Authenticated admin sessions are identified by the admin cookie. */
+function isAuthenticatedAdmin(request: NextRequest): boolean {
+  return Boolean(request.cookies.get("dongle_admin_token")?.value);
+}
+
+export async function middleware(request: NextRequest): Promise<NextResponse> {
+  const nonce = generateNonce();
+  const csp = buildCsp(nonce);
+
+  const { pathname } = request.nextUrl;
+
+  // Enforce rate limits on API routes (Issue #729).
+  if (pathname.startsWith("/api/")) {
+    const category = classifyRequest(pathname, request.method);
+    const result = await apiRateLimiter.check(
+      {
+        ip: hashIp(clientIp(request)),
+        subject: isAuthenticatedAdmin(request) ? "admin" : null,
+      },
+      category,
+    );
+
+    if (!result.allowed) {
+      const blocked = NextResponse.json(
+        {
+          error: "Too Many Requests",
+          message: `Rate limit exceeded for ${result.category} requests.`,
+          retryAfterSeconds: result.retryAfterSeconds,
+        },
+        { status: 429 },
+      );
+      applyRateLimitHeaders(blocked, result);
+      applySecurityHeaders(blocked, csp);
+      return blocked;
+    }
+
+    const response = buildNextResponse(request, nonce);
+    applySecurityHeaders(response, csp);
+    return applyRateLimitHeaders(response, result);
+  }
+
+  const response = buildNextResponse(request, nonce);
+  applySecurityHeaders(response, csp);
   return response;
 }
 

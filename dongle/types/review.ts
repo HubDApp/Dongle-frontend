@@ -13,9 +13,11 @@ export interface Review {
   userAddress: string;
   rating: number;
   comment: string;
+  /** Detected language code, or `und` when the text is too short/ambiguous. */
+  language?: string;
   createdAt: string;
-  sentiment?: ReviewSentiment;
-  sentimentSource?: "automatic" | "admin";
+  language?: string;
+  isVerifiedReviewer?: boolean;
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
   /** Cryptographic signature fields — present for signed submissions (#558). */

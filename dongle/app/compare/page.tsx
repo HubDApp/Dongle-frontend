@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useComparison } from "@/context/comparison.context";
-import { useRouter } from "next/navigation";
-import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle, History, Link as LinkIcon } from "lucide-react";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { Button } from "@/components/ui/Button";
 import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
@@ -11,12 +11,30 @@ import { VerificationBadge, VerificationStatus } from "@/components/projects/Ver
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
 import type { Project } from "@/types/project";
+import { projectService } from "@/services/project/project.service";
+import { buildComparisonPermalink, getComparisonProjectIdsFromQuery } from "@/utils/comparison-history.util";
+import { toast } from "sonner";
 
 export default function ComparePage() {
-  const { selectedProjects, removeProject, clearComparison } = useComparison();
+  const { selectedProjects, removeProject, clearComparison, restoreProjects, saveCurrentComparison } = useComparison();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const idsText = searchParams.get("ids");
+    const ids = getComparisonProjectIdsFromQuery(idsText);
+    if (!ids.length) return;
+
+    const nextProjects = ids
+      .map((id) => projectService.getProjectById(id))
+      .filter((project): project is Project => Boolean(project));
+
+    if (nextProjects.length >= 2) {
+      restoreProjects(nextProjects.slice(0, 4));
+    }
+  }, [searchParams, restoreProjects]);
 
   useEffect(() => {
     const fetchStatuses = async () => {
@@ -89,7 +107,29 @@ export default function ComparePage() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-4xl font-bold">Compare Projects</h1>
-            <div className="flex gap-3">
+            <div className="flex gap-3 flex-wrap">
+              <Button variant="outline" onClick={() => router.push("/compare/history")}>
+                <History className="w-4 h-4 mr-2" />
+                History
+              </Button>
+              <Button variant="outline" onClick={() => {
+                const entry = saveCurrentComparison();
+                if (entry) {
+                  toast.success("Comparison saved to history");
+                } else {
+                  toast.error("Select at least two projects to save a comparison");
+                }
+              }}>
+                Save Snapshot
+              </Button>
+              <Button variant="outline" onClick={async () => {
+                const link = buildComparisonPermalink(selectedProjects.map((project) => project.id));
+                await navigator.clipboard.writeText(link);
+                toast.success("Shareable comparison link copied");
+              }}>
+                <LinkIcon className="w-4 h-4 mr-2" />
+                Copy Link
+              </Button>
               <Button variant="outline" onClick={() => router.push("/discover")}>
                 Add More
               </Button>

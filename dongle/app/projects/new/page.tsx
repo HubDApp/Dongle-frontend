@@ -6,6 +6,7 @@ import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { ShieldCheck, Zap, Rocket } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 
 const SUBMIT_PURPOSE =
   "Connect Freighter to register a new project on Dongle with an on-chain transaction.";
@@ -15,6 +16,7 @@ export default function NewProjectPage() {
 
   return (
     <main className="min-h-screen pt-32 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-blue-500/5 via-transparent to-transparent">
+      <PageHeatmapRecorder page="project_submission" />
       <div className="container mx-auto px-4">
         {gate.state === "ready" ? (
           <ProjectForm />

@@ -48,7 +48,11 @@ export function ThemeProvider({
 
   // Initialize theme from storage or use default
   useEffect(() => {
-    const stored = localStorage.getItem(storageKey) as Theme | null;
+    let stored: Theme | null = null;
+    try {
+      const value = localStorage.getItem(storageKey);
+      if (value === "light" || value === "dark" || value === "system") stored = value;
+    } catch { /* Storage is optional. */ }
     const initial = stored || defaultTheme;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted preferences after mount
     setThemeState(initial);
@@ -92,12 +96,7 @@ export function ThemeProvider({
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     setResolvedTheme(resolveTheme(newTheme));
-    localStorage.setItem(storageKey, newTheme);
-  };
-
-  const setHighContrast = (enabled: boolean) => {
-    setHighContrastState(enabled);
-    localStorage.setItem(highContrastStorageKey, String(enabled));
+    try { localStorage.setItem(storageKey, newTheme); } catch { /* Storage is optional. */ }
   };
 
   return (

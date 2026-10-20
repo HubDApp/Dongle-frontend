@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Review, type ReviewSentiment } from "@/types/review";
+import { useEffect } from "react";
+import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/lib/i18n/useTranslation";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/review-translation";
 import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { reviewAnalyticsService } from "@/services/review/review-analytics.service";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -27,6 +28,7 @@ interface ReviewListProps {
   onOverrideSentiment?: (reviewId: string, sentiment: ReviewSentiment) => void;
   emptyMessage?: string;
   emptyTitle?: string;
+  onClearFilters?: () => void;
 }
 
 type ReviewTranslationState = {
@@ -66,166 +68,66 @@ export default function ReviewList({
   onOverrideSentiment,
   emptyMessage,
   emptyTitle,
+  onClearFilters
 }: ReviewListProps) {
-  const { locale } = useTranslation();
-  const [translationState, setTranslationState] = useState<Record<string, ReviewTranslationState>>({});
-
   useEffect(() => {
-    const nextMap: Record<string, ReviewTranslationState> = {};
-    for (const entry of readReviewTranslationCache()) {
-      if (entry.targetLocale !== locale) continue;
-      nextMap[buildCacheKey(entry.reviewId, entry.targetLocale)] = {
-        translatedText: entry.translatedText,
-        detectedLanguage: entry.detectedLanguage,
-        targetLocale: entry.targetLocale,
-        showOriginal: false,
-        loading: false,
-      };
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync cached translations when the selected locale changes
-    setTranslationState(nextMap);
-  }, [locale]);
-
-  const translateReview = useCallback(
-    async (review: Review) => {
-      const key = buildCacheKey(review.id, locale);
-      const cached = getCachedReviewTranslation(review.id, locale);
-
-      if (cached) {
-        setTranslationState((current) => ({
-          ...current,
-          [key]: {
-            translatedText: cached.translatedText,
-            detectedLanguage: cached.detectedLanguage,
-            targetLocale: locale,
-            showOriginal: false,
-            loading: false,
-          },
-        }));
-        return;
-      }
-
-      setTranslationState((current) => ({
-        ...current,
-        [key]: {
-          translatedText: review.comment,
-          detectedLanguage: "auto",
-          targetLocale: locale,
-          showOriginal: false,
-          loading: true,
-        },
-      }));
-
-      try {
-        const response = await fetch("/api/translate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text: review.comment,
-            targetLocale: locale,
-          }),
-        });
-
-        const data = (await response.json()) as {
-          translatedText?: string;
-          detectedLanguage?: string;
-          error?: string;
-        };
-
-        if (!response.ok || !data.translatedText) {
-          throw new Error(data.error ?? "Translation failed");
-        }
-
-        const nextState: ReviewTranslationState = {
-          translatedText: data.translatedText,
-          detectedLanguage: data.detectedLanguage ?? "auto",
-          targetLocale: locale,
-          showOriginal: false,
-          loading: false,
-        };
-
-        setTranslationState((current) => ({
-          ...current,
-          [key]: nextState,
-        }));
-
-        persistReviewTranslation({
-          reviewId: review.id,
-          targetLocale: locale,
-          originalText: review.comment,
-          translatedText: data.translatedText,
-          detectedLanguage: data.detectedLanguage ?? "auto",
-          createdAt: new Date().toISOString(),
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Translation failed";
-        setTranslationState((current) => ({
-          ...current,
-          [key]: {
-            translatedText: review.comment,
-            detectedLanguage: "auto",
-            targetLocale: locale,
-            showOriginal: false,
-            loading: false,
-            error: message,
-          },
-        }));
-      }
-    },
-    [locale],
-  );
-
-  const toggleOriginalView = useCallback((review: Review) => {
-    const key = buildCacheKey(review.id, locale);
-    setTranslationState((current) => {
-      const existing = current[key];
-      if (!existing) return current;
-      return {
-        ...current,
-        [key]: {
-          ...existing,
-          showOriginal: !existing.showOriginal,
-        },
-      };
-    });
-  }, [locale]);
+    reviewAnalyticsService.recordViews(reviews.map((review) => review.id));
+  }, [reviews]);
 
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
+      <div>{controls}<div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
         {emptyTitle && <p className="text-base font-bold text-zinc-700 dark:text-zinc-300 mb-1">{emptyTitle}</p>}
-        <p className="text-zinc-500">{emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
-      </div>
+        <p className="text-zinc-500">{rating !== "all" ? "No reviews match this rating range. Try clearing filters." : emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
+      </div></div>
     );
   }
 
+  const filteredReviews = languageFilter === "all"
+    ? reviews
+    : reviews.filter((review) => (review.language ?? "und") === languageFilter);
+  const languageGroups = new Map<string, Review[]>();
+  for (const review of filteredReviews) {
+    const language = review.language && review.language in REVIEW_LANGUAGES ? review.language : "und";
+    const group = languageGroups.get(language) ?? [];
+    group.push(review);
+    languageGroups.set(language, group);
+  }
+  const groupEntries = [...languageGroups.entries()].sort(([languageA], [languageB]) => {
+    if (showPreferredFirst && preferredLanguage) {
+      if (languageA === preferredLanguage) return -1;
+      if (languageB === preferredLanguage) return 1;
+    }
+    return 0;
+  });
+
   return (
     <div className="space-y-4">
-      {reviews.map((review) => {
-        const key = buildCacheKey(review.id, locale);
-        const translation = translationState[key];
-        const content = translation && !translation.showOriginal ? translation.translatedText : review.comment;
-        const languageLabel = LOCALE_NAMES[locale];
-        const sentimentPresentation = review.sentiment
-          ? {
-              positive: { emoji: "😊", label: "Positive" },
-              neutral: { emoji: "😐", label: "Neutral" },
-              negative: { emoji: "😞", label: "Negative" },
-            }[review.sentiment]
-          : null;
-        const shouldHideSentiment = currentUserAddress === review.userAddress;
-
-        return (
-          <div
-            key={review.id}
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:border-zinc-300 dark:hover:border-zinc-700"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                  {review.userAddress.substring(0, 1)}
+      {controls}
+      {visibleReviews.map((review) => (
+        <div 
+          key={review.id}
+          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:border-zinc-300 dark:hover:border-zinc-700"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                {review.userAddress.substring(0, 1)}
+              </div>
+              <div>
+                <div className="font-bold flex items-center gap-2">
+                  <AddressDisplay address={review.userAddress} copyable={true} truncated={true} inline={true} />
+                  {review.language && (
+                    <span
+                      title="Language automatically detected from the review text"
+                      className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                    >
+                      {getReviewLanguageLabel(review.language)}
+                    </span>
+                  )}
+                  {currentUserAddress === review.userAddress && (
+                    <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full uppercase">You</span>
+                  )}
                 </div>
                 <div>
                   <div className="font-bold flex items-center gap-2">
@@ -244,6 +146,26 @@ export default function ReviewList({
                 <span className="text-sm font-bold text-yellow-700 dark:text-yellow-500">{review.rating}</span>
               </div>
             </div>
+            <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-lg">
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+              <span className="text-sm font-bold text-yellow-700 dark:text-yellow-500">{review.rating}</span>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              {review.comment}
+            </p>
+            <a
+              href="https://github.com/HubDApp/Dongle-frontend/issues/18"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+              aria-label="Request an automatic translation (Issue 18)"
+            >
+              Translate
+            </a>
+          </div>
 
             {!shouldHideSentiment && (sentimentPresentation || isAdmin) && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -403,8 +325,16 @@ export default function ReviewList({
               </div>
             </div>
           </div>
-        );
-      })}
+
+          {/* Threaded discussion — Issue #654 */}
+          <ReviewComments
+            reviewId={review.id}
+            currentUserAddress={currentUserAddress}
+          />
+        </div>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

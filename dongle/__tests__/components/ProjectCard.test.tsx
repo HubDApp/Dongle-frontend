@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { Project } from "@/types/project";
 
-const { comparisonMocks, watchlistMocks } = vi.hoisted(() => ({
+const { comparisonMocks, watchlistMocks, socialProofMocks } = vi.hoisted(() => ({
   comparisonMocks: {
     addProject: vi.fn(),
     removeProject: vi.fn(),
@@ -16,6 +16,11 @@ const { comparisonMocks, watchlistMocks } = vi.hoisted(() => ({
     toggleWatchlist: vi.fn(),
     canManageWatchlist: true,
   },
+  socialProofMocks: { data: undefined as { badges: Record<string, { type: string; label: string; tooltip: string }[]> } | undefined },
+}));
+
+vi.mock("swr", () => ({
+  default: () => ({ data: socialProofMocks.data }),
 }));
 
 vi.mock("next/link", () => ({
@@ -64,6 +69,7 @@ describe("ProjectCard component", () => {
     comparisonMocks.canAddMore = true;
     watchlistMocks.isOnWatchlist.mockReturnValue(false);
     watchlistMocks.canManageWatchlist = true;
+    socialProofMocks.data = undefined;
   });
 
   // ── Data rendering ────────────────────────────────────────────────────────
@@ -82,6 +88,23 @@ describe("ProjectCard component", () => {
 
     expect(screen.getByText("lending")).toBeInTheDocument();
     expect(screen.getByText("defi")).toBeInTheDocument();
+  });
+
+  it("renders no more than two social proof badges", () => {
+    socialProofMocks.data = {
+      badges: {
+        [baseProject.id]: [
+          { type: "featured", label: "⭐ Featured", tooltip: "Admin selected." },
+          { type: "trending", label: "🔥 Trending", tooltip: "Top 10 this week." },
+          { type: "new", label: "🆕 New", tooltip: "Added in the last 7 days." },
+        ],
+      },
+    };
+    renderCard();
+
+    expect(screen.getByText("⭐ Featured")).toHaveAttribute("title", "Admin selected.");
+    expect(screen.getByText("🔥 Trending")).toBeInTheDocument();
+    expect(screen.queryByText("🆕 New")).not.toBeInTheDocument();
   });
 
   it("omits the tag list when the project has no tags", () => {

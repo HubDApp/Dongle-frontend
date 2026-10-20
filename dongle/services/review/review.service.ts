@@ -8,8 +8,7 @@ import {
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
 import { reviewApiService } from "./review-api.service";
-import { classifyReviewSentiment } from "@/lib/review-sentiment";
-import type { ReviewSentiment } from "@/types/review";
+import { detectReviewLanguage } from "@/lib/review-language";
 
 const STORAGE_KEY = "dongle_reviews";
 
@@ -81,8 +80,6 @@ function getLocalReviews(): Review[] {
     } else {
       createdAt = nowUTC();
     }
-    const hasValidSentiment = isReviewSentiment(record.sentiment);
-    if (!hasValidSentiment) migratedSentiment = true;
     const review: Review = {
       id,
       projectId: record.projectId,
@@ -90,11 +87,8 @@ function getLocalReviews(): Review[] {
       userAddress: record.userAddress,
       rating,
       comment: record.comment,
+      language: typeof record.language === "string" ? record.language : detectReviewLanguage(record.comment),
       createdAt,
-      sentiment: hasValidSentiment
-        ? record.sentiment
-        : classifyReviewSentiment(record.comment),
-      sentimentSource: record.sentimentSource === "admin" ? "admin" : "automatic",
     };
     if (Array.isArray(record.helpfulVotes)) {
       review.helpfulVotes = record.helpfulVotes.filter((v): v is string => typeof v === "string");
@@ -164,11 +158,10 @@ async function addReview(
   }
   const newReview: Review = {
     ...review,
+    language: detectReviewLanguage(review.comment),
     userAddress,
     id: generateId(),
     createdAt: new Date().toISOString(),
-    sentiment: classifyReviewSentiment(review.comment),
-    sentimentSource: "automatic",
   };
   if (signedPayload) {
     newReview.signedPayload = signedPayload.payload;
@@ -216,12 +209,7 @@ async function updateReview(
   reviews[index] = {
     ...reviews[index],
     ...updates,
-    ...(updates.comment !== undefined
-      ? {
-          sentiment: classifyReviewSentiment(updates.comment),
-          sentimentSource: "automatic" as const,
-        }
-      : {}),
+    ...(updates.comment !== undefined ? { language: detectReviewLanguage(updates.comment) } : {}),
   };
   saveLocalReviews(reviews);
   return { success: true, data: reviews[index] };
@@ -278,6 +266,58 @@ async function getReviewsByUser(userAddress: string): Promise<Review[]> {
   }
   warnDevMode();
   return getLocalReviews().filter((r) => r.userAddress === userAddress);
+}
+
+async function searchReviews(params: Record<string, string | number | boolean | undefined>) {
+  if (getPersistenceMode() === "api") {
+    try {
+      return await reviewApiService.searchReviews(params);
+    } catch {
+      if (typeof window !== "undefined") {
+        console.warn(DEV_MODE_WARN);
+      }
+    }
+  }
+
+  warnDevMode();
+  const reviews = getLocalReviews();
+  const all = reviews.filter((review) => {
+    const search = String(params.q ?? "").trim().toLowerCase();
+    if (!search) return true;
+    return review.comment.toLowerCase().includes(search);
+  });
+
+  const ratingMin = params.ratingMin !== undefined ? Number(params.ratingMin) : undefined;
+  const ratingMax = params.ratingMax !== undefined ? Number(params.ratingMax) : undefined;
+  const verifiedOnly = params.verifiedOnly === true;
+  const language = typeof params.language === "string" ? params.language.toLowerCase() : undefined;
+  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const pageSize = Math.max(1, Number(params.pageSize ?? 20) || 20);
+
+  const filtered = all.filter((review) => {
+    if (ratingMin !== undefined && review.rating < ratingMin) return false;
+    if (ratingMax !== undefined && review.rating > ratingMax) return false;
+    if (verifiedOnly && review.isVerifiedReviewer !== true) return false;
+    if (language && review.language && review.language.toLowerCase() !== language) return false;
+    return true;
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageResults = filtered.slice((page - 1) * pageSize, page * pageSize).map((review) => ({
+    ...review,
+    score: 1,
+    highlights: [],
+  }));
+
+  return {
+    results: pageResults,
+    total,
+    page,
+    pageSize,
+    totalPages,
+    suggestions: [],
+  };
 }
 
 async function voteHelpful(
@@ -347,6 +387,7 @@ export const reviewService = {
   deleteReview,
   getReviewsByProject,
   getReviewsByUser,
+  searchReviews,
   voteHelpful,
   voteUnhelpful,
   overrideSentiment,

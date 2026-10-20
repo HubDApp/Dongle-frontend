@@ -66,3 +66,24 @@ export type {
 // Issue #706: funnel and engagement analysis
 export { FUNNELS, computeFunnel, averageTimeOnPage } from "./funnels";
 export type { FunnelDefinition, FunnelStepResult } from "./funnels";
+
+// Issue #715: UTM capture and acquisition attribution
+export {
+  parseUtm,
+  buildTouchPoint,
+  captureAttribution,
+  getAttribution,
+  getAttributionRecords,
+  markEngaged,
+  recordConversion,
+  computeAttributionMetrics,
+  toAttributionCsv,
+  buildSampleAttributionRecords,
+} from "./attribution";
+export type {
+  UtmParams,
+  TouchPoint,
+  AttributionRecord,
+  AttributionState,
+  AttributionMetric,
+} from "./attribution";
