@@ -1,0 +1,108 @@
+---
+title: Error Reference
+description: HTTP status codes, error response format, and application error codes.
+---
+
+# Error Reference
+
+## Error Response Format
+
+All errors return a consistent JSON envelope:
+
+```json
+{
+  "success": false,
+  "error": "Human-readable error message",
+  "errors": [
+    {
+      "field": "comment",
+      "message": "Comment must be at least 10 characters"
+    }
+  ]
+}
+```
+
+- `error` — general message for the whole request
+- `errors` — field-level validation errors (present on `400`)
+
+## HTTP Status Codes
+
+| Code | When |
+|------|------|
+| `400 Bad Request` | Validation error, malformed JSON, missing required fields |
+| `401 Unauthorized` | Missing or expired admin token; missing wallet address |
+| `403 Forbidden` | Valid identity but insufficient permission (not the resource owner, not in admin allowlist) |
+| `404 Not Found` | Resource doesn't exist or was deleted |
+| `409 Conflict` | Duplicate resource: user already reviewed this project |
+| `429 Too Many Requests` | Rate limit exceeded |
+| `500 Internal Server Error` | Unexpected server error |
+
+## Application Error Codes
+
+Error codes appear in brackets in the browser console and in toast notifications: `[WALLET_LOCKED]`.
+
+### Wallet errors (`WALLET_*`)
+
+| Code | Message | Resolution |
+|------|---------|------------|
+| `WALLET_NOT_INSTALLED` | Freighter not found | Install from [freighter.app](https://freighter.app/) |
+| `WALLET_LOCKED` | Freighter is locked | Unlock the extension |
+| `WALLET_USER_REJECTED` | User cancelled the popup | Approve the connection request |
+| `WALLET_WRONG_NETWORK` | Network mismatch | Switch Freighter to the correct network |
+
+### Network errors (`NETWORK_*`)
+
+| Code | Message | Resolution |
+|------|---------|------------|
+| `NETWORK_TIMEOUT` | Request timed out | Check connectivity and RPC endpoint |
+| `NETWORK_OFFLINE` | No internet connection | Restore network access |
+| `NETWORK_CONNECTION_REFUSED` | RPC endpoint refused | Verify `NEXT_PUBLIC_SOROBAN_RPC_URL` |
+
+### Account errors (`ACCOUNT_*`)
+
+| Code | Message | Resolution |
+|------|---------|------------|
+| `ACCOUNT_NOT_FOUND` | Account does not exist | Fund account via [Friendbot](https://laboratory.stellar.org/#account-creator) |
+| `ACCOUNT_UNFUNDED` | Account has zero XLM | Fund via Friendbot |
+| `ACCOUNT_INSUFFICIENT_BALANCE` | Insufficient XLM for fees | Add XLM to the account |
+
+### Transaction errors (`TRANSACTION_*`)
+
+| Code | Message | Resolution |
+|------|---------|------------|
+| `TRANSACTION_FAILED` | Transaction rejected by ledger | Check error result in explorer |
+| `TRANSACTION_BAD_SEQUENCE` | Sequence number mismatch | Retry the transaction |
+| `TRANSACTION_TIMEOUT` | Polling exceeded 60s | Check transaction in Stellar explorer |
+
+### API errors (`API_*`)
+
+| Code | Message | Resolution |
+|------|---------|------------|
+| `API_NOT_FOUND` | Endpoint doesn't exist | Check the URL |
+| `API_SERVER_ERROR` | Internal server error | Report with console output |
+| `API_RATE_LIMITED` | Rate limit exceeded | Wait and retry |
+
+### Contract errors
+
+| Error string | Contract | Meaning |
+|---|---|---|
+| `"Only project owner can update the project"` | Project Registry | Connect with the owner wallet |
+| `"Project not found"` | Project Registry | Verify the project ID |
+| `"A verification request is already pending..."` | Verification Registry | Request already exists |
+
+## Rate Limit Response
+
+```http
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1735392000000
+
+{
+  "success": false,
+  "error": "Rate limit exceeded. Try again in 45 seconds.",
+  "retryAfter": 45
+}
+```
+
+See [Rate Limiting](/api-reference/rate-limiting) for limits per category.

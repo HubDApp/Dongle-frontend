@@ -1,0 +1,67 @@
+---
+title: Input
+description: Input component props and accessibility patterns.
+---
+
+import { Callout } from "nextra/components";
+
+# Input
+
+```tsx
+import { Input } from "@/components/ui/Input";
+```
+
+Native `<input>` with Dongle styling. Forwards a ref. Use `FormField` when you need a visible label, helper text, and error message all together.
+
+## Props
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `error` | `boolean` | `false` | Red border |
+| `type` | HTML input types | `"text"` | `text`, `email`, `url`, `search`, … |
+| `...rest` | `InputHTMLAttributes` | — | `value`, `onChange`, `disabled`, `maxLength`, `aria-*` |
+
+## Examples
+
+```tsx
+// With an associated label
+<label htmlFor="project-name">Project name</label>
+<Input
+  id="project-name"
+  name="projectName"
+  autoComplete="organization"
+/>
+
+// Error state
+<Input
+  id="website"
+  aria-label="Website URL"
+  error
+  aria-invalid="true"
+  aria-describedby="website-error"
+/>
+<p id="website-error" role="alert">
+  Enter a valid https:// URL.
+</p>
+
+// Disabled
+<Input value="Read only value" disabled aria-label="Contract ID" />
+```
+
+## Accessibility
+
+<Callout type="warning">
+  A `placeholder` is **not** a label. Always provide an associated `<label>` or `aria-label`.
+</Callout>
+
+| Prop | When to use |
+|------|-------------|
+| `aria-label` or `<label htmlFor>` | Always — one or the other is required |
+| `aria-invalid="true"` | Set when `error={true}` |
+| `aria-describedby` | Space-separated IDs of error messages and helper text |
+| `required` / `aria-required` | Required fields |
+| `autoComplete` | Use standard tokens: `url`, `email`, `organization`, etc. |
+
+<Callout>
+  Use `FormField` instead of a bare `Input` inside forms — it wires `htmlFor`, `aria-invalid`, and `aria-describedby` automatically.
+</Callout>

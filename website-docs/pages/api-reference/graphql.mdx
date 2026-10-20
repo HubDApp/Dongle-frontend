@@ -1,0 +1,195 @@
+---
+title: GraphQL API
+description: Schema, queries, mutations, and subscriptions for the Dongle GraphQL endpoint.
+---
+
+import { Callout } from "nextra/components";
+
+# GraphQL API
+
+**Endpoint:** `POST /api/graphql`  
+**Introspection:** `GET /api/graphql`
+
+<Callout>
+  Use the interactive explorer at `http://localhost:3000/api/docs` to test queries directly in the browser.
+</Callout>
+
+## Schema
+
+```graphql
+type Query {
+  submissions(limit: Int, offset: Int, status: String): SubmissionConnection!
+  submission(id: ID!): Submission
+  reviews(projectId: String, limit: Int, offset: Int): ReviewConnection!
+  review(id: ID!): Review
+}
+
+type Mutation {
+  createSubmission(input: SubmissionInput!): SubmissionResult!
+  updateSubmission(id: ID!, input: SubmissionInput!): SubmissionResult!
+  deleteSubmission(id: ID!): DeleteResult!
+  createReview(input: ReviewInput!): ReviewResult!
+  updateReview(id: ID!, input: ReviewInput!): ReviewResult!
+  deleteReview(id: ID!): DeleteResult!
+}
+
+type Subscription {
+  submissionUpdated(id: ID): Submission!
+  reviewUpdated(projectId: String): Review!
+}
+```
+
+## Types
+
+```graphql
+type Review {
+  id: ID!
+  projectId: String!
+  projectName: String!
+  userAddress: String!
+  rating: Int!
+  comment: String!
+  createdAt: String!
+  helpfulVotes: [String!]!
+  unhelpfulVotes: [String!]!
+}
+
+type ReviewConnection {
+  items: [Review!]!
+  total: Int!
+  hasMore: Boolean!
+}
+
+input ReviewInput {
+  projectId: String!
+  projectName: String
+  userAddress: String!
+  rating: Int!
+  comment: String!
+}
+
+type ReviewResult {
+  success: Boolean!
+  review: Review
+  error: String
+}
+
+type DeleteResult {
+  success: Boolean!
+  error: String
+}
+```
+
+## Example Queries
+
+### Fetch reviews for a project
+
+```graphql
+query GetProjectReviews {
+  reviews(projectId: "soroban-swap", limit: 10) {
+    items {
+      id
+      userAddress
+      rating
+      comment
+      createdAt
+    }
+    total
+    hasMore
+  }
+}
+```
+
+### Fetch submissions
+
+```graphql
+query GetSubmissions {
+  submissions(limit: 10, status: "approved") {
+    items {
+      id
+      projectName
+      status
+      qualityScore
+      submittedAt
+    }
+    total
+    hasMore
+  }
+}
+```
+
+## Example Mutations
+
+### Create a review
+
+```graphql
+mutation CreateReview($input: ReviewInput!) {
+  createReview(input: $input) {
+    success
+    review {
+      id
+      rating
+      comment
+      createdAt
+    }
+    error
+  }
+}
+```
+
+Variables:
+
+```json
+{
+  "input": {
+    "projectId": "soroban-swap",
+    "userAddress": "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H",
+    "rating": 5,
+    "comment": "Great project with solid documentation!"
+  }
+}
+```
+
+### Create a submission
+
+```graphql
+mutation CreateSubmission($input: SubmissionInput!) {
+  createSubmission(input: $input) {
+    success
+    submission {
+      id
+      status
+    }
+    error
+  }
+}
+```
+
+## Subscriptions
+
+### Subscribe to review updates
+
+```graphql
+subscription OnReviewUpdated($projectId: String!) {
+  reviewUpdated(projectId: $projectId) {
+    id
+    rating
+    comment
+    createdAt
+  }
+}
+```
+
+<Callout type="info">
+  Subscriptions use **WebSocket** transport. The main app deploys as a Next.js serverless function on Vercel which does not support long-lived WebSocket connections. For production multi-instance deployments, replace the in-memory event bus with Redis pub/sub.
+</Callout>
+
+## curl Example
+
+```bash
+curl -X POST http://localhost:3000/api/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "query { reviews(projectId: \"soroban-swap\") { items { id rating comment } total } }"
+  }'
+```

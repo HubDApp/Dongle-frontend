@@ -7,12 +7,12 @@
  * button, and featured-first ordering. Featured reviews show a ⭐ badge.
  */
 
-import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles } from "lucide-react";
+import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock } from "lucide-react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
-import { getReviewLanguageLabel } from "@/lib/review-language";
+import { ENCRYPTED_COMMENT_SENTINEL } from "@/lib/review-encryption";
 
 interface ReviewCardProps {
   review: Review;
@@ -64,12 +64,13 @@ export default function ReviewCard({
                   Featured
                 </span>
               )}
-              {review.language && (
+              {review.encrypted && (
                 <span
-                  title="Language automatically detected from the review text"
-                  className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                  className="inline-flex items-center gap-1 text-[10px] bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded-full font-semibold"
+                  title="This review is end-to-end encrypted"
                 >
-                  {getReviewLanguageLabel(review.language)}
+                  <Lock className="w-3 h-3" aria-hidden="true" />
+                  Encrypted
                 </span>
               )}
             </div>
@@ -82,18 +83,14 @@ export default function ReviewCard({
         </div>
       </div>
 
-      <div className="mb-6">
-        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">{review.comment}</p>
-        <a
-          href="https://github.com/HubDApp/Dongle-frontend/issues/18"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
-          aria-label="Request an automatic translation (Issue 18)"
-        >
-          Translate
-        </a>
-      </div>
+      {review.encrypted ? (
+        <div className="flex items-center gap-2 mb-6 text-sm text-indigo-600 dark:text-indigo-400 italic">
+          <Lock className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <span>{ENCRYPTED_COMMENT_SENTINEL}</span>
+        </div>
+      ) : (
+        <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">{review.comment}</p>
+      )}
 
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">

@@ -28,7 +28,6 @@ export default function ReviewsPage() {
   const [selectedProject, setSelectedProject] = useState<ReviewProject | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "oldest" | "highest" | "lowest" | "helpfulness">("recent");
   const [projectFilter, setProjectFilter] = useState<string>("all");
-  const [ratingFilter, setRatingFilter] = useState<string>("all");
   const [userFilter, setUserFilter] = useState<"all" | "mine">("all");
   const [reviewSearch, setReviewSearch] = useState("");
   const [showWalletGate, setShowWalletGate] = useState(false);
@@ -202,10 +201,6 @@ export default function ReviewsPage() {
       list = list.filter((r) => r.projectId === projectFilter);
     }
 
-    if (ratingFilter !== "all") {
-      const ratingNum = parseInt(ratingFilter, 10);
-      list = list.filter((r) => r.rating === ratingNum);
-    }
 
     if (userFilter === "mine" && gate.publicKey) {
       list = list.filter((r) => r.userAddress === gate.publicKey);
@@ -235,7 +230,7 @@ export default function ReviewsPage() {
       default:
         return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
-  }, [reviews, sortBy, projectFilter, ratingFilter, userFilter, gate.publicKey, reviewSearch]);
+  }, [reviews, sortBy, projectFilter, userFilter, gate.publicKey]);
 
   const emptyStateMessage = useMemo(() => {
     if (reviews.length === 0) {
@@ -249,15 +244,11 @@ export default function ReviewsPage() {
       const projName = allProjects.find((p) => p.id === projectFilter)?.name || "selected project";
       activeFilters.push(`project "${projName}"`);
     }
-    if (ratingFilter !== "all") {
-      activeFilters.push(`${ratingFilter}-star rating`);
-    }
-    if (reviewSearch.trim()) activeFilters.push(`text matching "${reviewSearch.trim()}"`);
     if (activeFilters.length > 0) {
       return `No reviews found matching ${activeFilters.join(" and ")}. Try adjusting your filters.`;
     }
     return "No reviews match the selected filter criteria.";
-  }, [reviews.length, userFilter, projectFilter, ratingFilter, reviewSearch, allProjects]);
+  }, [reviews.length, userFilter, projectFilter, allProjects]);
 
   const topProjects = allProjects.slice(0, 6);
 
@@ -411,22 +402,7 @@ export default function ReviewsPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-zinc-500 whitespace-nowrap">Rating:</span>
-                      <select
-                        aria-label="Filter reviews by rating"
-                        value={ratingFilter}
-                        onChange={(e) => setRatingFilter(e.target.value)}
-                        className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold"
-                      >
-                        <option value="all">All Ratings</option>
-                        <option value="5">5 Stars</option>
-                        <option value="4">4 Stars</option>
-                        <option value="3">3 Stars</option>
-                        <option value="2">2 Stars</option>
-                        <option value="1">1 Star</option>
-                      </select>
-                    </div>
+
                     <div className="flex items-center gap-2">
                       <span className="text-zinc-500 whitespace-nowrap">Sort by:</span>
                       <select
@@ -446,6 +422,7 @@ export default function ReviewsPage() {
                 </div>
 
                 <ReviewList
+                  onClearFilters={() => { setSortBy("recent"); setProjectFilter("all"); setUserFilter("all"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   onEdit={handleEditReview}

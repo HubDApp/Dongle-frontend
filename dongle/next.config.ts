@@ -41,7 +41,10 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Security headers for all routes
+  // Security headers (CSP + most headers) are set dynamically in middleware.ts
+  // so that a fresh nonce can be embedded in the CSP on every request.
+  // Only headers that apply to static assets (served directly by Next.js,
+  // bypassing middleware) are kept here.
   async headers() {
     return [
       {
@@ -49,16 +52,7 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
-          },
         ],
       },
     ];

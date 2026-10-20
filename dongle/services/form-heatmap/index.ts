@@ -10,6 +10,8 @@ export {
 } from "./collector";
 export { heatColor, pointsToCells } from "./visualize";
 export type { HeatCell } from "./visualize";
+export { detectDevice, currentDevice, DEVICE_TYPES } from "./types";
+export type { DeviceType } from "./types";
 export type {
   HeatPoint,
   ClickEvent,

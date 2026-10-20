@@ -1,0 +1,63 @@
+---
+title: Card
+description: Card component props, variants, and accessibility guidance.
+---
+
+# Card
+
+```tsx
+import { Card } from "@/components/ui/Card";
+```
+
+A styled `div` for grouping content. Not interactive by default.
+
+## Props
+
+| Prop | Type | Default | Notes |
+|------|------|---------|-------|
+| `variant` | `"default" \| "glass" \| "outline"` | `"default"` | Surface style |
+| `padding` | `"none" \| "sm" \| "md" \| "lg"` | `"md"` | Inner spacing |
+| `...rest` | `HTMLAttributes<HTMLDivElement>` | — | `className`, `role`, `aria-*` |
+
+## Examples
+
+```tsx
+<Card variant="default" padding="md">
+  <h2>Project Name</h2>
+  <p>Project description here.</p>
+</Card>
+
+<Card variant="glass" padding="lg">
+  <h2>Featured</h2>
+</Card>
+
+<Card variant="outline" padding="sm">
+  <Badge variant="success">Verified</Badge>
+</Card>
+```
+
+## Accessibility
+
+Card has no default `role`. Add one only when the grouping is a landmark or article:
+
+```tsx
+// Listing item
+<Card role="article" aria-labelledby="project-title">
+  <h3 id="project-title">Soroban Swap</h3>
+</Card>
+
+// Named region
+<Card role="region" aria-label="Verification status">
+  ...
+</Card>
+```
+
+**Do not** attach `onClick` directly to a Card. Put a `Link` or `Button` inside so keyboard users get a proper tab stop and role.
+
+## Variants Reference
+
+| Variant | Visual |
+|---------|--------|
+| `default` | Solid background with shadow |
+| `glass` | Semi-transparent frosted-glass effect |
+| `outline` | Transparent with border |

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
-import { getReviewLanguageLabel, REVIEW_LANGUAGES } from "@/lib/review-language";
+import { reviewAnalyticsService } from "@/services/review/review-analytics.service";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -18,6 +18,7 @@ interface ReviewListProps {
   onReport?: (review: Review) => void;
   emptyMessage?: string;
   emptyTitle?: string;
+  onClearFilters?: () => void;
 }
 
 export default function ReviewList({ 
@@ -29,28 +30,19 @@ export default function ReviewList({
   onVoteUnhelpful,
   onReport,
   emptyMessage,
-  emptyTitle
+  emptyTitle,
+  onClearFilters
 }: ReviewListProps) {
-  const [languageFilter, setLanguageFilter] = useState("all");
-  const [preferredLanguage, setPreferredLanguage] = useState("");
-  const [showPreferredFirst, setShowPreferredFirst] = useState(true);
-
   useEffect(() => {
-    const storedLanguage = localStorage.getItem("dongle_review_language");
-    const browserLanguage = navigator.language.split("-")[0].toLowerCase();
-    const language = storedLanguage && storedLanguage in REVIEW_LANGUAGES
-      ? storedLanguage
-      : browserLanguage in REVIEW_LANGUAGES ? browserLanguage : "";
-    setPreferredLanguage(language);
-    setShowPreferredFirst(localStorage.getItem("dongle_reviews_preferred_first") !== "false");
-  }, []);
+    reviewAnalyticsService.recordViews(reviews.map((review) => review.id));
+  }, [reviews]);
 
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
+      <div>{controls}<div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
         {emptyTitle && <p className="text-base font-bold text-zinc-700 dark:text-zinc-300 mb-1">{emptyTitle}</p>}
-        <p className="text-zinc-500">{emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
-      </div>
+        <p className="text-zinc-500">{rating !== "all" ? "No reviews match this rating range. Try clearing filters." : emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
+      </div></div>
     );
   }
 
@@ -73,42 +65,9 @@ export default function ReviewList({
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 pb-3 dark:border-zinc-800">
-        <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-          Filter language
-          <select
-            aria-label="Filter reviews by language"
-            value={languageFilter}
-            onChange={(event) => setLanguageFilter(event.target.value)}
-            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <option value="all">All languages</option>
-            {[...new Set(reviews.map((review) => review.language ?? "und"))].map((language) => (
-              <option key={language} value={language}>{getReviewLanguageLabel(language)}</option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-          <input
-            type="checkbox"
-            checked={showPreferredFirst}
-            onChange={(event) => {
-              setShowPreferredFirst(event.target.checked);
-              localStorage.setItem("dongle_reviews_preferred_first", String(event.target.checked));
-            }}
-          />
-          Show reviews in my language first
-        </label>
-      </div>
-      {groupEntries.length === 0 ? (
-        <div className="py-10 text-center text-sm text-zinc-500">No reviews in this language.</div>
-      ) : groupEntries.map(([language, languageReviews]) => (
-        <section key={language} aria-labelledby={`review-language-${language}`} className="space-y-3">
-          <h3 id={`review-language-${language}`} className="text-sm font-semibold text-zinc-500">
-            {getReviewLanguageLabel(language)} <span className="font-normal">({languageReviews.length})</span>
-          </h3>
-          {languageReviews.map((review) => (
+    <div className="space-y-4">
+      {controls}
+      {visibleReviews.map((review) => (
         <div 
           key={review.id}
           className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:border-zinc-300 dark:hover:border-zinc-700"
@@ -228,6 +187,12 @@ export default function ReviewList({
               )}
             </div>
           </div>
+
+          {/* Threaded discussion — Issue #654 */}
+          <ReviewComments
+            reviewId={review.id}
+            currentUserAddress={currentUserAddress}
+          />
         </div>
           ))}
         </section>

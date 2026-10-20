@@ -30,6 +30,13 @@ export const reviewApiService = {
         body.signatureNonce = signedPayload.nonce;
         body.signatureTimestamp = signedPayload.timestamp;
       }
+      // Pass through E2E encryption fields if present (#731)
+      if (review.encrypted) {
+        body.encrypted = review.encrypted;
+        body.encryptedPayload = review.encryptedPayload;
+        body.encryptedCid = review.encryptedCid;
+        body.adminWrappedKey = review.adminWrappedKey;
+      }
       const response = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,6 +100,32 @@ export const reviewApiService = {
   async getReviewsByUser(userAddress: string): Promise<Review[]> {
     const response = await fetch(`${API_BASE}?userAddress=${encodeURIComponent(userAddress)}`);
     const data = await handleResponse<{ success: boolean; data: Review[] }>(response);
+    return data.data;
+  },
+
+  async searchReviews(params: Record<string, string | number | boolean | undefined>): Promise<{
+    results: Array<Review & { score: number; highlights: Array<{ start: number; end: number }> }>;
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    suggestions: string[];
+  }> {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      queryParams.set(key, String(value));
+    });
+
+    const response = await fetch(`${API_BASE}/search?${queryParams.toString()}`);
+    const data = await handleResponse<{ success: boolean; data: {
+      results: Array<Review & { score: number; highlights: Array<{ start: number; end: number }> }>;
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+      suggestions: string[];
+    } }>(response);
     return data.data;
   },
 };

@@ -1,0 +1,95 @@
+---
+title: Review Services
+description: API contracts for ReviewService, ReviewReportService, and ReviewApiService.
+---
+
+import { Callout } from "nextra/components";
+
+# Review Services
+
+## ReviewService
+
+`services/review/review.service.ts`
+
+### Methods
+
+#### `getReviewsForProject(projectId: string): Review[]`
+Returns reviews sorted newest-first.
+
+#### `addReview(reviewData): Promise<Review>`
+
+```typescript
+const review = await reviewService.addReview({
+  projectId: "soroban-swap",
+  authorAddress: "GBRPYHIL2...",
+  rating: 5,
+  title: "Excellent protocol",
+  body: "Low fees and fast transactions."
+});
+```
+
+**Validation:**
+| Rule | Error code |
+|------|------------|
+| Author already reviewed this project | `DUPLICATE_REVIEW` |
+| Rating not between 1–5 | `INVALID_RATING` |
+| Review body < 10 characters | `SHORT_BODY` |
+
+#### `voteReview(reviewId, userAddress, voteType): void`
+`voteType`: `"upvote"` | `"downvote"`. Toggles or updates an existing vote.
+
+#### `getReviewStats(projectId): ReviewStats`
+```typescript
+const stats = reviewService.getReviewStats("soroban-swap");
+// {
+//   averageRating: 4.7,
+//   totalReviews: 42,
+//   ratingDistribution: { 1: 0, 2: 1, 3: 3, 4: 12, 5: 26 }
+// }
+```
+
+<Callout>
+  **Mock mode** — persisted in `MockReviewRepository` (encrypted `localStorage`).  
+  **Production** — interacts with the Soroban Review Registry contract and a backend API indexer.
+</Callout>
+
+---
+
+## ReviewReportService
+
+`services/review/review-report.service.ts` — report inappropriate or spam reviews.
+
+```typescript
+// Report a review
+const ok = await reviewReportService.reportReview(
+  reviewId,
+  reporterAddress,
+  "Spam / advertising"
+);
+
+// List reports for a review (admin)
+const reports = reviewReportService.getReportsForReview(reviewId);
+```
+
+Throws on missing parameters. Logs a warning on network error.
+
+---
+
+## ReviewApiService
+
+`services/review/review-api.service.ts` — remote HTTP transport for the review backend.
+
+```typescript
+const result = await reviewApiService.fetchProjectReviews("soroban-swap");
+// { ok: true, data: Review[] }
+
+const created = await reviewApiService.submitReviewRemote(payload);
+// { ok: true, data: Review }
+```
+
+**Error cases:**
+| Status | Meaning |
+|--------|---------|
+| `401` | Wallet signature / auth missing |
+| `429` | Rate limit exceeded |
+| `500` | Server error — UI falls back to local storage |

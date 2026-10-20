@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { trackPageView } from "@/lib/analytics";
+import { captureAttribution, trackPageView } from "@/lib/analytics";
 
 /**
  * Emits a `page_view` event on client-side route changes.
@@ -28,6 +28,9 @@ export default function AnalyticsProvider({
     trackPageView(pathname, {
       has_query: hasQuery,
     });
+
+    // Issue #715: capture UTM parameters for first/last-touch attribution.
+    captureAttribution(window.location.search, pathname);
   }, [pathname, searchParams]);
 
   return <>{children}</>;

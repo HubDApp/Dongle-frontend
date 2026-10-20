@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 
 describe("FormSubmissionRetry component", () => {
@@ -65,5 +65,36 @@ describe("FormSubmissionRetry component", () => {
     );
 
     expect(screen.getByText(/Wallet Signature Declined/i)).toBeDefined();
+  });
+
+  it("displays a standardized API submission error", () => {
+    render(
+      <FormSubmissionRetry
+        error={{ success: false, error: { message: "The service is unavailable" } }}
+        onRetry={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("The service is unavailable")).toBeDefined();
+  });
+
+  it("automatically dismisses after the configured timeout", () => {
+    vi.useFakeTimers();
+    const onDismiss = vi.fn();
+    render(
+      <FormSubmissionRetry
+        error="Submission failed"
+        onRetry={vi.fn()}
+        onDismiss={onDismiss}
+        autoDismissMs={3000}
+      />
+    );
+
+    expect(screen.getByRole("alert")).toBeDefined();
+    act(() => vi.advanceTimersByTime(3000));
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

@@ -1,0 +1,152 @@
+name: Deploy – Docs Site
+
+# Builds and deploys the Nextra documentation site (website-docs/) to
+# docs.dongle.app via Vercel.
+#
+# Preview deploy:  every PR that touches website-docs/
+# Production deploy: merge to main (after manual approval via "docs-production" environment)
+#
+# Required secrets:
+#   VERCEL_TOKEN
+#   VERCEL_ORG_ID
+#   VERCEL_PROJECT_ID_DOCS   ← separate Vercel project for the docs site
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "website-docs/**"
+      - ".github/workflows/deploy-docs.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "website-docs/**"
+      - ".github/workflows/deploy-docs.yml"
+
+concurrency:
+  group: deploy-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Preview deploy (PRs only) ─────────────────────────────────────────────
+  deploy-docs-preview:
+    name: Deploy docs preview
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./website-docs
+
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.preview-url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./website-docs/package-lock.json"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment (preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+
+      - name: Build
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+
+      - name: Deploy
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          echo "preview-url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "Docs preview: ${URL}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+
+      - name: Comment on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: docs-preview
+          message: |
+            ## 📚 Docs Preview
+
+            | | |
+            |---|---|
+            | **URL** | ${{ steps.deploy.outputs.preview-url }} |
+            | **Commit** | `${{ github.sha }}` |
+            | **Branch** | `${{ github.head_ref }}` |
+
+  # ── Production deploy (merge to main) ────────────────────────────────────
+  deploy-docs-production:
+    name: Deploy docs to production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    # Pause here until a reviewer approves the "docs-production" GitHub Environment.
+    # Configure required reviewers at:
+    #   Settings → Environments → docs-production → Required reviewers
+    environment: docs-production
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: ./website-docs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./website-docs/package-lock.json"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment (production)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}
+
+      - name: Deploy to docs.dongle.app
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 | tail -1)
+          echo "🚀 Docs deployed to: ${URL}"
+          echo "### Docs Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed to **${URL}** (docs.dongle.app)" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_DOCS }}

@@ -15,14 +15,9 @@ import {
   APIError,
 } from "@/services/error/error.service";
 import { cacheGet, cacheSet, cacheDel, CacheKey, REVIEWS_TTL_S } from "@/lib/cache";
-import { detectReviewLanguage } from "@/lib/review-language";
+import { getReviewStore } from "@/lib/review-store";
 
-interface InMemoryReview extends Review {
-  helpfulVotes: string[];
-  unhelpfulVotes: string[];
-}
-
-const store = new Map<string, InMemoryReview>();
+const store = getReviewStore();
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -103,19 +98,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, projectName, userAddress, rating, comment, signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken } = body;
+    const {
+      projectId, projectName, userAddress, rating, comment,
+      signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken,
+      // E2E encryption fields (#731)
+      encrypted, encryptedPayload, encryptedCid, adminWrappedKey,
+    } = body;
 
     if (!projectId || !projectName || !userAddress) {
       return NextResponse.json(
-        {
-          success: false,
-          errors: [{ field: "comment", message: "Missing required fields" }],
-        },
+        { success: false, errors: [{ field: "comment", message: "Missing required fields" }] },
         { status: 400 }
       );
     }
 
-    const validationError = validateReviewInput(rating, comment);
+    // For encrypted reviews the comment is the sentinel — skip length validation.
+    const validationError = encrypted
+      ? validateReviewInput(rating, "placeholder comment") // rating-only check
+      : validateReviewInput(rating, comment);
     if (validationError) {
       return NextResponse.json(
         { success: false, errors: [validationError] },
@@ -123,9 +123,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Encrypted reviews must supply an encryptedPayload.
+    if (encrypted && !encryptedPayload) {
+      return NextResponse.json(
+        { success: false, errors: [{ field: "comment", message: "encryptedPayload is required for encrypted reviews" }] },
+        { status: 400 }
+      );
+    }
+
     // ── Signature verification (cryptographic form submission signing) ─────
     // If a signature is provided, verify it against the payload and public key.
     // This ensures tamper detection and authenticity of the submission.
+    let isVerifiedReviewer = false;
     if (signedPayload && signature) {
       const isValid = verifySignature(signedPayload, signature, userAddress);
       if (!isValid) {
@@ -134,6 +143,7 @@ export async function POST(request: NextRequest) {
           { status: 401 }
         );
       }
+      isVerifiedReviewer = true;
     }
 
     if (isReviewerBanned(userAddress)) {
@@ -179,12 +189,21 @@ export async function POST(request: NextRequest) {
       comment,
       language: detectReviewLanguage(comment),
       createdAt: new Date().toISOString(),
+      language: typeof language === "string"
+        ? language.toLowerCase().split("-")[0]
+        : request.headers.get("accept-language")?.split(",")[0]?.split("-")[0]?.toLowerCase(),
+      isVerifiedReviewer,
       helpfulVotes: [],
       unhelpfulVotes: [],
       signedPayload: signedPayload || undefined,
       signature: signature || undefined,
       signatureNonce: signatureNonce || undefined,
       signatureTimestamp: signatureTimestamp || undefined,
+      // E2E encryption (#731)
+      encrypted: encrypted === true ? true : undefined,
+      encryptedPayload: encryptedPayload || undefined,
+      encryptedCid: encryptedCid || undefined,
+      adminWrappedKey: adminWrappedKey || undefined,
     };
 
     store.set(newReview.id, newReview);

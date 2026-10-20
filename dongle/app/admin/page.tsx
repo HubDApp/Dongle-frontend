@@ -65,6 +65,7 @@ import EnrichmentDetailsModal from "@/components/admin/EnrichmentDetailsModal";
 import SegmentationDashboard from "@/components/admin/SegmentationDashboard";
 import SegmentFilter from "@/components/admin/SegmentFilter";
 import ExperimentAnalyticsView from "@/components/admin/ExperimentAnalyticsView";
+import MLInsightsPanel from "@/components/admin/MLInsightsPanel";
 import { findDuplicates } from "@/services/form-deduplication";
 import { enrichFormData, type FormEnrichmentResult } from "@/services/form-enrichment";
 import {
@@ -192,7 +193,7 @@ export default function AdminDashboard() {
     | "merges"
     | "segments"
     | "experiments"
-    | "events"
+    | "ml-insights"
   >("verification");
 
   // Segmentation state
@@ -826,12 +827,19 @@ export default function AdminDashboard() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
-        <header className="mb-12">
+        <header className="mb-6">
           <h1 className="text-4xl font-black mb-2 tracking-tight">ADMIN DASHBOARD</h1>
           <p className="text-zinc-500 dark:text-zinc-400">
             Manage ecosystem verification, review reports, and system parameters.
           </p>
         </header>
+
+        <nav aria-label="Admin sections" className="flex flex-wrap gap-2 mb-8">
+          <a href="/admin/reports" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Reports</a>
+          <a href="/admin/audit-logs" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Audit Logs</a>
+          <a href="/admin/batch" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Batch Ops</a>
+          <a href="/admin/settings/notifications" className="px-4 py-2 rounded-xl text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700">Notifications</a>
+        </nav>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-4 mb-8 border-b border-zinc-200 dark:border-zinc-800">
@@ -976,16 +984,16 @@ export default function AdminDashboard() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab("events")}
+            onClick={() => setActiveTab("ml-insights")}
             className={`pb-3 px-1 font-medium transition-colors relative flex items-center gap-2 ${
-              activeTab === "events"
+              activeTab === "ml-insights"
                 ? "text-blue-600 dark:text-blue-400"
                 : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
             }`}
           >
-            <Activity className="w-4 h-4" />
-            Events
-            {activeTab === "events" && (
+            <Sparkles className="w-4 h-4" />
+            ML Insights
+            {activeTab === "ml-insights" && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400" />
             )}
           </button>
@@ -2307,7 +2315,8 @@ export default function AdminDashboard() {
         {activeTab === "experiments" && (
           <ExperimentAnalyticsView />
         )}
-        {activeTab === "events" && <EventProcessingMonitor />}
+
+        {activeTab === "ml-insights" && <MLInsightsPanel />}
       </div>
 
       {/* Duplicate Merge Conflict Resolution Modal */}

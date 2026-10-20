@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { Project } from "@/types/project";
 import ProjectImage from "@/components/projects/ProjectImage";
@@ -8,6 +8,8 @@ import { formatDate } from "@/lib/date";
 import { Star, Plus, Check, Bookmark, BookmarkCheck } from "lucide-react";
 import { VerificationBadge, VerificationStatus } from "@/components/projects/VerificationBadge";
 import { ProjectLifecycleStatusBadge } from "@/components/projects/ProjectLifecycleStatusBadge";
+import { HealthBadge } from "@/components/projects/HealthBadge";
+import { getProjectHealth, type ProjectHealth } from "@/lib/project-health";
 import { IconButton } from "@/components/ui/IconButton";
 import { useComparison } from "@/context/comparison.context";
 import { useWatchlist } from "@/hooks/useWatchlist";
@@ -27,6 +29,10 @@ interface ProjectCardProps {
   verificationStatus?: VerificationStatus;
   showCompareCheckbox?: boolean;
   highlightTerm?: string;
+  /** Precomputed health; computed from the project when omitted. */
+  health?: ProjectHealth;
+  /** Week-over-week health change shown on the badge. */
+  healthTrend?: number | null;
 }
 
 export const ProjectCard = ({
@@ -34,10 +40,17 @@ export const ProjectCard = ({
   verificationStatus,
   showCompareCheckbox = true,
   highlightTerm = "",
+  health: healthProp,
+  healthTrend,
 }: ProjectCardProps) => {
   const { addProject, removeProject, isSelected, canAddMore } = useComparison();
   const { isOnWatchlist, toggleWatchlist, canManageWatchlist } = useWatchlist();
   const { data: socialProof } = useSWR("/api/social-proof", fetchSocialProof);
+
+  const health = useMemo(
+    () => healthProp ?? getProjectHealth(project, { verificationStatus }),
+    [healthProp, project, verificationStatus],
+  );
 
   const selected = isSelected(project.id);
   const isSaved = isOnWatchlist(project.id);
@@ -147,6 +160,7 @@ export const ProjectCard = ({
               <VerificationBadge status={verificationStatus} tier={project.verificationTier} showIcon={false} />
             )}
             <ProjectLifecycleStatusBadge status={project.status} />
+            <HealthBadge health={health} trend={healthTrend} />
           </div>
           <div className="flex items-center gap-1 text-sm font-bold shrink-0">
             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
