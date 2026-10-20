@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useEffect, useState, useRef, Suspense } from "react";
+import { useMemo, useEffect, useState, useRef, Suspense, useCallback } from "react";
+import { useProjectGridNavigation } from "@/hooks/useKeyboardShortcuts";
 import { projectService } from "@/services/project/project.service";
 import { LazyProjectCard } from "@/components/projects/LazyProjectCard";
 import { Button } from "@/components/ui/Button";
@@ -48,6 +49,8 @@ function DiscoverContent() {
   const gate = useWalletPageGate();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
+  const gridRef = useRef<HTMLDivElement>(null);
+  useProjectGridNavigation(gridRef);
 
   const {
     searchInput,
@@ -480,7 +483,7 @@ function DiscoverContent() {
             ))}
           </div>
         ) : filteredCount > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleProjects.map((project) => (
               <LazyProjectCard
                 key={project.id}

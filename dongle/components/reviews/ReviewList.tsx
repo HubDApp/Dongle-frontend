@@ -147,6 +147,12 @@ export default function ReviewList({
               )}
             </div>
           </div>
+
+          {/* Threaded discussion — Issue #654 */}
+          <ReviewComments
+            reviewId={review.id}
+            currentUserAddress={currentUserAddress}
+          />
         </div>
       ))}
     </div>

@@ -41,7 +41,8 @@ export function LazyProjectCard({
   });
 
   return (
-    <div ref={ref} className="min-h-[320px]">
+    // data-grid-card enables arrow-key navigation via useProjectGridNavigation (#659)
+    <div ref={ref} className="min-h-[320px]" data-grid-card tabIndex={0}>
       {isIntersecting ? (
         <Suspense fallback={null}>
           <ProjectCardDynamic
