@@ -500,7 +500,6 @@ export const en = {
     walletLinked: "Wallet linked",
     account: "Account",
   },
-} satisfies Record<string, unknown>;
 
   twofa: {
     title: "Two-Factor Authentication",
@@ -559,6 +558,6 @@ export const en = {
     submissionRequirementOn: "2FA required for form submissions",
     submissionRequirementOff: "2FA no longer required for form submissions",
   },
-} as const;
+} satisfies Record<string, unknown>;
 
 export type Messages = typeof en;
