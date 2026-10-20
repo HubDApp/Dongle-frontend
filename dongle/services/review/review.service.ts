@@ -245,6 +245,58 @@ async function getReviewsByUser(userAddress: string): Promise<Review[]> {
   return getLocalReviews().filter((r) => r.userAddress === userAddress);
 }
 
+async function searchReviews(params: Record<string, string | number | boolean | undefined>) {
+  if (getPersistenceMode() === "api") {
+    try {
+      return await reviewApiService.searchReviews(params);
+    } catch {
+      if (typeof window !== "undefined") {
+        console.warn(DEV_MODE_WARN);
+      }
+    }
+  }
+
+  warnDevMode();
+  const reviews = getLocalReviews();
+  const all = reviews.filter((review) => {
+    const search = String(params.q ?? "").trim().toLowerCase();
+    if (!search) return true;
+    return review.comment.toLowerCase().includes(search);
+  });
+
+  const ratingMin = params.ratingMin !== undefined ? Number(params.ratingMin) : undefined;
+  const ratingMax = params.ratingMax !== undefined ? Number(params.ratingMax) : undefined;
+  const verifiedOnly = params.verifiedOnly === true;
+  const language = typeof params.language === "string" ? params.language.toLowerCase() : undefined;
+  const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const pageSize = Math.max(1, Number(params.pageSize ?? 20) || 20);
+
+  const filtered = all.filter((review) => {
+    if (ratingMin !== undefined && review.rating < ratingMin) return false;
+    if (ratingMax !== undefined && review.rating > ratingMax) return false;
+    if (verifiedOnly && review.isVerifiedReviewer !== true) return false;
+    if (language && review.language && review.language.toLowerCase() !== language) return false;
+    return true;
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageResults = filtered.slice((page - 1) * pageSize, page * pageSize).map((review) => ({
+    ...review,
+    score: 1,
+    highlights: [],
+  }));
+
+  return {
+    results: pageResults,
+    total,
+    page,
+    pageSize,
+    totalPages,
+    suggestions: [],
+  };
+}
+
 async function voteHelpful(
   id: string,
   userAddress: string,
@@ -296,6 +348,7 @@ export const reviewService = {
   deleteReview,
   getReviewsByProject,
   getReviewsByUser,
+  searchReviews,
   voteHelpful,
   voteUnhelpful,
 };

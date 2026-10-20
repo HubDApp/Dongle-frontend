@@ -8,6 +8,8 @@ export interface Review {
   rating: number;
   comment: string;
   createdAt: string;
+  language?: string;
+  isVerifiedReviewer?: boolean;
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
   /** Cryptographic signature fields — present for signed submissions (#558). */

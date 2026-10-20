@@ -1,13 +1,17 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { Project } from "@/types/project";
+import { useWallet } from "@/context/wallet.context";
+import { saveComparisonSnapshot, type ComparisonHistoryEntry } from "@/utils/comparison-history.util";
 
 interface ComparisonContextType {
   selectedProjects: Project[];
   addProject: (project: Project) => void;
   removeProject: (projectId: string) => void;
   clearComparison: () => void;
+  restoreProjects: (projects: Project[]) => void;
+  saveCurrentComparison: (userAddress?: string | null) => ComparisonHistoryEntry | null;
   isSelected: (projectId: string) => boolean;
   canAddMore: boolean;
   maxSelections: number;
@@ -19,6 +23,12 @@ const MAX_SELECTIONS = 4;
 
 export function ComparisonProvider({ children }: { children: React.ReactNode }) {
   const [selectedProjects, setSelectedProjects] = useState<Project[]>([]);
+  const { publicKey } = useWallet();
+
+  const restoreProjects = useCallback((projects: Project[]) => {
+    const unique = projects.filter((project, index, list) => list.findIndex((item) => item.id === project.id) === index);
+    setSelectedProjects(unique.slice(0, MAX_SELECTIONS));
+  }, []);
 
   const addProject = useCallback((project: Project) => {
     setSelectedProjects((prev) => {
@@ -36,6 +46,16 @@ export function ComparisonProvider({ children }: { children: React.ReactNode }) 
     setSelectedProjects([]);
   }, []);
 
+  const saveCurrentComparison = useCallback((userAddress?: string | null) => {
+    return saveComparisonSnapshot(selectedProjects, userAddress ?? publicKey ?? null); 
+  }, [selectedProjects, publicKey]);
+
+  useEffect(() => {
+    if (selectedProjects.length >= 2) {
+      saveComparisonSnapshot(selectedProjects, publicKey ?? null);
+    }
+  }, [selectedProjects, publicKey]);
+
   const isSelected = useCallback((projectId: string) => {
     return selectedProjects.some(p => p.id === projectId);
   }, [selectedProjects]);
@@ -48,6 +68,8 @@ export function ComparisonProvider({ children }: { children: React.ReactNode }) 
       addProject,
       removeProject,
       clearComparison,
+      restoreProjects,
+      saveCurrentComparison,
       isSelected,
       canAddMore,
       maxSelections: MAX_SELECTIONS,

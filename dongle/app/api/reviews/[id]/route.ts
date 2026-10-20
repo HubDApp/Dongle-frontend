@@ -5,27 +5,10 @@ import {
   createErrorResponse,
   ErrorCode,
 } from "@/services/error/error.service";
-
-interface InMemoryReview {
-  id: string;
-  projectId: string;
-  projectName: string;
-  userAddress: string;
-  rating: number;
-  comment: string;
-  createdAt: string;
-  helpfulVotes: string[];
-  unhelpfulVotes: string[];
-  signedPayload?: string;
-  signature?: string;
-  signatureNonce?: string;
-  signatureTimestamp?: string;
-}
-
-const store = new Map<string, InMemoryReview>();
+import { getReviewStore } from "@/lib/review-store";
 
 function getStore(): Map<string, InMemoryReview> {
-  return store;
+  return getReviewStore();
 }
 
 function validateReviewInput(rating: unknown, comment: unknown): string | null {
