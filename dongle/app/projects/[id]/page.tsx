@@ -6,6 +6,9 @@ import {
   useRouter } from "next/navigation";
 import { projectService } from "@/services/project/project.service";
 import { projectStatusService } from "@/services/project/project-status.service";
+import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Badge } from "@/components/ui/Badge";
@@ -62,8 +65,7 @@ import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";
-import { abbreviateStellarAddress } from "@/lib/stellar-address";
-import { ContractAddressList } from "@/components/projects/ContractAddressList";
+import { projectService } from "@/services/project/project.service";
 import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
@@ -1125,9 +1127,11 @@ export default function ProjectDetailPage() {
               {project.ownerAddress && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
                   <h3 className="text-lg font-bold mb-4">Owner</h3>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono break-all">
-                    {abbreviateStellarAddress(project.ownerAddress)}
-                  </p>
+                  <SnsAddressDisplay
+                    address={project.ownerAddress}
+                    truncated={false}
+                    className="text-sm break-all"
+                  />
                 </div>
               )}
 
@@ -1135,6 +1139,9 @@ export default function ProjectDetailPage() {
               {project.contractAddresses && project.contractAddresses.length > 0 && (
                 <ContractAddressList addresses={project.contractAddresses} />
               )}
+
+              {/* Bridge Information (Issue #726) */}
+              <BridgeInfoCard bridge={project.bridge} />
             </div>
           </div>
         </div>
