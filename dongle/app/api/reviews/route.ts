@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Review } from "@/types/review";
+import { Review, isReviewSentiment } from "@/types/review";
 import { hasMinLength } from "@/lib/validation";
 import { verifySignature } from "@/lib/verify-signature";
 import {
@@ -79,6 +79,12 @@ export async function GET(request: NextRequest) {
       reviews = reviews.filter((r) => r.userAddress === userAddress);
     }
 
+    for (const review of reviews) {
+      if (!isReviewSentiment(review.sentiment)) {
+        review.sentiment = classifyReviewSentiment(review.comment);
+        review.sentimentSource = "automatic";
+      }
+    }
     reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Populate cache for project-scoped results
@@ -180,7 +186,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const newReview: InMemoryReview = {
+    const newReview: Review = {
       id: generateId(),
       projectId,
       projectName,
@@ -218,3 +224,49 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const token = await getAdminTokenFromCookie();
+    const admin = token ? await verifyAdminToken(token) : null;
+    if (!admin || !isAdminAllowed(admin.publicKey)) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.AUTHENTICATION_ERROR, "Admin authentication required", 401),
+        { status: 401 },
+      );
+    }
+
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.VALIDATION_ERROR, "A review ID and valid sentiment are required", 400),
+        { status: 400 },
+      );
+    }
+    const { id, sentiment } = body as { id?: unknown; sentiment?: unknown };
+    if (typeof id !== "string" || !id || !isReviewSentiment(sentiment)) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.VALIDATION_ERROR, "A review ID and valid sentiment are required", 400),
+        { status: 400 },
+      );
+    }
+
+    const review = store.get(id);
+    if (!review) {
+      return NextResponse.json(
+        createErrorResponse(ErrorCode.NOT_FOUND, "Review not found", 404),
+        { status: 404 },
+      );
+    }
+
+    review.sentiment = sentiment;
+    review.sentimentSource = "admin";
+    await cacheDel(CacheKey.reviews(review.projectId));
+    return NextResponse.json(createSuccessResponse(review));
+  } catch (error) {
+    console.error("[Reviews API] Failed to override review sentiment:", error);
+    return NextResponse.json(
+      createErrorResponse(ErrorCode.INTERNAL_ERROR, "Could not update review sentiment", 500),
+      { status: 500 },
+    );
+  }
+}

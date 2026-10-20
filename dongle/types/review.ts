@@ -1,5 +1,11 @@
 import { Project } from "@/types/project";
 
+export type ReviewSentiment = "positive" | "negative" | "neutral";
+
+export function isReviewSentiment(value: unknown): value is ReviewSentiment {
+  return value === "positive" || value === "negative" || value === "neutral";
+}
+
 export interface Review {
   id: string;
   projectId: string;
@@ -107,4 +113,3 @@ export interface ReviewReportValidationError {
 
 // Re-export Project for backward compatibility in components
 export type { Project };
-

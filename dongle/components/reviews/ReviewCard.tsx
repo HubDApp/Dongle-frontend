@@ -25,6 +25,7 @@ interface ReviewCardProps {
   onReport?: (review: Review) => void;
   onFeature?: (id: string) => void;
   onUnfeature?: (id: string) => void;
+  onOverrideSentiment?: (id: string, sentiment: ReviewSentiment) => void;
 }
 
 export default function ReviewCard({
@@ -38,7 +39,17 @@ export default function ReviewCard({
   onReport,
   onFeature,
   onUnfeature,
+  onOverrideSentiment,
 }: ReviewCardProps) {
+  const sentimentPresentation = review.sentiment
+    ? {
+        positive: { emoji: "😊", label: "Positive" },
+        neutral: { emoji: "😐", label: "Neutral" },
+        negative: { emoji: "😞", label: "Negative" },
+      }[review.sentiment]
+    : null;
+  const isReviewAuthor = currentUserAddress === review.userAddress;
+
   return (
     <div
       className={`bg-white dark:bg-zinc-900 border p-6 rounded-3xl transition-all ${

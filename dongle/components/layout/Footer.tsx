@@ -58,6 +58,11 @@ export default function Footer() {
                   {t("nav.profile")}
                 </Link>
               </li>
+              <li>
+                <Link href="/settings/accessibility" className="hover:text-black dark:hover:text-white">
+                  Accessibility settings
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

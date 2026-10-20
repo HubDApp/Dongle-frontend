@@ -88,7 +88,7 @@ export async function PUT(
       );
     }
 
-    const updated: InMemoryReview = {
+    const updated = {
       ...review,
       ...(rating !== undefined ? { rating } : {}),
       ...(comment !== undefined ? { comment } : {}),

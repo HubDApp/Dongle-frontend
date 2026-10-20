@@ -103,9 +103,6 @@ export async function createAdminToken(publicKey: string): Promise<string> {
     .setJti(nonce)
     .sign(await getSecretKey());
 
-  // Store nonce for replay protection
-  storeNonce(nonce, now + TOKEN_MAX_AGE_SECONDS);
-
   return token;
 }
 
@@ -131,7 +128,7 @@ export async function refreshAdminToken(token: string): Promise<string | null> {
 
   // Mark old nonce as used (consumed by refresh)
   if (payload.nonce) {
-    usedNonces.set(payload.nonce as string, Date.now());
+    storeNonce(payload.nonce as string, Date.now());
   }
 
   // Issue a new token

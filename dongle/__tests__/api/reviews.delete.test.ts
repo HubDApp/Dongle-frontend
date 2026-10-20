@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { DELETE } from "@/app/api/reviews/[id]/route";
 import { POST } from "@/app/api/reviews/route";
+import { reviewStore } from "@/lib/review-store";
 
 // Mock the verification signature
 vi.mock("@/lib/verify-signature", () => ({
@@ -16,6 +17,7 @@ describe("DELETE /api/reviews/[id]", () => {
   beforeEach(() => {
     // Clear the in-memory store before each test
     vi.clearAllMocks();
+    reviewStore.clear();
   });
 
   describe("Authorization checks", () => {
@@ -35,7 +37,7 @@ describe("DELETE /api/reviews/[id]", () => {
 
       expect(response.status).toBe(404);
       expect(data.success).toBe(false);
-      expect(data.error).toBe("Review not found");
+      expect(data.error.message).toBe("Review not found");
     });
 
     it("should only allow review author to delete", async () => {
@@ -75,7 +77,7 @@ describe("DELETE /api/reviews/[id]", () => {
 
       expect(response.status).toBe(403);
       expect(data.success).toBe(false);
-      expect(data.error).toContain("permission");
+      expect(data.error.message).toContain("permission");
     });
 
     it("should return 403 if userAddress is missing", async () => {
@@ -115,7 +117,7 @@ describe("DELETE /api/reviews/[id]", () => {
 
       expect(response.status).toBe(403);
       expect(data.success).toBe(false);
-      expect(data.error).toContain("permission");
+      expect(data.error.message).toContain("permission");
     });
   });
 
@@ -255,7 +257,7 @@ describe("DELETE /api/reviews/[id]", () => {
 
       expect(response2.status).toBe(404);
       expect(data2.success).toBe(false);
-      expect(data2.error).toBe("Review not found");
+      expect(data2.error.message).toBe("Review not found");
     });
   });
 

@@ -153,6 +153,8 @@ export interface Project {
   bugBountyUrl?: string;
   domain?: string;
   ownerAddress?: string;
+  /** IPFS CID for the project's roadmap JSON; referenced by the registry contract. */
+  roadmapCid?: string;
   repositoryMetadata?: RepositoryMetadata; // Cached repository metadata
   /**
    * Optional list of Soroban contract IDs associated with this project.

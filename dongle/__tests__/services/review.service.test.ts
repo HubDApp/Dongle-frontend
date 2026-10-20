@@ -35,6 +35,7 @@ describe("Review Service", () => {
       expect(result.data?.createdAt).toBeDefined();
       expect(result.data?.rating).toBe(5);
       expect(result.data?.comment).toBe(review.comment);
+      expect(result.data?.sentiment).toBe("positive");
     });
 
     it("should reject review with invalid rating (too low)", async () => {

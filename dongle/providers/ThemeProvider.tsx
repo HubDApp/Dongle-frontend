@@ -8,6 +8,8 @@ interface ThemeContextValue {
   theme: Theme;
   resolvedTheme: "light" | "dark";
   setTheme: (theme: Theme) => void;
+  highContrast: boolean;
+  setHighContrast: (enabled: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -33,7 +35,9 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+  const [highContrast, setHighContrastState] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const highContrastStorageKey = `${storageKey}-high-contrast`;
 
   // Resolve system theme preference
   const resolveTheme = (t: Theme): "light" | "dark" => {
@@ -50,10 +54,12 @@ export function ThemeProvider({
       if (value === "light" || value === "dark" || value === "system") stored = value;
     } catch { /* Storage is optional. */ }
     const initial = stored || defaultTheme;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate persisted preferences after mount
     setThemeState(initial);
     setResolvedTheme(resolveTheme(initial));
+    setHighContrastState(localStorage.getItem(highContrastStorageKey) === "true");
     setMounted(true);
-  }, [defaultTheme, storageKey]);
+  }, [defaultTheme, highContrastStorageKey, storageKey]);
 
   // Listen to system theme changes
   useEffect(() => {
@@ -83,8 +89,9 @@ export function ThemeProvider({
     }
 
     // Update media query for consistency
-    html.style.colorScheme = resolvedTheme;
-  }, [resolvedTheme, mounted]);
+    html.classList.toggle("high-contrast", highContrast);
+    html.style.colorScheme = highContrast ? "light" : resolvedTheme;
+  }, [resolvedTheme, highContrast, mounted]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -93,7 +100,15 @@ export function ThemeProvider({
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        resolvedTheme,
+        setTheme,
+        highContrast,
+        setHighContrast,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

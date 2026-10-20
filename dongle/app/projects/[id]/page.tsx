@@ -29,7 +29,8 @@ import { ProjectHealthPanel } from "@/components/projects/ProjectHealthPanel";
 import { getProjectHealth } from "@/lib/project-health";
 import { Review,
   ReviewReport,
-  ReviewReportReason } from "@/types/review";
+  ReviewReportReason,
+  type ReviewSentiment } from "@/types/review";
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
@@ -77,6 +78,7 @@ import { ProjectUpdate, UpdateType } from "@/types/update";
 import UpdateList from "@/components/updates/UpdateList";
 import UpdateForm from "@/components/updates/UpdateForm";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import ProjectRoadmap from "@/components/projects/ProjectRoadmap";
 import { ProjectStatusBanner } from "@/components/projects/ProjectStatusBanner";
 import { ClaimStatusBanner } from "@/components/projects/ClaimStatusBanner";
 import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
@@ -92,6 +94,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const gate = useWalletPageGate();
+  const { isAdmin } = useAdminAccess();
   const confirm = useConfirm();
   const {
     isOnWatchlist,
@@ -368,6 +371,10 @@ export default function ProjectDetailPage() {
     () => computeRatingDistribution(reviews),
     [reviews],
   );
+  const positiveSentimentPercentage = React.useMemo(
+    () => getPositiveSentimentPercentage(reviews),
+    [reviews],
+  );
 
   const sortedReviews = React.useMemo(() => {
     let list = [...reviews];
@@ -418,6 +425,21 @@ export default function ProjectDetailPage() {
     if (!ok) return;
     await reviewService.deleteReview(id, gate.publicKey);
     setReviews(await reviewService.getReviewsByProject(projectId));
+  };
+
+  const handleSentimentOverride = async (
+    reviewId: string,
+    sentiment: ReviewSentiment,
+  ) => {
+    const result = await reviewService.overrideSentiment(reviewId, sentiment);
+    if (!result.success || !result.data) {
+      toast.error(result.error ?? "Could not update review sentiment");
+      return;
+    }
+    setReviews((current) =>
+      current.map((review) => review.id === reviewId ? result.data : review),
+    );
+    toast.success("Review sentiment updated");
   };
 
   const handleSubmitReview = async (data: {
@@ -897,6 +919,8 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
+              <ProjectRoadmap cid={project.roadmapCid} />
+
               {/* Reviews Section */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
@@ -911,6 +935,22 @@ export default function ProjectDetailPage() {
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
 
+                    <div className="flex items-center gap-1 text-sm">
+                      <span className="text-zinc-500 text-xs font-medium">Sentiment:</span>
+                      <select
+                        aria-label="Filter reviews by sentiment"
+                        value={sentimentFilter}
+                        onChange={(event) =>
+                          setSentimentFilter(event.target.value as "all" | ReviewSentiment)
+                        }
+                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="all">All Sentiments</option>
+                        <option value="positive">😊 Positive</option>
+                        <option value="neutral">😐 Neutral</option>
+                        <option value="negative">😞 Negative</option>
+                      </select>
+                    </div>
                     <div className="flex items-center gap-1 text-sm">
                       <span className="text-zinc-500 text-xs font-medium">Sort:</span>
                       <select
@@ -943,6 +983,17 @@ export default function ProjectDetailPage() {
                   averageRating={actualRating}
                   className="mb-8"
                 />
+                {positiveSentimentPercentage !== null && (
+                  <p className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                    Community sentiment:{" "}
+                    <strong className="text-zinc-900 dark:text-zinc-100">
+                      {positiveSentimentPercentage}% positive
+                    </strong>
+                    <span className="ml-1">
+                      ({reviews.filter((review) => review.sentiment).length} classified reviews)
+                    </span>
+                  </p>
+                )}
 
                 {isOwner && (
                   <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-xl border border-blue-100 dark:border-blue-900/50 text-sm flex items-start gap-3">
@@ -1001,6 +1052,10 @@ export default function ProjectDetailPage() {
                   onVoteHelpful={handleVoteHelpful}
                   onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
+                  isAdmin={isAdmin}
+                  onOverrideSentiment={(reviewId, sentiment) =>
+                    void handleSentimentOverride(reviewId, sentiment)
+                  }
                   emptyMessage={projectEmptyMessage}
                   emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
                 />

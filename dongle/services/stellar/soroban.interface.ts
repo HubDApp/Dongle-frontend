@@ -33,6 +33,8 @@ export interface ProjectData {
   bugBountyUrl?: string;
   owner: string;
   createdAt: string;
+  roadmapCid?: string;
+  roadmap?: import("@/types/roadmap").ProjectRoadmap;
 }
 
 export interface ProjectRegistrationParams {
@@ -44,6 +46,7 @@ export interface ProjectRegistrationParams {
   logoUrl?: string;
   docsUrl?: string;
   contractAddresses?: string[];
+  roadmapCid?: string;
 }
 
 export interface TransactionResult {

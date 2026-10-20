@@ -3,6 +3,7 @@ import {
   ReviewInput,
   REVIEW_CONSTRAINTS,
   ReviewValidationError,
+  isReviewSentiment,
 } from "@/types/review";
 import { generateId } from "@/lib/id-generator";
 import { nowUTC, isValidDate } from "@/lib/dates";
@@ -61,6 +62,7 @@ function getLocalReviews(): Review[] {
   }
   if (!Array.isArray(parsed)) return [];
   const validatedReviews: Review[] = [];
+  let migratedSentiment = false;
   for (const item of parsed) {
     if (!item || typeof item !== "object") continue;
     const record = item as Record<string, unknown>;
@@ -100,6 +102,7 @@ function getLocalReviews(): Review[] {
     }
     validatedReviews.push(review);
   }
+  if (migratedSentiment) saveLocalReviews(validatedReviews);
   return validatedReviews;
 }
 
@@ -361,6 +364,22 @@ async function voteUnhelpful(
   return { success: true, data: reviews[index] };
 }
 
+async function overrideSentiment(
+  id: string,
+  sentiment: ReviewSentiment,
+): Promise<{ success: boolean; data?: Review; error?: string }> {
+  if (getPersistenceMode() === "api") {
+    return reviewApiService.overrideSentiment(id, sentiment);
+  }
+
+  const reviews = getLocalReviews();
+  const index = reviews.findIndex((review) => review.id === id);
+  if (index === -1) return { success: false, error: "Review not found" };
+  reviews[index] = { ...reviews[index], sentiment, sentimentSource: "admin" };
+  saveLocalReviews(reviews);
+  return { success: true, data: reviews[index] };
+}
+
 export const reviewService = {
   getReviews,
   addReview,
@@ -371,6 +390,7 @@ export const reviewService = {
   searchReviews,
   voteHelpful,
   voteUnhelpful,
+  overrideSentiment,
 };
 
 export function isReviewPersistenceApi(): boolean {
