@@ -1,0 +1,83 @@
+---
+title: Wallet Service
+description: WalletService API contract — Freighter connection, signing, and network validation.
+---
+
+# Wallet Service
+
+`services/wallet/wallet.service.ts` — integrates with the Freighter browser extension.
+
+## Methods
+
+### `isFreighterAvailable(): Promise<boolean>`
+Safe to call anywhere. Never throws.
+
+### `connectWallet(): Promise<string>`
+Opens the Freighter popup and returns the user's Stellar public key (`G…`).
+
+```typescript
+const publicKey = await walletService.connectWallet();
+```
+
+**Error cases:**
+| Error | Meaning |
+|-------|---------|
+| `FREIGHTER_NOT_INSTALLED` | Extension missing — prompt user with installation link |
+| `USER_DENIED` | User closed the popup without approving |
+
+### `getPublicKey(): Promise<string | null>`
+Reads the previously approved address **without** showing a popup. Returns `null` if never connected.
+
+### `isConnected(): Promise<boolean>`
+Returns `true` if Freighter has an active approved session.
+
+### `getNetworkPassphrase(): Promise<string | null>`
+Returns the active network's passphrase string. Returns `null` when disconnected.
+
+### `signTransaction(xdr: string, networkPassphrase: string): Promise<string>`
+Passes the unsigned XDR to Freighter for signing. Returns the signed XDR.
+
+```typescript
+const signedXdr = await walletService.signTransaction(
+  unsignedTxXdr,
+  "Test SDF Network ; September 2015"
+);
+```
+
+**Error cases:**
+| Error | Meaning |
+|-------|---------|
+| `USER_REJECTED` | User cancelled the sign request in Freighter |
+| `WALLET_NOT_CONNECTED` | No active session |
+
+### `disconnectWallet(): void`
+Clears local wallet state and fires `WalletContext` update.
+
+## Transaction Pipeline
+
+All Soroban writes follow this sequence (implemented in `soroban.service.ts`):
+
+```
+1. walletService.getPublicKey()          → get signer address
+2. assertCorrectNetwork()                → verify Freighter network
+3. server.getAccount(publicKey)          → fetch sequence number
+4. Contract(...).call(method, ...args)   → build invoke operation
+5. server.prepareTransaction()           → simulate + set resource footprint
+6. walletService.signTransaction(xdr)    → user signs in Freighter popup
+7. server.sendTransaction()              → submit to ledger
+8. pollTransaction(hash)                 → wait for SUCCESS (≤60s)
+```
+
+## Network Validation
+
+```typescript
+// Called before every transaction
+async function assertCorrectNetwork(): Promise<void> {
+  const passphrase = await walletService.getNetworkPassphrase();
+  if (passphrase !== EXPECTED_NETWORK_PASSPHRASE) {
+    throw new NetworkMismatchError(passphrase);
+  }
+}
+```
+
+`EXPECTED_NETWORK_PASSPHRASE` reads from `NEXT_PUBLIC_SOROBAN_NETWORK_PASSPHRASE`. A mismatch surfaces as a toast and a network banner in the UI.

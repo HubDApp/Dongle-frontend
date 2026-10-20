@@ -86,22 +86,35 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { projectId, projectName, userAddress, rating, comment, signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken, language } = body;
+    const {
+      projectId, projectName, userAddress, rating, comment,
+      signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken,
+      // E2E encryption fields (#731)
+      encrypted, encryptedPayload, encryptedCid, adminWrappedKey,
+    } = body;
 
     if (!projectId || !projectName || !userAddress) {
       return NextResponse.json(
-        {
-          success: false,
-          errors: [{ field: "comment", message: "Missing required fields" }],
-        },
+        { success: false, errors: [{ field: "comment", message: "Missing required fields" }] },
         { status: 400 }
       );
     }
 
-    const validationError = validateReviewInput(rating, comment);
+    // For encrypted reviews the comment is the sentinel — skip length validation.
+    const validationError = encrypted
+      ? validateReviewInput(rating, "placeholder comment") // rating-only check
+      : validateReviewInput(rating, comment);
     if (validationError) {
       return NextResponse.json(
         { success: false, errors: [validationError] },
+        { status: 400 }
+      );
+    }
+
+    // Encrypted reviews must supply an encryptedPayload.
+    if (encrypted && !encryptedPayload) {
+      return NextResponse.json(
+        { success: false, errors: [{ field: "comment", message: "encryptedPayload is required for encrypted reviews" }] },
         { status: 400 }
       );
     }
@@ -173,6 +186,11 @@ export async function POST(request: NextRequest) {
       signature: signature || undefined,
       signatureNonce: signatureNonce || undefined,
       signatureTimestamp: signatureTimestamp || undefined,
+      // E2E encryption (#731)
+      encrypted: encrypted === true ? true : undefined,
+      encryptedPayload: encryptedPayload || undefined,
+      encryptedCid: encryptedCid || undefined,
+      adminWrappedKey: adminWrappedKey || undefined,
     };
 
     store.set(newReview.id, newReview);

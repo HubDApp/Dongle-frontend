@@ -1,0 +1,83 @@
+---
+title: Changelog
+description: Release history for the Dongle platform.
+---
+
+# Changelog
+
+All notable changes to Dongle are documented here.
+
+---
+
+## [0.1.0] — 2026-10-18
+
+### Added — Docs Site (#747)
+- Dedicated documentation site at `docs.dongle.app` built with Nextra 3
+- Sections: Getting Started, API Reference, Component Library, Service Contracts, Integration Guides, Smart Contract Specs, Architecture, Types, Testing, Deployment
+- Full-text search (FlexSearch, built into Nextra)
+- Syntax-highlighted code examples across all pages
+- Version selector in navbar (foundation for versioned docs)
+- Deployed via `deploy-docs.yml` GitHub Actions workflow
+
+### Added — CI/CD (#746)
+- Visual regression tests via Chromatic (Playwright mode, no Storybook required)
+- Performance budgets enforced by Lighthouse CI: Performance ≥ 90, Accessibility ≥ 95, Best Practices ≥ 90, FCP < 1.8 s, LCP < 2.5 s
+- Bundle size limit: 200 KB initial JS (gzip), enforced by `bundlewatch` and `resource-summary` Lighthouse assertion
+- Auto-deploy preview on PR via `deploy-preview.yml` with sticky PR comment
+- Auto-deploy to staging on merge to `main` via `deploy-staging.yml`
+- Manual approval gate for production via GitHub Environments (`deploy-production.yml`)
+
+### Added — API Features (#1–#4)
+- GraphQL endpoint at `/api/graphql` (queries, mutations, subscriptions)
+- Batch form submissions at `/api/batch/submissions` (up to 100 items, atomic or individual mode)
+- Webhook signatures (HMAC-SHA256, replay-attack prevention via timestamp tolerance)
+- Smart webhook retry with exponential backoff, jitter, dead-letter queue, and monitoring dashboard
+- Auto-generated OpenAPI 3.1 spec at `/api/openapi` with interactive Swagger UI at `/api/docs`
+
+### Added — Features (#443–#446)
+- Internationalisation: `en`, `es`, `pt` locales via custom catalog
+- Real-time notifications via Server-Sent Events (`/api/notifications/stream`)
+- Analytics dashboard at `/analytics` with 7d/30d/90d/all range and CSV export
+- Google and GitHub OAuth (read-only identity; Freighter still required for writes)
+- Form audit logging with IP stamping and redacted export
+
+### Added — Core Platform
+- Project Registry, Review Registry, and Verification Registry Soroban contract integration
+- Wallet-based authentication via Freighter (`@stellar/freighter-api`)
+- Project submission, discovery, verification request, and review workflows
+- Admin dashboard protected by `NEXT_PUBLIC_ADMIN_ALLOWLIST`
+- Draft autosave with AES-256 encrypted localStorage and remote sync
+- Saved projects and recently viewed projects per wallet
+- Project comparison tray (max 4)
+- Anomaly detection and rate limiting middleware
+- pa11y-ci WCAG 2.1 AA audit on every PR
+
+---
+
+## SDK Releases
+
+| Package | Version | Language |
+|---------|---------|----------|
+| `@dongle/form-api-client` | 1.0.0 | TypeScript / JavaScript |
+| `dongle-api` | 1.0.0 | Python |
+| `github.com/dongle/go-sdk` | 1.0.0 | Go |
+| `dongle-api` gem | 1.0.0 | Ruby |
+| `com.dongle:dongle-api` | 1.0.0 | Java / Maven |
+
+---
+
+## Breaking Changes
+
+None — initial release.
+
+## Migration Guide
+
+No migration required — initial release.
+
+## Planned Next
+
+- WebSocket support for real-time GraphQL subscriptions
+- Bulk operations API
+- Redis-backed notification bus for multi-instance production
+- Full Soroban Review Registry and Verification Registry contract integration
+- Stellar indexer integration for aggregate catalog queries

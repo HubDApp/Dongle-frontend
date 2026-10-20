@@ -18,6 +18,8 @@ describe("repositoryService", () => {
       ok: true,
       json: async () => ({
         html_url: "https://github.com/org/app",
+        name: "app",
+        homepage: "https://app.example",
         stargazers_count: 1500,
         forks_count: 12,
         license: { spdx_id: "MIT" },
@@ -44,7 +46,44 @@ describe("repositoryService", () => {
       license: "MIT",
       lastUpdate: "2026-08-01T00:00:00Z",
       language: "TypeScript",
+      homepage: "https://app.example",
+      name: "app",
     });
+  });
+
+  it("returns GitHub import fields for form population", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        html_url: "https://github.com/org/app",
+        name: "app",
+        homepage: "https://app.example",
+        stargazers_count: 42,
+        forks_count: 7,
+        license: { spdx_id: "MIT" },
+        updated_at: "2026-08-01T00:00:00Z",
+        description: "Project description",
+        language: "Rust",
+        topics: ["stellar", "defi"],
+      }),
+    });
+
+    await expect(repositoryService.fetchGitHubImport("https://github.com/org/app")).resolves.toMatchObject({
+      name: "app",
+      homepage: "https://app.example",
+      description: "Project description",
+      language: "Rust",
+      topics: ["stellar", "defi"],
+      license: "MIT",
+      stars: 42,
+      forks: 7,
+    });
+  });
+
+  it("reports private or unavailable repositories clearly", async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 404 });
+    await expect(repositoryService.fetchGitHubImport("https://github.com/private/repo"))
+      .rejects.toThrow(/not found or private/i);
   });
 
   it("returns null for an invalid repository URL", async () => {

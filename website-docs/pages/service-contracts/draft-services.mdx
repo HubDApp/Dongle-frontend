@@ -1,0 +1,81 @@
+---
+title: Draft Services
+description: DraftService and DraftApiService API contracts for project form autosave.
+---
+
+import { Callout } from "nextra/components";
+
+# Draft Services
+
+## DraftService
+
+`services/draft/draft.service.ts` — manages auto-saved project submission drafts with hybrid server + encrypted local persistence.
+
+### Methods
+
+#### `getAllDrafts(publicKey?, options?): ProjectDraft[]`
+Returns drafts for the given wallet. Automatically migrates legacy unencrypted drafts on first read.
+
+```typescript
+const drafts = draftService.getAllDrafts("GBRPYHIL2...");
+```
+
+Decryption failure (key mismatch / corrupt storage) logs `[CryptoStorage Warning]` and returns `[]`.
+
+#### `saveDraft(draft, publicKey?): void`
+Encrypts the payload with AES-256 (SHA-256 hash of the Stellar public key) and saves to `localStorage`.
+
+```typescript
+draftService.saveDraft(
+  { id: "new-project-draft", name: "My dApp", category: "DeFi / DEX", ... },
+  "GBRPYHIL2..."
+);
+```
+
+#### `saveDraftRemote(walletAddress, draft): Promise<ProjectDraft | null>`
+Syncs to the server. Falls back to encrypted local storage if remote sync fails.
+
+#### `deleteDraft(draftId, publicKey?): void`
+Removes the draft from encrypted local storage and the remote backend.
+
+### UI behaviour
+
+- **Debounced auto-save** — 2-second debounce on form changes.
+- **Status badge** — "Draft saved 10:30 AM" | "Saving…" | "Sync Error – Saved Locally".
+
+### Usage with `useDraft`
+
+```tsx
+import { useDraft } from "@/hooks/useDraft";
+
+const { hasDraft, loadedDraft, lastSaved, saveDraft, clearDraft } = useDraft({
+  mode: "create",            // or "edit"
+  projectId: undefined,      // for edits: pass projectId
+  autoSave: true,
+});
+```
+
+<Callout>
+  See the [Custom Hooks guide](/integration-guides/hooks#usedraft) for the full hook reference.
+</Callout>
+
+---
+
+## DraftApiService
+
+`services/draft/draft-api.service.ts` — server-side HTTP transport for draft sync.
+
+```typescript
+// Fetch a draft
+const result = await draftApiService.getDraft(walletAddress, draftId);
+// { ok: true, data: ProjectDraft } | { ok: false, status: 404, error: "Not found" }
+
+// Save a draft
+const saved = await draftApiService.saveDraft(walletAddress, draft);
+
+// Delete a draft
+const deleted = await draftApiService.deleteDraft(walletAddress, draftId);
+// { ok: true, data: { success: true } }
+```
+
+All methods return `{ ok: false, status: number, error: string }` on HTTP errors.

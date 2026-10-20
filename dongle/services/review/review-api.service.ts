@@ -30,6 +30,13 @@ export const reviewApiService = {
         body.signatureNonce = signedPayload.nonce;
         body.signatureTimestamp = signedPayload.timestamp;
       }
+      // Pass through E2E encryption fields if present (#731)
+      if (review.encrypted) {
+        body.encrypted = review.encrypted;
+        body.encryptedPayload = review.encryptedPayload;
+        body.encryptedCid = review.encryptedCid;
+        body.adminWrappedKey = review.adminWrappedKey;
+      }
       const response = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

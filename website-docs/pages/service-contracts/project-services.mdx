@@ -1,0 +1,144 @@
+---
+title: Project Services
+description: API contracts for ProjectService, ProjectSubmissionService, ProjectClaimService, ProjectOwnerService, and ProjectReportService.
+---
+
+import { Callout } from "nextra/components";
+
+# Project Services
+
+## ProjectService
+
+`services/project/project.service.ts` — single source of truth for the project catalog.
+
+### Methods
+
+#### `getAllProjects(): Project[]`
+Returns all projects. Never throws; returns `[]` on empty catalog.
+
+#### `getProjectById(id: string): Project | null`
+```typescript
+const project = projectService.getProjectById("soroban-swap");
+// Returns Project or null — triggers 404 page when null
+```
+Applies active `ProjectOwnerService` address overrides.
+
+#### `getProjectsByCategory(category: string): Project[]`
+Passing `"All"` returns every project.
+
+#### `getProjectsByTags(tags: string[]): Project[]`
+Returns projects matching **at least one** tag. Empty array returns all.
+
+#### `getProjectsByOwner(ownerAddress: string): Project[]`
+Case-insensitive trimmed match on `ownerAddress`.
+
+#### `getDiscoverableProjects(): Project[]`
+Filters out moderated / hidden submissions.
+
+#### `searchProjects(query: string): Project[]`
+Case-insensitive match on `name`, `description`, or `tags`.
+
+#### `sortProjects(projects, sortBy): Project[]`
+```typescript
+sortProjects(projects, "rating" | "newest" | "popular")
+// Returns a new sorted array; does not mutate input
+```
+
+#### `async fetchAll(): Promise<Project[]>` (and `fetchById`, `fetchByCategory`, `fetchSearch`)
+Reads from `IProjectRepository` — mock data in dev, Soroban RPC in production.
+
+---
+
+## ProjectSubmissionService
+
+`services/project/project-submission.service.ts`
+
+#### `submitProject(draftData, ownerAddress): Promise<{ success: boolean; id?: string; error?: string }>`
+
+```typescript
+const result = await projectSubmissionService.submitProject(
+  { name: "My dApp", primaryCategory: "DeFi / DEX", description: "...", websiteUrl: "https://..." },
+  "GBRPYHIL2..."
+);
+```
+
+**Validation:**
+- `name`, `description`, `primaryCategory` must be non-empty
+- `websiteUrl` must be a valid URL
+- `ownerAddress` must be a valid Stellar G-address
+
+#### `isDiscoverable(projectId: string): boolean`
+`true` if approved or pending; `false` if rejected or hidden.
+
+#### `updateStatus(id, status, notes?): void`
+Saved to `localStorage` in mock mode; sends to Admin REST endpoint in production.
+
+---
+
+## ProjectClaimService
+
+`services/project/project-claim.service.ts`
+
+#### `initiateClaim(projectId, claimerAddress, proofData): Promise<ClaimResult>`
+
+```typescript
+const result = await projectClaimService.initiateClaim(
+  "soroban-swap",
+  "GBRPYHIL2...",
+  { proofType: "dns", proofValue: "dongle-verify=abc123" }
+);
+// { claimId, status: "pending_verification" | "verified" | "failed", message? }
+```
+
+**Proof types:** `"dns"` | `"github"` | `"signature"`
+
+**Error codes:**
+| Code | Meaning |
+|------|---------|
+| `INVALID_ADDRESS` | Claimer address fails Stellar StrKey checksum |
+| `ALREADY_CLAIMED` | Project already has a verified owner |
+| `PROOF_INVALID` | Proof value empty or DNS TXT record missing |
+
+<Callout>
+  **Mock mode** simulates verification with a 1500 ms delay and auto-approves valid DNS strings. **Production** interacts with the Soroban Ownership Registry contract and verifies real DNS TXT records / GitHub Gists.
+</Callout>
+
+#### `finalizeClaim(claimId): Promise<boolean>`
+Stores the ownership override in `ProjectOwnerService` when `true`.
+
+---
+
+## ProjectOwnerService
+
+`services/project/project-owner.service.ts` — manages runtime ownership overrides.
+
+```typescript
+projectOwnerService.getProjectOwnerOverride(projectId)  // string | null
+projectOwnerService.setProjectOwnerOverride(projectId, ownerAddress)
+projectOwnerService.clearProjectOwnerOverride(projectId)
+```
+
+SSR-safe: guards `typeof window === "undefined"`. Changes reflect immediately in the project header UI.
+
+---
+
+## ProjectReportService
+
+`services/project/project-report.service.ts`
+
+#### `submitReport(report): Promise<{ success: boolean; reportId?: string; error?: string }>`
+
+```typescript
+await projectReportService.submitReport({
+  projectId: "soroban-swap",
+  reporterAddress: "GBRPYHIL2...",
+  reason: "Scam / fraudulent",
+  details: "Website is a phishing clone."
+});
+```
+
+**Error codes:**
+| Code | Meaning |
+|------|---------|
+| `DUPLICATE_REPORT` | Same wallet reported this project within 24 hours |
+| `EMPTY_REASON` | Missing report category / reason |

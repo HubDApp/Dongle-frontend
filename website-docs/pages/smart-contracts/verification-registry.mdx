@@ -1,0 +1,91 @@
+---
+title: Verification Registry Contract
+description: Target ABI, status machine, and call patterns for the Verification Registry Soroban contract.
+---
+
+import { Callout } from "nextra/components";
+
+# Verification Registry Contract
+
+**Contract ID:** `DONGLE_CONTRACTS.VERIFICATION_REGISTRY`  
+**Current backend:** `verificationService` (localStorage)  
+**Partial integration:** `sorobanService.requestVerification()` delegates to `verificationService`
+
+<Callout>
+  Verification contract calls are **planned**. Activate by setting `NEXT_PUBLIC_VERIFICATION_REGISTRY_CONTRACT` to a real deployed contract ID.
+</Callout>
+
+## Target ABI
+
+```
+request_verification(
+  project_id:   Symbol,
+  evidence_cid: Symbol,   // IPFS CID for audit docs / links
+) → VerificationRequestId
+
+approve_verification(project_id: Symbol) → void   // admin / verifier only
+reject_verification(project_id: Symbol, reason: Symbol) → void   // admin / verifier only
+revoke_verification(project_id: Symbol, reason: Symbol) → void   // admin only
+
+get_verification_status(project_id: Symbol)        → VerificationStatus
+get_verification_request(project_id: Symbol)       → Option<VerificationRequest>
+list_pending_requests(offset: u32, limit: u32)     → Vec<VerificationRequest>
+```
+
+## Expected Types
+
+```typescript
+type VerificationStatus = "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
+
+interface VerificationRequest {
+  id: string;
+  projectId: string;
+  projectName: string;
+  submittedBy: string;          // Stellar public key
+  submittedAt: string;
+  status: VerificationStatus;
+  statusUpdatedAt: string;
+  statusUpdatedBy?: string;
+  rejectionReason?: string;
+  evidenceCid?: string;
+}
+```
+
+## Status State Machine
+
+```
+NONE ──────────────────────────────────────────────────┐
+  │                                                    │
+  ▼  request_verification()                            │
+PENDING ──── approve_verification() ──► VERIFIED       │
+  │                                        │           │
+  └── reject_verification() ──► REJECTED   │ revoke()  │
+                                    │      ▼           │
+                                    └─► (reset) ───────┘
+```
+
+- `NONE` — no request on record
+- `PENDING` — awaiting admin review
+- `VERIFIED` — approved; Verified Badge shown on project page
+- `REJECTED` — denied with optional reason; owner may reset and resubmit
+
+## Call Patterns
+
+| Action | Pattern | Caller |
+|--------|---------|--------|
+| Request verification | Single signed invoke (+ optional fee in batch) | Project owner |
+| Approve / Reject | Single signed invoke | Admin (allowlisted wallet) |
+| Read status | Read-only simulate (no sign) | Anyone |
+| List pending (admin) | Read-only simulate | Admin dashboard |
+
+## Frontend Integration Flow (Target)
+
+```
+1. Owner submits evidence files  →  upload to IPFS  →  receive CID
+2. Build request_verification(project_id, evidence_cid)
+3. Sign + submit + poll for SUCCESS
+4. UI shows PENDING badge
+5. Admin reviews in /admin dashboard
+6. Admin calls approve_verification / reject_verification
+7. UI reflects VERIFIED / REJECTED badge
+```

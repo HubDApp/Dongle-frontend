@@ -47,6 +47,12 @@ const VALID_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "claim_approved",
   "claim_rejected",
   "ownership_transferred",
+  "admin_2fa_enabled",
+  "admin_2fa_disabled",
+  "admin_2fa_verified",
+  "admin_2fa_recovery_used",
+  "admin_2fa_method_added",
+  "admin_2fa_method_removed",
 ]);
 
 /** Hydrate, validate, and return all stored entries (SSR-safe). */

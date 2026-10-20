@@ -29,11 +29,17 @@ export interface SessionPayload {
   name?: string;
   avatarUrl?: string;
   walletAddress?: string;
+  /** Device session ID — links the access token to a tracked device session. */
+  sessionId?: string;
 }
 
 const SESSION_COOKIE = "dongle_oauth_session";
+const REFRESH_COOKIE = "dongle_refresh_token";
 const STATE_COOKIE = "dongle_oauth_state";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+/** Access token TTL: 15 minutes. */
+const SESSION_MAX_AGE = 15 * 60;
+/** Refresh token cookie TTL: 30 days. */
+const REFRESH_MAX_AGE = 30 * 24 * 60 * 60;
 const STATE_MAX_AGE = 60 * 10;
 
 function sessionSecret(): Uint8Array<ArrayBuffer> {
@@ -58,7 +64,10 @@ async function getKey(): Promise<CryptoKey> {
   return cryptoKey;
 }
 
-export async function createSessionToken(user: AppUser): Promise<string> {
+export async function createSessionToken(
+  user: AppUser,
+  sessionId?: string,
+): Promise<string> {
   const key = await getKey();
   return new SignJWT({
     provider: user.provider,
@@ -66,6 +75,7 @@ export async function createSessionToken(user: AppUser): Promise<string> {
     name: user.name,
     avatarUrl: user.avatarUrl,
     walletAddress: user.walletAddress,
+    ...(sessionId ? { sessionId } : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
@@ -87,6 +97,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
       avatarUrl: typeof payload.avatarUrl === "string" ? payload.avatarUrl : undefined,
       walletAddress:
         typeof payload.walletAddress === "string" ? payload.walletAddress : undefined,
+      sessionId: typeof payload.sessionId === "string" ? payload.sessionId : undefined,
     };
   } catch {
     return null;
@@ -172,3 +183,28 @@ export function oauthCallbackUrl(provider: OAuthProvider): string {
 }
 
 export { SESSION_COOKIE, STATE_COOKIE, SESSION_MAX_AGE };
+
+// ─── Refresh token cookie helpers ─────────────────────────────────────────────
+
+export async function setRefreshTokenCookie(token: string): Promise<void> {
+  const jar = await cookies();
+  jar.set(REFRESH_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: cookieSecure(),
+    path: "/api/auth",
+    maxAge: REFRESH_MAX_AGE,
+  });
+}
+
+export async function readRefreshTokenCookie(): Promise<string | undefined> {
+  const jar = await cookies();
+  return jar.get(REFRESH_COOKIE)?.value;
+}
+
+export async function clearRefreshTokenCookie(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(REFRESH_COOKIE);
+}
+
+export { REFRESH_COOKIE, REFRESH_MAX_AGE };

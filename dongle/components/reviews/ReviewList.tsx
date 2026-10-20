@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { reviewAnalyticsService } from "@/services/review/review-analytics.service";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -16,6 +18,7 @@ interface ReviewListProps {
   onReport?: (review: Review) => void;
   emptyMessage?: string;
   emptyTitle?: string;
+  onClearFilters?: () => void;
 }
 
 export default function ReviewList({ 
@@ -27,20 +30,26 @@ export default function ReviewList({
   onVoteUnhelpful,
   onReport,
   emptyMessage,
-  emptyTitle
+  emptyTitle,
+  onClearFilters
 }: ReviewListProps) {
+  useEffect(() => {
+    reviewAnalyticsService.recordViews(reviews.map((review) => review.id));
+  }, [reviews]);
+
   if (reviews.length === 0) {
     return (
-      <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
+      <div>{controls}<div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900/50 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 px-4">
         {emptyTitle && <p className="text-base font-bold text-zinc-700 dark:text-zinc-300 mb-1">{emptyTitle}</p>}
-        <p className="text-zinc-500">{emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
-      </div>
+        <p className="text-zinc-500">{rating !== "all" ? "No reviews match this rating range. Try clearing filters." : emptyMessage || "No reviews yet. Be the first to leave one!"}</p>
+      </div></div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {reviews.map((review) => (
+      {controls}
+      {visibleReviews.map((review) => (
         <div 
           key={review.id}
           className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl transition-all hover:border-zinc-300 dark:hover:border-zinc-700"
@@ -141,6 +150,12 @@ export default function ReviewList({
               )}
             </div>
           </div>
+
+          {/* Threaded discussion — Issue #654 */}
+          <ReviewComments
+            reviewId={review.id}
+            currentUserAddress={currentUserAddress}
+          />
         </div>
       ))}
     </div>
