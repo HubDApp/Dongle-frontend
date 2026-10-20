@@ -5,6 +5,7 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationsRead,
   unreadCount,
 } from "@/lib/notifications/server-store";
 import { RECIPIENT_COOKIE } from "@/lib/notifications/constants";
@@ -35,9 +36,11 @@ export async function PATCH(request: Request) {
   if (!recipient) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const body = (await request.json()) as { id?: string; all?: boolean };
+  const body = (await request.json()) as { id?: string; ids?: string[]; all?: boolean };
   if (body.all) {
     markAllNotificationsRead(recipient);
+  } else if (Array.isArray(body.ids)) {
+    markNotificationsRead(recipient, body.ids.filter((id): id is string => typeof id === "string"));
   } else if (body.id) {
     markNotificationRead(recipient, body.id);
   }

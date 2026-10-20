@@ -52,7 +52,9 @@ import {
   ExternalLink,
   GitBranch,
   Globe,
+  Heart,
   Info,
+  History,
   Megaphone,
   MessageSquare,
   Shield,
@@ -66,6 +68,7 @@ import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBa
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { useProjectFollowing } from "@/hooks/useProjectFollowing";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
 import { updateService } from "@/services/update/update.service";
 import { projectService } from "@/services/project/project.service";
@@ -79,6 +82,7 @@ import { getApprovedProjectUrls } from "@/lib/externalLinkWarning";
 import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
+import { emitProjectFollowingEvent } from "@/lib/project-following/emit";
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -118,6 +122,12 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = useState<"about" | "updates">("about");
   const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [isChangingFollow, setIsChangingFollow] = useState(false);
+  const {
+    isFollowing,
+    followerCount,
+    setFollowing,
+  } = useProjectFollowing(projectId);
   // Track the most recent claim for this wallet + project (for the status banner)
   const [latestClaim, setLatestClaim] = useState<ReturnType<typeof projectClaimService.getLatestRequestForUser>>(null);
 
@@ -475,6 +485,13 @@ export default function ProjectDetailPage() {
       });
 
       setReviews(await reviewService.getReviewsByProject(projectId));
+      if (!editingReview) {
+        void emitProjectFollowingEvent(gate.publicKey, {
+          projectId: project.id,
+          type: "project_review_posted",
+          rating: data.rating,
+        });
+      }
       setIsAddingReview(false);
       setEditingReview(null);
     } catch (error) {
@@ -544,6 +561,10 @@ export default function ProjectDetailPage() {
         },
         gate.publicKey
       );
+      void emitProjectFollowingEvent(gate.publicKey, {
+        projectId: project.id,
+        type: "project_update_posted",
+      });
       toast.success("Update published successfully");
     }
 
@@ -584,6 +605,18 @@ export default function ProjectDetailPage() {
   };
 
   const approvedExternalUrls = project ? getApprovedProjectUrls(project) : [];
+
+  const handleToggleFollowing = async () => {
+    setIsChangingFollow(true);
+    try {
+      await setFollowing(projectId, !isFollowing);
+      toast.success(isFollowing ? "Project unfollowed" : "Following project");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update project follow status");
+    } finally {
+      setIsChangingFollow(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -703,15 +736,31 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant={isOnList ? "secondary" : "outline"}
-                    onClick={handleToggleWatchlist}
-                    disabled={!project}
-                    leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                    className="shrink-0"
-                  >
-                    {isOnList ? "On Watchlist" : "Add to Watchlist"}
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-2">
+                    <Button
+                      variant={isOnList ? "secondary" : "outline"}
+                      onClick={handleToggleWatchlist}
+                      disabled={!project}
+                      leftIcon={isOnList ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                    >
+                      {isOnList ? "On Watchlist" : "Add to Watchlist"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/projects/${projectId}/history`)}
+                      leftIcon={<History className="w-4 h-4" />}
+                    >
+                      Version history
+                    </Button>
+                    <Button
+                      variant={isFollowing ? "secondary" : "outline"}
+                      onClick={() => void handleToggleFollowing()}
+                      isLoading={isChangingFollow}
+                      leftIcon={<Heart className="w-4 h-4" fill={isFollowing ? "currentColor" : "none"} />}
+                    >
+                      {isFollowing ? "Unfollow" : "Follow"} · {followerCount}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Project Image */}
