@@ -43,6 +43,12 @@ function parsePage(raw: string | null): number {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+function parseOffset(raw: string | null): number | null {
+  if (raw === null) return null;
+  const offset = Number.parseInt(raw, 10);
+  return Number.isFinite(offset) && offset >= 0 ? offset : 0;
+}
+
 function parseTags(raw: string | null): string[] {
   if (!raw) return [];
   return raw.split(",").filter(Boolean);
@@ -75,7 +81,10 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
   const urlCategories = parseCategories(searchParams.get("categories"));
   const urlTags = parseTags(searchParams.get("tags"));
   const urlSort = parseSort(searchParams.get("sort"));
-  const urlPage = parsePage(searchParams.get("page"));
+  const urlOffset = parseOffset(searchParams.get("offset"));
+  const urlPage = urlOffset === null
+    ? parsePage(searchParams.get("page"))
+    : Math.floor(urlOffset / 20) + 1;
 
   const initialCategories =
     urlCategories.length > 0
@@ -108,12 +117,14 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
   const pushParams = useCallback(
     (
       updates: Partial<
-        Record<"q" | "categories" | "tags" | "sort" | "page", string>
+        Record<"q" | "categories" | "tags" | "sort" | "page" | "offset", string>
       >,
     ) => {
       const params = new URLSearchParams(searchParams.toString());
 
       params.delete("category");
+      if (updates.page === "1") params.delete("offset");
+      if (updates.offset !== undefined) params.delete("page");
 
       for (const [key, value] of Object.entries(updates)) {
         const isEmpty =
@@ -127,7 +138,8 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
             (key === "categories" && value === "") ||
             (key === "tags" && value === "") ||
             (key === "sort" && value === "rating") ||
-            (key === "page" && value === "1")
+            (key === "page" && value === "1") ||
+            (key === "offset" && value === "0")
           ) {
             params.delete(key);
           } else {
@@ -208,7 +220,7 @@ export function useDiscoverParams(): DiscoverParams & DiscoverParamsActions {
   );
 
   const loadNextPage = useCallback(() => {
-    pushParams({ page: String(urlPage + 1) });
+    pushParams({ offset: String(urlPage * 20) });
   }, [pushParams, urlPage]);
 
   const clearFilters = useCallback(() => {

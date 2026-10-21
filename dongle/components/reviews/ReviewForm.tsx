@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useId, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Review, REVIEW_CONSTRAINTS } from "@/types/review";
+import { Review, ReviewMedia, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { useFormAuditLog } from "@/hooks/useFormAuditLog";
-import { X, Star, Lock, ShieldAlert } from "lucide-react";
+import { X, Star, Lock, ShieldAlert, Upload } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { TextAreaField } from "@/components/ui/TextAreaField";
 import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
@@ -20,6 +20,7 @@ import { FormAnnouncerProvider, useFormAnnouncer } from "@/components/ui/FormAnn
 import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
 import { useFormAnalytics } from "@/hooks/useFormAnalytics";
 import { useReviewDraft } from "@/hooks/useReviewDraft";
+import { uploadImageToIpfs } from "@/services/ipfs/image-upload.service";
 import {
   deriveKeyFromWallet,
   encryptReview,
@@ -38,9 +39,16 @@ interface ReviewFormProps {
     review: Omit<
       Review,
       "id" | "createdAt" | "userAddress" | "projectId" | "projectName"
-    > & { captchaToken?: string },
+    > & { captchaToken?: string; media?: ReviewMedia[] },
   ) => void | Promise<void>;
   onCancel: () => void;
+}
+
+interface ReviewAttachmentDraft {
+  file: File;
+  altText: string;
+  preview: string;
+  progress: number;
 }
 
 function ReviewFormInner({
@@ -58,6 +66,11 @@ function ReviewFormInner({
   const encryptCheckboxId = useId();
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const [encryptError, setEncryptError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<ReviewAttachmentDraft[]>([]);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const attachmentUrls = useRef<string[]>([]);
+
+  useEffect(() => () => attachmentUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const conversion = useFormConversion({
     formId: `review-form-${projectId}`,
@@ -123,6 +136,12 @@ function ReviewFormInner({
     conversion.trackSubmitAttempt();
     setCaptchaError(null);
     setEncryptError(null);
+    setMediaError(null);
+
+    if (attachments.some((attachment) => !attachment.altText.trim())) {
+      setMediaError("Add alt text for every attachment before submitting.");
+      return;
+    }
 
     let captchaToken: string | undefined;
     if (requiresCaptcha) {
@@ -137,6 +156,17 @@ function ReviewFormInner({
     }
 
     try {
+      const media = await Promise.all(attachments.map(async (attachment) => {
+        const upload = await uploadImageToIpfs(attachment.file, (progress) => {
+          setAttachments((current) => current.map((item) => item.file === attachment.file ? { ...item, progress } : item));
+        });
+        return {
+          cid: upload.cid,
+          url: upload.url,
+          type: attachment.file.type.startsWith("video/") ? "video" as const : "image" as const,
+          altText: attachment.altText.trim(),
+        };
+      }));
       let submissionComment = data.comment;
       let encryptedPayload: string | undefined;
       let adminWrappedKey: string | undefined;
@@ -155,6 +185,7 @@ function ReviewFormInner({
         rating: data.rating,
         comment: submissionComment,
         captchaToken,
+        ...(media.length > 0 && { media }),
         ...(data.encrypt && {
           encrypted: true,
           encryptedPayload,
@@ -165,6 +196,7 @@ function ReviewFormInner({
       conversion.trackSuccess({ project_id: projectId });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Submission failed";
+      if (attachments.length > 0) setMediaError(msg);
       // Surface encryption-specific errors distinctly.
       if (data.encrypt && msg.toLowerCase().includes("sign")) {
         setEncryptError("Wallet signature required to encrypt — please approve the request in Freighter.");
@@ -331,6 +363,75 @@ function ReviewFormInner({
             </div>
           </div>
         </div>
+
+        {!initialReview && (
+          <section className="space-y-3" aria-labelledby="review-media-label">
+            <label id="review-media-label" className="block text-sm font-medium">Evidence (optional, up to 3 files)</label>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800">
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              Add photos or video
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                multiple
+                className="sr-only"
+                aria-label="Upload review photos or videos"
+                onChange={(event) => {
+                  const selected = Array.from(event.currentTarget.files ?? []);
+                  event.currentTarget.value = "";
+                  const allowed = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]);
+                  if (selected.some((file) => !allowed.has(file.type))) {
+                    setMediaError("Use JPG, PNG, WebP, MP4, or WebM files.");
+                    return;
+                  }
+                  if (selected.some((file) => file.size > 10 * 1024 * 1024)) {
+                    setMediaError("Each file must be 10 MB or smaller.");
+                    return;
+                  }
+                  if (attachments.length + selected.length > 3) {
+                    setMediaError("You can attach up to 3 files.");
+                    return;
+                  }
+                  setMediaError(null);
+                  setAttachments((current) => [...current, ...selected.map((file) => {
+                    const preview = URL.createObjectURL(file);
+                    attachmentUrls.current.push(preview);
+                    return { file, altText: "", preview, progress: 0 };
+                  })]);
+                }}
+              />
+            </label>
+            {attachments.map((attachment) => (
+              <div key={`${attachment.file.name}-${attachment.preview}`} className="grid grid-cols-[5rem_1fr_auto] items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                {attachment.file.type.startsWith("video/") ? (
+                  <video src={attachment.preview} controls className="h-16 w-20 rounded object-cover" aria-label="Video preview" />
+                ) : (
+                  <img src={attachment.preview} alt={attachment.altText || "Selected review evidence preview"} className="h-16 w-20 rounded object-cover" />
+                )}
+                <div className="min-w-0">
+                  <input
+                    type="text"
+                    value={attachment.altText}
+                    maxLength={200}
+                    required
+                    aria-label={`Alt text for ${attachment.file.name}`}
+                    placeholder="Required alt text"
+                    onChange={(event) => setAttachments((current) => current.map((item) => item === attachment ? { ...item, altText: event.target.value } : item))}
+                    className="w-full rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-700"
+                  />
+                  {attachment.progress > 0 && attachment.progress < 100 && (
+                    <progress className="mt-2 h-1.5 w-full" max={100} value={attachment.progress} aria-label={`Uploading ${attachment.file.name}`} />
+                  )}
+                  <p className="mt-1 truncate text-xs text-zinc-500">{attachment.file.name}</p>
+                </div>
+                <button type="button" onClick={() => setAttachments((current) => current.filter((item) => item !== attachment))} aria-label={`Remove ${attachment.file.name}`} className="text-zinc-500 hover:text-red-600">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            {mediaError && <p role="alert" className="text-sm text-red-600">{mediaError}</p>}
+          </section>
+        )}
 
         {/* Encryption opt-in (#731) — only available for new reviews */}
         {!initialReview && (

@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
     const {
       projectId, projectName, userAddress, rating, comment,
       signedPayload, signature, signatureNonce, signatureTimestamp, captchaToken,
+      media,
       // E2E encryption fields (#731)
       encrypted, encryptedPayload, encryptedCid, adminWrappedKey,
     } = body;
@@ -134,6 +135,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, errors: [{ field: "comment", message: "encryptedPayload is required for encrypted reviews" }] },
         { status: 400 }
+      );
+    }
+
+    if (media !== undefined && (!Array.isArray(media) || media.length > 3 || media.some((item) =>
+      !item || typeof item !== "object" ||
+      typeof item.cid !== "string" || !/^[a-zA-Z0-9]+$/.test(item.cid) ||
+      typeof item.url !== "string" || !item.url.startsWith("ipfs://") ||
+      (item.type !== "image" && item.type !== "video") ||
+      typeof item.altText !== "string" || !item.altText.trim() || item.altText.length > 200
+    ))) {
+      return NextResponse.json(
+        { success: false, errors: [{ field: "media", message: "Review media must include a valid IPFS file and alt text (up to 3 files)." }] },
+        { status: 400 },
       );
     }
 
@@ -210,6 +224,7 @@ export async function POST(request: NextRequest) {
       encryptedPayload: encryptedPayload || undefined,
       encryptedCid: encryptedCid || undefined,
       adminWrappedKey: adminWrappedKey || undefined,
+      media: media || [],
     };
 
     store.set(newReview.id, newReview);
@@ -242,7 +257,16 @@ export async function PATCH(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { id, sentiment } = body as { id?: unknown; sentiment?: unknown };
+    const { id, sentiment, removeMediaCid } = body as { id?: unknown; sentiment?: unknown; removeMediaCid?: unknown };
+    if (typeof removeMediaCid === "string" && removeMediaCid) {
+      const review = store.get(id as string);
+      if (!review) {
+        return NextResponse.json(createErrorResponse(ErrorCode.NOT_FOUND, "Review not found", 404), { status: 404 });
+      }
+      review.media = (review.media ?? []).filter((item) => item.cid !== removeMediaCid);
+      await cacheDel(CacheKey.reviews(review.projectId));
+      return NextResponse.json(createSuccessResponse(review));
+    }
     if (typeof id !== "string" || !id || !isReviewSentiment(sentiment)) {
       return NextResponse.json(
         createErrorResponse(ErrorCode.VALIDATION_ERROR, "A review ID and valid sentiment are required", 400),

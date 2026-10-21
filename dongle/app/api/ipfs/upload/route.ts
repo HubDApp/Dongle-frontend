@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"]);
 
 function hasValidImageSignature(type: string, bytes: Uint8Array): boolean {
   if (type === "image/jpeg") {
@@ -17,9 +17,11 @@ function hasValidImageSignature(type: string, bytes: Uint8Array): boolean {
     return String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" &&
       String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
   }
-  if (type === "image/gif") {
-    const signature = String.fromCharCode(...bytes.slice(0, 6));
-    return signature === "GIF87a" || signature === "GIF89a";
+  if (type === "video/mp4") {
+    return String.fromCharCode(...bytes.slice(4, 8)) === "ftyp";
+  }
+  if (type === "video/webm") {
+    return bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
   }
   return false;
 }
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   const pinataJwt = process.env.PINATA_JWT;
   if (!pinataJwt) {
     return Response.json(
-      { error: "Image uploads are not configured. Set PINATA_JWT on the server." },
+      { error: "Media uploads are not configured. Set PINATA_JWT on the server." },
       { status: 503 },
     );
   }
@@ -42,28 +44,28 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   if (!(file instanceof File)) {
-    return Response.json({ error: "An image file is required." }, { status: 400 });
+    return Response.json({ error: "A media file is required." }, { status: 400 });
   }
   if (!ALLOWED_TYPES.has(file.type)) {
     return Response.json(
-      { error: "Choose a JPEG, PNG, WebP, or GIF image." },
+      { error: "Choose a JPG, PNG, WebP, MP4, or WebM file." },
       { status: 415 },
     );
   }
-  if (file.size === 0 || file.size > MAX_IMAGE_SIZE) {
+  if (file.size === 0 || file.size > MAX_FILE_SIZE) {
     return Response.json(
-      { error: "Images must be smaller than 10 MB." },
+      { error: "Files must be smaller than 10 MB." },
       { status: 413 },
     );
   }
 
   const signatureBytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   if (!hasValidImageSignature(file.type, signatureBytes)) {
-    return Response.json({ error: "The uploaded file is not a valid image." }, { status: 415 });
+    return Response.json({ error: "The uploaded file is not a valid image or video." }, { status: 415 });
   }
 
   const uploadBody = new FormData();
-  uploadBody.append("file", file, "project-image");
+  uploadBody.append("file", file, file.name);
 
   let pinataResponse: Response;
   try {
@@ -81,7 +83,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     console.error("[api/ipfs/upload] Pinata rejected upload", {
       status: pinataResponse.status,
     });
-    return Response.json({ error: "The IPFS upload service rejected the image." }, { status: 502 });
+    return Response.json({ error: "The IPFS upload service rejected the file." }, { status: 502 });
   }
 
   let result: { IpfsHash?: unknown };
