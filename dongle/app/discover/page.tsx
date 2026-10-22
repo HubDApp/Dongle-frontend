@@ -6,7 +6,7 @@ import { projectService } from "@/services/project/project.service";
 import { LazyProjectCard } from "@/components/projects/LazyProjectCard";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, ArrowUp } from "lucide-react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
@@ -31,7 +31,7 @@ import {
 import projectService from "@/services/project/project.service";
 import { Spinner } from "@/components/ui/Spinner";
 
-const ITEMS_PER_PAGE = 9;
+const ITEMS_PER_PAGE = 20;
 
 type HealthFilter = "ALL" | "80" | "60" | "40" | "BELOW_40";
 
@@ -46,10 +46,12 @@ function DiscoverContent() {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
   const [healthFilter, setHealthFilter] = useState<HealthFilter>("ALL");
   const [healthTrends, setHealthTrends] = useState<Record<string, number | null>>({});
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const gate = useWalletPageGate();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const confirm = useConfirm();
   const gridRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   useProjectGridNavigation(gridRef);
 
   const {
@@ -247,13 +249,30 @@ function DiscoverContent() {
     });
   };
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
     setIsLoadingMore(true);
     loadMoreTimerRef.current = setTimeout(() => {
       loadNextPage();
       setIsLoadingMore(false);
     }, 600);
-  };
+  }, [hasMore, isLoadingMore, loadNextPage]);
+
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 600);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (isInitialLoading || isLoadingMore || !hasMore || !loadMoreRef.current || !("IntersectionObserver" in window)) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) handleLoadMore();
+    }, { rootMargin: "400px 0px" });
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [handleLoadMore, hasMore, isInitialLoading, isLoadingMore]);
 
   const handleClearFilters = () => {
     clearFilters();
@@ -519,14 +538,15 @@ function DiscoverContent() {
         ) : filteredCount > 0 ? (
           <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleProjects.map((project) => (
-              <LazyProjectCard
-                key={project.id}
-                project={project}
-                verificationStatus={verificationStatuses[project.id]}
-                highlightTerm={searchQuery}
-                health={healthById[project.id]}
-                healthTrend={healthTrends[project.id]}
-              />
+              <div key={project.id} style={{ contentVisibility: "auto", containIntrinsicSize: "1px 620px" }}>
+                <LazyProjectCard
+                  project={project}
+                  verificationStatus={verificationStatuses[project.id]}
+                  highlightTerm={searchQuery}
+                  health={healthById[project.id]}
+                  healthTrend={healthTrends[project.id]}
+                />
+              </div>
             ))}
           </div>
         ) : (
@@ -544,20 +564,23 @@ function DiscoverContent() {
         )}
 
         {/* Load More */}
-        {!isLoadingMore && hasMore && visibleProjects.length > 0 && (
-          <div className="flex justify-center mt-10">
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={handleLoadMore}
-              isLoading={isLoadingMore}
-              className="w-full sm:w-auto min-w-50"
-            >
-              {!isLoadingMore && "Load More Projects"}
-            </Button>
+        {hasMore && visibleProjects.length > 0 && (
+          <div ref={loadMoreRef} className="flex justify-center mt-10 min-h-12">
+            {isLoadingMore ? (
+              <div role="status" className="flex items-center gap-2 text-sm text-zinc-500"><Spinner size="sm" /> Loading projects...</div>
+            ) : (
+              <Button variant="secondary" size="lg" onClick={handleLoadMore} className="w-full sm:w-auto min-w-50">
+                Load More Projects
+              </Button>
+            )}
           </div>
         )}
       </div>
+      {showBackToTop && (
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top" title="Back to top" className="fixed bottom-6 right-6 z-30 rounded-full border border-zinc-300 bg-white p-3 text-zinc-700 shadow-lg hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800">
+          <ArrowUp className="h-5 w-5" aria-hidden="true" />
+        </button>
+      )}
     </main>
   );
 }

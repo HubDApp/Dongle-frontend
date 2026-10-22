@@ -33,6 +33,14 @@ export interface Review {
   encryptedCid?: string;
   /** Admin-wrapped copy of the per-review key (RSA-OAEP, base64). */
   adminWrappedKey?: string;
+  media?: ReviewMedia[];
+}
+
+export interface ReviewMedia {
+  cid: string;
+  url: string;
+  type: "image" | "video";
+  altText: string;
 }
 
 export interface ReviewOwnerResponse {

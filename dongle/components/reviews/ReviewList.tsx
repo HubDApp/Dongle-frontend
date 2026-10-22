@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { Badge } from "@/components/ui/Badge";
@@ -13,9 +13,10 @@ import {
   persistReviewTranslation,
   readReviewTranslationCache,
 } from "@/lib/review-translation";
-import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag } from "lucide-react";
+import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag, X } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { reviewAnalyticsService } from "@/services/review/review-analytics.service";
+import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
 
 interface ReviewListProps {
   reviews: Review[];
@@ -71,6 +72,9 @@ export default function ReviewList({
   emptyTitle,
   onClearFilters
 }: ReviewListProps) {
+  const [lightbox, setLightbox] = useState<{ url: string; altText: string } | null>(null);
+  const [removedMedia, setRemovedMedia] = useState<string[]>([]);
+
   useEffect(() => {
     reviewAnalyticsService.recordViews(reviews.map((review) => review.id));
   }, [reviews]);
@@ -167,6 +171,52 @@ export default function ReviewList({
               Translate
             </a>
           </div>
+
+          {review.media?.filter((media) => !removedMedia.includes(`${review.id}:${media.cid}`)).length ? (
+            <div className="mb-6 flex flex-wrap gap-3">
+              {review.media.filter((media) => !removedMedia.includes(`${review.id}:${media.cid}`)).map((media) => {
+                const mediaUrl = getIpfsGatewayUrls(media.url)[0] ?? media.url;
+                return (
+                  <div key={media.cid} className="relative">
+                    {media.type === "video" ? (
+                      <video src={mediaUrl} controls preload="metadata" className="max-h-64 max-w-full rounded-lg" aria-label={media.altText} />
+                    ) : (
+                      <button type="button" onClick={() => setLightbox({ url: mediaUrl, altText: media.altText })} aria-label={`View image: ${media.altText}`}>
+                        <img src={mediaUrl} alt={media.altText} className="max-h-64 max-w-full cursor-zoom-in rounded-lg object-contain" />
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        aria-label="Remove inappropriate media"
+                        title="Remove media"
+                        onClick={async () => {
+                          const response = await fetch("/api/reviews", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: review.id, removeMediaCid: media.cid }),
+                          });
+                          if (response.ok) setRemovedMedia((current) => [...current, `${review.id}:${media.cid}`]);
+                        }}
+                        className="absolute right-1 top-1 rounded bg-white p-1 text-red-600 shadow hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {lightbox && (
+            <div role="dialog" aria-modal="true" aria-label="Review image" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setLightbox(null)}>
+              <button type="button" aria-label="Close image" className="absolute right-4 top-4 text-white" onClick={() => setLightbox(null)}>
+                <X className="h-7 w-7" />
+              </button>
+              <img src={lightbox.url} alt={lightbox.altText} className="max-h-full max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
+            </div>
+          )}
 
             {!shouldHideSentiment && (sentimentPresentation || isAdmin) && (
               <div className="mb-3 flex flex-wrap items-center gap-2">

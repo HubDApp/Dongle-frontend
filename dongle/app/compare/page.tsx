@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useComparison } from "@/context/comparison.context";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle, History, Link as LinkIcon } from "lucide-react";
+import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle, History, Link as LinkIcon, Download } from "lucide-react";
 import ProjectImage from "@/components/projects/ProjectImage";
 import { Button } from "@/components/ui/Button";
 import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
@@ -14,6 +14,15 @@ import type { Project } from "@/types/project";
 import { projectService } from "@/services/project/project.service";
 import { buildComparisonPermalink, getComparisonProjectIdsFromQuery } from "@/utils/comparison-history.util";
 import { toast } from "sonner";
+import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
+
+type ExportFormat = "pdf" | "png" | "csv";
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character] ?? character);
+}
 
 export default function ComparePage() {
   const { selectedProjects, removeProject, clearComparison, restoreProjects, saveCurrentComparison } = useComparison();
@@ -21,6 +30,105 @@ export default function ComparePage() {
   const searchParams = useSearchParams();
   const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportComparison = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `dongle-comparison-${date}`;
+    const rows: Array<[string, (project: Project) => string]> = [
+      ["Rating", (project) => String(project.rating ?? "")],
+      ["Reviews", (project) => String(project.reviews ?? 0)],
+      ["Verification", (project) => verificationStatuses[project.id] ?? "NONE"],
+      ["Category", (project) => project.primaryCategory ?? ""],
+      ["Tags", (project) => (project.tags ?? []).join(", ")],
+      ["Description", (project) => project.description ?? ""],
+      ["Logo", (project) => project.logoUrl ?? ""],
+      ["Website", (project) => project.websiteUrl ?? ""],
+      ["GitHub", (project) => project.githubUrl ?? ""],
+      ["Documentation", (project) => project.docsUrl ?? ""],
+      ["Audit Report", (project) => project.auditReportUrl ?? ""],
+      ["Bug Bounty", (project) => project.bugBountyUrl ?? ""],
+    ];
+
+    try {
+      if (exportFormat === "csv") {
+        const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const csv = [
+          ["Attribute", ...selectedProjects.map((project) => project.name)],
+          ...rows.map(([label, value]) => [label, ...selectedProjects.map(value)]),
+        ].map((row) => row.map(quote).join(",")).join("\r\n");
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+        link.download = `${filename}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      } else if (exportFormat === "pdf") {
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+          toast.error("Allow pop-ups to export this comparison as PDF");
+          return;
+        }
+        const columns = selectedProjects.map((project) => {
+          const logo = project.logoUrl ? getIpfsGatewayUrls(project.logoUrl)[0] : "";
+          return `<th><img src="${escapeHtml(logo)}" alt="" /><strong>${escapeHtml(project.name)}</strong></th>`;
+        }).join("");
+        const tableRows = rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th>${selectedProjects.map((project) => `<td>${escapeHtml(value(project))}</td>`).join("")}</tr>`).join("");
+        printWindow.document.write(`<!doctype html><html><head><title>${filename}.pdf</title><style>body{font:14px Arial,sans-serif;padding:24px;color:#18181b}h1{font-size:22px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d4d4d8;padding:10px;text-align:left;vertical-align:top}thead th{text-align:center}thead img{display:block;width:56px;height:56px;object-fit:contain;margin:0 auto 8px}thead strong{display:block} @media print{body{padding:0}}</style></head><body><h1>Project Comparison</h1><table><thead><tr><th>Attribute</th>${columns}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+        printWindow.document.close();
+        printWindow.requestAnimationFrame(() => printWindow.print());
+      } else {
+        const columnWidth = 420;
+        const padding = 48;
+        const rowHeight = 92;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1400, padding * 2 + columnWidth * (selectedProjects.length + 1));
+        canvas.height = 240 + rowHeight * rows.length;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas export is unavailable");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "#18181b";
+        context.font = "bold 38px sans-serif";
+        context.fillText("Project Comparison", padding, 62);
+        context.font = "bold 24px sans-serif";
+        selectedProjects.forEach((project, index) => {
+          const x = padding + columnWidth * (index + 1);
+          context.fillText(project.name.slice(0, 24), x, 138);
+        });
+        rows.forEach(([label, value], rowIndex) => {
+          const y = 240 + rowHeight * rowIndex;
+          context.strokeStyle = "#e4e4e7";
+          context.beginPath();
+          context.moveTo(padding, y);
+          context.lineTo(canvas.width - padding, y);
+          context.stroke();
+          context.fillStyle = "#3f3f46";
+          context.font = "bold 20px sans-serif";
+          context.fillText(label, padding, y + 34);
+          selectedProjects.forEach((project, index) => {
+            context.fillStyle = "#18181b";
+            context.font = "18px sans-serif";
+            const text = value(project);
+            context.fillText(text.slice(0, 48), padding + columnWidth * (index + 1), y + 34);
+          });
+        });
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("Could not generate PNG");
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}.png`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      }
+    } catch {
+      toast.error("Could not export this comparison");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   useEffect(() => {
     const idsText = searchParams.get("ids");
@@ -108,6 +216,16 @@ export default function ComparePage() {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-4xl font-bold">Compare Projects</h1>
             <div className="flex gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <select aria-label="Export format" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as ExportFormat)} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+                  <option value="csv">CSV</option>
+                  <option value="pdf">PDF</option>
+                  <option value="png">PNG</option>
+                </select>
+                <Button variant="outline" onClick={() => void exportComparison()} isLoading={isExporting}>
+                  <Download className="mr-2 h-4 w-4" />Export
+                </Button>
+              </div>
               <Button variant="outline" onClick={() => router.push("/compare/history")}>
                 <History className="w-4 h-4 mr-2" />
                 History

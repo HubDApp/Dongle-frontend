@@ -7,12 +7,14 @@
  * button, and featured-first ordering. Featured reviews show a ⭐ badge.
  */
 
-import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock } from "lucide-react";
+import { useState } from "react";
+import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock, X } from "lucide-react";
 import { Review } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
 import { ENCRYPTED_COMMENT_SENTINEL } from "@/lib/review-encryption";
+import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
 
 interface ReviewCardProps {
   review: Review;
@@ -25,6 +27,7 @@ interface ReviewCardProps {
   onReport?: (review: Review) => void;
   onFeature?: (id: string) => void;
   onUnfeature?: (id: string) => void;
+  onMediaRemoved?: (review: Review) => void;
   onOverrideSentiment?: (id: string, sentiment: ReviewSentiment) => void;
 }
 
@@ -39,8 +42,11 @@ export default function ReviewCard({
   onReport,
   onFeature,
   onUnfeature,
+  onMediaRemoved,
   onOverrideSentiment,
 }: ReviewCardProps) {
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [removedMedia, setRemovedMedia] = useState<string[]>([]);
   const sentimentPresentation = review.sentiment
     ? {
         positive: { emoji: "😊", label: "Positive" },
@@ -101,6 +107,55 @@ export default function ReviewCard({
         </div>
       ) : (
         <p className="text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">{review.comment}</p>
+      )}
+
+      {review.media?.some((media) => !removedMedia.includes(media.cid)) && (
+        <div className="mb-6 flex flex-wrap gap-3">
+          {review.media.filter((media) => !removedMedia.includes(media.cid)).map((media) => {
+            const mediaUrl = getIpfsGatewayUrls(media.url)[0] ?? media.url;
+            return (
+              <div key={media.cid} className="relative">
+                {media.type === "video" ? (
+                  <video src={mediaUrl} controls preload="metadata" className="max-h-64 max-w-full rounded-lg" aria-label={media.altText} />
+                ) : (
+                  <button type="button" onClick={() => setLightboxUrl(mediaUrl)} aria-label={`View image: ${media.altText}`}>
+                    <img src={mediaUrl} alt={media.altText} className="max-h-64 max-w-full cursor-zoom-in rounded-lg object-contain" />
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    aria-label="Remove inappropriate media"
+                    title="Remove media"
+                    onClick={async () => {
+                      const response = await fetch("/api/reviews", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ id: review.id, removeMediaCid: media.cid }),
+                      });
+                      if (response.ok) {
+                        setRemovedMedia((current) => [...current, media.cid]);
+                        onMediaRemoved?.({ ...review, media: review.media?.filter((item) => item.cid !== media.cid) });
+                      }
+                    }}
+                    className="absolute right-1 top-1 rounded bg-white p-1 text-red-600 shadow hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div role="dialog" aria-modal="true" aria-label="Review image" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setLightboxUrl(null)}>
+          <button type="button" aria-label="Close image" className="absolute right-4 top-4 text-white" onClick={() => setLightboxUrl(null)}>
+            <X className="h-7 w-7" />
+          </button>
+          <img src={lightboxUrl} alt={review.media?.find((media) => getIpfsGatewayUrls(media.url)[0] === lightboxUrl)?.altText ?? "Review evidence"} className="max-h-full max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
+        </div>
       )}
 
       <div className="flex justify-between items-center">

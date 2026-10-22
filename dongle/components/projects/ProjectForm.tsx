@@ -124,7 +124,7 @@ const projectSchema = z
   .object({
     name: z.string().min(3, "Project name must be at least 3 characters"),
     primaryCategory: z.string().min(1, "Please select a category"),
-    tags: z.array(z.string()),
+    tags: z.array(z.string().max(30, "Tags cannot exceed 30 characters")).max(10, "A project can have at most 10 tags"),
     description: z
       .string()
       .min(10, "Description must be at least 10 characters")
@@ -1046,6 +1046,9 @@ export default function ProjectForm({
               onChange={field.onChange}
               error={errors.tags?.message}
               placeholder="Add tags (press enter)"
+              suggestionsEnabled
+              maxTags={10}
+              maxTagLength={30}
             />
           )}
         />
