@@ -1,0 +1,63 @@
+name: Accessibility Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "dongle/**"
+      - ".github/workflows/a11y-audit.yml"
+
+concurrency:
+  group: a11y-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pa11y:
+    name: pa11y-ci WCAG AA
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dongle
+    env:
+      # Max number of WCAG AA errors allowed before the build fails.
+      PA11Y_THRESHOLD: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          CI: true
+
+      - uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Run pa11y-ci
+        run: |
+          export PA11Y_CHROMIUM_PATH="$(which google-chrome-stable || which chromium-browser || which chromium)"
+          PA11Y_PORT=3000 node scripts/serve-static-for-pa11y.mjs > /tmp/pa11y-server.log 2>&1 &
+          SERVER_PID=$!
+          sleep 3
+          set +e
+          npx pa11y-ci --config .pa11yci.js --threshold "${PA11Y_THRESHOLD}" --json > pa11y-report.json
+          EXIT=$?
+          kill ${SERVER_PID} 2>/dev/null || true
+          exit ${EXIT}
+
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pa11y-report
+          path: dongle/pa11y-report.json
+          if-no-files-found: ignore

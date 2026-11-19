@@ -7,16 +7,27 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: CI,
   retries: CI ? 2 : 0,
-  workers: CI ? 1 : undefined,
-  reporter: CI ? "github" : "list",
-  use: {
+  workers: CI ? 4 : undefined,
+  reporter: CI ? [["github"], ["html", { open: "never" }]] : "list",  use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+    screenshot: "only-on-failure",
   },
   projects: [
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: /mobile\/.*\.spec\.ts/,
+    },
+    {
+      name: "mobile-iphone-13",
+      use: { ...devices["iPhone 13"], browserName: "chromium" },
+      testMatch: /mobile\/.*\.spec\.ts/,
+    },
+    {
+      name: "mobile-pixel-5",
+      use: { ...devices["Pixel 5"] },
+      testMatch: /mobile\/.*\.spec\.ts/,
     },
   ],
   webServer: {
