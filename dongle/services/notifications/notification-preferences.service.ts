@@ -33,6 +33,7 @@ export interface NotificationPreferences {
     digestTime: string;
     smartGrouping: boolean;
   };
+  groupMode: "auto" | "always" | "never";
   devices: {
     desktop: { enabled: boolean; quietHours: boolean; batchLowPriority: boolean };
     mobile: { enabled: boolean; quietHours: boolean; batchLowPriority: boolean };
@@ -69,6 +70,7 @@ const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userId" | "updatedAt">
     digestTime: "09:00",
     smartGrouping: true,
   },
+  groupMode: "auto",
   devices: {
     desktop: { enabled: true, quietHours: true, batchLowPriority: true },
     mobile: { enabled: true, quietHours: true, batchLowPriority: true },
