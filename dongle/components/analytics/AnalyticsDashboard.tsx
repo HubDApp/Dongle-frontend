@@ -230,15 +230,40 @@ export default function AnalyticsDashboard() {
           <section>
             <h2 className="mb-3 text-lg font-semibold">{t("analytics.topCategories")}</h2>
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {data.result.categories.map((item) => (
-                <li
-                  key={item.category}
-                  className="flex items-center justify-between rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-                >
-                  <span>{item.category}</span>
-                  <span className="font-semibold">{item.count}</span>
-                </li>
-              ))}
+              {data.result.categories.map((item) => {
+                const fastest = data.result.categories.reduce((best, candidate) =>
+                  candidate.growth > best.growth ? candidate : best
+                , data.result.categories[0])?.category === item.category && item.growth > 0;
+                const arrow = item.trend === "up" ? "↑" : item.trend === "down" ? "↓" : "→";
+                const color = item.trend === "up"
+                  ? "text-green-600"
+                  : item.trend === "down"
+                    ? "text-red-600"
+                    : "text-zinc-500";
+                return (
+                  <li
+                    key={item.category}
+                    className="flex items-center justify-between rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800"
+                  >
+                    <span className="flex items-center gap-2">
+                      {item.category}
+                      {fastest ? <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">Trending</span> : null}
+                    </span>
+                    <details>
+                      <summary className="cursor-pointer list-none text-right">
+                        <span className="font-semibold">{item.count}</span>{" "}
+                        <span className={color} title={`${item.growth >= 0 ? "+" : ""}${item.growth} projects this week`} aria-label={`${item.growth >= 0 ? "+" : ""}${item.growth} projects this week`}>
+                          {arrow}
+                        </span>
+                      </summary>
+                      <div className="mt-2 flex h-8 items-end gap-1" aria-label="Growth chart">
+                        <span className="block w-5 bg-zinc-300" style={{ height: `${Math.max(4, item.previousCount * 4)}px` }} />
+                        <span className="block w-5 bg-blue-500" style={{ height: `${Math.max(4, item.count ? (item.count - item.previousCount) * 4 : 4)}px` }} />
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         </>

@@ -254,6 +254,25 @@ export function NotificationPreferencesComponent({
           </div>
 
           <div className="border-t border-zinc-200 pt-5 dark:border-zinc-800 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <label className="block text-sm font-medium">
+              Notification grouping
+              <select
+                aria-label="Notification grouping preference"
+                value={preferences.groupMode}
+                onChange={(event) => {
+                  const updated = notificationPreferencesService.updatePreferences(userId, {
+                    groupMode: event.target.value as NotificationPreferences["groupMode"],
+                  });
+                  setPreferences(updated);
+                }}
+                className="mt-2 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                disabled={!preferences.enabled}
+              >
+                <option value="auto">Group 3+ similar items within 24 hours</option>
+                <option value="always">Always group</option>
+                <option value="never">Never group</option>
+              </select>
+            </label>
             <label className="flex items-center gap-3 font-medium">
               <Checkbox
                 checked={preferences.batching.enabled}
