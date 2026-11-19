@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getStoredItem, setStoredItem } from "@/lib/indexed-storage";
 
 export const REVIEW_DRAFT_STORAGE_KEY = "dongle_review_drafts";
 const REVIEW_DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -17,12 +18,11 @@ interface StoredReviewDraft {
 
 type ReviewDrafts = Record<string, StoredReviewDraft>;
 
-function readDrafts(): ReviewDrafts {
+async function readDrafts(): Promise<ReviewDrafts> {
   if (typeof window === "undefined") return {};
 
   try {
-    const value = localStorage.getItem(REVIEW_DRAFT_STORAGE_KEY);
-    const parsed: unknown = value ? JSON.parse(value) : {};
+    const parsed: unknown = (await getStoredItem<unknown>(REVIEW_DRAFT_STORAGE_KEY)) ?? {};
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
 
     const now = Date.now();
@@ -40,9 +40,9 @@ function readDrafts(): ReviewDrafts {
   }
 }
 
-function writeDrafts(drafts: ReviewDrafts) {
+async function writeDrafts(drafts: ReviewDrafts) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(REVIEW_DRAFT_STORAGE_KEY, JSON.stringify(drafts));
+  await setStoredItem(REVIEW_DRAFT_STORAGE_KEY, drafts);
 }
 
 export function useReviewDraft(
@@ -54,7 +54,11 @@ export function useReviewDraft(
   const [draft, setDraft] = useState<StoredReviewDraft | null>(null);
 
   const refreshDraft = useCallback(() => {
-    setDraft(enabled ? readDrafts()[draftKey] ?? null : null);
+    if (!enabled) {
+      setDraft(null);
+      return;
+    }
+    void readDrafts().then((drafts) => setDraft(drafts[draftKey] ?? null));
   }, [draftKey, enabled]);
 
   useEffect(() => {
@@ -69,20 +73,20 @@ export function useReviewDraft(
   const saveDraft = useCallback(
     (data: ReviewDraftData) => {
       if (!enabled || !walletAddress) return;
-      const drafts = readDrafts();
-      const next = { ...drafts, [draftKey]: { data, savedAt: Date.now() } };
-      writeDrafts(next);
-      setDraft(next[draftKey]);
+      const entry = { data, savedAt: Date.now() };
+      setDraft(entry);
+      void readDrafts().then((drafts) => writeDrafts({ ...drafts, [draftKey]: entry }));
     },
     [draftKey, enabled, walletAddress],
   );
 
   const clearDraft = useCallback(() => {
     if (!enabled) return;
-    const drafts = readDrafts();
-    delete drafts[draftKey];
-    writeDrafts(drafts);
     setDraft(null);
+    void readDrafts().then((drafts) => {
+      delete drafts[draftKey];
+      return writeDrafts(drafts);
+    });
   }, [draftKey, enabled]);
 
   const dismissRecovery = useCallback(() => setDraft(null), []);

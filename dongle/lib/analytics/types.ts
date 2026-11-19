@@ -37,7 +37,8 @@ export type AnalyticsEventName =
   | "consent_withdrawn"
   | "data_export"
   | "data_deletion_requested"
-  | "data_deletion_completed";
+  | "data_deletion_completed"
+  | "storage_quota_warning";
 
 /** Flat property bag — values must be JSON-serializable primitives. */
 export type AnalyticsProperties = Record<

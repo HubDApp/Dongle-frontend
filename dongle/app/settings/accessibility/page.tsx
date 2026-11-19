@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTheme } from "@/providers/ThemeProvider";
 
 export default function AccessibilitySettingsPage() {
@@ -42,6 +43,14 @@ export default function AccessibilitySettingsPage() {
           >
             {highContrast ? "On" : "Off"}
           </button>
+        </div>
+        <div className="mt-6 flex flex-wrap gap-4 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-700">
+          <Link href="/settings/translations" className="font-medium text-zinc-900 underline dark:text-zinc-100">
+            Suggest better translation
+          </Link>
+          <Link href="/settings/storage" className="font-medium text-zinc-900 underline dark:text-zinc-100">
+            Manage storage
+          </Link>
         </div>
         <p className="sr-only" role="status" aria-live="polite">
           High contrast mode is {highContrast ? "on" : "off"}.

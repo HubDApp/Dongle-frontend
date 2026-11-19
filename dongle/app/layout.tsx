@@ -6,6 +6,7 @@ import { WalletProvider } from "@/context/wallet.context";
 import { ConfirmDialogProvider } from "@/hooks/useConfirm";
 import { ComparisonProvider } from "@/context/comparison.context";
 import { Toaster } from "sonner";
+import { StorageBootstrap } from "@/components/layout/StorageBootstrap";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import AnalyticsRoot from "@/components/analytics/AnalyticsRoot";
 import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
@@ -90,6 +91,7 @@ export default async function RootLayout({
             </LocaleProvider>
           </WalletProvider>
           <Toaster position="top-right" richColors />
+          <StorageBootstrap />
         </ThemeProvider>
       </body>
     </html>
