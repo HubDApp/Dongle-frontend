@@ -1,0 +1,52 @@
+name: Load Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  k6:
+    name: k6 discovery and analytics
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'performance')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dongle
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: "./dongle/package-lock.json"
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          CI: true
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Start app
+        run: |
+          npm run start > /tmp/next.log 2>&1 &
+          npx --yes wait-on http://localhost:3000 --timeout 120000
+
+      - name: Discovery page load test
+        run: k6 run --summary-export=discovery-summary.json __tests__/load/discovery-page.load.js
+
+      - name: Analytics dashboard load test
+        run: k6 run --summary-export=analytics-summary.json __tests__/load/analytics-dashboard.load.js
+
+      - name: Upload k6 summaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summaries
+          path: dongle/*-summary.json
+          if-no-files-found: ignore
