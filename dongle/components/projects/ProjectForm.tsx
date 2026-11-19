@@ -86,7 +86,7 @@ const optionalUrlSchema = z.string().transform((val, ctx) => {
   }
 });
 
-const repositoryUrlSchema = z.string().transform((val, ctx) => {
+export const repositoryUrlSchema = z.string().transform((val, ctx) => {
   if (isBlank(val)) return "";
   
   const validation = validateRepositoryUrl(val);
