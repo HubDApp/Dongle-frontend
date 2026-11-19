@@ -49,12 +49,12 @@ jobs:
           CI: true
 
       - name: Check gzipped JS per route (< 200 KB)
-        run: npm run test:bundle
+        run: node scripts/check-bundle-size.mjs
 
       - name: Run Lighthouse CI
         # Asserts: performance > 90, accessibility > 95, best-practices > 90,
         #          FCP < 1800ms, LCP < 2500ms, CLS < 0.1, initial JS < 200KB
-        run: npm run test:lighthouse
+        run: npx --yes @lhci/cli@0.14.0 autorun
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
 

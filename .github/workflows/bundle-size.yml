@@ -1,0 +1,83 @@
+name: Bundle size
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "dongle/**"
+      - ".github/workflows/bundle-size.yml"
+  push:
+    branches: [main]
+    paths:
+      - "dongle/**"
+      - ".github/workflows/bundle-size.yml"
+
+concurrency:
+  group: bundle-size-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  bundle-size:
+    name: Enforce bundle size limits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: head
+
+      - name: Checkout base branch
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: head/dongle/package-lock.json
+
+      - name: Measure base branch bundles
+        if: github.event_name == 'pull_request'
+        working-directory: base/dongle
+        continue-on-error: true
+        run: |
+          npm ci
+          npm run build
+          cp ../../head/dongle/scripts/check-bundlewatch-limits.mjs scripts/
+          cp ../../head/dongle/.bundlewatch.config.json .
+          node scripts/check-bundlewatch-limits.mjs --out "$RUNNER_TEMP/base-sizes.json" || true
+        env:
+          CI: true
+
+      - name: Install dependencies
+        working-directory: head/dongle
+        run: npm ci
+
+      - name: Dependency analysis
+        working-directory: head/dongle
+        run: npm run analyze:deps
+
+      - name: Production build
+        working-directory: head/dongle
+        run: npm run build
+        env:
+          CI: true
+
+      - name: Check bundle limits and growth (> 10% fails)
+        working-directory: head/dongle
+        run: node scripts/check-bundlewatch-limits.mjs --out "$RUNNER_TEMP/bundle-sizes.json" --base "$RUNNER_TEMP/base-sizes.json"
+
+      - name: Upload bundle sizes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-sizes
+          path: ${{ runner.temp }}/bundle-sizes.json
+          if-no-files-found: ignore
