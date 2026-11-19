@@ -1,0 +1,111 @@
+name: Cross-browser Visual & Memory
+
+# Visual regression with Playwright's built-in toHaveScreenshot (no paid
+# service): baselines are captured on every push to main and cached; PRs
+# compare against the latest main baseline per browser, breakpoint and
+# colour scheme. Memory-leak profiling runs nightly in Chromium.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "dongle/**"
+      - ".github/workflows/cross-browser-quality.yml"
+  push:
+    branches: [main]
+    paths:
+      - "dongle/**"
+      - ".github/workflows/cross-browser-quality.yml"
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cross-browser-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    name: Visual regression (chromium, firefox, webkit)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dongle
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "dongle/package-lock.json"
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Restore baseline screenshots from main
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: dongle/e2e-quality/__screenshots__
+          key: visual-baselines-${{ github.event.pull_request.base.sha }}
+          restore-keys: visual-baselines-
+
+      - name: Compare screenshots
+        if: github.event_name == 'pull_request'
+        run: npx playwright test -c playwright.quality.config.ts --project=visual-chromium --project=visual-firefox --project=visual-webkit --update-snapshots=missing
+        env:
+          CI: true
+
+      - name: Update baseline screenshots
+        if: github.event_name != 'pull_request'
+        run: npx playwright test -c playwright.quality.config.ts --project=visual-chromium --project=visual-firefox --project=visual-webkit --update-snapshots=all
+        env:
+          CI: true
+
+      - name: Save baseline screenshots
+        if: github.event_name != 'pull_request'
+        uses: actions/cache/save@v4
+        with:
+          path: dongle/e2e-quality/__screenshots__
+          key: visual-baselines-${{ github.sha }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-report
+          path: dongle/playwright-quality-report/
+          retention-days: 14
+
+  memory:
+    name: Memory leak profiling (nightly)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dongle
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "dongle/package-lock.json"
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test -c playwright.quality.config.ts --project=memory
+        env:
+          CI: true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: memory-report
+          path: dongle/playwright-quality-report/
+          retention-days: 30
