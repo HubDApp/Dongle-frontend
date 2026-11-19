@@ -14,6 +14,7 @@
 /coverage
 /test-results/
 /playwright-report/
+/playwright-quality-report/
 /blob-report/
 /playwright/.cache/
 

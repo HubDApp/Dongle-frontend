@@ -14,6 +14,8 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [
+    { name: "firefox", use: { ...devices["Desktop Firefox"] }, testIgnore: /mobile\/.*\.spec\.ts/ },
+    { name: "webkit", use: { ...devices["Desktop Safari"] }, testIgnore: /mobile\/.*\.spec\.ts/ },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },

@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useState, useRef, Suspense, useCallback } from "react";
 import { useProjectGridNavigation } from "@/hooks/useKeyboardShortcuts";
+import { useWindowVirtualRows } from "@/hooks/useWindowVirtualRows";
 import { projectService } from "@/services/project/project.service";
 import { LazyProjectCard } from "@/components/projects/LazyProjectCard";
 import { Button } from "@/components/ui/Button";
@@ -32,6 +33,8 @@ import projectService from "@/services/project/project.service";
 import { Spinner } from "@/components/ui/Spinner";
 
 const ITEMS_PER_PAGE = 20;
+// Card placeholder height (containIntrinsicSize below) plus the grid's gap-6.
+const GRID_ROW_HEIGHT = 644;
 
 type HealthFilter = "ALL" | "80" | "60" | "40" | "BELOW_40";
 
@@ -179,6 +182,7 @@ function DiscoverContent() {
   const visibleCount = page * ITEMS_PER_PAGE;
   const visibleProjects = filteredAndSortedProjects.slice(0, visibleCount);
   const hasMore = visibleCount < filteredCount;
+  const virtualRows = useWindowVirtualRows(gridRef, visibleProjects.length, GRID_ROW_HEIGHT);
 
   const loadMoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSearchRef = useRef<string | null>(null);
@@ -536,8 +540,12 @@ function DiscoverContent() {
             ))}
           </div>
         ) : filteredCount > 0 ? (
-          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleProjects.map((project) => (
+          <div
+            ref={gridRef}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            style={{ paddingTop: virtualRows.paddingTop, paddingBottom: virtualRows.paddingBottom }}
+          >
+            {visibleProjects.slice(virtualRows.start, virtualRows.end).map((project) => (
               <div key={project.id} style={{ contentVisibility: "auto", containIntrinsicSize: "1px 620px" }}>
                 <LazyProjectCard
                   project={project}
