@@ -894,6 +894,7 @@ export default function ProjectForm({
         ref={bindFormRef}
         onSubmit={handleFormSubmit}
         onFocusCapture={() => conversion.trackStart()}
+        onBlurCapture={() => draft.forceSave()}
         className="space-y-6"
       >
         <FormHeatmapOverlay
@@ -912,6 +913,7 @@ export default function ProjectForm({
           hasDraft={draft.hasDraft}
           lastSaved={draft.lastSaved}
           isSaving={draft.isSaving}
+          isSaved={draft.isSaved}
           saveError={draft.saveError}
           onDiscard={handleDiscardDraft}
         />
