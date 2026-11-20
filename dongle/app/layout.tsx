@@ -14,6 +14,7 @@ import { AuthProvider } from "@/context/auth.context";
 import { NotificationProvider } from "@/context/notification.context";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { TwoFAProvider } from "@/context/twofa.context";
+import { SyncProvider } from "@/context/sync.context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -74,21 +75,23 @@ export default async function RootLayout({
       >
         <ThemeProvider defaultTheme="system" storageKey="dongle-theme">
           <WalletProvider>
-            <LocaleProvider>
-              <AuthProvider>
-                <NotificationProvider>
-                  <ConfirmDialogProvider>
-                    <ComparisonProvider>
-                      <AnalyticsRoot>
-                        <TwoFAProvider>
-                          <LayoutWrapper>{children}</LayoutWrapper>
-                        </TwoFAProvider>
-                      </AnalyticsRoot>
-                    </ComparisonProvider>
-                  </ConfirmDialogProvider>
-                </NotificationProvider>
-              </AuthProvider>
-            </LocaleProvider>
+            <SyncProvider>
+              <LocaleProvider>
+                <AuthProvider>
+                  <NotificationProvider>
+                    <ConfirmDialogProvider>
+                      <ComparisonProvider>
+                        <AnalyticsRoot>
+                          <TwoFAProvider>
+                            <LayoutWrapper>{children}</LayoutWrapper>
+                          </TwoFAProvider>
+                        </AnalyticsRoot>
+                      </ComparisonProvider>
+                    </ConfirmDialogProvider>
+                  </NotificationProvider>
+                </AuthProvider>
+              </LocaleProvider>
+            </SyncProvider>
           </WalletProvider>
           <Toaster position="top-right" richColors />
           <StorageBootstrap />
