@@ -14,6 +14,7 @@ import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
+import { TransactionLoadMore } from "@/components/transactions/TransactionLoadMore";
 import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import {
   LogOut,
@@ -58,7 +59,17 @@ export default function ProfilePage() {
   const router = useRouter();
   const gate = useWalletPageGate({ requireFundedAccount: true });
   const { balances, loading: balancesLoading, error: balancesError } = useStellarAccount();
-  const { transactions, loading: txLoading, error: txError } = useWalletTransactions(8);
+  const {
+    transactions,
+    loading: txLoading,
+    error: txError,
+    hasMore: txHasMore,
+    loadingMore: txLoadingMore,
+    loadMoreError: txLoadMoreError,
+    loadMore: loadMoreTx,
+    refetch: refetchTx,
+  } = useWalletTransactions(8);
+  const txCountLabel = `${transactions.length}${txHasMore ? "+" : ""}`;
   const confirm = useConfirm();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const { savedProjectIds } = useSavedProjects();
@@ -326,7 +337,9 @@ export default function ProfilePage() {
                     <Activity className="w-6 h-6" />
                     Recent Wallet Activity
                   </h2>
-                  <Badge variant="secondary">{transactions.length}</Badge>
+                  <Badge variant="secondary" aria-label={`${txCountLabel} transactions`}>
+                    {txCountLabel}
+                  </Badge>
                 </div>
 
                 {txLoading ? (
@@ -334,10 +347,14 @@ export default function ProfilePage() {
                     <Spinner size="md" />
                   </div>
                 ) : txError ? (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
-                    {txError}
+                  <div className="flex items-center justify-between gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                    <span>{txError}</span>
+                    <button onClick={() => void refetchTx()} className="shrink-0 font-semibold underline">
+                      Retry
+                    </button>
                   </div>
                 ) : transactions.length > 0 ? (
+                  <>
                   <div className="space-y-3">
                     {transactions.map((tx) => (
                       <div
@@ -358,6 +375,13 @@ export default function ProfilePage() {
                       </div>
                     ))}
                   </div>
+                  <TransactionLoadMore
+                    hasMore={txHasMore}
+                    loadingMore={txLoadingMore}
+                    error={txLoadMoreError}
+                    onLoadMore={() => void loadMoreTx()}
+                  />
+                  </>
                 ) : (
                   <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                     <Wallet className="w-10 h-10 mx-auto mb-2 opacity-50" />
@@ -734,7 +758,7 @@ export default function ProfilePage() {
                       <Activity className="w-4 h-4" />
                       Transactions
                     </span>
-                    <span className="font-bold text-lg">{transactions.length}</span>
+                    <span className="font-bold text-lg">{txCountLabel}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">

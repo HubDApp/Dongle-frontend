@@ -7,6 +7,8 @@ import { useAuth } from "@/context/auth.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
+import { WalletSelectModal } from "@/components/wallet/WalletSelectModal";
+import { WalletAccountsMenu } from "@/components/wallet/WalletAccountsMenu";
 
 function GoogleMark() {
   return (
@@ -51,11 +53,11 @@ function LoginMenuInner() {
     publicKey,
     isCorrectNetwork,
     walletNetworkLabel,
-    connectWallet,
     disconnectWallet,
   } = useWallet();
   const { user, isOAuth, isReadOnly, startOAuth, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
@@ -110,6 +112,7 @@ function LoginMenuInner() {
           >
             {t("wallet.disconnect")}
           </Button>
+          <WalletAccountsMenu />
         </div>
       </div>
     );
@@ -123,7 +126,7 @@ function LoginMenuInner() {
             {t("auth.readOnlyBanner")}
           </span>
         ) : null}
-        <Button onClick={connectWallet} isLoading={isConnecting} size="sm" className="rounded-full">
+        <Button onClick={() => setSelectOpen(true)} isLoading={isConnecting} size="sm" className="rounded-full">
           {t("auth.connectWallet")}
         </Button>
         <div className="relative" ref={rootRef}>
@@ -156,6 +159,7 @@ function LoginMenuInner() {
             </div>
           ) : null}
         </div>
+        <WalletSelectModal open={selectOpen} onClose={() => setSelectOpen(false)} />
       </div>
     );
   }
@@ -186,7 +190,7 @@ function LoginMenuInner() {
             className="w-full justify-start"
             onClick={() => {
               setOpen(false);
-              void connectWallet();
+              setSelectOpen(true);
             }}
           >
             {t("wallet.connect")}
@@ -215,6 +219,7 @@ function LoginMenuInner() {
           </Button>
         </div>
       ) : null}
+      <WalletSelectModal open={selectOpen} onClose={() => setSelectOpen(false)} />
     </div>
   );
 }
