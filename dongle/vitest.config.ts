@@ -24,7 +24,16 @@ export default defineConfig({
         "**/vitest.*.ts",
         "**/next.config.ts",
       ],
-      include: ["lib/**/*.ts", "hooks/**/*.ts"],
+      include: [
+        "lib/**/*.ts",
+        "hooks/**/*.ts",
+        // Primitive UI components covered by __tests__/components/ui-primitives.test.tsx
+        "components/ui/Badge.tsx",
+        "components/ui/Card.tsx",
+        "components/ui/IconButton.tsx",
+        "components/ui/Button.tsx",
+        "components/ui/Input.tsx",
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
