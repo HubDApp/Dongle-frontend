@@ -142,6 +142,8 @@ export interface Project {
   bookmarkCount?: number;
   /** Admin-curated flag supplied by the project catalog. */
   isFeatured?: boolean;
+  /** ISO date the project was marked as featured. */
+  featuredAt?: string;
   createdAt: string; // ISO date string
   websiteUrl?: string;
   githubUrl?: string;

@@ -22,6 +22,7 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import { cn } from "@/lib/utils";
+import { FeaturedProjectsCarousel } from "@/components/projects/FeaturedProjectsCarousel";
 import {
   getHealthHistory,
   getHealthTrend,
@@ -286,10 +287,13 @@ function DiscoverContent() {
     setHealthFilter("ALL");
   };
 
+  const featuredSource = useMemo(() => projectService.getDiscoverableProjects(), []);
+
   return (
     <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <PageHeatmapRecorder page="discovery" />
       <div className="container mx-auto px-4">
+        <FeaturedProjectsCarousel projects={featuredSource} />
         {/* Header & Controls */}
         <div className="mb-12">
           <h1 className="text-4xl font-bold tracking-tight mb-4">
