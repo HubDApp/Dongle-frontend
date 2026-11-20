@@ -159,6 +159,11 @@ export const ProjectCard = ({
             {verificationStatus && (
               <VerificationBadge status={verificationStatus} tier={project.verificationTier} showIcon={false} />
             )}
+            {project.isFeatured && (
+              <span className="text-xs font-semibold text-amber-700 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-1 rounded">
+                Featured
+              </span>
+            )}
             <ProjectLifecycleStatusBadge status={project.status} />
             <HealthBadge health={health} trend={healthTrend} />
           </div>

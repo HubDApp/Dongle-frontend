@@ -41,6 +41,10 @@ export function trackWalletDisconnect(): void {
   track("wallet_disconnect");
 }
 
+export function trackFeaturedProjectView(projectId: string, position: number): void {
+  track("featured_project_view", { project_id: projectId, position });
+}
+
 export function trackProjectView(
   projectId: string,
   properties?: AnalyticsProperties,
