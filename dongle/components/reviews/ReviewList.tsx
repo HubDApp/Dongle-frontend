@@ -20,6 +20,8 @@ import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
 
 interface ReviewListProps {
   reviews: Review[];
+  /** Total number of reviews before pagination slicing (for the count display). */
+  totalCount?: number;
   currentUserAddress: string | null;
   onEdit: (review: Review) => void;
   onDelete: (id: string) => void | Promise<void>;
