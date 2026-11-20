@@ -57,14 +57,11 @@ export const stellarService = {
    * @param limit The number of transactions to retrieve (default 10).
    * @returns A collection of transaction records.
    */
-  async getTransactions(publicKey: string, limit: number = 10) {
+  async getTransactions(publicKey: string, limit: number = 10, cursor?: string) {
     try {
-      const transactions = await server
-        .transactions()
-        .forAccount(publicKey)
-        .limit(limit)
-        .order("desc")
-        .call();
+      let query = server.transactions().forAccount(publicKey).limit(limit).order("desc");
+      if (cursor) query = query.cursor(cursor);
+      const transactions = await query.call();
       return transactions.records;
     } catch (error) {
       logger.error(`[StellarService] Error fetching transactions for ${redactWalletAddress(publicKey)}:`, error);
