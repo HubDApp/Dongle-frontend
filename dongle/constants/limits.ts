@@ -63,6 +63,17 @@ export const MAX_SAVED_SEARCHES = 10;
 /** Maximum user-saved form templates per wallet. */
 export const MAX_FORM_TEMPLATES = 25;
 
+// ─── Review pagination ───────────────────────────────────────────────────────
+
+/** Reviews shown per page / per "load more" batch. */
+export const REVIEWS_PAGE_SIZE = 20;
+
+/**
+ * Minimum total review count before the "Jump to page" input is shown.
+ * Below this threshold the control adds clutter without real value.
+ */
+export const REVIEWS_JUMP_THRESHOLD = 100;
+
 // ─── Review moderation / spam ────────────────────────────────────────────────
 
 /** Reviews per wallet per day before velocity flagging and CAPTCHA. */

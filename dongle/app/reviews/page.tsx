@@ -5,6 +5,7 @@ import { reviewService, isReviewPersistenceApi } from "@/services/review/review.
 import { projectService } from "@/services/project/project.service";
 import { Review, Project as ReviewProject } from "@/types/review";
 import ReviewList from "@/components/reviews/ReviewList";
+import { ReviewPagination } from "@/components/reviews/ReviewPagination";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import { toast } from "sonner";
 import WalletStatePanel, {
@@ -15,6 +16,7 @@ import { AlertTriangle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { trackReviewSubmit } from "@/lib/analytics";
 import { reviewSearchMatches } from "@/lib/review-language";
+import { useReviewPagination } from "@/hooks/useReviewPagination";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
@@ -257,6 +259,19 @@ export default function ReviewsPage() {
 
   const topProjects = allProjects.slice(0, 6);
 
+  const pagination = useReviewPagination(sortedReviews);
+
+  // Reset to page 1 whenever the user changes filters or sort order so they
+  // don't land on a now-empty page.
+  const prevFilterKey = `${sortBy}|${projectFilter}|${userFilter}|${reviewSearch}`;
+  const filterKeyRef = { current: prevFilterKey };
+  useEffect(() => {
+    if (filterKeyRef.current !== prevFilterKey) {
+      pagination.goToPage(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, projectFilter, userFilter, reviewSearch]);
+
   const walletBlocked =
     showWalletGate && gate.state !== "ready" && gate.state !== "account-loading";
 
@@ -351,7 +366,7 @@ export default function ReviewsPage() {
             )}
 
             <div className="grid grid-cols-1 gap-12">
-              <section>
+              <section id="reviews-section">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <span className="w-2 h-8 bg-blue-500 rounded-full" />
@@ -364,6 +379,11 @@ export default function ReviewsPage() {
                       : sortBy === "oldest"
                       ? "Oldest Reviews"
                       : "Recent Activity"}
+                    {sortedReviews.length > 0 && (
+                      <span className="ml-1 text-sm font-normal text-zinc-400 dark:text-zinc-500">
+                        ({sortedReviews.length})
+                      </span>
+                    )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3 text-sm">
                     <label className="flex items-center gap-2">
@@ -428,7 +448,8 @@ export default function ReviewsPage() {
 
                 <ReviewList
                   onClearFilters={() => { setSortBy("recent"); setProjectFilter("all"); setUserFilter("all"); }}
-                  reviews={sortedReviews}
+                  reviews={pagination.visibleReviews}
+                  totalCount={sortedReviews.length}
                   currentUserAddress={gate.publicKey}
                   isAdmin={isAdmin}
                   onEdit={handleEditReview}
@@ -437,6 +458,21 @@ export default function ReviewsPage() {
                   onVoteUnhelpful={handleVoteUnhelpful}
                   emptyMessage={emptyStateMessage}
                   emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
+                />
+
+                <ReviewPagination
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  totalCount={pagination.totalCount}
+                  hasNextPage={pagination.hasNextPage}
+                  hasPrevPage={pagination.hasPrevPage}
+                  isLoadingMore={pagination.isLoadingMore}
+                  mode={pagination.mode}
+                  onNextPage={pagination.goToNextPage}
+                  onPrevPage={pagination.goToPrevPage}
+                  onGoToPage={pagination.goToPage}
+                  onSetMode={pagination.setMode}
+                  sentinelRef={pagination.sentinelRef}
                 />
               </section>
             </div>
