@@ -36,11 +36,14 @@ export default function ReviewsPage() {
   const [showWalletGate, setShowWalletGate] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
-      const loaded = await reviewService.getReviews();
+      const loaded = await reviewService.getReviews(controller.signal);
+      if (controller.signal.aborted) return;
       setReviews(loaded);
       setIsLoading(false);
     })();
+    return () => controller.abort();
   }, []);
 
   const handleAddReview = (project: ReviewProject) => {

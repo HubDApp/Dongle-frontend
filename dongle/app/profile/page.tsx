@@ -100,22 +100,26 @@ export default function ProfilePage() {
   useEffect(() => {
     if (savedProjects.length === 0) return;
 
+    const controller = new AbortController();
+
     const fetchStatuses = async () => {
       const statuses: Record<string, VerificationStatus> = {};
       await Promise.all(
         savedProjects.map(async (project) => {
           try {
-            const status = await sorobanService.getVerificationStatus(project.id);
+            const status = await sorobanService.getVerificationStatus(project.id, controller.signal);
             statuses[project.id] = status;
           } catch {
             statuses[project.id] = "NONE";
           }
         }),
       );
+      if (controller.signal.aborted) return;
       setSavedProjectVerificationStatuses(statuses);
     };
 
     void fetchStatuses();
+    return () => controller.abort();
   }, [savedProjectIds]);
 
   const handleClearHistory = async () => {

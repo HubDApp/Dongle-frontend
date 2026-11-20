@@ -145,23 +145,26 @@ export default function ComparePage() {
   }, [searchParams, restoreProjects]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchStatuses = async () => {
       const statuses: Record<string, VerificationStatus> = {};
       await Promise.all(
         selectedProjects.map(async (project) => {
           try {
-            const status = await sorobanService.getVerificationStatus(project.id);
+            const status = await sorobanService.getVerificationStatus(project.id, controller.signal);
             statuses[project.id] = status;
           } catch {
             statuses[project.id] = "NONE";
           }
         })
       );
+      if (controller.signal.aborted) return;
       setVerificationStatuses(statuses);
       setIsLoading(false);
     };
 
     void fetchStatuses();
+    return () => controller.abort();
   }, [selectedProjects]);
 
   if (selectedProjects.length === 0) {

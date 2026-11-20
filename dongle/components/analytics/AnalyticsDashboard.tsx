@@ -8,6 +8,7 @@ import { downloadCsv, toCsv } from "@/lib/analytics-dashboard/csv";
 import type { AnalyticsRange, AnalyticsResult, VerificationFilter } from "@/lib/analytics-dashboard/metrics";
 import { ALL_CATEGORIES } from "@/types/project";
 import { Button } from "@/components/ui/Button";
+import { isAbortError } from "@/types/guards";
 
 interface Payload {
   result: AnalyticsResult;
@@ -34,25 +35,29 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const query = useCallback(async () => {
+  const query = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ range, category, status });
-      const res = await fetch(`/api/analytics?${params.toString()}`);
+      const res = await fetch(`/api/analytics?${params.toString()}`, { signal });
       if (!res.ok) throw new Error("fail");
       const body = (await res.json()) as Payload;
+      if (signal?.aborted) return;
       setData(body);
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) return;
       setError(t("analytics.loadFailed"));
       setData(null);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [category, range, status, t]);
 
   useEffect(() => {
-    void query();
+    const controller = new AbortController();
+    void query(controller.signal);
+    return () => controller.abort();
   }, [query]);
 
   const exportCsv = () => {
