@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { reviewService, isReviewPersistenceApi } from "@/services/review/review.service";
 import { projectService } from "@/services/project/project.service";
 import { Review, Project as ReviewProject } from "@/types/review";
@@ -51,7 +51,7 @@ export default function ReviewsPage() {
     setShowWalletGate(false);
   };
 
-  const handleEditReview = (review: Review) => {
+  const handleEditReview = useCallback((review: Review) => {
     if (gate.state !== "ready") {
       setShowWalletGate(true);
       return;
@@ -79,9 +79,9 @@ export default function ReviewsPage() {
         createdAt: new Date().toISOString(),
       }
     );
-  };
+  }, [gate.state]);
 
-  const handleDeleteReview = async (id: string) => {
+  const handleDeleteReview = useCallback(async (id: string) => {
     if (!gate.publicKey) {
       setShowWalletGate(true);
       return;
@@ -95,13 +95,13 @@ export default function ReviewsPage() {
         toast.error(result.error || "Failed to delete review");
       }
     }
-  };
+  }, [gate.publicKey]);
 
   const handleExportReviews = () => {
     downloadCsv("dongle-reviews.csv", reviewsToCsv(sortedReviews));
   };
 
-  const handleVoteHelpful = async (id: string) => {
+  const handleVoteHelpful = useCallback(async (id: string) => {
     if (!gate.publicKey) {
       toast.error("Please connect your wallet to vote");
       return;
@@ -112,9 +112,9 @@ export default function ReviewsPage() {
     } else {
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey]);
 
-  const handleVoteUnhelpful = async (id: string) => {
+  const handleVoteUnhelpful = useCallback(async (id: string) => {
     if (!gate.publicKey) {
       toast.error("Please connect your wallet to vote");
       return;
@@ -125,7 +125,13 @@ export default function ReviewsPage() {
     } else {
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey]);
+
+  const handleClearFilters = useCallback(() => {
+    setSortBy("recent");
+    setProjectFilter("all");
+    setUserFilter("all");
+  }, []);
 
   const handleSubmit = async (data: { rating: number; comment: string }) => {
     if (!gate.publicKey || !selectedProject) return;
@@ -319,19 +325,19 @@ export default function ReviewsPage() {
             {walletBlocked &&
               gate.state !== "ready" &&
               gate.state !== "account-loading" && (
-              <div className="mb-12">
-                <WalletStatePanel
-                  state={gate.state}
-                  pagePurpose={REVIEWS_PURPOSE}
-                  walletNetworkLabel={gate.walletNetworkLabel}
-                  publicKey={gate.publicKey}
-                  onConnect={gate.connectWallet}
-                  onDisconnect={gate.disconnectWallet}
-                  onRetry={gate.retryAccountLoad}
-                  compact
-                />
-              </div>
-            )}
+                <div className="mb-12">
+                  <WalletStatePanel
+                    state={gate.state}
+                    pagePurpose={REVIEWS_PURPOSE}
+                    walletNetworkLabel={gate.walletNetworkLabel}
+                    publicKey={gate.publicKey}
+                    onConnect={gate.connectWallet}
+                    onDisconnect={gate.disconnectWallet}
+                    onRetry={gate.retryAccountLoad}
+                    compact
+                  />
+                </div>
+              )}
 
             {(isAddingReview || editingReview) && selectedProject && gate.state === "ready" && (
               <div className="mb-12">
@@ -358,12 +364,12 @@ export default function ReviewsPage() {
                     {sortBy === "helpfulness"
                       ? "Most Helpful Reviews"
                       : sortBy === "highest"
-                      ? "Highest Rated Reviews"
-                      : sortBy === "lowest"
-                      ? "Lowest Rated Reviews"
-                      : sortBy === "oldest"
-                      ? "Oldest Reviews"
-                      : "Recent Activity"}
+                        ? "Highest Rated Reviews"
+                        : sortBy === "lowest"
+                          ? "Lowest Rated Reviews"
+                          : sortBy === "oldest"
+                            ? "Oldest Reviews"
+                            : "Recent Activity"}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3 text-sm">
                     <label className="flex items-center gap-2">
@@ -427,7 +433,7 @@ export default function ReviewsPage() {
                 </div>
 
                 <ReviewList
-                  onClearFilters={() => { setSortBy("recent"); setProjectFilter("all"); setUserFilter("all"); }}
+                  onClearFilters={handleClearFilters}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   isAdmin={isAdmin}
