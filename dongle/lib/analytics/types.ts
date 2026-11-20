@@ -38,7 +38,11 @@ export type AnalyticsEventName =
   | "data_export"
   | "data_deletion_requested"
   | "data_deletion_completed"
-  | "storage_quota_warning";
+  | "storage_quota_warning"
+  | "transactions_export"
+  | "pending_transaction_confirmed"
+  | "contract_verification_failed"
+  | "contract_method_invoked";
 
 /** Flat property bag — values must be JSON-serializable primitives. */
 export type AnalyticsProperties = Record<

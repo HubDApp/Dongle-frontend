@@ -2,6 +2,7 @@
 
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { NotificationPreferencesComponent } from "@/components/notifications/NotificationPreferences";
+import { TransactionNotificationSettings } from "@/components/notifications/TransactionNotificationSettings";
 import { useAuth } from "@/context/auth.context";
 import { useWallet } from "@/context/wallet.context";
 import { Bell } from "lucide-react";
@@ -24,6 +25,7 @@ export default function NotificationSettingsPage() {
               Set when notifications reach you and how activity is grouped.
             </p>
           </header>
+          <TransactionNotificationSettings />
           <NotificationPreferencesComponent userId={userId} />
         </div>
       </main>

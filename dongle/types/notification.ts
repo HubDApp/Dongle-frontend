@@ -20,6 +20,8 @@ export const REALTIME_NOTIFICATION_TYPES = [
   "submission_shared",
   "submission_team_change",
   "project_update",
+  "transaction_confirmed",
+  "contract_missing",
 ] as const;
 
 export const LEGACY_NOTIFICATION_TYPES = [

@@ -14,6 +14,7 @@ import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useStellarAccount } from "@/hooks/useStellarAccount";
 import { useWalletTransactions } from "@/hooks/useWalletTransactions";
+import { ExportTransactionsButton } from "@/components/transactions/ExportTransactionsButton";
 import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
 import {
   LogOut,
@@ -58,7 +59,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const gate = useWalletPageGate({ requireFundedAccount: true });
   const { balances, loading: balancesLoading, error: balancesError } = useStellarAccount();
-  const { transactions, loading: txLoading, error: txError } = useWalletTransactions(8);
+  const { transactions, loading: txLoading, error: txError } = useWalletTransactions(200);
   const confirm = useConfirm();
   const { recentProjects, clearHistory, hasHistory } = useRecentViews(gate.publicKey || undefined);
   const { savedProjectIds } = useSavedProjects();
@@ -329,6 +330,10 @@ export default function ProfilePage() {
                   <Badge variant="secondary">{transactions.length}</Badge>
                 </div>
 
+                <div className="mb-4">
+                  <ExportTransactionsButton transactions={transactions} />
+                </div>
+
                 {txLoading ? (
                   <div className="flex justify-center py-8">
                     <Spinner size="md" />
@@ -339,7 +344,7 @@ export default function ProfilePage() {
                   </div>
                 ) : transactions.length > 0 ? (
                   <div className="space-y-3">
-                    {transactions.map((tx) => (
+                    {transactions.slice(0, 8).map((tx) => (
                       <div
                         key={tx.id}
                         className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
