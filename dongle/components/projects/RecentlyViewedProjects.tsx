@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import ProjectImage from "@/components/projects/ProjectImage";
-import { VerificationBadge, type VerificationStatus } from "@/components/projects/VerificationBadge";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import { useVerificationStatuses } from "@/hooks/useVerificationStatuses";
 import { Clock, X, Star } from "lucide-react";
 
 interface RecentlyViewedProjectsProps {
@@ -19,28 +18,11 @@ export function RecentlyViewedProjects({
   onClear,
   compact = false,
 }: RecentlyViewedProjectsProps) {
-  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
-
-  useEffect(() => {
-    if (projects.length === 0) return;
-
-    const fetchStatuses = async () => {
-      const statuses: Record<string, VerificationStatus> = {};
-      await Promise.all(
-        projects.map(async (project) => {
-          try {
-            const status = await sorobanService.getVerificationStatus(project.id);
-            statuses[project.id] = status;
-          } catch {
-            statuses[project.id] = "NONE";
-          }
-        }),
-      );
-      setVerificationStatuses(statuses);
-    };
-
-    void fetchStatuses();
-  }, [projects]);
+  // Shares the same SWR cache entries as every other component that requests
+  // these same project IDs — no extra network calls when already loaded.
+  const { statuses: verificationStatuses } = useVerificationStatuses(
+    projects.map((p) => p.id),
+  );
 
   if (projects.length === 0) {
     return null;
