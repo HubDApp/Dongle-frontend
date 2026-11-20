@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 import type { Project } from "@/types/project";
@@ -253,27 +253,105 @@ describe("ProjectCard component", () => {
 
   // ── Keyboard navigation & focus states ────────────────────────────────────
 
+  it("does not make the card container itself focusable", () => {
+    renderCard();
+
+    const card = screen.getByRole("article", { name: /stellar lend/i });
+    expect(card).not.toHaveAttribute("tabindex");
+    expect(card.tabIndex).toBe(-1);
+  });
+
   it("keeps action buttons out of the detail-page link", () => {
     renderCard();
 
     const link = screen.getByRole("link", { name: /stellar lend/i });
     const compareToggle = screen.getByRole("button", { name: /add stellar lend to comparison/i });
+    const saveButton = screen.getByRole("button", { name: /add stellar lend to watchlist/i });
 
     // Buttons are siblings of the link, so activating them must not navigate.
     expect(link.contains(compareToggle)).toBe(false);
+    expect(link.contains(saveButton)).toBe(false);
   });
 
-  it("allows keyboard users to reach the card link and controls via Tab", async () => {
+  it("orders tab stops as: detail link, save button, compare button", async () => {
     const user = userEvent.setup();
     renderCard();
+
+    await user.tab();
+    expect(screen.getByRole("link", { name: /stellar lend/i })).toHaveFocus();
 
     await user.tab();
     expect(screen.getByRole("button", { name: /add stellar lend to watchlist/i })).toHaveFocus();
 
     await user.tab();
     expect(screen.getByRole("button", { name: /add stellar lend to comparison/i })).toHaveFocus();
+  });
 
-    await user.tab();
-    expect(screen.getByRole("link", { name: /stellar lend/i })).toHaveFocus();
+  it("activates the compare button with Enter and Space", async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    const compare = screen.getByRole("button", { name: /add stellar lend to comparison/i });
+    compare.focus();
+
+    await user.keyboard("{Enter}");
+    expect(comparisonMocks.addProject).toHaveBeenCalledTimes(1);
+
+    comparisonMocks.addProject.mockClear();
+    await user.keyboard(" ");
+    expect(comparisonMocks.addProject).toHaveBeenCalledTimes(1);
+  });
+
+  it("activates the save button with Enter and Space", async () => {
+    const user = userEvent.setup();
+    renderCard();
+
+    const save = screen.getByRole("button", { name: /add stellar lend to watchlist/i });
+    save.focus();
+
+    await user.keyboard("{Enter}");
+    expect(watchlistMocks.toggleWatchlist).toHaveBeenCalledTimes(1);
+
+    watchlistMocks.toggleWatchlist.mockClear();
+    await user.keyboard(" ");
+    expect(watchlistMocks.toggleWatchlist).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies focus-visible styling to every interactive element", () => {
+    renderCard();
+
+    expect(screen.getByRole("link", { name: /stellar lend/i }).className).toContain(
+      "focus-visible:ring-2",
+    );
+    expect(
+      screen.getByRole("button", { name: /add stellar lend to watchlist/i }).className,
+    ).toContain("focus-visible:ring-2");
+    expect(
+      screen.getByRole("button", { name: /add stellar lend to comparison/i }).className,
+    ).toContain("focus-visible:ring-2");
+  });
+
+  it("shows tooltips for the action buttons and links them while focused", () => {
+    renderCard();
+
+    const save = screen.getByRole("button", { name: /add stellar lend to watchlist/i });
+    const saveTooltip = screen.getByText("Add to watchlist", { selector: '[role="tooltip"]' });
+    expect(save).toHaveAttribute("aria-describedby", saveTooltip.id);
+
+    const compare = screen.getByRole("button", { name: /add stellar lend to comparison/i });
+    const compareTooltip = screen.getByText("Add to comparison", { selector: '[role="tooltip"]' });
+    expect(compare).toHaveAttribute("aria-describedby", compareTooltip.id);
+  });
+
+  it("announces the card content to screen readers", () => {
+    renderCard();
+
+    const card = screen.getByRole("article", { name: "Stellar Lend" });
+    expect(
+      within(card).getByRole("heading", { level: 3, name: "Stellar Lend" }),
+    ).toBeInTheDocument();
+    expect(
+      within(card).getByText("A lending protocol for the Stellar network"),
+    ).toBeInTheDocument();
   });
 });
