@@ -315,28 +315,32 @@ describe("Website URL field validation", () => {
   });
 });
 
-describe("GitHub / repository URL field validation", () => {
-  it("rejects a non-GitHub URL as repository", async () => {
+describe("Repository URL field validation", () => {
+  it.each([
+    ["GitHub", "https://github.com/stellar/lend", "https://github.com/stellar/lend"],
+    ["GitLab", "https://gitlab.com/group/project", "https://gitlab.com/group/project"],
+    ["Bitbucket", "https://bitbucket.org/team/repo", "https://bitbucket.org/team/repo"],
+    ["Gitea", "https://gitea.com/owner/repo", "https://gitea.com/owner/repo"],
+  ])("accepts a valid %s repository URL", async (_host, url, expected) => {
     renderForm();
     const user = await fillMinimumValid();
-    await user.type(screen.getByLabelText(/repository url/i), "https://bitbucket.org/owner/repo");
-    submit();
-    await waitFor(() => {
-      expect(screen.getByText(/unsupported repository host/i)).toBeInTheDocument();
-    });
-  });
-
-  it("accepts a valid GitHub repository URL", async () => {
-    renderForm();
-    const user = await fillMinimumValid();
-    await user.type(screen.getByLabelText(/repository url/i), "https://github.com/stellar/lend");
+    await user.type(screen.getByLabelText(/repository url/i), url);
     submit();
     await waitFor(() => {
       expect(sorobanMocks.registerProject).toHaveBeenCalledTimes(1);
     });
-    expect(sorobanMocks.registerProject.mock.calls[0][0].githubUrl).toBe(
-      "https://github.com/stellar/lend",
-    );
+    expect(sorobanMocks.registerProject.mock.calls[0][0].githubUrl).toBe(expected);
+  });
+
+  it("rejects an unsupported repository host", async () => {
+    renderForm();
+    const user = await fillMinimumValid();
+    await user.type(screen.getByLabelText(/repository url/i), "https://example.com/owner/repo");
+    submit();
+    await waitFor(() => {
+      expect(screen.getByText(/unsupported repository host/i)).toBeInTheDocument();
+    });
+    expect(sorobanMocks.registerProject).not.toHaveBeenCalled();
   });
 
   it("allows the repository URL to be left empty", async () => {

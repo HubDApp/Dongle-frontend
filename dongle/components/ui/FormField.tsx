@@ -17,6 +17,7 @@ import type { FieldValues, Path, UseFormRegister, UseFormRegisterReturn } from "
 import { Input } from "./Input";
 import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
 import type { PasteEvent } from "@/hooks/useFormPasteDetection";
+import { getFieldPlaceholder, inferFieldType, type FieldType } from "@/lib/form-placeholder";
 
 interface FormFieldProps<TFieldValues extends FieldValues = FieldValues>
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "name"> {
@@ -28,10 +29,16 @@ interface FormFieldProps<TFieldValues extends FieldValues = FieldValues>
   showCounter?: boolean;
   /** When true, shows a required indicator and sets aria-required. */
   required?: boolean;
+  /** Semantic field type used to derive a contextual placeholder. */
+  fieldType?: FieldType;
+  /** Optional handler invoked with enriched paste events. */
+  onPasteDetected?: (event: PasteEvent) => void;
+  /** When true (default) native paste is prevented in favour of onPasteDetected. */
+  preventDefaultPaste?: boolean;
 }
 
 export const FormField = React.forwardRef<HTMLInputElement, FormFieldProps>(
-  ({ label, name, register, error, helperText, className = "", id, maxLength, onChange, onBlur, value, defaultValue, showCounter = true, required, ...props }, ref) => {
+  ({ label, name, register, error, helperText, className = "", id, maxLength, onChange, onBlur, value, defaultValue, showCounter = true, required, placeholder, fieldType, disabled, readOnly, onPasteDetected, preventDefaultPaste, ...props }, ref) => {
     const generatedId = React.useId();
     const inputId = id || generatedId;
     const errorId = `${inputId}-error`;

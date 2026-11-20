@@ -89,6 +89,7 @@ export function DexTradingCard({ tokenCode, tokenIssuer }: DexTradingCardProps) 
           ) : null}
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="Current Price" value={data.currentPrice || "—"} unit="XLM" />
           <MetricCard
@@ -136,6 +137,7 @@ export function DexTradingCard({ tokenCode, tokenIssuer }: DexTradingCardProps) 
           Source: {data.source === "horizon" ? "Stellar Horizon /trades" : "Fallback (cached)"}{" "}
           • Updated {data.updatedAt} • Data cached for 5 minutes
         </div>
+        </>
       )}
     </section>
   );

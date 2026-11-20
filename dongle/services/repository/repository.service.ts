@@ -199,6 +199,50 @@ async function fetchBitbucketMetadata(
 }
 
 /**
+ * Fetch repository metadata from Gitea
+ */
+async function fetchGiteaMetadata(
+  owner: string,
+  repo: string
+): Promise<RepositoryMetadata | null> {
+  try {
+    const response = await fetch(
+      `https://gitea.com/api/v1/repos/${owner}/${repo}`,
+      {
+        headers: {
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`Gitea API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    return {
+      url: data.html_url,
+      host: "gitea",
+      owner,
+      repo,
+      name: data.name,
+      homepage: data.website || undefined,
+      stars: data.stars_count,
+      forks: data.forks_count,
+      lastUpdate: data.updated_at,
+      description: data.description,
+      language: data.language,
+      topics: data.topics || [],
+    };
+  } catch (error) {
+    console.error("Failed to fetch Gitea metadata:", error);
+    return null;
+  }
+}
+
+/**
  * Repository service for fetching metadata
  */
 export const repositoryService = {
@@ -226,6 +270,8 @@ export const repositoryService = {
         return fetchGitLabMetadata(owner, repo);
       case "bitbucket":
         return fetchBitbucketMetadata(owner, repo);
+      case "gitea":
+        return fetchGiteaMetadata(owner, repo);
       default:
         console.error("Unsupported repository host:", host);
         return null;

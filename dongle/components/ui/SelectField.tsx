@@ -28,10 +28,12 @@ interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement>
   options: SelectOption[];
   error?: string;
   helperText?: string;
+  /** HTML <select> has no native readOnly; we simulate it by blocking changes. */
+  readOnly?: boolean;
 }
 
 export const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(
-  ({ label, options, error, helperText, className = "", id, ...props }, ref) => {
+  ({ label, options, error, helperText, className = "", id, required, disabled, readOnly, onChange, ...props }, ref) => {
     const generatedId = React.useId();
     const selectId = id || generatedId;
     const errorId = `${selectId}-error`;
