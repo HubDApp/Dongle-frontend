@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@/__tests__/lib/axe-matchers";
 import { testA11y, getAllFocusableElements, tabThroughSequence } from "@/__tests__/lib/a11y-test-helpers";
@@ -310,10 +310,83 @@ describe("Keyboard Navigation - Interactive Components", () => {
       );
 
       const input = screen.getByLabelText("Tags");
+
+      // Tab reaches the tag list before the text input.
+      await user.tab();
+      expect(screen.getByRole("option", { name: "stellar" })).toHaveFocus();
+
       await user.tab();
       expect(input).toHaveFocus();
 
-      await user.type(input, "dao,");
+      await user.type(input, "dao{Enter}");
+      expect(onChange).toHaveBeenCalledWith(["stellar", "defi", "dao"]);
+    });
+
+    it("exposes tags as listbox options with accessible names", async () => {
+      render(
+        <TagInput id="tags" label="Tags" tags={["stellar", "defi"]} onChange={() => {}} />,
+      );
+
+      const listbox = screen.getByRole("listbox", { name: "Selected Tags" });
+      const options = within(listbox).getAllByRole("option");
+
+      expect(options).toHaveLength(2);
+      expect(options[0]).toHaveAccessibleName("stellar");
+      expect(options[0]).toHaveAttribute("aria-selected", "true");
+      expect(options[0].className).toContain("focus-visible:ring-2");
+    });
+
+    it("navigates between tags with arrow keys and removes the focused tag with Delete", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      render(
+        <TagInput id="tags" label="Tags" tags={["stellar", "defi", "dao"]} onChange={onChange} />,
+      );
+
+      const options = screen.getAllByRole("option");
+
+      await user.tab();
+      expect(options[0]).toHaveFocus();
+
+      await user.keyboard("{ArrowRight}");
+      expect(options[1]).toHaveFocus();
+
+      await user.keyboard("{ArrowLeft}");
+      expect(options[0]).toHaveFocus();
+
+      await user.keyboard("{Delete}");
+      expect(onChange).toHaveBeenCalledWith(["defi", "dao"]);
+    });
+
+    it("removes the focused tag with Backspace", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      render(
+        <TagInput id="tags" label="Tags" tags={["stellar", "defi"]} onChange={onChange} />,
+      );
+
+      await user.tab();
+      await user.keyboard("{ArrowRight}");
+      await user.keyboard("{Backspace}");
+
+      expect(onChange).toHaveBeenCalledWith(["stellar"]);
+    });
+
+    it("clicking the remove control deletes a tag", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      render(
+        <TagInput id="tags" label="Tags" tags={["stellar", "defi"]} onChange={onChange} />,
+      );
+
+      const listbox = screen.getByRole("listbox", { name: "Selected Tags" });
+      const removeControls = listbox.querySelectorAll("span[aria-hidden='true']");
+      await user.click(removeControls[0] as HTMLElement);
+
+      expect(onChange).toHaveBeenCalledWith(["defi"]);
     });
   });
 });
