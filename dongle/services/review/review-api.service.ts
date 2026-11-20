@@ -16,8 +16,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export const reviewApiService = {
-  async getReviews(): Promise<Review[]> {
-    const response = await fetch(API_BASE);
+  async getReviews(signal?: AbortSignal): Promise<Review[]> {
+    const response = await fetch(API_BASE, { signal });
     const data = await handleResponse<{ success: boolean; data: Review[] }>(response);
     return data.data;
   },

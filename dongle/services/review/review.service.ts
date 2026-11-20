@@ -146,10 +146,10 @@ function warnDevMode(): void {
   }
 }
 
-async function getReviews(): Promise<Review[]> {
+async function getReviews(signal?: AbortSignal): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return attachOwnerResponses(await reviewApiService.getReviews());
+      return attachOwnerResponses(await reviewApiService.getReviews(signal));
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
