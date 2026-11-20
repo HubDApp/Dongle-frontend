@@ -36,7 +36,7 @@ import { projectReportService } from "@/services/project/project-report.service"
 import { projectClaimService } from "@/services/project/project-claim.service";
 import { formatDate } from "@/lib/date";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import { submissionSigningService } from "@/services/submission-signing";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -119,8 +119,13 @@ export default function ProjectDetailPage() {
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
-  const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
+  // Issue #925: single SWR-backed fetch shared across all components for this project
+  const {
+    status: verificationStatus,
+    error: verificationSWRError,
+    refresh: refreshVerification,
+  } = useVerificationStatus(projectId);
+  const verificationError = verificationSWRError?.message ?? null;
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
@@ -160,25 +165,7 @@ export default function ProjectDetailPage() {
         trackProjectView(foundProject.id, {
           category: foundProject.primaryCategory,
         });
-        
-        // Fetch verification status with cancellation support
-        const fetchVerification = async () => {
-          if (!cancelled) setVerificationError(null);
-          try {
-            const status = await sorobanService.getVerificationStatus(projectId, abortController.signal);
-            if (!cancelled) {
-              setVerificationStatus(status);
-            }
-          } catch (error) {
-            if (!cancelled) {
-              console.error("Failed to fetch verification status:", error);
-              setVerificationError(
-                error instanceof Error ? error.message : "Failed to load verification status",
-              );
-            }
-          }
-        };
-        fetchVerification();
+        // Verification status is now fetched by useVerificationStatus (Issue #925)
       }
 
       if (!cancelled) {
@@ -204,19 +191,8 @@ export default function ProjectDetailPage() {
   }, [gate.publicKey, project]);
 
   const retryVerification = React.useCallback(() => {
-    setVerificationError(null);
-    setVerificationStatus(null);
-    const abortController = new AbortController();
-    void sorobanService
-      .getVerificationStatus(projectId, abortController.signal)
-      .then(setVerificationStatus)
-      .catch((err) => {
-        console.error("Failed to fetch verification status:", err);
-        setVerificationError(
-          err instanceof Error ? err.message : "Failed to load verification status",
-        );
-      });
-  }, [projectId]);
+    void refreshVerification();
+  }, [refreshVerification]);
 
   const actualRating = React.useMemo(() => {
     if (reviews.length === 0) return project?.rating || 0;

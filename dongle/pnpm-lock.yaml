@@ -56,6 +56,9 @@ importers:
       react-hook-form:
         specifier: ^7.74.0
         version: 7.90.0(@types/react@19.2.14)(react@19.2.3)
+      sentiment:
+        specifier: ^5.0.2
+        version: 5.0.2
       sonner:
         specifier: ^2.0.7
         version: 2.0.8(@types/react@19.2.14)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -123,6 +126,9 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.3.0(@types/react@19.2.14)
+      '@types/sentiment':
+        specifier: ^5.0.4
+        version: 5.0.4
       '@vitejs/plugin-react':
         specifier: ^6.0.1
         version: 6.1.2(vite@8.3.4(@types/node@20.19.39)(esbuild@0.25.12)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15))
@@ -1650,6 +1656,9 @@ packages:
 
   '@types/semver@7.8.0':
     resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
+
+  '@types/sentiment@5.0.4':
+    resolution: {integrity: sha512-6FL0CYijhnrR3gHbu7boAJn8zRCekJXBPfIHLkIgWbkY+hz5Dwfsq79FM7l/tLZKuEgQWktnzf6JqV2UCWKrbg==}
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
@@ -4434,6 +4443,10 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  sentiment@5.0.2:
+    resolution: {integrity: sha512-ZeC3y0JsOYTdwujt5uOd7ILJNilbgFzUtg/LEG4wUv43LayFNLZ28ec8+Su+h3saHlJmIwYxBzfDHHZuiMA15g==}
+    engines: {node: '>=8.0'}
+
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
 
@@ -6483,6 +6496,8 @@ snapshots:
   '@types/resolve@1.20.6': {}
 
   '@types/semver@7.8.0': {}
+
+  '@types/sentiment@5.0.4': {}
 
   '@types/trusted-types@2.0.7':
     optional: true
@@ -9540,6 +9555,8 @@ snapshots:
   semver@7.7.1: {}
 
   semver@7.8.5: {}
+
+  sentiment@5.0.2: {}
 
   set-blocking@2.0.0: {}
 

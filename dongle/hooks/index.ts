@@ -45,3 +45,7 @@ export type {
   UseFormFieldDependenciesOptions,
   UseFormFieldDependenciesReturn,
 } from "./useFormFieldDependencies";
+export { useDOMPurify, RICH_TEXT_CONFIG, PLAIN_TEXT_CONFIG } from "./useDOMPurify";
+export type { UseDOMPurifyResult } from "./useDOMPurify";
+export { useVerificationStatus, verificationSWRKey } from "./useVerificationStatus";
+export type { UseVerificationStatusResult } from "./useVerificationStatus";
