@@ -33,6 +33,8 @@ interface ProjectCardProps {
   health?: ProjectHealth;
   /** Week-over-week health change shown on the badge. */
   healthTrend?: number | null;
+  /** Skip lazy loading for above-the-fold images */
+  priority?: boolean;
 }
 
 export const ProjectCard = ({
@@ -42,6 +44,7 @@ export const ProjectCard = ({
   highlightTerm = "",
   health: healthProp,
   healthTrend,
+  priority = false,
 }: ProjectCardProps) => {
   const { addProject, removeProject, isSelected, canAddMore } = useComparison();
   const { isOnWatchlist, toggleWatchlist, canManageWatchlist } = useWatchlist();
@@ -138,6 +141,7 @@ export const ProjectCard = ({
           name={project.name}
           className="mb-6 shrink-0"
           fallbackTextSize="text-lg"
+          priority={priority}
         />
         <div className="mb-2 flex min-h-6 flex-wrap gap-2" aria-label="Project social proof">
           {badges.map((badge) => (

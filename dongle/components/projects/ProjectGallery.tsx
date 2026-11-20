@@ -34,7 +34,7 @@ function Gallery({ images, name }: { images: string[]; name: string }) {
     {images.some(src => src.includes("ipfs")) && <p className="mb-2">IPFS images <ContextHelp tip="ipfs" label="IPFS images" href="https://docs.ipfs.tech/concepts/what-is-ipfs/">IPFS identifies files by their content rather than a single server address. Dongle loads these images through gateways and tries another gateway when one fails.</ContextHelp></p>}
     <div className={`mb-6 grid gap-3 ${images.length > 1 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
       {images.map((src, i) => <button key={`${src}-${i}`} type="button" aria-label={`Open ${name} image ${i + 1}`} onClick={event => { event.currentTarget.focus(); reset(); setIndex(i); }}>
-        <ProjectImage logoUrl={src} name={name} alt={`${name} image ${i + 1}`} />
+        <ProjectImage logoUrl={src} name={name} alt={`${name} image ${i + 1}`} priority={i === 0} />
       </button>)}
     </div>
     {open && <div ref={dialog} role="dialog" aria-modal="true" aria-label={`${name} image gallery`} tabIndex={-1} className="fixed inset-0 z-[110] flex flex-col bg-black/95 text-white"
@@ -79,7 +79,7 @@ function Gallery({ images, name }: { images: string[]; name: string }) {
             pointers.current.delete(e.pointerId);
           }} onPointerCancel={e => pointers.current.delete(e.pointerId)}>
           <div style={{ transform: `translate(${zoom === 1 ? 0 : pan.x}px, ${zoom === 1 ? 0 : pan.y}px) scale(${zoom})` }}>
-            <ProjectImage key={images[index]} logoUrl={images[index]} name={name} alt={`${name} image ${index + 1}`} className="!bg-transparent max-h-[70vh]" />
+            <ProjectImage key={images[index]} logoUrl={images[index]} name={name} alt={`${name} image ${index + 1}`} priority className="!bg-transparent max-h-[70vh]" />
           </div>
         </div>
         {images.length > 1 && <button type="button" aria-label="Next image" onClick={() => navigate(1)} className="absolute right-3 z-20 rounded-full bg-black/70 p-3">→</button>}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   useParams,
   useRouter } from "next/navigation";
@@ -337,14 +337,14 @@ export default function ProjectDetailPage() {
     setIsClaiming(false);
   };
 
-  const handleReportReview = (review: Review) => {
+  const handleReportReview = useCallback((review: Review) => {
     if (gate.state !== "ready") {
       setShowWalletGate(true);
       return;
     }
     setReportingReview(review);
     setIsReportingReview(true);
-  };
+  }, [gate.state]);
 
   const handleReportReviewSubmit = async (data: { reason: string; explanation: string }) => {
     if (!gate.publicKey || !reportingReview) return;
@@ -409,12 +409,12 @@ export default function ProjectDetailPage() {
     return "No reviews match the selected filter options.";
   }, [reviews.length, reviewSort]);
 
-  const handleEdit = (review: Review) => {
+  const handleEdit = useCallback((review: Review) => {
     setEditingReview(review);
     setIsAddingReview(true);
-  };
+  }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!gate.publicKey) return;
     const ok = await confirm({
       title: "Delete review",
@@ -427,9 +427,9 @@ export default function ProjectDetailPage() {
     if (!ok) return;
     await reviewService.deleteReview(id, gate.publicKey);
     setReviews(await reviewService.getReviewsByProject(projectId));
-  };
+  }, [confirm, gate.publicKey, projectId]);
 
-  const handleSentimentOverride = async (
+  const handleSentimentOverride = useCallback(async (
     reviewId: string,
     sentiment: ReviewSentiment,
   ) => {
@@ -442,7 +442,7 @@ export default function ProjectDetailPage() {
       current.map((review) => review.id === reviewId ? result.data : review),
     );
     toast.success("Review sentiment updated");
-  };
+  }, []);
 
   const handleSubmitReview = async (data: {
     rating: number;
@@ -529,7 +529,7 @@ export default function ProjectDetailPage() {
     setEditingReview(null);
   };
 
-  const handleVoteHelpful = async (id: string) => {
+  const handleVoteHelpful = useCallback(async (id: string) => {
     if (!gate.publicKey) {
       toast.error("Please connect your wallet to vote");
       return;
@@ -540,9 +540,9 @@ export default function ProjectDetailPage() {
     } else {
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey, projectId]);
 
-  const handleVoteUnhelpful = async (id: string) => {
+  const handleVoteUnhelpful = useCallback(async (id: string) => {
     if (!gate.publicKey) {
       toast.error("Please connect your wallet to vote");
       return;
@@ -553,7 +553,11 @@ export default function ProjectDetailPage() {
     } else {
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey, projectId]);
+
+  const handleClearReviewSort = useCallback(() => {
+    setReviewSort("newest");
+  }, []);
 
   const handleAddUpdate = () => {
     setIsAddingUpdate(true);
@@ -1069,7 +1073,7 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
                 <ReviewList
-                  onClearFilters={() => { setReviewSort("newest"); }}
+                  onClearFilters={handleClearReviewSort}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   isAdmin={isAdmin}
@@ -1078,10 +1082,7 @@ export default function ProjectDetailPage() {
                   onVoteHelpful={handleVoteHelpful}
                   onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
-                  isAdmin={isAdmin}
-                  onOverrideSentiment={(reviewId, sentiment) =>
-                    void handleSentimentOverride(reviewId, sentiment)
-                  }
+                  onOverrideSentiment={handleSentimentOverride}
                   emptyMessage={projectEmptyMessage}
                   emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
                 />
