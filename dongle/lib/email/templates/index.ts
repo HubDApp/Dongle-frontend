@@ -15,3 +15,6 @@ export type { ReviewMentionEmailData } from "./review-mention";
 
 export { generateReviewCommentEmail } from "./review-comment";
 export type { ReviewCommentEmailData } from "./review-comment";
+
+export { generateClaimDecisionEmail } from "./claim-decision";
+export type { ClaimDecision, ClaimDecisionEmailData } from "./claim-decision";
