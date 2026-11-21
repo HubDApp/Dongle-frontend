@@ -232,6 +232,52 @@ export function formatCompactNumber(value: number): string {
   }
 }
 
+/**
+ * Format a number as a currency value
+ * 
+ * @example
+ * formatCurrency(1234.56, "USD") // "$1,234.56"
+ * formatCurrency(0.001, "XLM") // "0.001 XLM"
+ * formatCurrency(1200000, "XLM", { compact: true }) // "1.2M XLM"
+ */
+export function formatCurrency(
+  amount: number,
+  currency: "XLM" | "USD" | string = "XLM",
+  options: { compact?: boolean; locale?: string } = {}
+): string {
+  const locale = options.locale || getLocale();
+  const isXLM = currency === "XLM";
+
+  try {
+    // 1. Determine formatting options based on currency and compact requirement
+    const formatOptions: Intl.NumberFormatOptions = {
+      style: isXLM ? "decimal" : "currency",
+      currency: isXLM ? undefined : currency,
+      notation: options.compact ? "compact" : "standard",
+      compactDisplay: "short",
+      // XLM often needs more precision for small amounts
+      minimumFractionDigits: isXLM ? (amount < 1 ? 3 : 2) : 2,
+      maximumFractionDigits: isXLM ? (amount < 1 ? 7 : 2) : 2,
+    };
+
+    const formatted = new Intl.NumberFormat(locale, formatOptions).format(amount);
+
+    // 2. Handle XLM suffix manually as Intl.NumberFormat doesn't natively support XLM symbol placement well across all locales
+    if (isXLM) {
+      // For XLM, we append the code. Some locales might prefer it before, but XLM is standardly suffixed.
+      return `${formatted} XLM`;
+    }
+
+    return formatted;
+  } catch (error) {
+    console.error("Error formatting currency:", error);
+    // Simple fallback
+    const symbol = currency === "USD" ? "$" : "";
+    const suffix = currency === "XLM" ? " XLM" : ` ${currency}`;
+    return `${symbol}${amount.toLocaleString(locale)}${isXLM ? suffix : ""}`;
+  }
+}
+
 // ─── List Formatting ────────────────────────────────────────────────────────
 
 /**

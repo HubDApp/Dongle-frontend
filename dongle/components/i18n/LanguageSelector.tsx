@@ -5,6 +5,7 @@ import { Check, Globe } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
 import { SUPPORTED_LOCALES, type LocaleCode } from "@/lib/i18n/locales";
+import { Flag } from "./Flag";
 
 const LOCALE_NATIVE: Record<LocaleCode, string> = {
   en: "English",
@@ -46,17 +47,18 @@ export default function LanguageSelector() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        className="inline-flex min-w-[8.5rem] items-center justify-between gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        className="inline-flex min-w-[9rem] items-center justify-between gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
         aria-label={t("language.select")}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="inline-flex min-w-0 items-center gap-1.5">
-          <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <Flag code={locale} className="h-3 w-4 shrink-0 rounded-sm shadow-[0_0_0_1px_rgba(0,0,0,0.05)]" />
           <span className="truncate">{LOCALE_NATIVE[locale]}</span>
         </span>
+        <Globe className="h-3.5 w-3.5 shrink-0 opacity-50" aria-hidden="true" />
       </button>
       {open && (
         <ul
@@ -79,7 +81,10 @@ export default function LanguageSelector() {
                     setOpen(false);
                   }}
                 >
-                  <span>{LOCALE_NATIVE[code]}</span>
+                  <span className="flex items-center gap-2">
+                    <Flag code={code} className="h-3 w-4 shrink-0 rounded-sm shadow-[0_0_0_1px_rgba(0,0,0,0.05)]" />
+                    <span>{LOCALE_NATIVE[code]}</span>
+                  </span>
                   {selected ? <Check className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
                 </button>
               </li>

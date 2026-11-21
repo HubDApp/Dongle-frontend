@@ -20,6 +20,7 @@ interface DraftIndicatorProps {
   hasDraft: boolean;
   lastSaved: string | null;
   isSaving?: boolean;
+  isSaved?: boolean;
   saveError?: string | null;
   onDiscard: () => void;
 }
@@ -28,55 +29,56 @@ export function DraftIndicator({
   hasDraft,
   lastSaved,
   isSaving = false,
+  isSaved = false,
   saveError = null,
   onDiscard,
 }: DraftIndicatorProps) {
-  if (!hasDraft || !lastSaved) return null;
+  if (!hasDraft && !isSaving) return null;
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
-      <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
-        <Save className="w-4 h-4" />
-        <span className="font-medium">Draft saved</span>
-        <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-          <Clock className="w-3.5 h-3.5" />
-          <span>{formatDate(lastSaved, "relative")}</span>
-        </div>
+    <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-500/5 border border-zinc-200 dark:border-zinc-800 text-sm animate-fade-in">
+      <div className="flex items-center gap-3">
+        {isSaving ? (
+          <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="font-medium">Saving...</span>
+          </div>
+        ) : isSaved ? (
+          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="font-medium">Saved</span>
+          </div>
+        ) : saveError ? (
+          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="font-medium text-xs">{saveError}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
+            <Save className="w-4 h-4" />
+            <span className="font-medium">Draft saved</span>
+            {lastSaved && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{formatDate(lastSaved, "relative")}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onDiscard}
-        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
-        leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-      >
-        Discard Draft
-      </Button>
-    </div>
-  );
-
-  // Draft exists but no timestamp yet (edge case)
-  if (hasDraft) {
-    return (
-      <div className="flex items-center justify-between p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
-        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-          <Save className="w-4 h-4" />
-          <span className="font-medium">Draft saved</span>
-        </div>
+      
+      {hasDraft && (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={onDiscard}
-          className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8"
           leftIcon={<Trash2 className="w-3.5 h-3.5" />}
         >
-          Discard Draft
+          Discard
         </Button>
-      </div>
-    );
-  }
-
-  return null;
+      )}
+    </div>
+  );
 }
