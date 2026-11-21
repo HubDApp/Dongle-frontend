@@ -34,7 +34,9 @@ import { Review,
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
+import { projectOwnerService } from "@/services/project/project-owner.service";
 import { formatDate } from "@/lib/date";
+import { getPositiveSentimentPercentage } from "@/lib/review-sentiment";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { submissionSigningService } from "@/services/submission-signing";
@@ -67,6 +69,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
+import { ProjectLifecycleStatusBadge } from "@/components/projects/ProjectLifecycleStatusBadge";
 import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBanner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
@@ -119,6 +122,7 @@ export default function ProjectDetailPage() {
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
   const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
+  const [sentimentFilter, setSentimentFilter] = useState<"all" | ReviewSentiment>("all");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
@@ -241,6 +245,9 @@ export default function ProjectDetailPage() {
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isOnList = project ? isOnWatchlist(project.id) : false;
+  // A project is "claimed" when its owner was assigned through the claim flow,
+  // which records an owner override for the project.
+  const claimedBy = project ? projectOwnerService.getProjectOwnerOverride(project.id) : undefined;
 
   useEffect(() => {
     if (!gate.publicKey) {
@@ -253,6 +260,15 @@ export default function ProjectDetailPage() {
       setDailyReviewCount(result.dailyCount);
     });
   }, [gate.publicKey]);
+
+  const canManageStatus = Boolean(isOwner) || isAdmin;
+
+  const handleStatusChange = (status: ProjectStatus) => {
+    if (!project) return;
+    projectStatusService.setProjectStatus(project.id, status);
+    setProject({ ...project, status });
+    toast.success("Project status updated");
+  };
 
   const handleToggleWatchlist = () => {
     if (!project) return;
@@ -288,8 +304,24 @@ export default function ProjectDetailPage() {
     setShowWalletGate(false);
   };
 
-  const handleReportSubmit = (data: { reason: string; explanation: string }) => {
+  const handleReportSubmit = async (data: { reason: string; explanation: string }) => {
     if (!gate.publicKey || !project) return;
+
+    // A wallet signature is required before a report can be submitted.
+    try {
+      await submissionSigningService.sign(
+        {
+          projectId: project.id,
+          projectName: project.name,
+          reason: data.reason,
+          explanation: data.explanation,
+        },
+        gate.publicKey,
+      );
+    } catch {
+      toast.error("Wallet signature is required to submit a report.");
+      return;
+    }
 
     const result = projectReportService.createReport(
       {
@@ -380,6 +412,9 @@ export default function ProjectDetailPage() {
 
   const sortedReviews = React.useMemo(() => {
     let list = [...reviews];
+    if (sentimentFilter !== "all") {
+      list = list.filter((r) => r.sentiment === sentimentFilter);
+    }
     if (reviewSort === "mine") {
       list = list.filter((r) => r.userAddress === gate.publicKey);
     }
@@ -393,7 +428,7 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
-  }, [reviews, reviewSort, gate.publicKey]);
+  }, [reviews, reviewSort, sentimentFilter, gate.publicKey]);
 
   const projectEmptyMessage = React.useMemo(() => {
     if (reviews.length === 0) {
@@ -725,6 +760,11 @@ export default function ProjectDetailPage() {
                       <ProjectLifecycleStatusBadge status={project.status} />
                       {verificationStatus && (
                         <VerificationBadge status={verificationStatus} tier={project.verificationTier} />
+                      )}
+                      {claimedBy && (
+                        <Badge variant="success">
+                          Claimed by {claimedBy.slice(0, 4)}…{claimedBy.slice(-4)}
+                        </Badge>
                       )}
                     </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>
@@ -1069,7 +1109,7 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
                 <ReviewList
-                  onClearFilters={() => { setReviewSort("newest"); }}
+                  onClearFilters={() => { setReviewSort("newest"); setSentimentFilter("all"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   isAdmin={isAdmin}
@@ -1078,7 +1118,6 @@ export default function ProjectDetailPage() {
                   onVoteHelpful={handleVoteHelpful}
                   onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
-                  isAdmin={isAdmin}
                   onOverrideSentiment={(reviewId, sentiment) =>
                     void handleSentimentOverride(reviewId, sentiment)
                   }

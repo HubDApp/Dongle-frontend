@@ -2,11 +2,11 @@
   "name": "dongle-docs",
   "version": "0.1.0",
   "private": true,
-  "description": "Dongle documentation site — docs.dongle.app",
+  "description": "Dongle documentation site \u2014 docs.dongle.app",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node init && next dev",
+    "build": "node init && next build",
+    "start": "node init && next start",
     "typecheck": "tsc --noEmit",
     "lint": "next lint"
   },
