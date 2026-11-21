@@ -24,6 +24,7 @@ import {
   CheckCircle,
   Clock,
   XCircle,
+  Flag,
   Package,
   Bookmark,
   Heart,
@@ -44,6 +45,9 @@ import { useSavedProjects } from "@/hooks/useSavedProjects";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { savedSearchService } from "@/services/search/saved-search.service";
 import { getWatchlistNotifications } from "@/services/watchlist/watchlist-notification.service";
+import { projectClaimService } from "@/services/project/project-claim.service";
+import { projectReportService } from "@/services/project/project-report.service";
+import { PROJECT_REPORT_REASONS } from "@/types/project";
 import { GamificationPanel } from "@/components/gamification/GamificationPanel";
 
 interface StellarNonNativeBalance {
@@ -95,6 +99,34 @@ export default function ProfilePage() {
   const ownedProjects = gate.publicKey
     ? projectService.getProjectsByOwner(gate.publicKey)
     : [];
+  // Ownership claims submitted by the connected wallet (most recent first).
+  const claimRequests = useMemo(
+    () =>
+      gate.publicKey
+        ? projectClaimService
+            .getRequests()
+            .filter((claim) => claim.requestedBy === gate.publicKey)
+            .sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            )
+        : [],
+    [gate.publicKey],
+  );
+
+  // Malicious-project reports submitted by the connected wallet (most recent first).
+  const reportSubmissions = useMemo(
+    () =>
+      gate.publicKey
+        ? projectReportService
+            .getReportsByReporter(gate.publicKey)
+            .sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+            )
+        : [],
+    [gate.publicKey],
+  );
 
   // Fetch verification statuses for saved projects
   useEffect(() => {
@@ -385,6 +417,162 @@ export default function ProfilePage() {
                   <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                     <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">No owned projects found for this wallet.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <ShieldCheck className="w-6 h-6" />
+                    Ownership Claims
+                  </h2>
+                  <Badge variant="secondary">{claimRequests.length}</Badge>
+                </div>
+
+                {claimRequests.length > 0 ? (
+                  <div className="space-y-4">
+                    {claimRequests.map((claim) => {
+                      const claimStatus = {
+                        pending: {
+                          bg: "bg-yellow-50 dark:bg-yellow-900/20",
+                          text: "text-yellow-700 dark:text-yellow-500",
+                          icon: Clock,
+                          label: "Pending",
+                        },
+                        approved: {
+                          bg: "bg-green-50 dark:bg-green-900/20",
+                          text: "text-green-700 dark:text-green-500",
+                          icon: CheckCircle,
+                          label: "Approved",
+                        },
+                        rejected: {
+                          bg: "bg-red-50 dark:bg-red-900/20",
+                          text: "text-red-700 dark:text-red-500",
+                          icon: XCircle,
+                          label: "Rejected",
+                        },
+                      }[claim.status];
+                      const ClaimStatusIcon = claimStatus.icon;
+                      const claimProject = projectService.getProjectById(claim.projectId);
+
+                      return (
+                        <div
+                          key={claim.id}
+                          className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
+                          onClick={() => router.push(`/projects/${claim.projectId}`)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                                {claimProject?.name ?? claim.projectId}
+                              </p>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                Submitted {formatDate(claim.createdAt, "relative")}
+                              </p>
+                            </div>
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${claimStatus.bg}`}>
+                              <ClaimStatusIcon className={`w-4 h-4 ${claimStatus.text}`} />
+                              <span className={`text-sm font-medium ${claimStatus.text}`}>
+                                {claimStatus.label}
+                              </span>
+                            </div>
+                          </div>
+                          {claim.reviewNote && (
+                            <div className="mt-3 p-3 bg-zinc-100 dark:bg-zinc-900/50 rounded-lg">
+                              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                                Reviewer Note:
+                              </p>
+                              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                                {claim.reviewNote}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">You haven&apos;t submitted any ownership claims.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Flag className="w-6 h-6" />
+                    My Reports
+                  </h2>
+                  <Badge variant="secondary">{reportSubmissions.length}</Badge>
+                </div>
+
+                {reportSubmissions.length > 0 ? (
+                  <div className="space-y-4">
+                    {reportSubmissions.map((report) => {
+                      const reportStatus = {
+                        pending: {
+                          bg: "bg-yellow-50 dark:bg-yellow-900/20",
+                          text: "text-yellow-700 dark:text-yellow-500",
+                          icon: Clock,
+                          label: "Pending",
+                        },
+                        resolved: {
+                          bg: "bg-green-50 dark:bg-green-900/20",
+                          text: "text-green-700 dark:text-green-500",
+                          icon: CheckCircle,
+                          label: "Resolved",
+                        },
+                        dismissed: {
+                          bg: "bg-zinc-100 dark:bg-zinc-800",
+                          text: "text-zinc-600 dark:text-zinc-400",
+                          icon: XCircle,
+                          label: "Dismissed",
+                        },
+                      }[report.status];
+                      const ReportStatusIcon = reportStatus.icon;
+                      const reportProject = projectService.getProjectById(report.projectId);
+                      const reasonLabel =
+                        PROJECT_REPORT_REASONS.find((r) => r.value === report.reason)?.label ??
+                        report.reason;
+
+                      return (
+                        <div
+                          key={report.id}
+                          className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
+                          onClick={() => router.push(`/projects/${report.projectId}`)}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                                {reportProject?.name ?? report.projectId}
+                              </p>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                {reasonLabel} • Submitted {formatDate(report.createdAt, "relative")}
+                              </p>
+                            </div>
+                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${reportStatus.bg}`}>
+                              <ReportStatusIcon className={`w-4 h-4 ${reportStatus.text}`} />
+                              <span className={`text-sm font-medium ${reportStatus.text}`}>
+                                {reportStatus.label}
+                              </span>
+                            </div>
+                          </div>
+                          {report.explanation && (
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                              {report.explanation}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <Flag className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">You haven&apos;t reported any projects.</p>
                   </div>
                 )}
               </div>

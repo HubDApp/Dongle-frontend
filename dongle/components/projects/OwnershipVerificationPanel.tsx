@@ -35,7 +35,7 @@ function instructionsFor(record: PublicOwnershipVerification, token?: string): s
     return `Add a TXT record to ${record.target} with the value dongle-verify=${token}.`;
   }
   if (record.method === "github_file") {
-    return `Add dongle-verify.txt to the root of ${record.target} on its default branch. The file must contain only ${token}.`;
+    return `Add .well-known/dongle-verify.txt to ${record.target} on its default branch. The file must contain only ${token}.`;
   }
   return `Serve https://${record.target}/.well-known/stellar.toml with HOME_DOMAIN = "${record.target}", ACCOUNTS = ["${record.walletAddress}"], and DONGLE_VERIFY = "${token}".`;
 }
@@ -261,7 +261,7 @@ export function OwnershipVerificationPanel({
         </ul>
       )}
       {feedback.poll && <p role="status" className="text-xs text-amber-700 dark:text-amber-400">{feedback.poll}</p>}
-      <p className="text-xs text-zinc-500">DNS uses a TXT record named <code>dongle-verify</code>; GitHub uses a root-level <code>dongle-verify.txt</code>; Stellar.toml must list your wallet and verification token. Checks also run automatically every 15 seconds while pending.</p>
+      <p className="text-xs text-zinc-500">DNS uses a TXT record named <code>dongle-verify</code>; GitHub uses <code>.well-known/dongle-verify.txt</code>; Stellar.toml must list your wallet and verification token. Checks also run automatically every 15 seconds while pending.</p>
     </section>
   );
 }
