@@ -5,6 +5,7 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 import CommandPalette from "./CommandPalette";
 import NetworkMismatchBanner from "./NetworkMismatchBanner";
+import { NetworkSwitchModal } from "@/components/wallet/NetworkSwitchModal";
 import ProductionConfigBanner from "./ProductionConfigBanner";
 import { ComparisonFloatingButton } from "@/components/compare/ComparisonFloatingButton";
 import { KeyboardShortcutsModal } from "@/components/ui/KeyboardShortcutsModal";
@@ -77,6 +78,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       <CommandPalette />
       <ProductionConfigBanner />
       <NetworkMismatchBanner />
+      <NetworkSwitchModal />
       <main className="grow pt-16">
         {children}
       </main>
