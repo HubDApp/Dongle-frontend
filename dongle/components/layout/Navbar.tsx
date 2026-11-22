@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { getPrefetchValue } from "@/lib/prefetch-config";
@@ -13,6 +13,13 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 import LanguageSelector from "@/components/i18n/LanguageSelector";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import LoginMenu from "@/components/auth/LoginMenu";
+
+const FOCUSABLE_SELECTOR =
+  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -38,21 +45,21 @@ export default function Navbar() {
 
   const isActive = (href: string) => pathname === href;
 
-  const closeMenu = (options?: { returnFocus?: boolean }) => {
+  const closeMenu = useCallback((options?: { returnFocus?: boolean }) => {
     setIsMenuOpen(false);
     if (options?.returnFocus) {
       requestAnimationFrame(() => {
         toggleBtnRef.current?.focus();
       });
     }
-  };
+  }, []);
 
-  const openMenu = () => {
+  const openMenu = useCallback(() => {
     setIsMenuOpen(true);
     requestAnimationFrame(() => {
       firstMenuItemRef.current?.focus();
     });
-  };
+  }, []);
 
   // Close menu on route changes
   useEffect(() => {
@@ -60,41 +67,54 @@ export default function Navbar() {
     setIsMenuOpen(false);
   }, [pathname]);
 
-  // Focus trap and escape key handler
+  // Close menu when clicking/tapping outside of it (nested dropdowns and the
+  // toggle button are treated as outside — the toggle keeps control of itself).
   useEffect(() => {
-    if (!isMenuOpen) {
-      return;
-    }
+    if (!isMenuOpen) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (toggleBtnRef.current?.contains(target)) return;
+      closeMenu();
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [isMenuOpen, closeMenu]);
+
+  // Focus trap: keeps Tab / Shift+Tab inside the open mobile menu and lets
+  // Escape close it, returning focus to the toggle button. Nested dropdowns
+  // (language, profile) are rendered outside `menuRef` and run their own
+  // traps, so focus that lands in them is left untouched here.
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
         closeMenu({ returnFocus: true });
         return;
       }
 
-      if (e.key === "Tab" && menuRef.current) {
-        const focusable = menuRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
+      if (event.key !== "Tab" || !menuRef.current) return;
 
-        const elements = Array.from(focusable).filter(Boolean) as HTMLElement[];
+      const elements = getFocusableElements(menuRef.current);
+      if (elements.length === 0) return;
 
-        if (elements.length === 0) return;
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      const active = document.activeElement;
+      const isInside = active instanceof HTMLElement && menuRef.current.contains(active);
 
-        const first = elements[0];
-        const last = elements[elements.length - 1];
-
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last?.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first?.focus();
-          }
+      if (event.shiftKey) {
+        if (!isInside || active === first) {
+          event.preventDefault();
+          last?.focus();
         }
+      } else if (!isInside || active === last) {
+        event.preventDefault();
+        first?.focus();
       }
     };
 
@@ -102,7 +122,7 @@ export default function Navbar() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, closeMenu]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
@@ -189,7 +209,7 @@ export default function Navbar() {
                 href={link.href}
                 ref={link.href === "/discover" ? firstMenuItemRef : undefined}
                 onClick={() => closeMenu({ returnFocus: true })}
-                className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
+                className={`block rounded-md py-2 px-1 text-sm font-medium transition-all border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${
                   isActive(link.href)
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
                     : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"
@@ -202,7 +222,7 @@ export default function Navbar() {
               <Link
                 href="/admin"
                 onClick={() => closeMenu({ returnFocus: true })}
-                className={`block py-2 px-1 text-sm font-medium transition-all border-b-2 ${
+                className={`block rounded-md py-2 px-1 text-sm font-medium transition-all border-b-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${
                   isActive("/admin")
                     ? "text-black dark:text-white font-semibold border-black dark:border-white"
                     : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white border-transparent"

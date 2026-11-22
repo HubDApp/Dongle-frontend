@@ -48,7 +48,9 @@ const {
 } = useWallet();
 ```
 
-Polls Freighter every 2 s while connected to detect account / network changes.
+Watches Freighter for account / network changes while connected (via its
+`WatchWalletChanges` API, falling back to a 5 s poll). Watching is paused while
+the tab is hidden and stops on disconnect.
 
 ---
 

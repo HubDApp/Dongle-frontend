@@ -3,29 +3,34 @@
  */
 
 import {
+  RepositoryHost,
   RepositoryValidationResult,
   SUPPORTED_HOSTS,
 } from "@/types/repository";
 
-const HOST_MAP: Record<string, "github" | "gitlab" | "bitbucket"> = {
+const HOST_MAP: Record<string, RepositoryHost> = {
   "github.com": "github",
   "gitlab.com": "gitlab",
   "bitbucket.org": "bitbucket",
+  "gitea.com": "gitea",
 };
 
-const HOST_CANONICAL: Record<"github" | "gitlab" | "bitbucket", string> = {
+const HOST_CANONICAL: Record<RepositoryHost, string> = {
   github: "github.com",
   gitlab: "gitlab.com",
   bitbucket: "bitbucket.org",
+  gitea: "gitea.com",
 };
 
 function stripWww(hostname: string): string {
   return hostname.replace(/^www\./i, "");
 }
 
+const HAS_PROTOCOL = /^[a-z][a-z\d+\-.]*:\/\//i;
+
 /**
  * Validate and parse a repository URL.
- * Supports GitHub, GitLab, and Bitbucket.
+ * Supports GitHub, GitLab, Bitbucket, and Gitea.
  */
 export function validateRepositoryUrl(
   url: string
@@ -38,13 +43,9 @@ export function validateRepositoryUrl(
 
   try {
     const normalized = url.trim();
-    let parsedUrl: URL;
-
-    if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
-      parsedUrl = new URL(`https://${normalized}`);
-    } else {
-      parsedUrl = new URL(normalized);
-    }
+    const parsedUrl = HAS_PROTOCOL.test(normalized)
+      ? new URL(normalized)
+      : new URL(`https://${normalized}`);
 
     if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
       return {
@@ -75,13 +76,6 @@ export function validateRepositoryUrl(
 
     const owner = pathParts[0];
     const repo = pathParts[1];
-
-    if (!owner || !repo) {
-      return {
-        isValid: false,
-        error: "Repository URL must include both owner and repository name",
-      };
-    }
 
     const cleanRepo = repo.replace(/\.git$/, "");
 

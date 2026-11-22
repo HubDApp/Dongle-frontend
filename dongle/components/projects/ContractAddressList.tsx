@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { Code2, ExternalLink, AlertTriangle } from "lucide-react";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { DEV_CONTRACT_PLACEHOLDER } from "@/constants/contracts";
@@ -125,6 +126,14 @@ export function ContractAddressList({
 
               {/* stellar.expert link — disabled for placeholders */}
               {!placeholder ? (
+                <div className="flex items-center gap-3">
+                <Link
+                  href={`/contracts/${address}`}
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  aria-label={`View contract ${address} methods`}
+                >
+                  View contract
+                </Link>
                 <a
                   href={stellarExpertUrl(address)}
                   target="_blank"
@@ -135,6 +144,7 @@ export function ContractAddressList({
                   View on stellar.expert
                   <ExternalLink className="w-3 h-3" aria-hidden="true" />
                 </a>
+                </div>
               ) : (
                 <span className="text-xs text-zinc-400 dark:text-zinc-600 italic">
                   Not deployed — stellar.expert link unavailable

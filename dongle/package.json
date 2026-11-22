@@ -35,7 +35,8 @@
     "docs:schemas": "node scripts/generate-schema-docs.mjs",
     "docs:schemas:json": "node scripts/generate-schema-docs.mjs --format json",
     "docs:schemas:html": "node scripts/generate-schema-docs.mjs --format html",
-    "docs:schemas:check": "node scripts/generate-schema-docs.mjs --check"
+    "docs:schemas:check": "node scripts/generate-schema-docs.mjs --check",
+    "i18n:check": "tsx scripts/i18n-check.js"
   },
   "dependencies": {
     "@albedo-link/intent": "^0.12.0",
@@ -85,6 +86,7 @@
     "@types/react-dom": "^19",
     "@types/sentiment": "^5.0.4",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "4.1.12",
     "axe-core": "^4.10.2",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.5",

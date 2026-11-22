@@ -23,15 +23,15 @@ const SHORTCUTS: { section: string; items: ShortcutRow[] }[] = [
     section: "Navigation",
     items: [
       { keys: ["/"], description: "Focus search bar" },
-      { keys: ["⌘", "K"], description: "Focus search bar (alternative)" },
+      { keys: ["⌘", "K"], description: "Focus search bar, or open the command palette" },
       { keys: ["N"], description: "New project form", requiresAuth: true },
     ],
   },
   {
     section: "Discovery",
     items: [
-      { keys: ["C"], description: "Open comparison tray" },
-      { keys: ["⌘", "B"], description: "Toggle bookmarks / watchlist" },
+      { keys: ["C"], description: "Toggle comparison tray" },
+      { keys: ["⌘", "B"], description: "Open bookmarks" },
     ],
   },
   {

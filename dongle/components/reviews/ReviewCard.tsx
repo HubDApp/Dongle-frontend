@@ -9,12 +9,19 @@
 
 import { useState } from "react";
 import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock, X } from "lucide-react";
-import { Review } from "@/types/review";
+import { Review, type ReviewSentiment } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
 import { ENCRYPTED_COMMENT_SENTINEL } from "@/lib/review-encryption";
 import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
+import {
+  helpfulVoteCount,
+  unhelpfulVoteCount,
+  helpfulnessScore,
+  hasVotedHelpful,
+  hasVotedUnhelpful,
+} from "@/lib/review-votes";
 
 interface ReviewCardProps {
   review: Review;
@@ -55,6 +62,11 @@ export default function ReviewCard({
       }[review.sentiment]
     : null;
   const isReviewAuthor = currentUserAddress === review.userAddress;
+  const votedHelpful = hasVotedHelpful(review, currentUserAddress);
+  const votedUnhelpful = hasVotedUnhelpful(review, currentUserAddress);
+  const helpful = helpfulVoteCount(review);
+  const unhelpful = unhelpfulVoteCount(review);
+  const net = helpfulnessScore(review);
 
   return (
     <div
@@ -166,20 +178,37 @@ export default function ReviewCard({
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => onVoteHelpful?.(review.id)}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
-              aria-label={`Mark as helpful, current count ${review.helpfulVotes?.length || 0}`}
+              aria-pressed={votedHelpful}
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                votedHelpful
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-500"
+                  : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
+              }`}
+              aria-label={`Mark as helpful, current count ${helpful}`}
             >
               <ThumbsUp className="w-3 h-3" />
-              <span>{review.helpfulVotes?.length || 0}</span>
+              <span>{helpful}</span>
             </button>
             <button
               onClick={() => onVoteUnhelpful?.(review.id)}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
-              aria-label={`Mark as unhelpful, current count ${review.unhelpfulVotes?.length || 0}`}
+              aria-pressed={votedUnhelpful}
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                votedUnhelpful
+                  ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-500"
+                  : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
+              }`}
+              aria-label={`Mark as unhelpful, current count ${unhelpful}`}
             >
               <ThumbsDown className="w-3 h-3" />
-              <span>{review.unhelpfulVotes?.length || 0}</span>
+              <span>{unhelpful}</span>
             </button>
+            <span
+              className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              title="Net helpfulness score (helpful − unhelpful)"
+              aria-label={`Net helpfulness score ${net}`}
+            >
+              Net {net > 0 ? `+${net}` : net}
+            </span>
           </div>
         </div>
 

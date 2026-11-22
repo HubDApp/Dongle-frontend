@@ -8,6 +8,7 @@ import React, {
   ReactNode,
   useCallback,
 } from "react";
+import { WatchWalletChanges } from "@stellar/freighter-api";
 import { walletService } from "@/services/wallet/wallet.service";
 import {
   WalletType,
@@ -19,6 +20,7 @@ import {
 import { redactWalletAddress } from "@/utils/stellar-address.util";
 import { logger } from "@/utils/logger.util";
 import { SOROBAN_CONFIG } from "@/constants/contracts";
+import { WALLET_POLL_INTERVAL_MS } from "@/constants/timeouts";
 import { toast } from "sonner";
 import {
   trackWalletConnect,
@@ -206,59 +208,102 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     restore();
   }, []);
 
-  // ── poll for account/network changes while connected ───────────────────────
+  // ── watch for account/network changes while connected ───────────────────────
   useEffect(() => {
     if (!isConnected || walletType !== "freighter") return;
 
-    const poll = async () => {
+    let watcher: WatchWalletChanges | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+
+    const applyAddress = (address: string | null | undefined) => {
+      if (!address || address === publicKey) return;
+      logger.info("Account change detected:", redactWalletAddress(address));
+      setPublicKey(address);
+      localStorage.setItem(
+        WALLET_STORAGE_KEY,
+        JSON.stringify({ publicKey: address, isConnected: true }),
+      );
+    };
+
+    const applyNetwork = (passphrase: string | null | undefined) => {
+      if (!passphrase || passphrase === walletNetwork) return;
+      setWalletNetwork(passphrase);
+    };
+
+    // Authoritative read — drives the polling fallback and keeps disconnect
+    // handling consistent when the watcher reports an error.
+    const reconcile = async () => {
       try {
         const [currentKey, networkPassphrase] = await Promise.all([
           walletService.getPublicKey(),
           walletService.getNetworkPassphrase(),
         ]);
-
-        if (currentKey !== publicKey) {
-          logger.info("Account change detected:", redactWalletAddress(currentKey));
-          setPublicKey(currentKey);
-          localStorage.setItem(
-            WALLET_STORAGE_KEY,
-            JSON.stringify({ publicKey: currentKey, isConnected: true, walletType }),
-          );
-          setAccounts((prev) => {
-            const next = prev.map((a) =>
-              a.publicKey === publicKey && a.walletType === "freighter"
-                ? { ...a, publicKey: currentKey }
-                : a,
-            );
-            try {
-              localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(next));
-            } catch {
-              /* ignore */
-            }
-            return next;
-          });
-        }
-
-        if (networkPassphrase !== walletNetwork) {
-          setWalletNetwork(networkPassphrase);
-        }
+        if (cancelled) return;
+        applyAddress(currentKey);
+        applyNetwork(networkPassphrase);
       } catch (error) {
+        if (cancelled) return;
         logger.error("Error polling wallet:", error);
         disconnectWallet();
       }
     };
 
-    const interval = setInterval(poll, 2000);
-    return () => clearInterval(interval);
-  }, [isConnected, publicKey, walletNetwork, walletType, disconnectWallet]);
+    const start = () => {
+      if (cancelled || watcher || timer !== null) return;
 
-  // ── connect / add ──────────────────────────────────────────────────────────
-  const doConnect = useCallback(
-    async (type: WalletType, adding: boolean) => {
-      if (adding && accounts.length >= MAX_WALLETS) {
-        toast.error(`You can connect up to ${MAX_WALLETS} wallets per session`);
-        return;
+      // Prefer Freighter's event-based watcher: it only fires on real changes,
+      // so idle CPU usage stays close to zero.
+      if (typeof WatchWalletChanges !== "undefined") {
+        const instance = new WatchWalletChanges(WALLET_POLL_INTERVAL_MS);
+        const watchResult = instance.watch(
+          ({ address, networkPassphrase, error }) => {
+            if (cancelled) return;
+            if (error) {
+              void reconcile();
+              return;
+            }
+            applyAddress(address);
+            applyNetwork(networkPassphrase);
+          },
+        );
+        if (!watchResult.error) {
+          watcher = instance;
+          return;
+        }
       }
+
+      // Fallback for Freighter builds without the watcher API.
+      void reconcile();
+      timer = setInterval(() => void reconcile(), WALLET_POLL_INTERVAL_MS);
+    };
+
+    const stop = () => {
+      watcher?.stop();
+      watcher = null;
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    // Only watch while the tab is visible — pausing in the background saves
+    // CPU/battery, and a fresh watcher re-checks immediately on resume so
+    // changes are still detected without delay.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") start();
+      else stop();
+    };
+
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      stop();
+    };
+  }, [isConnected, publicKey, walletNetwork, disconnectWallet]);
 
       setIsConnecting(true);
       const toastId = toast.loading(`Connecting to ${WALLET_META[type].name}...`);
