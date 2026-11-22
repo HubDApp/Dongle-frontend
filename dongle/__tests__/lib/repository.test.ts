@@ -8,9 +8,10 @@ describe("validateRepositoryUrl", () => {
     expect(result.metadata).toEqual({ host: "github", owner: "owner", repo: "repo" });
   });
 
-  it("accepts GitLab and Bitbucket URLs", () => {
+  it("accepts GitLab, Bitbucket, and Gitea URLs", () => {
     expect(validateRepositoryUrl("https://gitlab.com/group/project").isValid).toBe(true);
     expect(validateRepositoryUrl("https://bitbucket.org/team/repo").isValid).toBe(true);
+    expect(validateRepositoryUrl("https://gitea.com/owner/repo").isValid).toBe(true);
   });
 
   it("accepts www hosts and URLs without a protocol", () => {

@@ -179,7 +179,7 @@ export const es: Messages = {
       tags: "Añade algunas palabras clave (pulsa Enter tras cada una) para mejorar la visibilidad.",
       description: "Resume qué hace el proyecto en 1–3 frases. Evita el lenguaje publicitario.",
       websiteUrl: "Enlace a la página pública que los usuarios deben visitar primero.",
-      githubUrl: "Compatible: GitHub, GitLab, Bitbucket. Se prefieren repositorios públicos.",
+      githubUrl: "Compatible: GitHub, GitLab, Bitbucket, Gitea. Se prefieren repositorios públicos.",
       logoUrl: "URL directa de imagen (PNG/SVG/JPG). Los logos cuadrados funcionan mejor.",
       docsUrl: "Enlace a documentación, whitepaper o guía de inicio.",
       auditReportUrl: "Enlace a un informe de auditoría de seguridad público, si existe.",

@@ -166,7 +166,7 @@ export const en = {
       tags: "Add a few keywords (press Enter after each) to improve discoverability.",
       description: "Summarize what the project does in 1–3 sentences. Avoid marketing fluff.",
       websiteUrl: "Link to the public homepage users should visit first.",
-      githubUrl: "Supported: GitHub, GitLab, Bitbucket. Public repos preferred.",
+      githubUrl: "Supported: GitHub, GitLab, Bitbucket, Gitea. Public repos preferred.",
       logoUrl: "Direct image URL (PNG/SVG/JPG). Square logos work best.",
       docsUrl: "Link to docs, whitepaper, or getting-started guide.",
       auditReportUrl: "Link to a public security audit report if available.",
