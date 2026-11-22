@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import ProjectImage from "@/components/projects/ProjectImage";
-import { VerificationBadge, type VerificationStatus } from "@/components/projects/VerificationBadge";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import { useVerificationStatuses } from "@/hooks/useVerificationStatuses";
 import { Clock, X, Star } from "lucide-react";
 import { isAbortError } from "@/types/guards";
 

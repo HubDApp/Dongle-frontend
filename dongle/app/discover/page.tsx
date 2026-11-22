@@ -11,7 +11,7 @@ import { Search, Filter, X, ArrowUp } from "lucide-react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
-import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
+import { useVerificationStatuses } from "@/hooks/useVerificationStatuses";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type ProjectStatus, type VerificationTier } from "@/types/project";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,7 +45,6 @@ type HealthFilter = "ALL" | "80" | "60" | "40" | "BELOW_40";
 function DiscoverContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
   const [verificationTierFilter, setVerificationTierFilter] = useState<VerificationTier | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
@@ -58,6 +57,28 @@ function DiscoverContent() {
   const gridRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   useProjectGridNavigation(gridRef);
+
+  // All project IDs — stable reference (the full discoverable list never
+  // changes shape mid-render, so the hook-call count is stable).
+  const allProjectIds = useMemo(
+    () => projectService.getDiscoverableProjects().map((p) => p.id),
+    [],
+  );
+
+  // Issue #925: SWR-backed, deduplicated, shared with every component that
+  // requests status for the same project IDs.
+  const {
+    statuses: verificationStatuses,
+    isLoading: isVerificationLoading,
+  } = useVerificationStatuses(allProjectIds);
+
+  // isInitialLoading gates the skeleton UI; resolve it once verification
+  // has at least attempted to load (even if some statuses are still missing).
+  useEffect(() => {
+    if (!isVerificationLoading) {
+      setIsInitialLoading(false);
+    }
+  }, [isVerificationLoading]);
 
   const {
     searchInput,
@@ -75,32 +96,7 @@ function DiscoverContent() {
     clearFilters,
   } = useDiscoverParams();
 
-  // Fetch verification statuses for all projects using batched fetch
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchVerificationStatuses = async () => {
-      const projects = projectService.getDiscoverableProjects();
-      const ids = projects.map((p) => p.id);
-
-      const statuses = await batchFetchVerificationStatuses(
-        ids,
-        controller.signal,
-      );
-
-      if (!controller.signal.aborted) {
-        setVerificationStatuses(statuses);
-        setIsInitialLoading(false);
-      }
-    };
-
-    void fetchVerificationStatuses();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
+  // Milestone data refresh
   useEffect(() => {
     const refreshMilestones = () => {
       const projects = projectService.getDiscoverableProjects();

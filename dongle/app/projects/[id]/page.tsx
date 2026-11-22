@@ -39,7 +39,7 @@ import { projectOwnerService } from "@/services/project/project-owner.service";
 import { formatDate } from "@/lib/date";
 import { getPositiveSentimentPercentage } from "@/lib/review-sentiment";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import { submissionSigningService } from "@/services/submission-signing";
 import { signMessage } from "@stellar/freighter-api";
 import { applyVote, buildVoteMessage, compareByHelpfulness } from "@/lib/review-votes";
@@ -167,25 +167,7 @@ export default function ProjectDetailPage() {
         trackProjectView(foundProject.id, {
           category: foundProject.primaryCategory,
         });
-        
-        // Fetch verification status with cancellation support
-        const fetchVerification = async () => {
-          if (!cancelled) setVerificationError(null);
-          try {
-            const status = await sorobanService.getVerificationStatus(projectId, abortController.signal);
-            if (!cancelled) {
-              setVerificationStatus(status);
-            }
-          } catch (error) {
-            if (!cancelled) {
-              console.error("Failed to fetch verification status:", error);
-              setVerificationError(
-                error instanceof Error ? error.message : "Failed to load verification status",
-              );
-            }
-          }
-        };
-        fetchVerification();
+        // Verification status is now fetched by useVerificationStatus (Issue #925)
       }
 
       if (!cancelled) {
@@ -211,19 +193,8 @@ export default function ProjectDetailPage() {
   }, [gate.publicKey, project]);
 
   const retryVerification = React.useCallback(() => {
-    setVerificationError(null);
-    setVerificationStatus(null);
-    const abortController = new AbortController();
-    void sorobanService
-      .getVerificationStatus(projectId, abortController.signal)
-      .then(setVerificationStatus)
-      .catch((err) => {
-        console.error("Failed to fetch verification status:", err);
-        setVerificationError(
-          err instanceof Error ? err.message : "Failed to load verification status",
-        );
-      });
-  }, [projectId]);
+    void refreshVerification();
+  }, [refreshVerification]);
 
   const actualRating = React.useMemo(() => {
     if (reviews.length === 0) return project?.rating || 0;
