@@ -8,6 +8,7 @@ import { projectService } from "@/services/project/project.service";
 import { projectStatusService } from "@/services/project/project-status.service";
 import { ContractAddressList } from "@/components/projects/ContractAddressList";
 import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import { SimilarProjects } from "@/components/projects/SimilarProjects";
 import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
@@ -1308,6 +1309,9 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Similar Projects (Issues #859, #860) */}
+        <SimilarProjects project={project} />
 
         <ClaimProjectModal
           isOpen={isClaiming}
