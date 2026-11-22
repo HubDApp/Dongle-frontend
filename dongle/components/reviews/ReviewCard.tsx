@@ -7,7 +7,7 @@
  * button, and featured-first ordering. Featured reviews show a ⭐ badge.
  */
 
-import { useState } from "react";
+import React, { memo, useCallback, useState } from "react";
 import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock, X } from "lucide-react";
 import { Review, type ReviewSentiment } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
@@ -23,7 +23,7 @@ import {
   hasVotedUnhelpful,
 } from "@/lib/review-votes";
 
-interface ReviewCardProps {
+export interface ReviewCardProps {
   review: Review;
   currentUserAddress: string | null;
   isAdmin?: boolean;
@@ -38,7 +38,7 @@ interface ReviewCardProps {
   onOverrideSentiment?: (id: string, sentiment: ReviewSentiment) => void;
 }
 
-export default function ReviewCard({
+export function ReviewCard({
   review,
   currentUserAddress,
   isAdmin = false,
@@ -50,7 +50,7 @@ export default function ReviewCard({
   onFeature,
   onUnfeature,
   onMediaRemoved,
-  onOverrideSentiment,
+  onOverrideSentiment: _onOverrideSentiment,
 }: ReviewCardProps) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [removedMedia, setRemovedMedia] = useState<string[]>([]);
@@ -131,7 +131,7 @@ export default function ReviewCard({
                   <video src={mediaUrl} controls preload="metadata" className="max-h-64 max-w-full rounded-lg" aria-label={media.altText} />
                 ) : (
                   <button type="button" onClick={() => setLightboxUrl(mediaUrl)} aria-label={`View image: ${media.altText}`}>
-                    <img src={mediaUrl} alt={media.altText} className="max-h-64 max-w-full cursor-zoom-in rounded-lg object-contain" />
+                    <LazyImage src={mediaUrl} alt={media.altText} className="max-h-64 max-w-full cursor-zoom-in rounded-lg object-contain" />
                   </button>
                 )}
                 {isAdmin && (
@@ -139,17 +139,7 @@ export default function ReviewCard({
                     type="button"
                     aria-label="Remove inappropriate media"
                     title="Remove media"
-                    onClick={async () => {
-                      const response = await fetch("/api/reviews", {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ id: review.id, removeMediaCid: media.cid }),
-                      });
-                      if (response.ok) {
-                        setRemovedMedia((current) => [...current, media.cid]);
-                        onMediaRemoved?.({ ...review, media: review.media?.filter((item) => item.cid !== media.cid) });
-                      }
-                    }}
+                    onClick={() => void handleRemoveMedia(media.cid)}
                     className="absolute right-1 top-1 rounded bg-white p-1 text-red-600 shadow hover:bg-red-50"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -162,11 +152,17 @@ export default function ReviewCard({
       )}
 
       {lightboxUrl && (
-        <div role="dialog" aria-modal="true" aria-label="Review image" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={() => setLightboxUrl(null)}>
-          <button type="button" aria-label="Close image" className="absolute right-4 top-4 text-white" onClick={() => setLightboxUrl(null)}>
+        <div role="dialog" aria-modal="true" aria-label="Review image" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={handleCloseLightbox}>
+          <button type="button" aria-label="Close image" className="absolute right-4 top-4 text-white" onClick={handleCloseLightbox}>
             <X className="h-7 w-7" />
           </button>
-          <img src={lightboxUrl} alt={review.media?.find((media) => getIpfsGatewayUrls(media.url)[0] === lightboxUrl)?.altText ?? "Review evidence"} className="max-h-full max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
+          <LazyImage
+            src={lightboxUrl}
+            alt={review.media?.find((media) => getIpfsGatewayUrls(media.url)[0] === lightboxUrl)?.altText ?? "Review evidence"}
+            priority={true}
+            className="max-h-full max-w-full object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
         </div>
       )}
 
@@ -215,7 +211,7 @@ export default function ReviewCard({
         <div className="flex gap-2">
           {isAdmin && onFeature && !review.featured && (
             <button
-              onClick={() => onFeature(review.id)}
+              onClick={handleFeature}
               className="text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
             >
               ⭐ Feature this review
@@ -223,7 +219,7 @@ export default function ReviewCard({
           )}
           {isAdmin && onUnfeature && review.featured && (
             <button
-              onClick={() => onUnfeature(review.id)}
+              onClick={handleUnfeature}
               className="text-xs font-semibold px-3 py-1.5 rounded-full bg-zinc-50 text-zinc-600 border border-zinc-200 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700"
             >
               Revoke featured
@@ -231,16 +227,16 @@ export default function ReviewCard({
           )}
           {currentUserAddress === review.userAddress ? (
             <>
-              <IconButton onClick={() => onEdit?.(review)} aria-label="Edit review" variant="default" size="sm">
+              <IconButton onClick={handleEdit} aria-label="Edit review" variant="default" size="sm">
                 <Pencil className="w-4 h-4" />
               </IconButton>
-              <IconButton onClick={() => onDelete?.(review.id)} aria-label="Delete review" variant="error" size="sm">
+              <IconButton onClick={handleDelete} aria-label="Delete review" variant="error" size="sm">
                 <Trash2 className="w-4 h-4" />
               </IconButton>
             </>
           ) : (
             currentUserAddress && onReport && (
-              <IconButton onClick={() => onReport(review)} aria-label="Report review" variant="ghost" size="sm">
+              <IconButton onClick={handleReport} aria-label="Report review" variant="ghost" size="sm">
                 <Flag className="w-4 h-4 text-zinc-400 hover:text-red-500" />
               </IconButton>
             )
@@ -251,9 +247,45 @@ export default function ReviewCard({
   );
 }
 
-/**
- * Sort reviews: featured first, then by date descending (#682).
- */
+export function areReviewCardPropsEqual(
+  prevProps: Readonly<ReviewCardProps>,
+  nextProps: Readonly<ReviewCardProps>
+): boolean {
+  if (prevProps.currentUserAddress !== nextProps.currentUserAddress) return false;
+  if (prevProps.isAdmin !== nextProps.isAdmin) return false;
+  if (prevProps.onEdit !== nextProps.onEdit) return false;
+  if (prevProps.onDelete !== nextProps.onDelete) return false;
+  if (prevProps.onVoteHelpful !== nextProps.onVoteHelpful) return false;
+  if (prevProps.onVoteUnhelpful !== nextProps.onVoteUnhelpful) return false;
+  if (prevProps.onReport !== nextProps.onReport) return false;
+  if (prevProps.onFeature !== nextProps.onFeature) return false;
+  if (prevProps.onUnfeature !== nextProps.onUnfeature) return false;
+  if (prevProps.onMediaRemoved !== nextProps.onMediaRemoved) return false;
+  if (prevProps.onOverrideSentiment !== nextProps.onOverrideSentiment) return false;
+
+  const pRev = prevProps.review;
+  const nRev = nextProps.review;
+  if (pRev === nRev) return true;
+
+  return (
+    pRev.id === nRev.id &&
+    pRev.rating === nRev.rating &&
+    pRev.comment === nRev.comment &&
+    pRev.createdAt === nRev.createdAt &&
+    pRev.userAddress === nRev.userAddress &&
+    pRev.projectName === nRev.projectName &&
+    pRev.featured === nRev.featured &&
+    pRev.sentiment === nRev.sentiment &&
+    pRev.sentimentSource === nRev.sentimentSource &&
+    pRev.encrypted === nRev.encrypted &&
+    pRev.helpfulVotes?.length === nRev.helpfulVotes?.length &&
+    pRev.unhelpfulVotes?.length === nRev.unhelpfulVotes?.length &&
+    pRev.media?.length === nRev.media?.length
+  );
+}
+
+export default memo(ReviewCard, areReviewCardPropsEqual);
+
 export function sortReviewsFeaturedFirst(reviews: Review[]): Review[] {
   return [...reviews].sort((a, b) => {
     if (a.featured && !b.featured) return -1;
@@ -262,9 +294,6 @@ export function sortReviewsFeaturedFirst(reviews: Review[]): Review[] {
   });
 }
 
-/**
- * Check if a project has reached the featured review limit (#682).
- */
 export function hasReachedFeaturedLimit(reviews: Review[]): boolean {
   return reviews.filter((r) => r.featured).length >= 3;
 }

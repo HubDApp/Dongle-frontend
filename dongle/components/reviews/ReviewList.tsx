@@ -16,8 +16,11 @@ import { Star, Pencil, Trash2, ThumbsUp, ThumbsDown, Flag, X } from "lucide-reac
 import { IconButton } from "@/components/ui/IconButton";
 import { reviewAnalyticsService } from "@/services/review/review-analytics.service";
 import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
+import { getReviewLanguageLabel, REVIEW_LANGUAGES } from "@/lib/review-language";
+import { ReviewComments } from "@/components/reviews/ReviewComments";
+import { LazyImage } from "@/components/ui/LazyImage";
 
-interface ReviewListProps {
+export interface ReviewListProps {
   reviews: Review[];
   /** Total number of reviews before pagination slicing (for the count display). */
   totalCount?: number;
@@ -56,6 +59,10 @@ export default function ReviewList({
   emptyMessage,
   emptyTitle,
 }: ReviewListProps) {
+  const { locale } = useTranslation();
+  const [languageFilter, setLanguageFilter] = useState("all");
+  const [preferredLanguage, setPreferredLanguage] = useState("");
+  const [showPreferredFirst, setShowPreferredFirst] = useState(true);
   const [lightbox, setLightbox] = useState<{ url: string; altText: string } | null>(null);
   const [removedMedia, setRemovedMedia] = useState<string[]>([]);
   const [languageFilter, setLanguageFilter] = useState<string>("all");

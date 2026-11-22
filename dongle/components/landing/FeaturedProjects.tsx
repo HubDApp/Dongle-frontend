@@ -131,11 +131,12 @@ export default function FeaturedProjects() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {filtered.map((project) => (
+            {filtered.map((project, index) => (
               <ProjectCard 
                 key={project.id} 
                 project={project}
                 verificationStatus={verificationStatuses[project.id]}
+                priority={index < 3}
               />
             ))}
           </div>
