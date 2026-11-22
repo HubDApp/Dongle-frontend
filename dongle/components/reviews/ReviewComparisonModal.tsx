@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import { X, Star, CheckCircle2, DollarSign, ShieldCheck } from "lucide-react";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 export interface ComparisonProject {
   id: string;
@@ -33,12 +34,19 @@ export function ReviewComparisonModal({
   similarProjects,
   onReferenceProject,
 }: ReviewComparisonModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
+
   if (!isOpen) return null;
 
   const allProjects = [currentProject, ...similarProjects.slice(0, 3)];
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"

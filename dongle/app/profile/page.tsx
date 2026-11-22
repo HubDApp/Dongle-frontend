@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { projectService } from "@/services/project/project.service";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { verificationService, type VerificationRequest } from "@/services/stellar/verification.service";
@@ -221,787 +220,783 @@ export default function ProfilePage() {
 
   if (gate.state !== "ready") {
     return (
-      <LayoutWrapper>
-        <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
-          <div className="container mx-auto px-4 max-w-2xl">
-            <WalletGate
-              gate={gate}
-              pagePurpose={PROFILE_PURPOSE}
-              loadingMessage="Loading your profile..."
-            />
-          </div>
-        </main>
-      </LayoutWrapper>
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+        <div className="container mx-auto px-4 max-w-2xl">
+          <WalletGate
+            gate={gate}
+            pagePurpose={PROFILE_PURPOSE}
+            loadingMessage="Loading your profile..."
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <LayoutWrapper>
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
-            <div>
-              <h1 className="text-4xl font-black mb-2 tracking-tight">
-                YOUR PROFILE
-              </h1>
-              <p className="text-zinc-500 dark:text-zinc-400">
-                Manage your account and view your activity on Dongle.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={gate.disconnectWallet}
-              className="inline-flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              Disconnect
-            </Button>
+    <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="container mx-auto px-4 max-w-6xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+          <div>
+            <h1 className="text-4xl font-black mb-2 tracking-tight">
+              YOUR PROFILE
+            </h1>
+            <p className="text-zinc-500 dark:text-zinc-400">
+              Manage your account and view your activity on Dongle.
+            </p>
           </div>
+          <Button
+            variant="outline"
+            onClick={gate.disconnectWallet}
+            className="inline-flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Disconnect
+          </Button>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              <GamificationPanel walletAddress={gate.publicKey!} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <GamificationPanel walletAddress={gate.publicKey!} />
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <h2 className="text-2xl font-bold mb-6">Account Summary</h2>
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <h2 className="text-2xl font-bold mb-6">Account Summary</h2>
 
-                <div className="mb-8">
-                  <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
-                    Wallet Address
-                  </label>
-                  <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl">
-                    <AddressDisplay
-                      address={gate.publicKey!}
-                      copyable={true}
-                      truncated={false}
-                      inline={true}
-                      className="flex-1 text-sm font-mono text-zinc-900 dark:text-zinc-100 break-all"
-                    />
-                  </div>
+              <div className="mb-8">
+                <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
+                  Wallet Address
+                </label>
+                <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl">
+                  <AddressDisplay
+                    address={gate.publicKey!}
+                    copyable={true}
+                    truncated={false}
+                    inline={true}
+                    className="flex-1 text-sm font-mono text-zinc-900 dark:text-zinc-100 break-all"
+                  />
                 </div>
-
-                <div className="mb-8">
-                  <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
-                    Network
-                  </label>
-                  <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl space-y-2">
-                    <p className="text-sm text-zinc-900 dark:text-zinc-100">
-                      Connected to{" "}
-                      <span className="font-semibold font-mono">
-                        {gate.walletNetworkLabel}
-                      </span>
-                    </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Dongle requires Stellar{" "}
-                      <span className="font-semibold font-mono">
-                        {EXPECTED_NETWORK_LABEL}
-                      </span>{" "}
-                      (Soroban testnet). Before signing, confirm Freighter is on
-                      this network via Settings → Network. Wrong-network
-                      transactions are blocked automatically.
-                    </p>
-                  </div>
-                </div>
-
-                {balancesLoading ? (
-                  <div className="flex justify-center py-6">
-                    <Spinner size="md" />
-                  </div>
-                ) : balancesError ? (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
-                    {balancesError}
-                  </div>
-                ) : balances && balances.length > 0 ? (
-                  <div>
-                    <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 block">
-                      Balances
-                    </label>
-                    <div className="space-y-3">
-                      {balances.map((balance, idx) => {
-                        const isNative = balance.asset_type === "native";
-                        const assetCode = isNative
-                          ? "Lumens (XLM)"
-                          : (balance as StellarNonNativeBalance).asset_code || "Unknown";
-                        const issuer = (balance as StellarNonNativeBalance).asset_issuer;
-
-                        return (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Zap className="w-5 h-5 text-yellow-500" />
-                              <div>
-                                <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                                  {assetCode}
-                                </p>
-                                {!isNative && issuer && (
-                                  <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
-                                    <AddressDisplay address={issuer} copyable={true} truncated={true} inline={true} />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <p className="font-bold text-zinc-900 dark:text-zinc-100">
-                              {parseFloat(balance.balance).toFixed(2)}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    No balances found for this account.
-                  </p>
-                )}
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <Activity className="w-6 h-6" />
-                    Recent Wallet Activity
-                  </h2>
-                  <Badge variant="secondary" aria-label={`${txCountLabel} transactions`}>
-                    {txCountLabel}
-                  </Badge>
+              <div className="mb-8">
+                <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2 block">
+                  Network
+                </label>
+                <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-2xl space-y-2">
+                  <p className="text-sm text-zinc-900 dark:text-zinc-100">
+                    Connected to{" "}
+                    <span className="font-semibold font-mono">
+                      {gate.walletNetworkLabel}
+                    </span>
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    Dongle requires Stellar{" "}
+                    <span className="font-semibold font-mono">
+                      {EXPECTED_NETWORK_LABEL}
+                    </span>{" "}
+                    (Soroban testnet). Before signing, confirm Freighter is on
+                    this network via Settings → Network. Wrong-network
+                    transactions are blocked automatically.
+                  </p>
                 </div>
+              </div>
 
-                <div className="mb-4">
-                  <ExportTransactionsButton transactions={transactions} />
+              {balancesLoading ? (
+                <div className="flex justify-center py-6">
+                  <Spinner size="md" />
                 </div>
-
-                {txLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner size="md" />
-                  </div>
-                ) : txError ? (
-                  <div className="flex items-center justify-between gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
-                    <span>{txError}</span>
-                    <button onClick={() => void refetchTx()} className="shrink-0 font-semibold underline">
-                      Retry
-                    </button>
-                  </div>
-                ) : transactions.length > 0 ? (
-                  <>
+              ) : balancesError ? (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                  {balancesError}
+                </div>
+              ) : balances && balances.length > 0 ? (
+                <div>
+                  <label className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 block">
+                    Balances
+                  </label>
                   <div className="space-y-3">
-                    {transactions.slice(0, 8).map((tx) => (
-                      <div
-                        key={tx.id}
-                        className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
-                      >
-                        <div>
-                          <p className="font-medium text-zinc-900 dark:text-zinc-100 capitalize">
-                            {tx.type.replace(/_/g, " ")}
-                          </p>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {formatDate(tx.createdAt, "relative")}
+                    {balances.map((balance, idx) => {
+                      const isNative = balance.asset_type === "native";
+                      const assetCode = isNative
+                        ? "Lumens (XLM)"
+                        : (balance as StellarNonNativeBalance).asset_code || "Unknown";
+                      const issuer = (balance as StellarNonNativeBalance).asset_issuer;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Zap className="w-5 h-5 text-yellow-500" />
+                            <div>
+                              <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                                {assetCode}
+                              </p>
+                              {!isNative && issuer && (
+                                <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
+                                  <AddressDisplay address={issuer} copyable={true} truncated={true} inline={true} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                            {parseFloat(balance.balance).toFixed(2)}
                           </p>
                         </div>
-                        <p className="text-xs font-mono text-zinc-500 truncate max-w-[120px]">
-                          {tx.hash.slice(0, 8)}…
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  No balances found for this account.
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Activity className="w-6 h-6" />
+                  Recent Wallet Activity
+                </h2>
+                <Badge variant="secondary" aria-label={`${txCountLabel} transactions`}>
+                  {txCountLabel}
+                </Badge>
+              </div>
+
+              <div className="mb-4">
+                <ExportTransactionsButton transactions={transactions} />
+              </div>
+
+              {txLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner size="md" />
+                </div>
+              ) : txError ? (
+                <div className="flex items-center justify-between gap-3 p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl text-sm text-red-600 dark:text-red-400">
+                  <span>{txError}</span>
+                  <button onClick={() => void refetchTx()} className="shrink-0 font-semibold underline">
+                    Retry
+                  </button>
+                </div>
+              ) : transactions.length > 0 ? (
+                <>
+                <div className="space-y-3">
+                  {transactions.slice(0, 8).map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl"
+                    >
+                      <div>
+                        <p className="font-medium text-zinc-900 dark:text-zinc-100 capitalize">
+                          {tx.type.replace(/_/g, " ")}
+                        </p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {formatDate(tx.createdAt, "relative")}
                         </p>
                       </div>
-                    ))}
-                  </div>
-                  <TransactionLoadMore
-                    hasMore={txHasMore}
-                    loadingMore={txLoadingMore}
-                    error={txLoadMoreError}
-                    onLoadMore={() => void loadMoreTx()}
-                  />
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
-                    <Wallet className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No recent on-chain activity found.</p>
-                  </div>
-                )}
+                      <p className="text-xs font-mono text-zinc-500 truncate max-w-[120px]">
+                        {tx.hash.slice(0, 8)}…
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <TransactionLoadMore
+                  hasMore={txHasMore}
+                  loadingMore={txLoadingMore}
+                  error={txLoadMoreError}
+                  onLoadMore={() => void loadMoreTx()}
+                />
+                </>
+              ) : (
+                <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                  <Wallet className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No recent on-chain activity found.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Package className="w-6 h-6" />
+                  Your Projects
+                </h2>
+                <Badge variant="secondary">{ownedProjects.length}</Badge>
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <Package className="w-6 h-6" />
-                    Your Projects
-                  </h2>
-                  <Badge variant="secondary">{ownedProjects.length}</Badge>
+              {ownedProjects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {ownedProjects.map((project) => (
+                    <ProjectCard key={project.id} project={project} />
+                  ))}
                 </div>
+              ) : (
+                <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                  <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No owned projects found for this wallet.</p>
+                </div>
+              )}
+            </div>
 
-                {ownedProjects.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {ownedProjects.map((project) => (
-                      <ProjectCard key={project.id} project={project} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
-                    <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No owned projects found for this wallet.</p>
-                  </div>
-                )}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <ShieldCheck className="w-6 h-6" />
+                  Ownership Claims
+                </h2>
+                <Badge variant="secondary">{claimRequests.length}</Badge>
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <ShieldCheck className="w-6 h-6" />
-                    Ownership Claims
-                  </h2>
-                  <Badge variant="secondary">{claimRequests.length}</Badge>
-                </div>
+              {claimRequests.length > 0 ? (
+                <div className="space-y-4">
+                  {claimRequests.map((claim) => {
+                    const claimStatus = {
+                      pending: {
+                        bg: "bg-yellow-50 dark:bg-yellow-900/20",
+                        text: "text-yellow-700 dark:text-yellow-500",
+                        icon: Clock,
+                        label: "Pending",
+                      },
+                      approved: {
+                        bg: "bg-green-50 dark:bg-green-900/20",
+                        text: "text-green-700 dark:text-green-500",
+                        icon: CheckCircle,
+                        label: "Approved",
+                      },
+                      rejected: {
+                        bg: "bg-red-50 dark:bg-red-900/20",
+                        text: "text-red-700 dark:text-red-500",
+                        icon: XCircle,
+                        label: "Rejected",
+                      },
+                    }[claim.status];
+                    const ClaimStatusIcon = claimStatus.icon;
+                    const claimProject = projectService.getProjectById(claim.projectId);
 
-                {claimRequests.length > 0 ? (
-                  <div className="space-y-4">
-                    {claimRequests.map((claim) => {
-                      const claimStatus = {
-                        pending: {
-                          bg: "bg-yellow-50 dark:bg-yellow-900/20",
-                          text: "text-yellow-700 dark:text-yellow-500",
-                          icon: Clock,
-                          label: "Pending",
-                        },
-                        approved: {
-                          bg: "bg-green-50 dark:bg-green-900/20",
-                          text: "text-green-700 dark:text-green-500",
-                          icon: CheckCircle,
-                          label: "Approved",
-                        },
-                        rejected: {
-                          bg: "bg-red-50 dark:bg-red-900/20",
-                          text: "text-red-700 dark:text-red-500",
-                          icon: XCircle,
-                          label: "Rejected",
-                        },
-                      }[claim.status];
-                      const ClaimStatusIcon = claimStatus.icon;
-                      const claimProject = projectService.getProjectById(claim.projectId);
-
-                      return (
-                        <div
-                          key={claim.id}
-                          className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
-                          onClick={() => router.push(`/projects/${claim.projectId}`)}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
-                                {claimProject?.name ?? claim.projectId}
-                              </p>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                Submitted {formatDate(claim.createdAt, "relative")}
-                              </p>
-                            </div>
-                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${claimStatus.bg}`}>
-                              <ClaimStatusIcon className={`w-4 h-4 ${claimStatus.text}`} />
-                              <span className={`text-sm font-medium ${claimStatus.text}`}>
-                                {claimStatus.label}
-                              </span>
-                            </div>
-                          </div>
-                          {claim.reviewNote && (
-                            <div className="mt-3 p-3 bg-zinc-100 dark:bg-zinc-900/50 rounded-lg">
-                              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                                Reviewer Note:
-                              </p>
-                              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                                {claim.reviewNote}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
-                    <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">You haven&apos;t submitted any ownership claims.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <Flag className="w-6 h-6" />
-                    My Reports
-                  </h2>
-                  <Badge variant="secondary">{reportSubmissions.length}</Badge>
-                </div>
-
-                {reportSubmissions.length > 0 ? (
-                  <div className="space-y-4">
-                    {reportSubmissions.map((report) => {
-                      const reportStatus = {
-                        pending: {
-                          bg: "bg-yellow-50 dark:bg-yellow-900/20",
-                          text: "text-yellow-700 dark:text-yellow-500",
-                          icon: Clock,
-                          label: "Pending",
-                        },
-                        resolved: {
-                          bg: "bg-green-50 dark:bg-green-900/20",
-                          text: "text-green-700 dark:text-green-500",
-                          icon: CheckCircle,
-                          label: "Resolved",
-                        },
-                        dismissed: {
-                          bg: "bg-zinc-100 dark:bg-zinc-800",
-                          text: "text-zinc-600 dark:text-zinc-400",
-                          icon: XCircle,
-                          label: "Dismissed",
-                        },
-                      }[report.status];
-                      const ReportStatusIcon = reportStatus.icon;
-                      const reportProject = projectService.getProjectById(report.projectId);
-                      const reasonLabel =
-                        PROJECT_REPORT_REASONS.find((r) => r.value === report.reason)?.label ??
-                        report.reason;
-
-                      return (
-                        <div
-                          key={report.id}
-                          className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
-                          onClick={() => router.push(`/projects/${report.projectId}`)}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
-                                {reportProject?.name ?? report.projectId}
-                              </p>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                {reasonLabel} • Submitted {formatDate(report.createdAt, "relative")}
-                              </p>
-                            </div>
-                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${reportStatus.bg}`}>
-                              <ReportStatusIcon className={`w-4 h-4 ${reportStatus.text}`} />
-                              <span className={`text-sm font-medium ${reportStatus.text}`}>
-                                {reportStatus.label}
-                              </span>
-                            </div>
-                          </div>
-                          {report.explanation && (
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-                              {report.explanation}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
-                    <Flag className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">You haven&apos;t reported any projects.</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <MessageSquare className="w-6 h-6" />
-                    Your Reviews
-                    {getReviewPersistenceLabel() !== "API" && (
-                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full">
-                        DEV-ONLY
-                      </span>
-                    )}
-                  </h2>
-                  <Badge variant="secondary">{userReviews.length}</Badge>
-                </div>
-
-                {userReviews.length > 0 ? (
-                  <div className="space-y-4">
-                    {userReviews.map((review) => (
+                    return (
                       <div
-                        key={review.id}
+                        key={claim.id}
                         className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/projects/${review.projectId}`)}
+                        onClick={() => router.push(`/projects/${claim.projectId}`)}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
                             <p className="font-bold text-zinc-900 dark:text-zinc-100">
-                              {review.projectName}
+                              {claimProject?.name ?? claim.projectId}
                             </p>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                              {formatDate(review.createdAt, "relative")}
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                              Submitted {formatDate(claim.createdAt, "relative")}
                             </p>
                           </div>
-                          <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-lg">
-                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                            <span className="text-sm font-bold text-yellow-700 dark:text-yellow-500">
-                              {review.rating}
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${claimStatus.bg}`}>
+                            <ClaimStatusIcon className={`w-4 h-4 ${claimStatus.text}`} />
+                            <span className={`text-sm font-medium ${claimStatus.text}`}>
+                              {claimStatus.label}
                             </span>
                           </div>
                         </div>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-                          {review.comment}
-                        </p>
+                        {claim.reviewNote && (
+                          <div className="mt-3 p-3 bg-zinc-100 dark:bg-zinc-900/50 rounded-lg">
+                            <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                              Reviewer Note:
+                            </p>
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                              {claim.reviewNote}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
-                    <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No reviews yet. Start reviewing projects!</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push("/discover")}
-                      className="mt-4"
-                    >
-                      Discover Projects
-                    </Button>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                  <ShieldCheck className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">You haven&apos;t submitted any ownership claims.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Flag className="w-6 h-6" />
+                  My Reports
+                </h2>
+                <Badge variant="secondary">{reportSubmissions.length}</Badge>
               </div>
 
-              {/* Recently Viewed Projects */}
-              {hasHistory && (
-                <RecentlyViewedProjects
-                  projects={recentProjects}
-                  onClear={handleClearHistory}
-                />
-              )}
+              {reportSubmissions.length > 0 ? (
+                <div className="space-y-4">
+                  {reportSubmissions.map((report) => {
+                    const reportStatus = {
+                      pending: {
+                        bg: "bg-yellow-50 dark:bg-yellow-900/20",
+                        text: "text-yellow-700 dark:text-yellow-500",
+                        icon: Clock,
+                        label: "Pending",
+                      },
+                      resolved: {
+                        bg: "bg-green-50 dark:bg-green-900/20",
+                        text: "text-green-700 dark:text-green-500",
+                        icon: CheckCircle,
+                        label: "Resolved",
+                      },
+                      dismissed: {
+                        bg: "bg-zinc-100 dark:bg-zinc-800",
+                        text: "text-zinc-600 dark:text-zinc-400",
+                        icon: XCircle,
+                        label: "Dismissed",
+                      },
+                    }[report.status];
+                    const ReportStatusIcon = reportStatus.icon;
+                    const reportProject = projectService.getProjectById(report.projectId);
+                    const reasonLabel =
+                      PROJECT_REPORT_REASONS.find((r) => r.value === report.reason)?.label ??
+                      report.reason;
 
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <Bookmark className="w-6 h-6" />
-                    Watchlist
-                  </h2>
-                  <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" onClick={() => router.push("/profile/following")}>
-                      <Heart className="h-4 w-4" />
-                      Following
-                    </Button>
-                    <Badge variant="secondary">
-                      {watchlistCount}/{maxWatchlistSize}
-                    </Badge>
-                  </div>
+                    return (
+                      <div
+                        key={report.id}
+                        className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/projects/${report.projectId}`)}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                              {reportProject?.name ?? report.projectId}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                              {reasonLabel} • Submitted {formatDate(report.createdAt, "relative")}
+                            </p>
+                          </div>
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${reportStatus.bg}`}>
+                            <ReportStatusIcon className={`w-4 h-4 ${reportStatus.text}`} />
+                            <span className={`text-sm font-medium ${reportStatus.text}`}>
+                              {reportStatus.label}
+                            </span>
+                          </div>
+                        </div>
+                        {report.explanation && (
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                            {report.explanation}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                  <Flag className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">You haven&apos;t reported any projects.</p>
+                </div>
+              )}
+            </div>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {["All", ...projectService.getCategories().filter((c) => c !== "All")].map(
-                    (cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setWatchlistCategory(cat)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <MessageSquare className="w-6 h-6" />
+                  Your Reviews
+                  {getReviewPersistenceLabel() !== "API" && (
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded-full">
+                      DEV-ONLY
+                    </span>
+                  )}
+                </h2>
+                <Badge variant="secondary">{userReviews.length}</Badge>
+              </div>
+
+              {userReviews.length > 0 ? (
+                <div className="space-y-4">
+                  {userReviews.map((review) => (
+                    <div
+                      key={review.id}
+                      className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/projects/${review.projectId}`)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                            {review.projectName}
+                          </p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {formatDate(review.createdAt, "relative")}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-lg">
+                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-sm font-bold text-yellow-700 dark:text-yellow-500">
+                            {review.rating}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                        {review.comment}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No reviews yet. Start reviewing projects!</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push("/discover")}
+                    className="mt-4"
+                  >
+                    Discover Projects
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Recently Viewed Projects */}
+            {hasHistory && (
+              <RecentlyViewedProjects
+                projects={recentProjects}
+                onClear={handleClearHistory}
+              />
+            )}
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Bookmark className="w-6 h-6" />
+                  Watchlist
+                </h2>
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => router.push("/profile/following")}>
+                    <Heart className="h-4 w-4" />
+                    Following
+                  </Button>
+                  <Badge variant="secondary">
+                    {watchlistCount}/{maxWatchlistSize}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                {["All", ...projectService.getCategories().filter((c) => c !== "All")].map(
+                  (cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setWatchlistCategory(cat)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
                           watchlistCategory === cat
                             ? "bg-blue-500 text-white"
                             : "bg-zinc-100 dark:bg-zinc-800"
                         }`}
-                      >
-                        {cat}
-                      </button>
-                    ),
-                  )}
-                </div>
+                    >
+                      {cat}
+                    </button>
+                  ),
+                )}
+              </div>
 
-                {filteredWatchlist.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {filteredWatchlist.map((project) => (
-                      <div key={project.id}>
-                        <ProjectCard
-                          project={project}
-                          verificationStatus={savedProjectVerificationStatuses[project.id]}
+              {filteredWatchlist.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {filteredWatchlist.map((project) => (
+                    <div key={project.id}>
+                      <ProjectCard
+                        project={project}
+                        verificationStatus={savedProjectVerificationStatuses[project.id]}
+                      />
+                      <label className="mt-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        <input
+                          type="checkbox"
+                          checked={isUpdateMuted(project.id)}
+                          onChange={() => toggleMuteUpdates(project.id)}
                         />
-                        <label className="mt-2 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                          <input
-                            type="checkbox"
-                            checked={isUpdateMuted(project.id)}
-                            onChange={() => toggleMuteUpdates(project.id)}
-                          />
-                          Mute project updates
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
-                    <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No projects on your watchlist yet.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push("/discover")}
-                      className="mt-4"
-                    >
-                      Browse Projects
-                    </Button>
-                  </div>
-                )}
-
-                {trendingFromWatchlist.length > 0 && (
-                  <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
-                    <h3 className="font-semibold mb-4">Trending from your watchlist</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {trendingFromWatchlist.map((project) => (
-                        <ProjectCard key={project.id} project={project} />
-                      ))}
+                        Mute project updates
+                      </label>
                     </div>
-                  </div>
-                )}
-
-                {watchlistNotifications.length > 0 && (
-                  <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
-                    <h3 className="font-semibold mb-3">Recent notifications</h3>
-                    <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-                      {watchlistNotifications.slice(0, 5).map((n) => (
-                        <li key={n.id}>{n.message}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <Search className="w-6 h-6" />
-                    Saved Searches
-                  </h2>
-                  <Badge variant="secondary">{savedSearches.length}</Badge>
+                  ))}
                 </div>
-                {savedSearches.length > 0 ? (
-                  <ul className="space-y-3">
-                    {savedSearches.map((search) => (
-                      <li
-                        key={search.id}
-                        className="flex items-center justify-between rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4"
-                      >
-                        <div>
-                          <p className="font-medium">{search.name}</p>
-                          <p className="text-xs text-zinc-500">
-                            {search.filters.query || "All projects"}
-                            {search.filters.preset ? ` · ${search.filters.preset}` : ""}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const params = new URLSearchParams();
-                            if (search.filters.query) params.set("q", search.filters.query);
-                            if (search.filters.categories?.length) {
-                              params.set("categories", search.filters.categories.join(","));
-                            }
-                            router.push(`/discover?${params.toString()}`);
-                          }}
-                        >
-                          Run
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-zinc-500 text-sm">
-                    Save custom filters from Discover (max 10 per wallet).
-                  </p>
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold flex items-center gap-2">
-                    <Package className="w-6 h-6" />
-                    Submitted Projects
-                  </h2>
-                  <Badge variant="secondary">{displayedVerificationRequests.length}</Badge>
-                </div>
-
-                {loadingVerifications ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner size="md" />
-                  </div>
-                ) : displayedVerificationRequests.length > 0 ? (
-                  <div className="space-y-4">
-                    {displayedVerificationRequests.map((request) => {
-                      const statusColors = {
-                        PENDING: {
-                          bg: "bg-yellow-50 dark:bg-yellow-900/20",
-                          text: "text-yellow-700 dark:text-yellow-500",
-                          icon: Clock,
-                        },
-                        VERIFIED: {
-                          bg: "bg-green-50 dark:bg-green-900/20",
-                          text: "text-green-700 dark:text-green-500",
-                          icon: CheckCircle,
-                        },
-                        REJECTED: {
-                          bg: "bg-red-50 dark:bg-red-900/20",
-                          text: "text-red-700 dark:text-red-500",
-                          icon: XCircle,
-                        },
-                        NONE: {
-                          bg: "bg-zinc-50 dark:bg-zinc-800",
-                          text: "text-zinc-700 dark:text-zinc-500",
-                          icon: AlertCircle,
-                        },
-                      };
-
-                      const status = statusColors[request.status];
-                      const StatusIcon = status.icon;
-
-                      return (
-                        <div
-                          key={request.id}
-                          className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <p className="font-bold text-zinc-900 dark:text-zinc-100">
-                                {request.projectName}
-                              </p>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                                Submitted {formatDate(request.submittedAt, "relative")}
-                              </p>
-                            </div>
-                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${status.bg}`}>
-                              <StatusIcon className={`w-4 h-4 ${status.text}`} />
-                              <span className={`text-sm font-medium ${status.text}`}>
-                                {request.status.charAt(0) + request.status.slice(1).toLowerCase()}
-                              </span>
-                            </div>
-                          </div>
-                          {request.rejectionReason && (
-                            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                              <p className="text-xs font-medium text-red-700 dark:text-red-500 mb-1">
-                                Rejection Reason:
-                              </p>
-                              <p className="text-sm text-red-600 dark:text-red-400">
-                                {request.rejectionReason}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
-                    <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No submitted projects yet.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push("/projects/new")}
-                      className="mt-4"
-                    >
-                      Submit Your First Project
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
-                <h3 className="text-lg font-bold mb-4">Activity Stats</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
-                      Reviews
-                    </span>
-                    <span className="font-bold text-lg">{userReviews.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                      <Star className="w-4 h-4" />
-                      Avg Rating
-                    </span>
-                    <span className="font-bold text-lg">
-                      {userReviews.length > 0
-                        ? (
-                            userReviews.reduce((sum, r) => sum + r.rating, 0) /
-                            userReviews.length
-                          ).toFixed(1)
-                        : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                      <Bookmark className="w-4 h-4" />
-                      Saved
-                    </span>
-                    <span className="font-bold text-lg">{savedProjects.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Owned
-                    </span>
-                    <span className="font-bold text-lg">{ownedProjects.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                      <Activity className="w-4 h-4" />
-                      Transactions
-                    </span>
-                    <span className="font-bold text-lg">{txCountLabel}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Verifications
-                    </span>
-                    <span className="font-bold text-lg">{displayedVerificationRequests.length}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
-                <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
-                <div className="space-y-3">
+              ) : (
+                <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                  <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No projects on your watchlist yet.</p>
                   <Button
-                    variant="primary"
-                    className="w-full"
+                    variant="outline"
+                    size="sm"
                     onClick={() => router.push("/discover")}
+                    className="mt-4"
                   >
                     Browse Projects
                   </Button>
+                </div>
+              )}
+
+              {trendingFromWatchlist.length > 0 && (
+                <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                  <h3 className="font-semibold mb-4">Trending from your watchlist</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {trendingFromWatchlist.map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {watchlistNotifications.length > 0 && (
+                <div className="mt-8 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                  <h3 className="font-semibold mb-3">Recent notifications</h3>
+                  <ul className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    {watchlistNotifications.slice(0, 5).map((n) => (
+                      <li key={n.id}>{n.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Search className="w-6 h-6" />
+                  Saved Searches
+                </h2>
+                <Badge variant="secondary">{savedSearches.length}</Badge>
+              </div>
+              {savedSearches.length > 0 ? (
+                <ul className="space-y-3">
+                  {savedSearches.map((search) => (
+                    <li
+                      key={search.id}
+                      className="flex items-center justify-between rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4"
+                    >
+                      <div>
+                        <p className="font-medium">{search.name}</p>
+                        <p className="text-xs text-zinc-500">
+                          {search.filters.query || "All projects"}
+                          {search.filters.preset ? ` · ${search.filters.preset}` : ""}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const params = new URLSearchParams();
+                          if (search.filters.query) params.set("q", search.filters.query);
+                          if (search.filters.categories?.length) {
+                            params.set("categories", search.filters.categories.join(","));
+                          }
+                          router.push(`/discover?${params.toString()}`);
+                        }}
+                      >
+                        Run
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-zinc-500 text-sm">
+                  Save custom filters from Discover (max 10 per wallet).
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Package className="w-6 h-6" />
+                  Submitted Projects
+                </h2>
+                <Badge variant="secondary">{displayedVerificationRequests.length}</Badge>
+              </div>
+
+              {loadingVerifications ? (
+                <div className="flex justify-center py-8">
+                  <Spinner size="md" />
+                </div>
+              ) : displayedVerificationRequests.length > 0 ? (
+                <div className="space-y-4">
+                  {displayedVerificationRequests.map((request) => {
+                    const statusColors = {
+                      PENDING: {
+                        bg: "bg-yellow-50 dark:bg-yellow-900/20",
+                        text: "text-yellow-700 dark:text-yellow-500",
+                        icon: Clock,
+                      },
+                      VERIFIED: {
+                        bg: "bg-green-50 dark:bg-green-900/20",
+                        text: "text-green-700 dark:text-green-500",
+                        icon: CheckCircle,
+                      },
+                      REJECTED: {
+                        bg: "bg-red-50 dark:bg-red-900/20",
+                        text: "text-red-700 dark:text-red-500",
+                        icon: XCircle,
+                      },
+                      NONE: {
+                        bg: "bg-zinc-50 dark:bg-zinc-800",
+                        text: "text-zinc-700 dark:text-zinc-500",
+                        icon: AlertCircle,
+                      },
+                    };
+
+                    const status = statusColors[request.status];
+                    const StatusIcon = status.icon;
+
+                    return (
+                      <div
+                        key={request.id}
+                        className="p-4 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-200 dark:border-zinc-700"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <p className="font-bold text-zinc-900 dark:text-zinc-100">
+                              {request.projectName}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                              Submitted {formatDate(request.submittedAt, "relative")}
+                            </p>
+                          </div>
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${status.bg}`}>
+                            <StatusIcon className={`w-4 h-4 ${status.text}`} />
+                            <span className={`text-sm font-medium ${status.text}`}>
+                              {request.status.charAt(0) + request.status.slice(1).toLowerCase()}
+                            </span>
+                          </div>
+                        </div>
+                        {request.rejectionReason && (
+                          <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                            <p className="text-xs font-medium text-red-700 dark:text-red-500 mb-1">
+                              Rejection Reason:
+                            </p>
+                            <p className="text-sm text-red-600 dark:text-red-400">
+                              {request.rejectionReason}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+                  <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No submitted projects yet.</p>
                   <Button
                     variant="outline"
-                    className="w-full"
-                    onClick={() => router.push("/reviews")}
-                  >
-                    View All Reviews
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => router.push("/profile/stats")}
-                    leftIcon={<Activity className="w-4 h-4" />}
-                  >
-                    Personal Stats
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
+                    size="sm"
                     onClick={() => router.push("/projects/new")}
+                    className="mt-4"
                   >
-                    Submit Project
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => router.push("/settings/twofa")}
-                    leftIcon={<ShieldCheck className="w-4 h-4" />}
-                  >
-                    Two-Factor Auth
+                    Submit Your First Project
                   </Button>
                 </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+              <h3 className="text-lg font-bold mb-4">Activity Stats</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4" />
+                    Reviews
+                  </span>
+                  <span className="font-bold text-lg">{userReviews.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                    <Star className="w-4 h-4" />
+                    Avg Rating
+                  </span>
+                  <span className="font-bold text-lg">
+                    {userReviews.length > 0
+                      ? (
+                          userReviews.reduce((sum, r) => sum + r.rating, 0) /
+                          userReviews.length
+                        ).toFixed(1)
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                    <Bookmark className="w-4 h-4" />
+                    Saved
+                  </span>
+                  <span className="font-bold text-lg">{savedProjects.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Owned
+                  </span>
+                  <span className="font-bold text-lg">{ownedProjects.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                    <Activity className="w-4 h-4" />
+                    Transactions
+                  </span>
+                  <span className="font-bold text-lg">{txCountLabel}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Verifications
+                  </span>
+                  <span className="font-bold text-lg">{displayedVerificationRequests.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6">
+              <h3 className="text-lg font-bold mb-4">Quick Actions</h3>
+              <div className="space-y-3">
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={() => router.push("/discover")}
+                >
+                  Browse Projects
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.push("/reviews")}
+                >
+                  View All Reviews
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.push("/profile/stats")}
+                  leftIcon={<Activity className="w-4 h-4" />}
+                >
+                  Personal Stats
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.push("/projects/new")}
+                >
+                  Submit Project
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => router.push("/settings/twofa")}
+                  leftIcon={<ShieldCheck className="w-4 h-4" />}
+                >
+                  Two-Factor Auth
+                </Button>
               </div>
             </div>
           </div>
         </div>
-      </main>
-    </LayoutWrapper>
+      </div>
+    </div>
   );
 }

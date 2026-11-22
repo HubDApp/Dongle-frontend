@@ -25,7 +25,7 @@ export default function ListsBrowser() {
   }, [publicKey]);
 
   return (
-    <main className="container mx-auto max-w-7xl px-4 py-8">
+    <div className="container mx-auto max-w-7xl px-4 py-8">
       <header className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs font-semibold uppercase text-emerald-700 dark:text-emerald-400">Community curation</p>
@@ -79,6 +79,6 @@ export default function ListsBrowser() {
         </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

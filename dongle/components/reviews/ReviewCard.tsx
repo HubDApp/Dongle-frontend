@@ -7,7 +7,7 @@
  * button, and featured-first ordering. Featured reviews show a ⭐ badge.
  */
 
-import React, { memo, useCallback, useState } from "react";
+import React, { memo, useCallback, useRef, useState } from "react";
 import { Star, ThumbsUp, ThumbsDown, Flag, Pencil, Trash2, Sparkles, Lock, X } from "lucide-react";
 import { Review, type ReviewSentiment } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
@@ -15,6 +15,7 @@ import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
 import { ENCRYPTED_COMMENT_SENTINEL } from "@/lib/review-encryption";
 import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   helpfulVoteCount,
   unhelpfulVoteCount,
@@ -54,6 +55,10 @@ export function ReviewCard({
 }: ReviewCardProps) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [removedMedia, setRemovedMedia] = useState<string[]>([]);
+
+  // Issue #939: trap focus while the image lightbox is open (Esc / focus return / Tab wrap).
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(Boolean(lightboxUrl), lightboxRef, undefined, () => setLightboxUrl(null));
   const sentimentPresentation = review.sentiment
     ? {
         positive: { emoji: "😊", label: "Positive" },
@@ -152,7 +157,7 @@ export function ReviewCard({
       )}
 
       {lightboxUrl && (
-        <div role="dialog" aria-modal="true" aria-label="Review image" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={handleCloseLightbox}>
+        <div ref={lightboxRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Review image" className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={handleCloseLightbox}>
           <button type="button" aria-label="Close image" className="absolute right-4 top-4 text-white" onClick={handleCloseLightbox}>
             <X className="h-7 w-7" />
           </button>

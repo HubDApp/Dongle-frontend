@@ -1,8 +1,8 @@
 "use client";
 
 import ContextHelp from "@/components/ui/ContextHelp";
-import React, { useState, useCallback, useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useForm, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
@@ -42,6 +42,7 @@ import { useFormConversion } from "@/hooks/useFormConversion";
 import { useFormCaptcha } from "@/hooks/useFormCaptcha";
 import { useFormHeatmap } from "@/hooks/useFormHeatmap";
 import { useFormSessionRecording } from "@/hooks/useFormSessionRecording";
+import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import {
@@ -335,8 +336,12 @@ export default function ProjectForm({
     autoStart: false,
   });
 
+  // Issue #936: shared ref used to move focus to the first invalid field on submit.
+  const formRef = useRef<HTMLFormElement>(null);
+
   const bindFormRef = useCallback(
     (node: HTMLFormElement | null) => {
+      formRef.current = node;
       heatmap.formRef(node);
       sessionRecording.formRef(node);
     },
@@ -775,6 +780,25 @@ export default function ProjectForm({
     [executeSubmit, mode, projectId, experiment],
   );
 
+  // Issue #936: move focus to the first invalid field and announce the error
+  // count to screen readers when validation fails on submit.
+  const { focusNextError, announceToSR } = useFormFocusManagement(formRef);
+  const handleInvalid = useCallback(
+    (fieldErrors: FieldErrors<ProjectFormValues>) => {
+      const count = Object.keys(fieldErrors).length;
+      window.setTimeout(() => {
+        focusNextError();
+        announceToSR(
+          count === 1
+            ? "1 field requires attention."
+            : `${count} fields require attention.`,
+          "assertive",
+        );
+      }, 0);
+    },
+    [focusNextError, announceToSR],
+  );
+
   const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     conversion.trackSubmitAttempt();
@@ -788,7 +812,7 @@ export default function ProjectForm({
       return;
     }
 
-    void handleSubmit(onPreSubmit)();
+    void handleSubmit(onPreSubmit, handleInvalid)();
   };
 
   const handleExportPdf = () => {
@@ -1358,7 +1382,11 @@ export default function ProjectForm({
                   )}
 
                   {errors.contractAddresses?.root?.message && (
-                    <p className="text-sm text-red-500 dark:text-red-400">
+                    <p
+                      id="contract-addresses-root-error"
+                      role="alert"
+                      className="text-sm text-red-500 dark:text-red-400"
+                    >
                       {errors.contractAddresses.root.message}
                     </p>
                   )}

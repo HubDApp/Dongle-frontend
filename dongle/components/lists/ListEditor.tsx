@@ -112,10 +112,10 @@ export default function ListEditor({ listId }: { listId?: string }) {
     return <div className="mx-auto max-w-2xl px-4 py-24"><WalletGate gate={gate} pagePurpose="Connect a wallet to create or edit a curated list." /></div>;
   }
 
-  if (loading) return <main className="container mx-auto max-w-4xl px-4 py-10 text-sm text-zinc-500">Loading list...</main>;
+  if (loading) return <div className="container mx-auto max-w-4xl px-4 py-10 text-sm text-zinc-500">Loading list...</div>;
 
   return (
-    <main className="container mx-auto max-w-5xl px-4 py-8">
+    <div className="container mx-auto max-w-5xl px-4 py-8">
       <Link href={listId ? `/lists/${listId}` : "/lists"} className="mb-5 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to lists
       </Link>
@@ -207,6 +207,6 @@ export default function ListEditor({ listId }: { listId?: string }) {
           </Button>
         </div>
       </form>
-    </main>
+    </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { ProjectVersion } from "@/types/history";
 import { formatDistanceToNow } from "date-fns";
 import { Clock, History, ArrowLeft, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ProjectHistoryModalProps {
   isOpen: boolean;
@@ -20,13 +21,24 @@ export function ProjectHistoryModal({
   onRestore,
 }: ProjectHistoryModalProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
 
   if (!isOpen) return null;
 
   const selectedVersion = history.find((v) => v.id === selectedVersionId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="project-history-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+    >
       <div className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-4xl max-h-[85vh] flex overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800 animate-slide-up">
         {/* Sidebar: Timeline */}
         <div className="w-1/3 bg-zinc-50 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
@@ -35,7 +47,7 @@ export function ProjectHistoryModal({
               <History className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Version History</h2>
+              <h2 id="project-history-title" className="font-bold text-lg">Version History</h2>
               <p className="text-xs text-zinc-500">Audit trail of changes</p>
             </div>
           </div>

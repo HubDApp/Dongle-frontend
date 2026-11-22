@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Review, type ReviewSentiment } from "@/types/review";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { formatDate } from "@/lib/date";
@@ -19,6 +19,7 @@ import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
 import { getReviewLanguageLabel, REVIEW_LANGUAGES } from "@/lib/review-language";
 import { ReviewComments } from "@/components/reviews/ReviewComments";
 import { LazyImage } from "@/components/ui/LazyImage";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 export interface ReviewListProps {
   reviews: Review[];
@@ -66,6 +67,10 @@ export default function ReviewList({
   const [lightbox, setLightbox] = useState<{ url: string; altText: string } | null>(null);
   const [removedMedia, setRemovedMedia] = useState<string[]>([]);
   const [languageFilter, setLanguageFilter] = useState<string>("all");
+
+  // Issue #939: trap focus while the image lightbox is open (Esc / focus return / Tab wrap).
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(Boolean(lightbox), lightboxRef, undefined, () => setLightbox(null));
 
   useEffect(() => {
     reviewAnalyticsService.recordViews(reviews.map((review) => review.id));
@@ -374,6 +379,8 @@ export default function ReviewList({
 
       {lightbox && (
         <div
+          ref={lightboxRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label="Review image"

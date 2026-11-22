@@ -8,7 +8,7 @@
  * device before upload, so the data is not visible to Dongle or its admins.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -20,13 +20,13 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DeviceList, SyncStatusIndicator } from "@/components/backup";
 import { useWallet } from "@/context/wallet.context";
 import { useSync } from "@/context/sync.context";
 import { useConfirm } from "@/hooks/useConfirm";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { AUTO_SYNC_INTERVAL_MS, type BackupConflict } from "@/hooks/useCloudBackup";
 import type { BackupSectionKey } from "@/services/backup/cloud-backup.service";
 
@@ -72,6 +72,11 @@ function BackupConflictDialog({
     setChoices(next);
   };
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // Issue #939: the dialog is only mounted while a conflict exists, so treat it as always open.
+  // Traps focus, focuses the first control on mount, restores focus on unmount, Esc to dismiss.
+  useModalFocusTrap(true, dialogRef, undefined, onCancel);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -80,6 +85,8 @@ function BackupConflictDialog({
         aria-hidden="true"
       />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby="backup-conflict-title"
@@ -253,203 +260,200 @@ export default function CloudBackupSettingsPage() {
   };
 
   return (
-    <LayoutWrapper>
-      <main className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
-        <div className="container mx-auto max-w-3xl px-4">
-          <header className="mb-8 border-b border-zinc-200 pb-6 dark:border-zinc-800">
-            <div className="flex items-center gap-3">
-              <Cloud className="h-6 w-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-              <h1 className="text-2xl font-bold">Cloud backup</h1>
-            </div>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Optionally back up your reviews, drafts, bookmarks and settings so you can restore
-              them on another device.
+    <div className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
+      <div className="container mx-auto max-w-3xl px-4">
+        <header className="mb-8 border-b border-zinc-200 pb-6 dark:border-zinc-800">
+          <div className="flex items-center gap-3">
+            <Cloud className="h-6 w-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <h1 className="text-2xl font-bold">Cloud backup</h1>
+          </div>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Optionally back up your reviews, drafts, bookmarks and settings so you can restore
+            them on another device.
+          </p>
+        </header>
+
+        {!publicKey && (
+          <Card variant="outline" className="mb-6 border-amber-300 dark:border-amber-800">
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Connect your wallet to enable cloud backup. Your wallet address is used to derive
+              the encryption key.
             </p>
-          </header>
-
-          {!publicKey && (
-            <Card variant="outline" className="mb-6 border-amber-300 dark:border-amber-800">
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                Connect your wallet to enable cloud backup. Your wallet address is used to derive
-                the encryption key.
-              </p>
-            </Card>
-          )}
-
-          {/* Privacy notice */}
-          <Card className="mb-6">
-            <div className="flex items-start gap-3">
-              <ShieldCheck
-                className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
-                aria-hidden="true"
-              />
-              <div>
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Your data stays private
-                </h2>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  Backups are encrypted on your device before they leave it. Dongle stores only the
-                  encrypted blob and cannot read it — your reviews, drafts, bookmarks and settings
-                  are not visible to admins.
-                </p>
-                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                  Learn more in our{" "}
-                  <Link href="/privacy" className="font-medium underline">
-                    privacy notice
-                  </Link>
-                  .
-                </p>
-              </div>
-            </div>
           </Card>
+        )}
 
-          {/* Opt-in + controls */}
-          <Card className="mb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Enable cloud backup
-                </h2>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  Automatically syncs every {Math.round(AUTO_SYNC_INTERVAL_MS / 60000)} minutes
-                  while enabled.
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isEnabled}
-                aria-label="Enable cloud backup"
-                disabled={!publicKey}
-                onClick={() => setEnabled(!isEnabled)}
-                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+        {/* Privacy notice */}
+        <Card className="mb-6">
+          <div className="flex items-start gap-3">
+            <ShieldCheck
+              className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            />
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Your data stays private
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Backups are encrypted on your device before they leave it. Dongle stores only the
+                encrypted blob and cannot read it — your reviews, drafts, bookmarks and settings
+                are not visible to admins.
+              </p>
+              <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Learn more in our{" "}
+                <Link href="/privacy" className="font-medium underline">
+                  privacy notice
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Opt-in + controls */}
+        <Card className="mb-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Enable cloud backup
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Automatically syncs every {Math.round(AUTO_SYNC_INTERVAL_MS / 60000)} minutes
+                while enabled.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isEnabled}
+              aria-label="Enable cloud backup"
+              disabled={!publicKey}
+              onClick={() => setEnabled(!isEnabled)}
+              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
                   isEnabled ? "bg-blue-600" : "bg-zinc-300 dark:bg-zinc-700"
                 }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
                     isEnabled ? "translate-x-6" : "translate-x-1"
                   }`}
-                />
-              </button>
-            </div>
-
-            <dl className="mt-6 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 text-sm dark:border-zinc-800 sm:grid-cols-2">
-              <div>
-                <dt className="text-zinc-500 dark:text-zinc-400">Last backup</dt>
-                <dd className="font-medium text-zinc-900 dark:text-zinc-100">
-                  {formatTimestamp(lastBackupAt)}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500 dark:text-zinc-400">Status</dt>
-                <dd className={`font-medium ${statusTone}`}>
-                  {isBusy ? "Working..." : message || (isEnabled ? "On" : "Off")}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="mt-5 flex flex-wrap gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-800">
-              <Button
-                size="sm"
-                leftIcon={<CloudUpload className="h-4 w-4" aria-hidden="true" />}
-                onClick={() => void backupNow()}
-                isLoading={status === "backing-up"}
-                loadingText="Backing up..."
-                disabled={!publicKey || isBusy}
-              >
-                Back up now
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                leftIcon={<CloudDownload className="h-4 w-4" aria-hidden="true" />}
-                onClick={() => void restoreNow()}
-                isLoading={status === "restoring"}
-                loadingText="Restoring..."
-                disabled={!publicKey || isBusy}
-              >
-                Restore from cloud
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
-                onClick={() => void syncNow()}
-                disabled={!publicKey || isBusy || !isEnabled}
-              >
-                Sync now
-              </Button>
-            </div>
-          </Card>
-
-          {/* Devices & real-time sync */}
-          <Card className="mb-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  Devices &amp; sync
-                </h2>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  Bookmark and draft changes sync to your other devices in real time.
-                </p>
-              </div>
-              <SyncStatusIndicator
-                status={device.status}
-                pendingCount={device.pendingCount}
-                className="mt-0.5 shrink-0"
               />
+            </button>
+          </div>
+
+          <dl className="mt-6 grid grid-cols-1 gap-3 border-t border-zinc-100 pt-4 text-sm dark:border-zinc-800 sm:grid-cols-2">
+            <div>
+              <dt className="text-zinc-500 dark:text-zinc-400">Last backup</dt>
+              <dd className="font-medium text-zinc-900 dark:text-zinc-100">
+                {formatTimestamp(lastBackupAt)}
+              </dd>
             </div>
-
-            <div className="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800">
-              {device.status === "offline" && device.pendingCount > 0 && (
-                <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
-                  You&apos;re offline. {device.pendingCount} change
-                  {device.pendingCount === 1 ? "" : "s"} queued and will sync automatically when
-                  your connection returns.
-                </p>
-              )}
-              <DeviceList
-                devices={device.devices}
-                isSigningOut={isSigningOut}
-                onRefresh={() => void device.refreshDevices()}
-                onSignOutOthers={
-                  publicKey && device.devices.some((entry) => !entry.isCurrent)
-                    ? () => void handleSignOutOthers()
-                    : undefined
-                }
-              />
+            <div>
+              <dt className="text-zinc-500 dark:text-zinc-400">Status</dt>
+              <dd className={`font-medium ${statusTone}`}>
+                {isBusy ? "Working..." : message || (isEnabled ? "On" : "Off")}
+              </dd>
             </div>
-          </Card>
+          </dl>
 
-          {/* What gets backed up */}
-          <Card variant="outline">
-            <div className="flex items-start gap-3">
-              <Lock
-                className="mt-0.5 h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400"
-                aria-hidden="true"
-              />
-              <div>
-                <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  What gets backed up
-                </h2>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
-                  <li>Your reviews and owner responses</li>
-                  <li>Project drafts and review drafts</li>
-                  <li>Bookmarks and watchlist</li>
-                  <li>App settings (theme and language)</li>
-                </ul>
-              </div>
+          <div className="mt-5 flex flex-wrap gap-3 border-t border-zinc-100 pt-5 dark:border-zinc-800">
+            <Button
+              size="sm"
+              leftIcon={<CloudUpload className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => void backupNow()}
+              isLoading={status === "backing-up"}
+              loadingText="Backing up..."
+              disabled={!publicKey || isBusy}
+            >
+              Back up now
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              leftIcon={<CloudDownload className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => void restoreNow()}
+              isLoading={status === "restoring"}
+              loadingText="Restoring..."
+              disabled={!publicKey || isBusy}
+            >
+              Restore from cloud
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => void syncNow()}
+              disabled={!publicKey || isBusy || !isEnabled}
+            >
+              Sync now
+            </Button>
+          </div>
+        </Card>
+
+        {/* Devices & real-time sync */}
+        <Card className="mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Devices &amp; sync
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Bookmark and draft changes sync to your other devices in real time.
+              </p>
             </div>
-          </Card>
+            <SyncStatusIndicator
+              status={device.status}
+              pendingCount={device.pendingCount}
+              className="mt-0.5 shrink-0"
+            />
+          </div>
 
-          {/* Live region for status updates */}
-          <p className="sr-only" role="status" aria-live="polite">
-            {isBusy ? "Working" : message}
-          </p>
-        </div>
-      </main>
+          <div className="mt-5 border-t border-zinc-100 pt-5 dark:border-zinc-800">
+            {device.status === "offline" && device.pendingCount > 0 && (
+              <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+                You&apos;re offline. {device.pendingCount} change
+                {device.pendingCount === 1 ? "" : "s"} queued and will sync automatically when
+                your connection returns.
+              </p>
+            )}
+            <DeviceList
+              devices={device.devices}
+              isSigningOut={isSigningOut}
+              onRefresh={() => void device.refreshDevices()}
+              onSignOutOthers={
+                publicKey && device.devices.some((entry) => !entry.isCurrent)
+                  ? () => void handleSignOutOthers()
+                  : undefined
+              }
+            />
+          </div>
+        </Card>
 
+        {/* What gets backed up */}
+        <Card variant="outline">
+          <div className="flex items-start gap-3">
+            <Lock
+              className="mt-0.5 h-5 w-5 shrink-0 text-zinc-500 dark:text-zinc-400"
+              aria-hidden="true"
+            />
+            <div>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">
+                What gets backed up
+              </h2>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+                <li>Your reviews and owner responses</li>
+                <li>Project drafts and review drafts</li>
+                <li>Bookmarks and watchlist</li>
+                <li>App settings (theme and language)</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+
+        {/* Live region for status updates */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {isBusy ? "Working" : message}
+        </p>
+      </div>
       {conflict && (
         <BackupConflictDialog
           conflict={conflict}
@@ -458,6 +462,6 @@ export default function CloudBackupSettingsPage() {
           onCancel={cancelConflict}
         />
       )}
-    </LayoutWrapper>
+    </div>
   );
 }

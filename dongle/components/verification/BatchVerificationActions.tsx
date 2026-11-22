@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   CheckCircle,
   XCircle,
@@ -42,6 +43,12 @@ export function BatchVerificationActions({
   const [pendingAction, setPendingAction] = useState<BatchAction | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [progress, setProgress] = useState(0);
+
+  // Issue #939: trap focus in the confirmation dialog (Esc / focus return / Tab wrap).
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(showConfirm, confirmDialogRef, undefined, () => {
+    if (!isProcessing) setShowConfirm(false);
+  });
 
   const toggleSelect = (id: string) => {
     const next = new Set(selected);
@@ -195,10 +202,17 @@ export function BatchVerificationActions({
       {/* Confirmation modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 dark:bg-zinc-900">
+          <div
+            ref={confirmDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="batch-confirm-title"
+            className="w-full max-w-md rounded-lg bg-white p-6 dark:bg-zinc-900"
+          >
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              <h3 className="font-semibold">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" aria-hidden="true" />
+              <h3 id="batch-confirm-title" className="font-semibold">
                 {pendingAction && actionLabels[pendingAction]}
               </h3>
             </div>

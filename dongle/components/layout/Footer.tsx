@@ -6,7 +6,7 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 export default function Footer() {
   const { t } = useTranslation();
   return (
-    <footer className="bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 py-12">
+    <footer role="contentinfo" className="bg-zinc-50 dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 py-12">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="col-span-1 md:col-span-2">

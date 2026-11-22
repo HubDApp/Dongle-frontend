@@ -1,9 +1,14 @@
 "use client";
 
-import { Controller, type Control } from "react-hook-form";
+import { Controller, useFormState, type Control, type FieldError } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import type { ProjectFormValues } from "@/components/projects/ProjectForm";
 import { ROADMAP_STATUSES, type RoadmapMilestone } from "@/types/roadmap";
+
+interface MilestoneFieldErrors {
+  title?: FieldError;
+  description?: FieldError;
+}
 
 const STATUS_LABELS: Record<(typeof ROADMAP_STATUSES)[number], string> = {
   planned: "Planned",
@@ -24,6 +29,13 @@ export default function RoadmapEditor({
 }: {
   control: Control<ProjectFormValues>;
 }) {
+  // Issue #936: surface milestone validation errors and link them to their inputs.
+  const { errors } = useFormState({ control });
+  const roadmapErrors = errors.roadmap as unknown as
+    | (MilestoneFieldErrors | undefined)[]
+    | undefined;
+  const roadmapRootError = (errors.roadmap as unknown as FieldError | undefined)?.message;
+
   return (
     <Controller
       name="roadmap"
@@ -66,19 +78,37 @@ export default function RoadmapEditor({
               </p>
             ) : (
               <div className="space-y-3">
-                {milestones.map((milestone, index) => (
+                {milestones.map((milestone, index) => {
+                  const titleError = roadmapErrors?.[index]?.title?.message;
+                  const titleId = `roadmap-milestone-${index}-title`;
+                  const titleErrorId = `${titleId}-error`;
+                  return (
                   <fieldset key={index} className="grid gap-3 rounded-xl bg-zinc-50 p-3 dark:bg-zinc-900 md:grid-cols-2">
                     <legend className="sr-only">Milestone {index + 1}</legend>
-                    <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                      Title
-                      <input
-                        value={milestone.title}
-                        onChange={(event) => updateMilestone(index, { title: event.target.value })}
-                        maxLength={120}
-                        required
-                        className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                      />
-                    </label>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        Title
+                        <input
+                          id={titleId}
+                          value={milestone.title}
+                          onChange={(event) => updateMilestone(index, { title: event.target.value })}
+                          maxLength={120}
+                          required
+                          aria-invalid={titleError ? true : undefined}
+                          aria-describedby={titleError ? titleErrorId : undefined}
+                          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                        />
+                      </label>
+                      {titleError && (
+                        <p
+                          id={titleErrorId}
+                          role="alert"
+                          className="mt-1 text-xs text-red-500 dark:text-red-400"
+                        >
+                          {titleError}
+                        </p>
+                      )}
+                    </div>
                     <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                       Status
                       <select
@@ -122,8 +152,14 @@ export default function RoadmapEditor({
                       </button>
                     </div>
                   </fieldset>
-                ))}
+                  );
+                })}
               </div>
+            )}
+            {roadmapRootError && (
+              <p id="roadmap-error" role="alert" className="text-xs text-red-500 dark:text-red-400">
+                {roadmapRootError}
+              </p>
             )}
             {milestones.length >= 30 && (
               <p className="text-xs text-amber-700 dark:text-amber-400">

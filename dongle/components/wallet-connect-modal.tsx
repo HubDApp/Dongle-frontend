@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useWalletConnect } from "@/hooks/useWalletConnect";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { QrCode, Wallet, Smartphone, Award, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,17 +19,24 @@ interface WalletConnectModalProps {
 export function WalletConnectModal({ open, onClose, onConnected }: WalletConnectModalProps) {
   const { session, connecting, error, networkValid, connect, disconnect, signTransaction } = useWalletConnect();
   const [qrOpen, setQrOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(open, dialogRef, undefined, onClose);
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       className={cn("fixed inset-0 z-50 flex items-center justify-center", open ? "opacity-100 pointer-events-auto" : "hidden opacity-0 pointer-events-none transition")}
       role="dialog"
       aria-modal="true"
+      aria-labelledby="wallet-connect-title"
     >
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-card p-6 rounded-xl shadow-lg max-w-md w-full border">
         <div className="flex justify-between items-start mb-4">
-          <h2 className="text-lg font-semibold">Connect Wallet</h2>
+          <h2 id="wallet-connect-title" className="text-lg font-semibold">Connect Wallet</h2>
           <button className="text-muted-foreground hover:text-foreground" onClick={onClose}>
             ✕
           </button>

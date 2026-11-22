@@ -3,7 +3,7 @@
 
 export default function Loading() {
   return (
-    <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <div className="container mx-auto px-4">
         {/* Header placeholder */}
         <div className="mb-12 animate-pulse">
@@ -21,6 +21,6 @@ export default function Loading() {
           <div className="h-10 w-32 bg-gray-200 rounded dark:bg-gray-700"></div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

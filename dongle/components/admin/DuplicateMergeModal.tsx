@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   suggestMerge,
   executeMerge,
   type FieldMergeDecision,
 } from "@/services/form-deduplication";
 import type { Project } from "@/types/project";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   GitMerge,
   X,
@@ -45,6 +46,10 @@ export default function DuplicateMergeModal({
     suggestion.fieldDecisions,
   );
   const [isMerging, setIsMerging] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
 
   if (!isOpen) return null;
 
@@ -108,7 +113,14 @@ export default function DuplicateMergeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicate-merge-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+    >
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20">
@@ -117,7 +129,7 @@ export default function DuplicateMergeModal({
               <GitMerge className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Merge Duplicate Submissions</h2>
+              <h2 id="duplicate-merge-title" className="text-lg font-bold">Merge Duplicate Submissions</h2>
               <p className="text-xs text-zinc-500">
                 Resolve conflicts field-by-field and create an audited merge snapshot.
               </p>

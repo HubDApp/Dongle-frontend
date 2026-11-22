@@ -429,7 +429,7 @@ describe("Project Detail Page - layout shell", () => {
     vi.mocked(projectService.getProjectById).mockReturnValue(mockProject);
     const { container } = render(<ProjectDetailPage />);
 
-    const shell = container.querySelector("main");
+    const shell = container.querySelector(".min-h-screen");
     expect(shell?.className).toMatch(/min-h-screen/);
     expect(shell?.className).toMatch(/pt-32/);
     expect(shell?.className).toMatch(/pb-24/);
@@ -442,7 +442,7 @@ describe("Project Detail Page - layout shell", () => {
     await finishInitialLoad();
 
     expect(screen.getByText(/Project Not Found/i)).toBeInTheDocument();
-    const shell = screen.getByText(/Project Not Found/i).closest("main");
+    const shell = screen.getByText(/Project Not Found/i).closest(".min-h-screen");
     expect(shell?.className).toMatch(/min-h-screen/);
     expect(shell?.className).toMatch(/pt-32/);
     expect(shell?.className).toMatch(/pb-24/);
@@ -455,7 +455,7 @@ describe("Project Detail Page - layout shell", () => {
 
     expect(screen.getByRole("heading", { name: mockProject.name })).toBeInTheDocument();
     expect(recentViewsService.addView).toHaveBeenCalledWith("test-project-id", "G_OWNER_123");
-    const shell = screen.getByRole("heading", { name: mockProject.name }).closest("main");
+    const shell = screen.getByRole("heading", { name: mockProject.name }).closest(".min-h-screen");
     expect(shell?.className).toMatch(/min-h-screen/);
     expect(shell?.className).toMatch(/pt-32/);
     expect(shell?.className).toMatch(/pb-24/);
