@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { isOnChainEnabled } from "@/lib/contract-health";
+import { trackPendingTransaction, removePendingTransaction } from "@/lib/pending-transactions";
 import { toast } from "sonner";
 import {
   createProgressState,
@@ -29,6 +31,14 @@ export function useOnChainTransaction() {
   const handlePhaseChange = useCallback(
     (phase: TransactionPhase, meta?: { txHash?: string; error?: Error }) => {
       setProgress(createProgressState(phase, meta));
+
+      // Hand off to the background watcher so the user is notified even if
+      // they navigate away before confirmation.
+      if (meta?.txHash && phase !== "success" && phase !== "failure") {
+        trackPendingTransaction(meta.txHash);
+      } else if (meta?.txHash && (phase === "success" || phase === "failure")) {
+        removePendingTransaction(meta.txHash);
+      }
 
       // Only toast for terminal states (success, failure) to reduce notification noise.
       // Intermediate phases (preparing, signing, submitting, confirming) are displayed
@@ -61,6 +71,12 @@ export function useOnChainTransaction() {
     async <T,>(
       action: (onPhaseChange: typeof handlePhaseChange) => Promise<T>,
     ): Promise<T | null> => {
+      if (!isOnChainEnabled()) {
+        handlePhaseChange("failure", {
+          error: new Error("On-chain actions are disabled: configured contracts were not found on the network."),
+        });
+        return null;
+      }
       const wrapped = () => action(handlePhaseChange);
       lastActionRef.current = wrapped;
 

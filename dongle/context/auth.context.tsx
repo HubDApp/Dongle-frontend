@@ -15,6 +15,7 @@ import { useWallet } from "@/context/wallet.context";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { isAbortError } from "@/types/guards";
 
 export interface AuthUser {
   id: string;
@@ -80,27 +81,32 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     }
   }, [scheduleRefresh]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch("/api/auth/session", { credentials: "include" });
+      const res = await fetch("/api/auth/session", { credentials: "include", signal });
+      if (signal?.aborted) return;
       if (!res.ok) {
         setUser(null);
         return;
       }
       const body = (await res.json()) as { user: AuthUser | null };
+      if (signal?.aborted) return;
       setUser(body.user);
       if (body.user) scheduleRefresh();
     } catch (error) {
+      if (isAbortError(error)) return;
       console.error("[auth] session restore failed", error);
       setUser(null);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [scheduleRefresh]);
 
   useEffect(() => {
-    void refresh();
+    const controller = new AbortController();
+    void refresh(controller.signal);
     return () => {
+      controller.abort();
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
   }, [refresh]);

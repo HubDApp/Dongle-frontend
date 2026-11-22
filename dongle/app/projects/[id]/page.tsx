@@ -8,6 +8,7 @@ import { projectService } from "@/services/project/project.service";
 import { projectStatusService } from "@/services/project/project-status.service";
 import { ContractAddressList } from "@/components/projects/ContractAddressList";
 import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import { SimilarProjects } from "@/components/projects/SimilarProjects";
 import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
@@ -34,10 +35,14 @@ import { Review,
 import { reviewReportService } from "@/services/review/review-report.service";
 import { projectReportService } from "@/services/project/project-report.service";
 import { projectClaimService } from "@/services/project/project-claim.service";
+import { projectOwnerService } from "@/services/project/project-owner.service";
 import { formatDate } from "@/lib/date";
+import { getPositiveSentimentPercentage } from "@/lib/review-sentiment";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import { submissionSigningService } from "@/services/submission-signing";
+import { signMessage } from "@stellar/freighter-api";
+import { applyVote, buildVoteMessage, compareByHelpfulness } from "@/lib/review-votes";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import WalletStatePanel,
@@ -67,6 +72,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
+import { ProjectLifecycleStatusBadge } from "@/components/projects/ProjectLifecycleStatusBadge";
 import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBanner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
 import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
@@ -118,14 +124,10 @@ export default function ProjectDetailPage() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
-  const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
-  // Issue #925: single SWR-backed fetch shared across all components for this project
-  const {
-    status: verificationStatus,
-    error: verificationSWRError,
-    refresh: refreshVerification,
-  } = useVerificationStatus(projectId);
-  const verificationError = verificationSWRError?.message ?? null;
+  const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "helpfulness" | "mine">("newest");
+  const [sentimentFilter, setSentimentFilter] = useState<"all" | ReviewSentiment>("all");
+  const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [updates, setUpdates] = useState<ProjectUpdate[]>([]);
   const [isAddingUpdate, setIsAddingUpdate] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState<ProjectUpdate | null>(null);
@@ -217,6 +219,9 @@ export default function ProjectDetailPage() {
 
   const isOwner = project && gate.publicKey && project.ownerAddress === gate.publicKey;
   const isOnList = project ? isOnWatchlist(project.id) : false;
+  // A project is "claimed" when its owner was assigned through the claim flow,
+  // which records an owner override for the project.
+  const claimedBy = project ? projectOwnerService.getProjectOwnerOverride(project.id) : undefined;
 
   useEffect(() => {
     if (!gate.publicKey) {
@@ -229,6 +234,15 @@ export default function ProjectDetailPage() {
       setDailyReviewCount(result.dailyCount);
     });
   }, [gate.publicKey]);
+
+  const canManageStatus = Boolean(isOwner) || isAdmin;
+
+  const handleStatusChange = (status: ProjectStatus) => {
+    if (!project) return;
+    projectStatusService.setProjectStatus(project.id, status);
+    setProject({ ...project, status });
+    toast.success("Project status updated");
+  };
 
   const handleToggleWatchlist = () => {
     if (!project) return;
@@ -264,8 +278,24 @@ export default function ProjectDetailPage() {
     setShowWalletGate(false);
   };
 
-  const handleReportSubmit = (data: { reason: string; explanation: string }) => {
+  const handleReportSubmit = async (data: { reason: string; explanation: string }) => {
     if (!gate.publicKey || !project) return;
+
+    // A wallet signature is required before a report can be submitted.
+    try {
+      await submissionSigningService.sign(
+        {
+          projectId: project.id,
+          projectName: project.name,
+          reason: data.reason,
+          explanation: data.explanation,
+        },
+        gate.publicKey,
+      );
+    } catch {
+      toast.error("Wallet signature is required to submit a report.");
+      return;
+    }
 
     const result = projectReportService.createReport(
       {
@@ -356,6 +386,9 @@ export default function ProjectDetailPage() {
 
   const sortedReviews = React.useMemo(() => {
     let list = [...reviews];
+    if (sentimentFilter !== "all") {
+      list = list.filter((r) => r.sentiment === sentimentFilter);
+    }
     if (reviewSort === "mine") {
       list = list.filter((r) => r.userAddress === gate.publicKey);
     }
@@ -363,13 +396,15 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
       list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (reviewSort === "helpfulness") {
+      list.sort(compareByHelpfulness);
     } else if (reviewSort === "oldest") {
       list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
-  }, [reviews, reviewSort, gate.publicKey]);
+  }, [reviews, reviewSort, sentimentFilter, gate.publicKey]);
 
   const projectEmptyMessage = React.useMemo(() => {
     if (reviews.length === 0) {
@@ -506,27 +541,81 @@ export default function ProjectDetailPage() {
   };
 
   const handleVoteHelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteHelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "helpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "helpful") : review)),
+    );
+
+    const result = await reviewService.voteHelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviewsByProject(projectId));
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
   };
 
   const handleVoteUnhelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "unhelpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "unhelpful") : review)),
+    );
+
+    const result = await reviewService.voteUnhelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviewsByProject(projectId));
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
   };
@@ -701,6 +790,11 @@ export default function ProjectDetailPage() {
                       <ProjectLifecycleStatusBadge status={project.status} />
                       {verificationStatus && (
                         <VerificationBadge status={verificationStatus} tier={project.verificationTier} />
+                      )}
+                      {claimedBy && (
+                        <Badge variant="success">
+                          Claimed by {claimedBy.slice(0, 4)}…{claimedBy.slice(-4)}
+                        </Badge>
                       )}
                     </div>
                     <h1 className="text-4xl font-bold mb-4">{project.name}</h1>
@@ -957,13 +1051,14 @@ export default function ProjectDetailPage() {
                       <select
                         aria-label="Sort reviews"
                         value={reviewSort}
-                        onChange={(e) => setReviewSort(e.target.value as "newest" | "oldest" | "highest" | "lowest" | "mine")}
+                        onChange={(e) => setReviewSort(e.target.value as "newest" | "oldest" | "highest" | "lowest" | "helpfulness" | "mine")}
                         className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
                         <option value="highest">Highest Rating</option>
                         <option value="lowest">Lowest Rating</option>
+                        <option value="helpfulness">Most Helpful</option>
                         {gate.publicKey && <option value="mine">My Reviews</option>}
                       </select>
                     </div>
@@ -1045,7 +1140,7 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
                 <ReviewList
-                  onClearFilters={() => { setReviewSort("newest"); }}
+                  onClearFilters={() => { setReviewSort("newest"); setSentimentFilter("all"); }}
                   reviews={sortedReviews}
                   currentUserAddress={gate.publicKey}
                   isAdmin={isAdmin}
@@ -1054,7 +1149,6 @@ export default function ProjectDetailPage() {
                   onVoteHelpful={handleVoteHelpful}
                   onVoteUnhelpful={handleVoteUnhelpful}
                   onReport={handleReportReview}
-                  isAdmin={isAdmin}
                   onOverrideSentiment={(reviewId, sentiment) =>
                     void handleSentimentOverride(reviewId, sentiment)
                   }
@@ -1245,6 +1339,9 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Similar Projects (Issues #859, #860) */}
+        <SimilarProjects project={project} />
 
         <ClaimProjectModal
           isOpen={isClaiming}

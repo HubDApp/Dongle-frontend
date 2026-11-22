@@ -20,6 +20,14 @@ export interface Review {
   isVerifiedReviewer?: boolean;
   helpfulVotes?: string[];
   unhelpfulVotes?: string[];
+  /** Admin-featured review (#682). */
+  featured?: boolean;
+  /** Detected/overridden sentiment classification. */
+  sentiment?: ReviewSentiment;
+  /** How the sentiment was determined: "automatic" or "admin". */
+  sentimentSource?: string;
+  /** Owner (project) response attached to the review. */
+  ownerResponse?: ReviewOwnerResponse;
   /** Cryptographic signature fields — present for signed submissions (#558). */
   signedPayload?: string;
   signature?: string;

@@ -6,6 +6,7 @@ import ProjectImage from "@/components/projects/ProjectImage";
 import { VerificationBadge } from "@/components/projects/VerificationBadge";
 import { useVerificationStatuses } from "@/hooks/useVerificationStatuses";
 import { Clock, X, Star } from "lucide-react";
+import { isAbortError } from "@/types/guards";
 
 interface RecentlyViewedProjectsProps {
   projects: Project[];
@@ -18,11 +19,33 @@ export function RecentlyViewedProjects({
   onClear,
   compact = false,
 }: RecentlyViewedProjectsProps) {
-  // Shares the same SWR cache entries as every other component that requests
-  // these same project IDs — no extra network calls when already loaded.
-  const { statuses: verificationStatuses } = useVerificationStatuses(
-    projects.map((p) => p.id),
-  );
+  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
+
+  useEffect(() => {
+    if (projects.length === 0) return;
+
+    const controller = new AbortController();
+
+    const fetchStatuses = async () => {
+      const statuses: Record<string, VerificationStatus> = {};
+      await Promise.all(
+        projects.map(async (project) => {
+          try {
+            const status = await sorobanService.getVerificationStatus(project.id, controller.signal);
+            statuses[project.id] = status;
+          } catch (err) {
+            if (isAbortError(err)) return;
+            statuses[project.id] = "NONE";
+          }
+        }),
+      );
+      if (controller.signal.aborted) return;
+      setVerificationStatuses(statuses);
+    };
+
+    void fetchStatuses();
+    return () => controller.abort();
+  }, [projects]);
 
   if (projects.length === 0) {
     return null;
