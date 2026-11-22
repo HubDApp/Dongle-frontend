@@ -5,9 +5,15 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 import TimeSeriesChart from "./TimeSeriesChart";
 import FormAnalyticsPanel from "./FormAnalyticsPanel";
 import { downloadCsv, toCsv } from "@/lib/analytics-dashboard/csv";
-import type { AnalyticsRange, AnalyticsResult, VerificationFilter } from "@/lib/analytics-dashboard/metrics";
+import type {
+  AnalyticsRange,
+  AnalyticsResult,
+  TimeSeriesPoint,
+  VerificationFilter,
+} from "@/lib/analytics-dashboard/metrics";
 import { ALL_CATEGORIES } from "@/types/project";
 import { Button } from "@/components/ui/Button";
+import { isAbortError } from "@/types/guards";
 
 interface Payload {
   result: AnalyticsResult;
@@ -33,26 +39,31 @@ export default function AnalyticsDashboard() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [drilldown, setDrilldown] = useState<TimeSeriesPoint | null>(null);
 
-  const query = useCallback(async () => {
+  const query = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ range, category, status });
-      const res = await fetch(`/api/analytics?${params.toString()}`);
+      const res = await fetch(`/api/analytics?${params.toString()}`, { signal });
       if (!res.ok) throw new Error("fail");
       const body = (await res.json()) as Payload;
+      if (signal?.aborted) return;
       setData(body);
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) return;
       setError(t("analytics.loadFailed"));
       setData(null);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [category, range, status, t]);
 
   useEffect(() => {
-    void query();
+    const controller = new AbortController();
+    void query(controller.signal);
+    return () => controller.abort();
   }, [query]);
 
   const exportCsv = () => {
@@ -193,7 +204,46 @@ export default function AnalyticsDashboard() {
 
           <section className="mb-8">
             <h2 className="mb-2 text-lg font-semibold">{t("analytics.timeSeries")}</h2>
-            <TimeSeriesChart series={data.result.series} emptyLabel={t("analytics.empty")} />
+            <TimeSeriesChart
+              series={data.result.series}
+              emptyLabel={t("analytics.empty")}
+              onPointClick={setDrilldown}
+            />
+            {drilldown ? (
+              <div className="mt-4 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">{t("analytics.drilldownTitle")}</h3>
+                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                      {format.formatDate(drilldown.date)}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDrilldown(null)}
+                  >
+                    {t("common.close")}
+                  </Button>
+                </div>
+                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-zinc-500">{t("analytics.totalProjects")}</dt>
+                    <dd className="font-semibold tabular-nums">{drilldown.projects}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">{t("analytics.totalReviews")}</dt>
+                    <dd className="font-semibold tabular-nums">{drilldown.reviews}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">{t("analytics.chartVerification")}</dt>
+                    <dd className="font-semibold tabular-nums">
+                      {formatRate(drilldown.verificationRate)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
           </section>
 
           <section className="mb-8">
@@ -230,15 +280,40 @@ export default function AnalyticsDashboard() {
           <section>
             <h2 className="mb-3 text-lg font-semibold">{t("analytics.topCategories")}</h2>
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {data.result.categories.map((item) => (
-                <li
-                  key={item.category}
-                  className="flex items-center justify-between rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800"
-                >
-                  <span>{item.category}</span>
-                  <span className="font-semibold">{item.count}</span>
-                </li>
-              ))}
+              {data.result.categories.map((item) => {
+                const fastest = data.result.categories.reduce((best, candidate) =>
+                  candidate.growth > best.growth ? candidate : best
+                , data.result.categories[0])?.category === item.category && item.growth > 0;
+                const arrow = item.trend === "up" ? "↑" : item.trend === "down" ? "↓" : "→";
+                const color = item.trend === "up"
+                  ? "text-green-600"
+                  : item.trend === "down"
+                    ? "text-red-600"
+                    : "text-zinc-500";
+                return (
+                  <li
+                    key={item.category}
+                    className="flex items-center justify-between rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-800"
+                  >
+                    <span className="flex items-center gap-2">
+                      {item.category}
+                      {fastest ? <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300">Trending</span> : null}
+                    </span>
+                    <details>
+                      <summary className="cursor-pointer list-none text-right">
+                        <span className="font-semibold">{item.count}</span>{" "}
+                        <span className={color} title={`${item.growth >= 0 ? "+" : ""}${item.growth} projects this week`} aria-label={`${item.growth >= 0 ? "+" : ""}${item.growth} projects this week`}>
+                          {arrow}
+                        </span>
+                      </summary>
+                      <div className="mt-2 flex h-8 items-end gap-1" aria-label="Growth chart">
+                        <span className="block w-5 bg-zinc-300" style={{ height: `${Math.max(4, item.previousCount * 4)}px` }} />
+                        <span className="block w-5 bg-blue-500" style={{ height: `${Math.max(4, item.count ? (item.count - item.previousCount) * 4 : 4)}px` }} />
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         </>

@@ -35,3 +35,13 @@ export const TOAST_ERROR_DURATION_MS = 10_000;
 
 /** Lifetime of an admin session token in seconds (15 minutes). */
 export const ADMIN_TOKEN_MAX_AGE_SECONDS = 900;
+
+// ─── Wallet ──────────────────────────────────────────────────────────────────
+
+/**
+ * Interval (ms) at which the wallet is checked for account/network changes.
+ * Used by both the Freighter `WatchWalletChanges` watcher and the polling
+ * fallback. Kept at 5s to minimise CPU usage while still detecting changes
+ * promptly.
+ */
+export const WALLET_POLL_INTERVAL_MS = 5_000;

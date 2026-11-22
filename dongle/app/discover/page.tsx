@@ -11,7 +11,7 @@ import { Search, Filter, X, ArrowUp } from "lucide-react";
 import { useDiscoverParams } from "@/hooks/useDiscoverParams";
 import type { SortBy } from "@/hooks/useDiscoverParams";
 import { TagInput } from "@/components/ui/TagInput";
-import { batchFetchVerificationStatuses } from "@/services/stellar/batch-verification";
+import { useVerificationStatuses } from "@/hooks/useVerificationStatuses";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type ProjectStatus, type VerificationTier } from "@/types/project";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +22,8 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { trackSearch, trackFilter } from "@/lib/analytics";
 import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import { cn } from "@/lib/utils";
+import { SearchAutocomplete } from "@/components/search/SearchAutocomplete";
+import { SavedSearchesMenu } from "@/components/search/SavedSearchesMenu";
 import {
   getHealthHistory,
   getHealthTrend,
@@ -43,7 +45,6 @@ type HealthFilter = "ALL" | "80" | "60" | "40" | "BELOW_40";
 function DiscoverContent() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [verificationStatuses, setVerificationStatuses] = useState<Record<string, VerificationStatus>>({});
   const [verificationFilter, setVerificationFilter] = useState<VerificationStatus | "ALL">("ALL");
   const [verificationTierFilter, setVerificationTierFilter] = useState<VerificationTier | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "ALL">("ALL");
@@ -57,6 +58,28 @@ function DiscoverContent() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   useProjectGridNavigation(gridRef);
 
+  // All project IDs — stable reference (the full discoverable list never
+  // changes shape mid-render, so the hook-call count is stable).
+  const allProjectIds = useMemo(
+    () => projectService.getDiscoverableProjects().map((p) => p.id),
+    [],
+  );
+
+  // Issue #925: SWR-backed, deduplicated, shared with every component that
+  // requests status for the same project IDs.
+  const {
+    statuses: verificationStatuses,
+    isLoading: isVerificationLoading,
+  } = useVerificationStatuses(allProjectIds);
+
+  // isInitialLoading gates the skeleton UI; resolve it once verification
+  // has at least attempted to load (even if some statuses are still missing).
+  useEffect(() => {
+    if (!isVerificationLoading) {
+      setIsInitialLoading(false);
+    }
+  }, [isVerificationLoading]);
+
   const {
     searchInput,
     searchQuery,
@@ -66,38 +89,14 @@ function DiscoverContent() {
     page,
     setSearchInput,
     toggleCategory,
+    setCategories,
     setTags,
     setSortBy,
     loadNextPage,
     clearFilters,
   } = useDiscoverParams();
 
-  // Fetch verification statuses for all projects using batched fetch
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchVerificationStatuses = async () => {
-      const projects = projectService.getDiscoverableProjects();
-      const ids = projects.map((p) => p.id);
-
-      const statuses = await batchFetchVerificationStatuses(
-        ids,
-        controller.signal,
-      );
-
-      if (!controller.signal.aborted) {
-        setVerificationStatuses(statuses);
-        setIsInitialLoading(false);
-      }
-    };
-
-    void fetchVerificationStatuses();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
+  // Milestone data refresh
   useEffect(() => {
     const refreshMilestones = () => {
       const projects = projectService.getDiscoverableProjects();
@@ -286,10 +285,13 @@ function DiscoverContent() {
     setHealthFilter("ALL");
   };
 
+  const featuredSource = useMemo(() => projectService.getDiscoverableProjects(), []);
+
   return (
     <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <PageHeatmapRecorder page="discovery" />
       <div className="container mx-auto px-4">
+        <FeaturedProjectsCarousel projects={featuredSource} />
         {/* Header & Controls */}
         <div className="mb-12">
           <h1 className="text-4xl font-bold tracking-tight mb-4">
@@ -301,31 +303,33 @@ function DiscoverContent() {
           </p>
 
           <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            {/* Search input — value is the unDebounced `searchInput` so it stays responsive */}
-            <div className="flex-1 w-full lg:w-auto relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
-              <input
-                type="search"
-                placeholder="Search projects by name or description..."
-                className={cn(
-                  "w-full pl-12 pr-11 py-3 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20",
-                )}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-              {searchInput && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  aria-label="Clear search"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700/60 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            {/* Search input with autocomplete — value is the unDebounced `searchInput` so it stays responsive */}
+            <SearchAutocomplete
+              value={searchInput}
+              onChange={setSearchInput}
+              onClear={handleClearSearch}
+              placeholder="Search projects by name or description..."
+            />
 
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              <SavedSearchesMenu
+                walletAddress={gate.publicKey || "anonymous"}
+                hasActiveFilters={!!searchQuery || selectedCategories.length > 0 || tags.length > 0}
+                currentFilters={{
+                  query: searchQuery,
+                  categories: selectedCategories,
+                  tags,
+                  verification: verificationFilter,
+                  sortBy: sortBy as "rating" | "newest" | "popular",
+                }}
+                onApply={(f) => {
+                  setSearchInput(f.query ?? "");
+                  setCategories(f.categories ?? []);
+                  setTags(f.tags ?? []);
+                  if (f.sortBy) setSortBy(f.sortBy as SortBy);
+                  setVerificationFilter(f.verification ?? "ALL");
+                }}
+              />
               {/* Category filters - multi-select */}
               <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 hide-scrollbar">
                 {categories.map((cat) => {

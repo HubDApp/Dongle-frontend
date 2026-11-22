@@ -160,6 +160,19 @@ describe("axe-core - UI Primitive Components", () => {
     );
   });
 
+  it("TagInput tag chips pass axe checks as a labelled listbox", async () => {
+    const results = await testA11y(
+      <TagInput
+        id="project-tags"
+        label="Tags"
+        tags={["stellar", "defi", "soroban"]}
+        onChange={() => {}}
+      />,
+    );
+
+    expect(results.violations).toEqual([]);
+  });
+
   it("Interactive elements without labels fail axe (negative test)", async () => {
     const { container } = render(
       <div>

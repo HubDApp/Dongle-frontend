@@ -179,7 +179,7 @@ export const pt: Messages = {
       tags: "Adicione algumas palavras-chave (pressione Enter após cada uma) para melhorar a descoberta.",
       description: "Resuma o que o projeto faz em 1–3 frases. Evite linguagem promocional.",
       websiteUrl: "Link da página pública que os usuários devem visitar primeiro.",
-      githubUrl: "Compatível: GitHub, GitLab, Bitbucket. Repositórios públicos são preferidos.",
+      githubUrl: "Compatível: GitHub, GitLab, Bitbucket, Gitea. Repositórios públicos são preferidos.",
       logoUrl: "URL direta da imagem (PNG/SVG/JPG). Logos quadrados funcionam melhor.",
       docsUrl: "Link para documentação, whitepaper ou guia de início.",
       auditReportUrl: "Link para um relatório público de auditoria de segurança, se houver.",
@@ -497,6 +497,13 @@ export const pt: Messages = {
     chartProjects: "Projetos",
     chartReviews: "Avaliações",
     chartVerification: "Taxa de verificação",
+    chartHint:
+      "Passe o cursor ou foque o gráfico e use as setas para inspecionar os pontos. Arraste sobre o gráfico para ampliar.",
+    chartKeyboardHint:
+      "Use as setas para mover entre os pontos, Enter para ver detalhes e Escape para redefinir o zoom.",
+    resetZoom: "Redefinir zoom",
+    exportPng: "Exportar PNG",
+    drilldownTitle: "Dia selecionado",
     reviewsPerWeek: "{count} avaliações/semana",
     formSubmissions: {
       title: "Análise de Envio de Formulários",

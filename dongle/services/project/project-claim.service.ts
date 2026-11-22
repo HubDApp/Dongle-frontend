@@ -44,6 +44,33 @@ function validateClaim(
   return errors;
 }
 
+/**
+ * Best-effort email notification to the claimant after an admin decision.
+ *
+ * Email delivery happens server-side (the recipient address is resolved from
+ * the digest preference store), so this fires a fire-and-forget request to the
+ * claim notification route. Failures are swallowed — in-app notifications and
+ * the audit trail remain the source of truth.
+ */
+function notifyClaimDecision(payload: {
+  recipientAddress: string;
+  projectId: string;
+  projectName: string;
+  decision: "approved" | "rejected";
+  reviewNote?: string;
+}): void {
+  if (typeof window === "undefined") return;
+  try {
+    void fetch("/api/projects/claims/notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch {
+    // ignore network errors — the email notification is best-effort
+  }
+}
+
 export const projectClaimService = {
   getRequests(): ProjectClaimRequest[] {
     if (typeof window === "undefined") return [];
@@ -220,6 +247,7 @@ export const projectClaimService = {
    * 1. Transfer ownership via projectOwnerService.
    * 2. Write `claim_approved` + `ownership_transferred` audit log entries.
    * 3. Send a `claim_approved` notification to the claimant.
+   * 4. Send a best-effort approval email to the claimant.
    */
   approveRequest(
     requestId: string,
@@ -293,6 +321,15 @@ export const projectClaimService = {
       projectName,
     });
 
+    // 5. Email notification to the claimant (best-effort)
+    notifyClaimDecision({
+      recipientAddress: claimRequest.requestedBy,
+      projectId: claimRequest.projectId,
+      projectName,
+      decision: "approved",
+      reviewNote: trimmedNote,
+    });
+
     return { success: true };
   },
 
@@ -300,6 +337,7 @@ export const projectClaimService = {
    * Reject a pending claim request, then:
    * 1. Write a `claim_rejected` audit log entry.
    * 2. Send a `claim_rejected` notification to the claimant with the reason.
+   * 3. Send a best-effort rejection email to the claimant.
    */
   rejectRequest(
     requestId: string,
@@ -352,6 +390,15 @@ export const projectClaimService = {
       claimRequestId: requestId,
       projectId: claimRequest.projectId,
       projectName,
+    });
+
+    // 3. Email notification to the claimant (best-effort)
+    notifyClaimDecision({
+      recipientAddress: claimRequest.requestedBy,
+      projectId: claimRequest.projectId,
+      projectName,
+      decision: "rejected",
+      reviewNote: trimmedNote,
     });
 
     return { success: true };

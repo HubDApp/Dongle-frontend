@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import AdminSessionTimer from "./AdminSessionTimer";
 import { BarChart3, ClipboardList, History, Bell, LayoutDashboard } from "lucide-react";
 
 const LINKS = [
@@ -33,6 +34,7 @@ export default function AdminNav() {
           </Link>
         );
       })}
+      <AdminSessionTimer />
     </nav>
   );
 }

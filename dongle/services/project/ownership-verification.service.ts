@@ -199,7 +199,7 @@ async function checkGitHub(record: OwnershipVerification): Promise<boolean> {
   const metadata = await response.json() as { default_branch?: string };
   if (!metadata.default_branch) throw new Error("GitHub did not report a default branch.");
   const encodedBranch = metadata.default_branch.split("/").map(encodeURIComponent).join("/");
-  const path = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodedBranch}/dongle-verify.txt`;
+  const path = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodedBranch}/.well-known/dongle-verify.txt`;
   return isTokenPresent(await fetchText(path), record.token);
 }
 

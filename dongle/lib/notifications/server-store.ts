@@ -15,6 +15,10 @@ import {
   type NotificationStreamEvent,
   type NotificationType,
 } from "@/types/notification";
+import {
+  isNotificationEnabled,
+  resetNotificationPreferencesForTests,
+} from "./preferences-store";
 
 type Listener = (event: NotificationStreamEvent) => void;
 
@@ -48,6 +52,9 @@ export function publishNotificationEvent(
     return null;
   }
   if (!isKnownNotificationType(input.type)) {
+    return null;
+  }
+  if (!isNotificationEnabled(input.recipientId, input.type)) {
     return null;
   }
   if (!rememberEventId(input.recipientId, input.id)) {
@@ -148,4 +155,5 @@ export function resetNotificationBusForTests(): void {
   history.clear();
   listeners.clear();
   seenEventIds.clear();
+  resetNotificationPreferencesForTests();
 }

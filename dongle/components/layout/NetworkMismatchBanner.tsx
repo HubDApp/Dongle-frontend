@@ -26,11 +26,11 @@ export default function NetworkMismatchBanner() {
         />
         <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
           <span className="font-semibold">Wrong network detected.</span>{" "}
-          Your Freighter wallet is currently on{" "}
+          Your wallet is currently on{" "}
           <span className="font-mono font-semibold">{walletNetworkLabel}</span>.
           This app requires{" "}
           <span className="font-mono font-semibold">{EXPECTED_NETWORK_LABEL}</span>.
-          {" "}Open Freighter, go to Settings → Network, and switch to{" "}
+          {" "}Switch your wallet to{" "}
           <span className="font-semibold">{EXPECTED_NETWORK_LABEL}</span>{" "}
           before submitting any transactions.
         </p>

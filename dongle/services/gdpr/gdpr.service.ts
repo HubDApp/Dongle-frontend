@@ -28,6 +28,8 @@ export interface DataExportResult {
   backupCount: number;
   archiveCount: number;
   consentRecords: ConsentRecord[];
+  attributionIncluded?: boolean;
+  walletAddress?: string;
 }
 
 export interface DataDeletionResult {
@@ -192,6 +194,7 @@ class GDPRService {
     formId: string,
     userId: string,
     formData?: Record<string, unknown>,
+    includeOwnAttribution = false,
   ): DataExportResult {
     const exportResult: DataExportResult = {
       exportedAt: new Date().toISOString(),
@@ -202,7 +205,12 @@ class GDPRService {
       backupCount: 0,
       archiveCount: 0,
       consentRecords: this.getConsentRecords(formType, formId, userId),
+      attributionIncluded: includeOwnAttribution,
+      ...(includeOwnAttribution ? { walletAddress: userId } : {}),
     };
+    if (includeOwnAttribution && formData) {
+      exportResult.data = [{ ...formData, walletAddress: userId }];
+    }
 
     // Include backups if available
     try {
@@ -211,7 +219,9 @@ class GDPRService {
       if (raw) {
         const backups = JSON.parse(raw) as Record<string, unknown>[];
         exportResult.backupCount = backups.length;
-        exportResult.data.push(...backups.map((b) => b.data));
+        exportResult.data.push(...backups.map((b) =>
+          includeOwnAttribution ? { ...(b.data as Record<string, unknown>), walletAddress: userId } : b.data
+        ));
       }
     } catch {
       // ignore
@@ -224,7 +234,9 @@ class GDPRService {
       if (raw) {
         const archives = JSON.parse(raw) as Record<string, unknown>[];
         exportResult.archiveCount = archives.length;
-        exportResult.data.push(...archives.map((a) => a.data));
+        exportResult.data.push(...archives.map((a) =>
+          includeOwnAttribution ? { ...(a.data as Record<string, unknown>), walletAddress: userId } : a.data
+        ));
       }
     } catch {
       // ignore

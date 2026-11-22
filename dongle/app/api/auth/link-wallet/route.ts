@@ -4,7 +4,7 @@ import {
   getSession,
   setSessionCookie,
 } from "@/lib/auth/session";
-import { getUser, linkWallet } from "@/lib/auth/users";
+import { getUser, linkWallet, recordAuthAudit } from "@/lib/auth/users";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const token = await createSessionToken(user);
+  recordAuthAudit({ userId: user.id, action: "wallet_link", detail: body.walletAddress });
+  const token = await createSessionToken(user, session.sessionId);
   await setSessionCookie(token);
   return NextResponse.json({ user });
 }

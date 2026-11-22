@@ -27,12 +27,7 @@ export default defineConfig({
       include: [
         "lib/**/*.ts",
         "hooks/**/*.ts",
-        // Primitive UI components covered by __tests__/components/ui-primitives.test.tsx
-        "components/ui/Badge.tsx",
-        "components/ui/Card.tsx",
-        "components/ui/IconButton.tsx",
-        "components/ui/Button.tsx",
-        "components/ui/Input.tsx",
+        "utils/repository.util.ts",
       ],
       thresholds: {
         lines: 80,

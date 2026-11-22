@@ -5,6 +5,7 @@ import {
   getListenerHeartbeat,
   sorobanQueueDepth,
 } from "@/services/indexer/event-queue.service";
+import { getConsecutiveRpcFailures } from "@/lib/analytics-dashboard/soroban";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,8 +36,11 @@ export async function GET() {
     }
   }
 
+  const consecutiveRpcFailures = getConsecutiveRpcFailures();
+  const circuitOpen = consecutiveRpcFailures >= 10;
+
   const workerActive = heartbeat > 0 && Date.now() - heartbeat < 30_000;
-  const healthy = Boolean(rpcUrl && contractId && redisAvailable && latestLedger !== null && workerActive);
+  const healthy = Boolean(rpcUrl && contractId && redisAvailable && latestLedger !== null && workerActive && !circuitOpen);
   return NextResponse.json({
     status: healthy ? "healthy" : "degraded",
     redisConfigured: redisAvailable,
@@ -46,6 +50,10 @@ export async function GET() {
     latestLedger,
     lagLedgers: latestLedger === null ? null : Math.max(0, latestLedger - checkpoint),
     queueDepth,
+    rpcCircuitBreaker: {
+      open: circuitOpen,
+      consecutiveFailures: consecutiveRpcFailures,
+    },
     checkedAt: new Date().toISOString(),
   }, { status: healthy ? 200 : 503 });
 }

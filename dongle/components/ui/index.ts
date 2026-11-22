@@ -51,3 +51,5 @@ export type { FormConflictResolutionProps, FormVersion } from "./FormConflictRes
 export { ConditionalField } from "./ConditionalField";
 export { FieldSuggestions } from "./FieldSuggestions";
 export { ThemeToggle } from "./ThemeToggle";
+export { LazyImage } from "./LazyImage";
+export type { LazyImageProps } from "./LazyImage";

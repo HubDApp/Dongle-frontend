@@ -13,6 +13,9 @@ import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import { AuthProvider } from "@/context/auth.context";
 import { NotificationProvider } from "@/context/notification.context";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { SWRProvider } from "@/providers/SWRProvider";
+import { ContractHealthBanner } from "@/components/layout/ContractHealthBanner";
+import { PendingTransactionWatcher } from "@/components/notifications/PendingTransactionWatcher";
 import { TwoFAProvider } from "@/context/twofa.context";
 import { SyncProvider } from "@/context/sync.context";
 
@@ -74,8 +77,8 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider defaultTheme="system" storageKey="dongle-theme">
-          <WalletProvider>
-            <SyncProvider>
+          <SWRProvider>
+            <WalletProvider>
               <LocaleProvider>
                 <AuthProvider>
                   <NotificationProvider>
@@ -83,6 +86,8 @@ export default async function RootLayout({
                       <ComparisonProvider>
                         <AnalyticsRoot>
                           <TwoFAProvider>
+                            <ContractHealthBanner />
+                            <PendingTransactionWatcher />
                             <LayoutWrapper>{children}</LayoutWrapper>
                           </TwoFAProvider>
                         </AnalyticsRoot>
@@ -91,10 +96,10 @@ export default async function RootLayout({
                   </NotificationProvider>
                 </AuthProvider>
               </LocaleProvider>
-            </SyncProvider>
-          </WalletProvider>
-          <Toaster position="top-right" richColors />
-          <StorageBootstrap />
+            </WalletProvider>
+            <Toaster position="top-right" richColors />
+            <StorageBootstrap />
+          </SWRProvider>
         </ThemeProvider>
       </body>
     </html>

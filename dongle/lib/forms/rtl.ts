@@ -1,10 +1,18 @@
 /**
  * Form-level right-to-left layout helpers (Issue #546).
+ *
+ * Built on the app-wide RTL helpers in `@/lib/i18n/rtl` so direction,
+ * icon mirroring and the Tailwind `rtl:` variant stay consistent everywhere.
  */
 
-import { getDocumentDirection, isRtlLocale } from "@/lib/i18n/locales";
+import {
+  getDirection,
+  mirrorIconClass,
+  shouldMirrorIcon,
+  type TextDirection,
+} from "@/lib/i18n/rtl";
 
-export type FormTextDirection = "ltr" | "rtl";
+export type FormTextDirection = TextDirection;
 
 export interface FormRtlOptions {
   /** Explicit direction override. */
@@ -16,12 +24,7 @@ export interface FormRtlOptions {
 /** Resolve the text direction for a form surface. */
 export function resolveFormDirection(options: FormRtlOptions = {}): FormTextDirection {
   if (options.dir) return options.dir;
-  if (options.locale) return getDocumentDirection(options.locale);
-  if (typeof document !== "undefined") {
-    const htmlDir = document.documentElement.getAttribute("dir");
-    if (htmlDir === "rtl" || htmlDir === "ltr") return htmlDir;
-  }
-  return "ltr";
+  return getDirection(options.locale);
 }
 
 export function isFormRtl(options: FormRtlOptions = {}): boolean {
@@ -51,41 +54,6 @@ export function formRtlClasses(dir: FormTextDirection): {
   };
 }
 
-/**
- * Icons that convey direction (chevrons, arrows) should be mirrored in RTL.
- * Decorative / symmetric icons should not.
- */
-const MIRROR_ICON_NAMES = new Set([
-  "chevron-left",
-  "chevron-right",
-  "arrow-left",
-  "arrow-right",
-  "caret-left",
-  "caret-right",
-  "corner-down-left",
-  "corner-down-right",
-  "reply",
-  "forward",
-  "log-out",
-  "log-in",
-  "external-link",
-]);
-
-export function shouldMirrorIcon(
-  name: string | undefined | null,
-  dir: FormTextDirection,
-): boolean {
-  if (dir !== "rtl" || !name) return false;
-  return MIRROR_ICON_NAMES.has(name.toLowerCase());
-}
-
-export function mirrorIconClass(
-  name: string | undefined | null,
-  dir: FormTextDirection,
-): string {
-  return shouldMirrorIcon(name, dir) ? "rtl:-scale-x-100" : "";
-}
-
 /** Inline style bag for a form root element. */
 export function formDirectionProps(options: FormRtlOptions = {}): {
   dir: FormTextDirection;
@@ -100,4 +68,5 @@ export function formDirectionProps(options: FormRtlOptions = {}): {
   };
 }
 
-export { isRtlLocale, getDocumentDirection };
+export { shouldMirrorIcon, mirrorIconClass };
+export { isRtlLocale, getDocumentDirection } from "@/lib/i18n/rtl";
