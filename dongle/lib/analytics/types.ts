@@ -9,6 +9,7 @@ export type AnalyticsEventName =
   | "wallet_connect"
   | "wallet_disconnect"
   | "wallet_connect_failed"
+  | "profile_sync"
   | "project_view"
   | "search"
   | "filter"
