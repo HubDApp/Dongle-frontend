@@ -9,6 +9,9 @@ export interface WalletTransaction {
   createdAt: string;
   type: string;
   sourceAccount: string;
+  status: "success" | "failed";
+  memo: string;
+  amount: string;
 }
 
 interface UseWalletTransactionsReturn {
@@ -24,6 +27,9 @@ function mapHorizonTransaction(record: {
   created_at: string;
   type?: string;
   source_account?: string;
+  successful?: boolean;
+  memo?: string;
+  fee_charged?: string | number;
 }): WalletTransaction {
   return {
     id: record.id,
@@ -31,6 +37,10 @@ function mapHorizonTransaction(record: {
     createdAt: record.created_at,
     type: record.type ?? "unknown",
     sourceAccount: record.source_account ?? "",
+    status: record.successful === false ? "failed" : "success",
+    memo: record.memo ?? "",
+    // Horizon transaction records carry the fee charged (stroops), not payment amounts.
+    amount: record.fee_charged != null ? String(record.fee_charged) : "",
   };
 }
 

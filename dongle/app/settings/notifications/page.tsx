@@ -3,6 +3,7 @@
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { DigestPreferences } from "@/components/notifications/DigestPreferences";
 import { NotificationPreferencesComponent } from "@/components/notifications/NotificationPreferences";
+import { TransactionNotificationSettings } from "@/components/notifications/TransactionNotificationSettings";
 import { useAuth } from "@/context/auth.context";
 import { useWallet } from "@/context/wallet.context";
 import { Bell } from "lucide-react";
@@ -26,6 +27,7 @@ export default function NotificationSettingsPage() {
               digests.
             </p>
           </header>
+          <TransactionNotificationSettings />
           <NotificationPreferencesComponent userId={userId} />
           <div className="mt-6">
             <DigestPreferences defaultEmail={user?.email ?? ""} />
