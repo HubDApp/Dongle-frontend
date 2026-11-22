@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import WalletGate from "@/components/wallet/WalletGate";
 import {
@@ -66,6 +66,12 @@ export default function AnalyticsDashboard() {
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
   const [showCustomDatePicker, setShowCustomDatePicker] = useState(false);
+  const [liveEnabled, setLiveEnabled] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<"connected" | "reconnecting" | "cached">("cached");
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState({ activeUsers: 0, projectsToday: 0, reviewsHour: 0 });
+  const [, setLiveClock] = useState(0);
+  const reconnectAttempt = useRef(0);
 
   // Fetch analytics data
   useEffect(() => {
@@ -99,6 +105,67 @@ export default function AnalyticsDashboard() {
 
     void fetchData();
   }, [isAdmin, range, category, status]);
+
+  useEffect(() => {
+    if (!isAdmin || !liveEnabled) {
+      setLiveStatus("cached");
+      return;
+    }
+
+    const url = process.env.NEXT_PUBLIC_ANALYTICS_WS_URL;
+    if (!url) {
+      setLiveStatus("cached");
+      return;
+    }
+
+    let socket: WebSocket | null = null;
+    let retryTimer: number | null = null;
+    let stopped = false;
+
+    const connect = () => {
+      if (stopped) return;
+      setLiveStatus(reconnectAttempt.current ? "reconnecting" : "connected");
+      socket = new WebSocket(url);
+      socket.onopen = () => {
+        reconnectAttempt.current = 0;
+        setLiveStatus("connected");
+      };
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as Partial<typeof liveMetrics>;
+          setLiveMetrics((current) => ({
+            activeUsers: payload.activeUsers ?? current.activeUsers,
+            projectsToday: payload.projectsToday ?? current.projectsToday,
+            reviewsHour: payload.reviewsHour ?? current.reviewsHour,
+          }));
+          setLastUpdated(Date.now());
+        } catch {
+          // Ignore malformed live payloads and retain the cached dashboard.
+        }
+      };
+      socket.onerror = () => socket?.close();
+      socket.onclose = () => {
+        if (stopped) return;
+        setLiveStatus("reconnecting");
+        const delay = Math.min(30000, 1000 * (2 ** reconnectAttempt.current));
+        reconnectAttempt.current += 1;
+        retryTimer = window.setTimeout(connect, delay);
+      };
+    };
+
+    connect();
+    return () => {
+      stopped = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      socket?.close();
+    };
+  }, [isAdmin, liveEnabled]);
+
+  useEffect(() => {
+    if (!liveEnabled) return;
+    const timer = window.setInterval(() => setLiveClock((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [liveEnabled]);
 
   // Export data as CSV
   const handleExportCSV = () => {
@@ -196,9 +263,22 @@ export default function AnalyticsDashboard() {
           <p className="text-zinc-500 dark:text-zinc-400 mt-1">
             Track user engagement, project views, and review statistics
           </p>
+          {liveEnabled ? (
+            <p className="mt-1 text-xs text-zinc-500">
+              {liveStatus === "connected" ? "Live" : liveStatus === "reconnecting" ? "Reconnecting..." : "Cached"} ·
+              {" "}Last updated: {lastUpdated ? `${Math.max(0, Math.floor((Date.now() - lastUpdated) / 1000))} seconds ago` : "waiting"}
+            </p>
+          ) : null}
         </div>
-
         <div className="flex gap-2">
+          <label className="flex items-center gap-2 rounded-md border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">
+            <input
+              type="checkbox"
+              checked={liveEnabled}
+              onChange={(event) => setLiveEnabled(event.target.checked)}
+            />
+            Real-time
+          </label>
           <Button
             onClick={handleExportCSV}
             disabled={!data}
@@ -308,6 +388,20 @@ export default function AnalyticsDashboard() {
       {/* Summary Cards */}
       {data && !loading && (
         <>
+          {liveEnabled && (
+            <div className="grid grid-cols-1 gap-6 mb-6 md:grid-cols-3" aria-live="polite">
+              {([
+                ["Active users", liveMetrics.activeUsers],
+                ["Projects submitted today", liveMetrics.projectsToday],
+                ["Reviews in last hour", liveMetrics.reviewsHour],
+              ] as const).map(([label, value]) => (
+                <Card key={label} className="p-6 transition-all">
+                  <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</h3>
+                  <p key={value} className="mt-2 text-3xl font-bold animate-pulse">{value}</p>
+                </Card>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             <Card className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -435,14 +529,38 @@ export default function AnalyticsDashboard() {
                   No projects in this category
                 </p>
               ) : (
-                <BarChart
-                  data={data.categories.map((cat) => ({
-                    label: cat.category,
-                    value: cat.count,
-                  }))}
-                  horizontal
-                  height={300}
-                />
+                <>
+                  <BarChart
+                    data={data.categories.map((cat) => ({
+                      label: cat.category,
+                      value: cat.count,
+                    }))}
+                    horizontal
+                    height={300}
+                  />
+                  <div className="mt-4 space-y-2">
+                  {data.categories.map((cat) => {
+                    const arrow = cat.trend === "up" ? "↑" : cat.trend === "down" ? "↓" : "→";
+                    const color = cat.trend === "up" ? "text-green-600" : cat.trend === "down" ? "text-red-600" : "text-zinc-500";
+                    const fastest = data.categories.reduce((best, candidate) => candidate.growth > best.growth ? candidate : best, data.categories[0])?.category === cat.category && cat.growth > 0;
+                    return (
+                      <div key={cat.category} className="flex items-center justify-between text-sm">
+                        <span>{cat.category}{fastest ? <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">Trending</span> : null}</span>
+                        <details>
+                          <summary className="cursor-pointer list-none">
+                            <span className="font-semibold">{cat.count}</span>{" "}
+                            <span className={color} title={`${cat.growth >= 0 ? "+" : ""}${cat.growth} projects this week`}>{arrow}</span>
+                          </summary>
+                          <div className="mt-1 flex h-8 items-end gap-1">
+                            <span className="block w-5 bg-zinc-300" style={{ height: `${Math.max(4, cat.previousCount * 4)}px` }} />
+                            <span className="block w-5 bg-blue-500" style={{ height: `${Math.max(4, cat.growth * 4)}px` }} />
+                          </div>
+                        </details>
+                      </div>
+                    );
+                  })}
+                </div>
+                </>
               )}
             </Card>
           </div>
