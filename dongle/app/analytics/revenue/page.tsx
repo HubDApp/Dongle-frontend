@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { BarChart, LineChart } from "@/components/analytics";
 import { downloadCsv } from "@/lib/analytics-dashboard/csv";
+import { formatCurrency } from "@/lib/i18n/format";
 import {
   buildSampleFees,
   computeRevenue,
@@ -22,10 +23,6 @@ import { AlertCircle, Coins, Download, TrendingUp, Wallet } from "lucide-react";
 
 const ADMIN_PURPOSE =
   "Connect an authorized admin Freighter wallet to view revenue analytics.";
-
-function formatUsd(value: number): string {
-  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-}
 
 export default function RevenuePage() {
   const { isAdmin, gate } = useAdminAccess();
@@ -100,25 +97,25 @@ export default function RevenuePage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <Card className="p-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Total revenue</p>
-          <p className="text-3xl font-bold">{report.totalXlm.toLocaleString()} XLM</p>
-          <p className="text-sm text-zinc-500 mt-1">{formatUsd(report.totalUsd)}</p>
+          <p className="text-3xl font-bold">{formatCurrency(report.totalXlm, "XLM")}</p>
+          <p className="text-sm text-zinc-500 mt-1">{formatCurrency(report.totalUsd, "USD")}</p>
         </Card>
         <Card className="p-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Avg transaction</p>
-          <p className="text-3xl font-bold">{report.averageTransactionXlm.toFixed(1)} XLM</p>
+          <p className="text-3xl font-bold">{formatCurrency(report.averageTransactionXlm, "XLM")}</p>
           <p className="text-sm text-zinc-500 mt-1">
-            {formatUsd(report.averageTransactionUsd)}
+            {formatCurrency(report.averageTransactionUsd, "USD")}
           </p>
         </Card>
         <Card className="p-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Monthly recurring</p>
-          <p className="text-3xl font-bold">{formatUsd(report.monthlyRecurringUsd)}</p>
+          <p className="text-3xl font-bold">{formatCurrency(report.monthlyRecurringUsd, "USD")}</p>
           <p className="text-sm text-zinc-500 mt-1">Current month (MRR)</p>
         </Card>
         <Card className="p-6">
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Next 3 months</p>
           <p className="text-3xl font-bold">
-            {formatUsd(report.forecast.reduce((sum, p) => sum + p.usd, 0))}
+            {formatCurrency(report.forecast.reduce((sum, p) => sum + p.usd, 0), "USD")}
           </p>
           <p className="text-sm text-zinc-500 mt-1 flex items-center gap-1">
             <TrendingUp className="w-4 h-4" /> projected
@@ -133,7 +130,7 @@ export default function RevenuePage() {
             data={report.byTier.map((tier) => ({ label: tier.tier, value: tier.xlm }))}
             horizontal
             height={220}
-            formatValue={(v) => `${v.toFixed(0)} XLM`}
+            formatValue={(v) => formatCurrency(v, "XLM", { compact: true })}
           />
           <table className="w-full mt-4 text-left text-sm">
             <thead>
@@ -151,8 +148,8 @@ export default function RevenuePage() {
                     <Badge variant="outline">{tier.tier}</Badge>
                   </td>
                   <td className="py-2 text-right font-mono">{tier.count}</td>
-                  <td className="py-2 text-right font-mono">{tier.xlm.toLocaleString()}</td>
-                  <td className="py-2 text-right font-mono">{formatUsd(tier.usd)}</td>
+                  <td className="py-2 text-right font-mono">{formatCurrency(tier.xlm, "XLM")}</td>
+                  <td className="py-2 text-right font-mono">{formatCurrency(tier.usd, "USD")}</td>
                 </tr>
               ))}
             </tbody>
@@ -165,7 +162,7 @@ export default function RevenuePage() {
             data={report.monthly.map((point) => ({ label: point.month, value: point.xlm }))}
             color="#f59e0b"
             height={220}
-            formatValue={(v) => `${v.toFixed(0)}`}
+            formatValue={(v) => formatCurrency(v, "XLM", { compact: true })}
           />
           <h3 className="text-sm font-medium mt-6 mb-2">Forecast (next 3 months)</h3>
           <ul className="space-y-1 text-sm">
@@ -173,7 +170,7 @@ export default function RevenuePage() {
               <li key={point.month} className="flex items-center justify-between">
                 <span className="text-zinc-500">{point.month}</span>
                 <span className="font-mono">
-                  {point.xlm.toFixed(1)} XLM · {formatUsd(point.usd)}
+                  {formatCurrency(point.xlm, "XLM")} · {formatCurrency(point.usd, "USD")}
                 </span>
               </li>
             ))}
