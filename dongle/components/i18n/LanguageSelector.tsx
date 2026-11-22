@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, Globe } from "lucide-react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useLocale } from "@/lib/i18n/LocaleProvider";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { SUPPORTED_LOCALES, type LocaleCode } from "@/lib/i18n/locales";
 import { Flag } from "./Flag";
 
@@ -22,7 +23,12 @@ export default function LanguageSelector() {
   const { setLocale } = useLocale();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLUListElement>(null);
   const listId = useId();
+
+  // Trap focus inside the open listbox so Tab / Shift+Tab cycle through the
+  // options and Escape closes it, returning focus to the trigger button.
+  useModalFocusTrap(open, panelRef, undefined, () => setOpen(false));
 
   useEffect(() => {
     if (!open) return;
@@ -32,14 +38,9 @@ export default function LanguageSelector() {
         setOpen(false);
       }
     };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
     document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
@@ -63,6 +64,7 @@ export default function LanguageSelector() {
       {open && (
         <ul
           id={listId}
+          ref={panelRef}
           role="listbox"
           aria-label={t("language.label")}
           className="absolute end-0 z-50 mt-2 min-w-[10rem] overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
