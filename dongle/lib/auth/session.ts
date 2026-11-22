@@ -20,6 +20,8 @@ export interface AppUser {
   avatarUrl?: string;
   walletAddress?: string;
   createdAt: string;
+  /** ISO time the profile was last synced from the OAuth provider. */
+  lastSyncedAt?: string;
 }
 
 export interface SessionPayload {

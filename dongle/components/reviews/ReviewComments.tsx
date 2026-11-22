@@ -12,7 +12,8 @@
  *  - Soft-delete (author only)
  *  - "Load more replies" for long threads
  *  - Real-time new-comment notifications via SSE
- *  - Markdown rendering (DOMPurify-sanitised on the server; raw text rendered here)
+ *  - Markdown rendering (DOMPurify-sanitised server-side; also lazy-sanitised
+ *    client-side via useDOMPurify for defense-in-depth — Issue #924)
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -21,6 +22,7 @@ import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { ReviewComment } from "@/types/review-comment";
 import { MAX_COMMENT_DEPTH, COMMENT_EDIT_WINDOW_MS } from "@/types/review-comment";
+import { useDOMPurify, RICH_TEXT_CONFIG } from "@/hooks/useDOMPurify";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -181,6 +183,8 @@ interface CommentNodeProps {
   onReplyPosted: (reply: ReviewComment) => void;
   onCommentUpdated: (updated: ReviewComment) => void;
   onCommentDeleted: (id: string) => void;
+  /** Sanitizer from useDOMPurify — passed down to avoid per-node imports. */
+  sanitize: (dirty: string, config?: import("dompurify").Config) => string;
 }
 
 function CommentNode({
@@ -190,6 +194,7 @@ function CommentNode({
   onReplyPosted,
   onCommentUpdated,
   onCommentDeleted,
+  sanitize,
 }: CommentNodeProps) {
   const [isReplying, setIsReplying] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -239,6 +244,7 @@ function CommentNode({
                 onReplyPosted={onReplyPosted}
                 onCommentUpdated={onCommentUpdated}
                 onCommentDeleted={onCommentDeleted}
+                sanitize={sanitize}
               />
             ))}
           </div>
@@ -282,9 +288,12 @@ function CommentNode({
           autoFocus
         />
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap break-words">
-          {comment.body}
-        </p>
+        <p
+          className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap break-words"
+          dangerouslySetInnerHTML={{
+            __html: sanitize(comment.body, RICH_TEXT_CONFIG) || comment.body,
+          }}
+        />
       )}
 
       {/* Actions */}
@@ -348,6 +357,7 @@ function CommentNode({
               onReplyPosted={onReplyPosted}
               onCommentUpdated={onCommentUpdated}
               onCommentDeleted={onCommentDeleted}
+              sanitize={sanitize}
             />
           ))}
           {hiddenCount > 0 && (
@@ -385,6 +395,9 @@ export function ReviewComments({ reviewId, currentUserAddress, className }: Revi
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Lazy-load DOMPurify only for this page — Issue #924
+  const { sanitize } = useDOMPurify();
 
   // ── Initial load ──
   useEffect(() => {
@@ -573,6 +586,7 @@ export function ReviewComments({ reviewId, currentUserAddress, className }: Revi
                   onReplyPosted={handleReplyPosted}
                   onCommentUpdated={handleCommentUpdated}
                   onCommentDeleted={handleCommentDeleted}
+                  sanitize={sanitize}
                 />
               ))}
               {hasMore && (

@@ -15,7 +15,13 @@ import { formatDate } from "@/lib/date";
 import { IconButton } from "@/components/ui/IconButton";
 import { ENCRYPTED_COMMENT_SENTINEL } from "@/lib/review-encryption";
 import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
-import { LazyImage } from "@/components/ui/LazyImage";
+import {
+  helpfulVoteCount,
+  unhelpfulVoteCount,
+  helpfulnessScore,
+  hasVotedHelpful,
+  hasVotedUnhelpful,
+} from "@/lib/review-votes";
 
 export interface ReviewCardProps {
   review: Review;
@@ -55,50 +61,12 @@ export function ReviewCard({
         negative: { emoji: "😞", label: "Negative" },
       }[review.sentiment]
     : null;
-
-  const handleCloseLightbox = useCallback(() => {
-    setLightboxUrl(null);
-  }, []);
-
-  const handleVoteHelpful = useCallback(() => {
-    onVoteHelpful?.(review.id);
-  }, [onVoteHelpful, review.id]);
-
-  const handleVoteUnhelpful = useCallback(() => {
-    onVoteUnhelpful?.(review.id);
-  }, [onVoteUnhelpful, review.id]);
-
-  const handleFeature = useCallback(() => {
-    onFeature?.(review.id);
-  }, [onFeature, review.id]);
-
-  const handleUnfeature = useCallback(() => {
-    onUnfeature?.(review.id);
-  }, [onUnfeature, review.id]);
-
-  const handleEdit = useCallback(() => {
-    onEdit?.(review);
-  }, [onEdit, review]);
-
-  const handleDelete = useCallback(() => {
-    onDelete?.(review.id);
-  }, [onDelete, review.id]);
-
-  const handleReport = useCallback(() => {
-    onReport?.(review);
-  }, [onReport, review]);
-
-  const handleRemoveMedia = useCallback(async (cid: string) => {
-    const response = await fetch("/api/reviews", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: review.id, removeMediaCid: cid }),
-    });
-    if (response.ok) {
-      setRemovedMedia((current) => [...current, cid]);
-      onMediaRemoved?.({ ...review, media: review.media?.filter((item) => item.cid !== cid) });
-    }
-  }, [onMediaRemoved, review]);
+  const isReviewAuthor = currentUserAddress === review.userAddress;
+  const votedHelpful = hasVotedHelpful(review, currentUserAddress);
+  const votedUnhelpful = hasVotedUnhelpful(review, currentUserAddress);
+  const helpful = helpfulVoteCount(review);
+  const unhelpful = unhelpfulVoteCount(review);
+  const net = helpfulnessScore(review);
 
   return (
     <div
@@ -205,21 +173,38 @@ export function ReviewCard({
           </div>
           <div className="flex items-center gap-1.5">
             <button
-              onClick={handleVoteHelpful}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
-              aria-label={`Mark as helpful, current count ${review.helpfulVotes?.length || 0}`}
+              onClick={() => onVoteHelpful?.(review.id)}
+              aria-pressed={votedHelpful}
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                votedHelpful
+                  ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-500"
+                  : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
+              }`}
+              aria-label={`Mark as helpful, current count ${helpful}`}
             >
               <ThumbsUp className="w-3 h-3" />
-              <span>{review.helpfulVotes?.length || 0}</span>
+              <span>{helpful}</span>
             </button>
             <button
-              onClick={handleVoteUnhelpful}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
-              aria-label={`Mark as unhelpful, current count ${review.unhelpfulVotes?.length || 0}`}
+              onClick={() => onVoteUnhelpful?.(review.id)}
+              aria-pressed={votedUnhelpful}
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                votedUnhelpful
+                  ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-500"
+                  : "bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-800 dark:text-zinc-400"
+              }`}
+              aria-label={`Mark as unhelpful, current count ${unhelpful}`}
             >
               <ThumbsDown className="w-3 h-3" />
-              <span>{review.unhelpfulVotes?.length || 0}</span>
+              <span>{unhelpful}</span>
             </button>
+            <span
+              className="inline-flex items-center text-xs font-semibold px-2 py-1 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              title="Net helpfulness score (helpful − unhelpful)"
+              aria-label={`Net helpfulness score ${net}`}
+            >
+              Net {net > 0 ? `+${net}` : net}
+            </span>
           </div>
         </div>
 

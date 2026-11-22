@@ -13,6 +13,9 @@ import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import { AuthProvider } from "@/context/auth.context";
 import { NotificationProvider } from "@/context/notification.context";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { SWRProvider } from "@/providers/SWRProvider";
+import { ContractHealthBanner } from "@/components/layout/ContractHealthBanner";
+import { PendingTransactionWatcher } from "@/components/notifications/PendingTransactionWatcher";
 import { TwoFAProvider } from "@/context/twofa.context";
 
 const geistSans = Geist({
@@ -73,25 +76,29 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider defaultTheme="system" storageKey="dongle-theme">
-          <WalletProvider>
-            <LocaleProvider>
-              <AuthProvider>
-                <NotificationProvider>
-                  <ConfirmDialogProvider>
-                    <ComparisonProvider>
-                      <AnalyticsRoot>
-                        <TwoFAProvider>
-                          <LayoutWrapper>{children}</LayoutWrapper>
-                        </TwoFAProvider>
-                      </AnalyticsRoot>
-                    </ComparisonProvider>
-                  </ConfirmDialogProvider>
-                </NotificationProvider>
-              </AuthProvider>
-            </LocaleProvider>
-          </WalletProvider>
-          <Toaster position="top-right" richColors />
-          <StorageBootstrap />
+          <SWRProvider>
+            <WalletProvider>
+              <LocaleProvider>
+                <AuthProvider>
+                  <NotificationProvider>
+                    <ConfirmDialogProvider>
+                      <ComparisonProvider>
+                        <AnalyticsRoot>
+                          <TwoFAProvider>
+                            <ContractHealthBanner />
+                            <PendingTransactionWatcher />
+                            <LayoutWrapper>{children}</LayoutWrapper>
+                          </TwoFAProvider>
+                        </AnalyticsRoot>
+                      </ComparisonProvider>
+                    </ConfirmDialogProvider>
+                  </NotificationProvider>
+                </AuthProvider>
+              </LocaleProvider>
+            </WalletProvider>
+            <Toaster position="top-right" richColors />
+            <StorageBootstrap />
+          </SWRProvider>
         </ThemeProvider>
       </body>
     </html>

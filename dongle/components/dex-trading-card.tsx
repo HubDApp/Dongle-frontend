@@ -6,6 +6,7 @@ import {
   buildTradeLink,
   type DexTradingData,
 } from "@/hooks/useDexTrading";
+import { formatCurrency } from "@/lib/i18n/format";
 import { ArrowRight, Clock, DollarSign, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 
 interface DexTradingCardProps {
@@ -89,8 +90,13 @@ export function DexTradingCard({ tokenCode, tokenIssuer }: DexTradingCardProps) 
           ) : null}
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard title="Current Price" value={data.currentPrice || "—"} unit="XLM" />
+          <MetricCard
+            title="Current Price"
+            value={data.currentPrice ? formatCurrency(Number(data.currentPrice), "XLM") : "—"}
+            unit=""
+          />
           <MetricCard
             title="24h Change"
             value={data.priceChange24h ? `${data.priceChange24h}%` : "—"}
@@ -98,8 +104,16 @@ export function DexTradingCard({ tokenCode, tokenIssuer }: DexTradingCardProps) 
             className={priceColor}
             icon={priceIcon}
           />
-          <MetricCard title="24h Volume" value={data.volume24h || "—"} unit="XLM" />
-          <MetricCard title="Liquidity" value={data.liquidity || "—"} unit="XLM" />
+          <MetricCard
+            title="24h Volume"
+            value={data.volume24h ? formatCurrency(Number(data.volume24h), "XLM", { compact: true }) : "—"}
+            unit=""
+          />
+          <MetricCard
+            title="Liquidity"
+            value={data.liquidity ? formatCurrency(Number(data.liquidity), "XLM", { compact: true }) : "—"}
+            unit=""
+          />
         </div>
 
         <div className="mt-6">
@@ -136,6 +150,7 @@ export function DexTradingCard({ tokenCode, tokenIssuer }: DexTradingCardProps) 
           Source: {data.source === "horizon" ? "Stellar Horizon /trades" : "Fallback (cached)"}{" "}
           • Updated {data.updatedAt} • Data cached for 5 minutes
         </div>
+        </>
       )}
     </section>
   );

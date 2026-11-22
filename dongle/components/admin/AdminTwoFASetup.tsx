@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { toast } from "sonner";
+import { isAbortError } from "@/types/guards";
 
 /** Minimal labelled input to avoid depending on the (currently broken) FormField. */
 function LabeledInput({
@@ -69,19 +70,23 @@ export default function AdminTwoFASetup() {
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [codesCopied, setCodesCopied] = useState(false);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch("/api/admin/2fa");
+      const res = await fetch("/api/admin/2fa", { signal });
+      if (signal?.aborted) return;
       if (res.ok) setStatus(await res.json());
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) return;
       // ignore — unauthenticated users will see the empty state
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadStatus();
+    const controller = new AbortController();
+    void loadStatus(controller.signal);
+    return () => controller.abort();
   }, [loadStatus]);
 
   const isEnabled = status?.enabled ?? false;

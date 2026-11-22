@@ -7,7 +7,7 @@ import {
   setRefreshTokenCookie,
   type OAuthProvider,
 } from "@/lib/auth/session";
-import { upsertOAuthUser } from "@/lib/auth/users";
+import { setProviderToken, upsertOAuthUser } from "@/lib/auth/users";
 import { createDeviceSession } from "@/lib/auth/device-sessions";
 import { extractClientIP } from "@/lib/request-ip";
 
@@ -53,7 +53,9 @@ export async function GET(
       return NextResponse.redirect(new URL("/?oauth_error=missing_profile", origin));
     }
 
-    const user = upsertOAuthUser(profile);
+    const { accessToken, ...profileData } = profile;
+    const user = upsertOAuthUser(profileData);
+    if (accessToken) setProviderToken(user.id, accessToken);
 
     const ip = extractClientIP(request as Parameters<typeof extractClientIP>[0]);
     const ua = request.headers.get("user-agent") ?? "";

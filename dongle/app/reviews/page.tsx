@@ -5,6 +5,7 @@ import { reviewService, isReviewPersistenceApi } from "@/services/review/review.
 import { projectService } from "@/services/project/project.service";
 import { Review, Project as ReviewProject } from "@/types/review";
 import ReviewList from "@/components/reviews/ReviewList";
+import { ReviewPagination } from "@/components/reviews/ReviewPagination";
 import ReviewForm from "@/components/reviews/ReviewForm";
 import { toast } from "sonner";
 import WalletStatePanel, {
@@ -15,6 +16,10 @@ import { AlertTriangle } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { trackReviewSubmit } from "@/lib/analytics";
 import { reviewSearchMatches } from "@/lib/review-language";
+import { useReviewPagination } from "@/hooks/useReviewPagination";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { signMessage } from "@stellar/freighter-api";
+import { applyVote, buildVoteMessage, compareByHelpfulness } from "@/lib/review-votes";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
@@ -34,11 +39,14 @@ export default function ReviewsPage() {
   const [showWalletGate, setShowWalletGate] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
-      const loaded = await reviewService.getReviews();
+      const loaded = await reviewService.getReviews(controller.signal);
+      if (controller.signal.aborted) return;
       setReviews(loaded);
       setIsLoading(false);
     })();
+    return () => controller.abort();
   }, []);
 
   const handleAddReview = (project: ReviewProject) => {
@@ -101,28 +109,82 @@ export default function ReviewsPage() {
     downloadCsv("dongle-reviews.csv", reviewsToCsv(sortedReviews));
   };
 
-  const handleVoteHelpful = useCallback(async (id: string) => {
-    if (!gate.publicKey) {
+  const handleVoteHelpful = async (id: string) => {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteHelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "helpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "helpful") : review)),
+    );
+
+    const result = await reviewService.voteHelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviews());
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
   }, [gate.publicKey]);
 
-  const handleVoteUnhelpful = useCallback(async (id: string) => {
-    if (!gate.publicKey) {
+  const handleVoteUnhelpful = async (id: string) => {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "unhelpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "unhelpful") : review)),
+    );
+
+    const result = await reviewService.voteUnhelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviews());
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
   }, [gate.publicKey]);
@@ -229,14 +291,7 @@ export default function ReviewsPage() {
       case "lowest":
         return list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       case "helpfulness":
-        return list.sort((a, b) => {
-          const votesA = a.helpfulVotes?.length || 0;
-          const votesB = b.helpfulVotes?.length || 0;
-          if (votesA !== votesB) {
-            return votesB - votesA;
-          }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
+        return list.sort(compareByHelpfulness);
       case "recent":
       default:
         return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -262,6 +317,19 @@ export default function ReviewsPage() {
   }, [reviews.length, userFilter, projectFilter, allProjects]);
 
   const topProjects = allProjects.slice(0, 6);
+
+  const pagination = useReviewPagination(sortedReviews);
+
+  // Reset to page 1 whenever the user changes filters or sort order so they
+  // don't land on a now-empty page.
+  const prevFilterKey = `${sortBy}|${projectFilter}|${userFilter}|${reviewSearch}`;
+  const filterKeyRef = { current: prevFilterKey };
+  useEffect(() => {
+    if (filterKeyRef.current !== prevFilterKey) {
+      pagination.goToPage(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, projectFilter, userFilter, reviewSearch]);
 
   const walletBlocked =
     showWalletGate && gate.state !== "ready" && gate.state !== "account-loading";
@@ -357,19 +425,24 @@ export default function ReviewsPage() {
             )}
 
             <div className="grid grid-cols-1 gap-12">
-              <section>
+              <section id="reviews-section">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <span className="w-2 h-8 bg-blue-500 rounded-full" />
                     {sortBy === "helpfulness"
                       ? "Most Helpful Reviews"
                       : sortBy === "highest"
-                        ? "Highest Rated Reviews"
-                        : sortBy === "lowest"
-                          ? "Lowest Rated Reviews"
-                          : sortBy === "oldest"
-                            ? "Oldest Reviews"
-                            : "Recent Activity"}
+                      ? "Highest Rated Reviews"
+                      : sortBy === "lowest"
+                      ? "Lowest Rated Reviews"
+                      : sortBy === "oldest"
+                      ? "Oldest Reviews"
+                      : "Recent Activity"}
+                    {sortedReviews.length > 0 && (
+                      <span className="ml-1 text-sm font-normal text-zinc-400 dark:text-zinc-500">
+                        ({sortedReviews.length})
+                      </span>
+                    )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3 text-sm">
                     <label className="flex items-center gap-2">
@@ -433,8 +506,9 @@ export default function ReviewsPage() {
                 </div>
 
                 <ReviewList
-                  onClearFilters={handleClearFilters}
-                  reviews={sortedReviews}
+                  onClearFilters={() => { setSortBy("recent"); setProjectFilter("all"); setUserFilter("all"); }}
+                  reviews={pagination.visibleReviews}
+                  totalCount={sortedReviews.length}
                   currentUserAddress={gate.publicKey}
                   isAdmin={isAdmin}
                   onEdit={handleEditReview}
@@ -443,6 +517,21 @@ export default function ReviewsPage() {
                   onVoteUnhelpful={handleVoteUnhelpful}
                   emptyMessage={emptyStateMessage}
                   emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
+                />
+
+                <ReviewPagination
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  totalCount={pagination.totalCount}
+                  hasNextPage={pagination.hasNextPage}
+                  hasPrevPage={pagination.hasPrevPage}
+                  isLoadingMore={pagination.isLoadingMore}
+                  mode={pagination.mode}
+                  onNextPage={pagination.goToNextPage}
+                  onPrevPage={pagination.goToPrevPage}
+                  onGoToPage={pagination.goToPage}
+                  onSetMode={pagination.setMode}
+                  sentinelRef={pagination.sentinelRef}
                 />
               </section>
             </div>

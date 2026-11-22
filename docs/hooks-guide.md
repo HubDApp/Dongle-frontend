@@ -108,7 +108,9 @@ export function WalletButton() {
 | `isCorrectNetwork` | Connected **and** passphrase matches env |
 | `connectWallet` / `disconnectWallet` | Actions |
 
-Polls Freighter every 2s while connected for account/network changes.
+Watches Freighter for account/network changes while connected (via its
+`WatchWalletChanges` API, falling back to a 5s poll). Watching is paused while
+the tab is hidden and stops on disconnect.
 
 ---
 

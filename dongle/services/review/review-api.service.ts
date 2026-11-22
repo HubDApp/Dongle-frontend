@@ -16,8 +16,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export const reviewApiService = {
-  async getReviews(): Promise<Review[]> {
-    const response = await fetch(API_BASE);
+  async getReviews(signal?: AbortSignal): Promise<Review[]> {
+    const response = await fetch(API_BASE, { signal });
     const data = await handleResponse<{ success: boolean; data: Review[] }>(response);
     return data.data;
   },
@@ -111,6 +111,33 @@ export const reviewApiService = {
         return { success: false, error: data.error || "Failed to delete review" };
       }
       return { success: true };
+    } catch {
+      return { success: false, error: "Network error. Please try again." };
+    }
+  },
+
+  async vote(
+    id: string,
+    userAddress: string,
+    kind: "helpful" | "unhelpful",
+    signed?: { payload: string; signature: string },
+  ): Promise<{ success: boolean; data?: Review; error?: string }> {
+    try {
+      const body: Record<string, unknown> = { userAddress, kind };
+      if (signed) {
+        body.signedPayload = signed.payload;
+        body.signature = signed.signature;
+      }
+      const response = await fetch(`${API_BASE}/${id}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.data) {
+        return { success: false, error: data.error?.message ?? data.error ?? "Failed to submit vote" };
+      }
+      return { success: true, data: data.data };
     } catch {
       return { success: false, error: "Network error. Please try again." };
     }

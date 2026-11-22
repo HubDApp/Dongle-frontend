@@ -8,6 +8,7 @@ import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import type { VerificationStatus } from "@/components/projects/VerificationBadge";
+import { isAbortError } from "@/types/guards";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "rating", label: "Top Rated" },
@@ -22,6 +23,8 @@ export default function FeaturedProjects() {
 
   // Fetch verification statuses for displayed projects
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchStatuses = async () => {
       if (filtered.length === 0) return;
       
@@ -29,19 +32,22 @@ export default function FeaturedProjects() {
       await Promise.all(
         filtered.map(async (project) => {
           try {
-            const status = await sorobanService.getVerificationStatus(project.id);
+            const status = await sorobanService.getVerificationStatus(project.id, controller.signal);
             statuses[project.id] = status;
           } catch (error) {
+            if (isAbortError(error)) return;
             console.error(`Failed to fetch verification status for ${project.id}:`, error);
             statuses[project.id] = "NONE";
           }
         })
       );
       
+      if (controller.signal.aborted) return;
       setVerificationStatuses(statuses);
     };
 
     void fetchStatuses();
+    return () => controller.abort();
   }, [filtered]);
 
   return (
