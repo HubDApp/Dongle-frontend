@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useComparison } from "@/context/comparison.context";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Star, ExternalLink, GitBranch, FileText, Shield, Bug, X, AlertCircle, History, Link as LinkIcon, Download } from "lucide-react";
@@ -17,6 +17,26 @@ import { toast } from "sonner";
 import { getIpfsGatewayUrls } from "@/lib/ipfs-gateway";
 
 type ExportFormat = "pdf" | "png" | "csv";
+type SortMetric = "default" | "rating" | "reviews" | "stars" | "name";
+
+const SORT_LABELS: Record<SortMetric, string> = {
+  default: "Selection order",
+  rating: "Rating",
+  reviews: "Reviews",
+  stars: "GitHub stars",
+  name: "Name",
+};
+
+/** Index set of the best (max) numeric values; empty when all values are equal. */
+function bestIndexes(values: number[]): Set<number> {
+  const max = Math.max(...values);
+  if (values.every((value) => value === max)) return new Set();
+  return new Set(values.flatMap((value, index) => (value === max ? [index] : [])));
+}
+
+function hasDifferences(values: string[]): boolean {
+  return new Set(values).size > 1;
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -32,6 +52,29 @@ export default function ComparePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
   const [isExporting, setIsExporting] = useState(false);
+  const [sortMetric, setSortMetric] = useState<SortMetric>("default");
+  const pendingUrlIds = useRef<string | null>(searchParams.get("ids"));
+
+  const orderedProjects = useMemo(() => {
+    if (sortMetric === "default") return selectedProjects;
+    return [...selectedProjects].sort((a, b) => {
+      if (sortMetric === "name") return a.name.localeCompare(b.name);
+      if (sortMetric === "stars") return (b.repositoryMetadata?.stars ?? 0) - (a.repositoryMetadata?.stars ?? 0);
+      return b[sortMetric] - a[sortMetric];
+    });
+  }, [selectedProjects, sortMetric]);
+
+  // Keep ?ids= in sync with the current selection so the URL is always shareable.
+  useEffect(() => {
+    const ids = selectedProjects.map((project) => project.id).join(",");
+    if (pendingUrlIds.current !== null) {
+      // Wait until the projects from the incoming URL have been restored.
+      if (ids !== getComparisonProjectIdsFromQuery(pendingUrlIds.current).join(",")) return;
+      pendingUrlIds.current = null;
+    }
+    if (selectedProjects.length < 2 || searchParams.get("ids") === ids) return;
+    router.replace(`/compare?ids=${encodeURIComponent(ids)}`, { scroll: false });
+  }, [selectedProjects, router, searchParams]);
 
   const exportComparison = async () => {
     if (isExporting) return;
@@ -133,7 +176,10 @@ export default function ComparePage() {
   useEffect(() => {
     const idsText = searchParams.get("ids");
     const ids = getComparisonProjectIdsFromQuery(idsText);
-    if (!ids.length) return;
+    if (!ids.length) {
+      pendingUrlIds.current = null;
+      return;
+    }
 
     const nextProjects = ids
       .map((id) => projectService.getProjectById(id))
@@ -141,6 +187,9 @@ export default function ComparePage() {
 
     if (nextProjects.length >= 2) {
       restoreProjects(nextProjects.slice(0, 4));
+      pendingUrlIds.current = nextProjects.slice(0, 4).map((project) => project.id).join(",");
+    } else {
+      pendingUrlIds.current = null;
     }
   }, [searchParams, restoreProjects]);
 
@@ -219,6 +268,14 @@ export default function ComparePage() {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-4xl font-bold">Compare Projects</h1>
             <div className="flex gap-3 flex-wrap">
+              <label className="flex items-center gap-2 text-sm">
+                Sort by
+                <select aria-label="Sort columns by metric" value={sortMetric} onChange={(event) => setSortMetric(event.target.value as SortMetric)} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900">
+                  {(Object.keys(SORT_LABELS) as SortMetric[]).map((metric) => (
+                    <option key={metric} value={metric}>{SORT_LABELS[metric]}</option>
+                  ))}
+                </select>
+              </label>
               <div className="flex items-center gap-2">
                 <select aria-label="Export format" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as ExportFormat)} className="h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900">
                   <option value="csv">CSV</option>
@@ -265,16 +322,16 @@ export default function ComparePage() {
         </div>
 
         {/* Desktop View - Horizontal Scrollable Table */}
-        <div className="hidden md:block overflow-x-auto">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <div className="hidden md:block max-h-[80vh] overflow-auto rounded-3xl">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                  <th className="text-left p-6 font-bold bg-zinc-50 dark:bg-zinc-800/50 sticky left-0 z-10 min-w-[200px]">
+                  <th className="text-left p-6 font-bold bg-zinc-50 dark:bg-zinc-800 sticky left-0 top-0 z-30 min-w-[200px]">
                     Attribute
                   </th>
-                  {selectedProjects.map((project) => (
-                    <th key={project.id} className="p-6 min-w-[250px] relative">
+                  {orderedProjects.map((project) => (
+                    <th key={project.id} className="p-6 min-w-[250px] sticky top-0 z-20 bg-white dark:bg-zinc-900">
                       <button
                         type="button"
                         onClick={() => removeProject(project.id)}
@@ -299,8 +356,9 @@ export default function ComparePage() {
                 {/* Rating */}
                 <ComparisonRow
                   label="Rating"
+                  best={bestIndexes(orderedProjects.map((p) => p.rating))}
                   icon={<Star className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id} className="flex items-center justify-center gap-1">
                       <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                       <span className="font-bold text-lg">{p.rating}</span>
@@ -311,7 +369,8 @@ export default function ComparePage() {
                 {/* Reviews */}
                 <ComparisonRow
                   label="Reviews"
-                  values={selectedProjects.map((p) => (
+                  best={bestIndexes(orderedProjects.map((p) => p.reviews))}
+                  values={orderedProjects.map((p) => (
                     <span key={p.id} className="font-semibold">{p.reviews} reviews</span>
                   ))}
                 />
@@ -319,7 +378,8 @@ export default function ComparePage() {
                 {/* Category */}
                 <ComparisonRow
                   label="Category"
-                  values={selectedProjects.map((p) => (
+                  differs={hasDifferences(orderedProjects.map((p) => p.primaryCategory))}
+                  values={orderedProjects.map((p) => (
                     <span
                       key={p.id}
                       className="inline-block px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-semibold"
@@ -332,8 +392,9 @@ export default function ComparePage() {
                 {/* Verification */}
                 <ComparisonRow
                   label="Verification"
+                  differs={!isLoading && hasDifferences(orderedProjects.map((p) => verificationStatuses[p.id] || "NONE"))}
                   icon={<Shield className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id}>
                       {isLoading ? (
                         <span className="text-zinc-400 text-sm">Loading...</span>
@@ -347,7 +408,8 @@ export default function ComparePage() {
                 {/* Tags */}
                 <ComparisonRow
                   label="Tags"
-                  values={selectedProjects.map((p) => (
+                  differs={hasDifferences(orderedProjects.map((p) => [...(p.tags ?? [])].sort().join(",")))}
+                  values={orderedProjects.map((p) => (
                     <div key={p.id} className="flex flex-wrap gap-2 justify-center">
                       {p.tags && p.tags.length > 0 ? (
                         p.tags.map((tag) => (
@@ -365,10 +427,22 @@ export default function ComparePage() {
                   ))}
                 />
 
+                {/* GitHub stars */}
+                <ComparisonRow
+                  label="GitHub Stars"
+                  icon={<GitBranch className="w-4 h-4" />}
+                  best={bestIndexes(orderedProjects.map((p) => p.repositoryMetadata?.stars ?? 0))}
+                  values={orderedProjects.map((p) => (
+                    <span key={p.id} className="font-semibold">
+                      {p.repositoryMetadata?.stars != null ? p.repositoryMetadata.stars.toLocaleString() : <span className="text-zinc-400 text-sm">N/A</span>}
+                    </span>
+                  ))}
+                />
+
                 {/* Description */}
                 <ComparisonRow
                   label="Description"
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <p key={p.id} className="text-sm text-zinc-600 dark:text-zinc-400">
                       {p.description}
                     </p>
@@ -379,7 +453,7 @@ export default function ComparePage() {
                 <ComparisonRow
                   label="Website"
                   icon={<ExternalLink className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id}>
                       {p.websiteUrl ? (
                         <CompareExternalLink
@@ -401,7 +475,7 @@ export default function ComparePage() {
                 <ComparisonRow
                   label="GitHub"
                   icon={<GitBranch className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id}>
                       {p.githubUrl ? (
                         <CompareExternalLink
@@ -423,7 +497,7 @@ export default function ComparePage() {
                 <ComparisonRow
                   label="Documentation"
                   icon={<FileText className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id}>
                       {p.docsUrl ? (
                         <CompareExternalLink
@@ -445,8 +519,9 @@ export default function ComparePage() {
                 {/* Security Resources */}
                 <ComparisonRow
                   label="Audit Report"
+                  differs={hasDifferences(orderedProjects.map((p) => String(Boolean(p.auditReportUrl))))}
                   icon={<Shield className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id}>
                       {p.auditReportUrl ? (
                         <CompareExternalLink
@@ -468,7 +543,7 @@ export default function ComparePage() {
                 <ComparisonRow
                   label="Bug Bounty"
                   icon={<Bug className="w-4 h-4" />}
-                  values={selectedProjects.map((p) => (
+                  values={orderedProjects.map((p) => (
                     <div key={p.id}>
                       {p.bugBountyUrl ? (
                         <CompareExternalLink
@@ -669,22 +744,31 @@ function ComparisonRow({
   label,
   icon,
   values,
+  best,
+  differs,
 }: {
   label: string;
   icon?: React.ReactNode;
   values: React.ReactNode[];
+  /** Column indexes holding the best value (highlighted green). */
+  best?: Set<number>;
+  /** Marks rows whose values differ between projects (highlighted amber). */
+  differs?: boolean;
 }) {
+  const isDifferent = differs || (best?.size ?? 0) > 0;
   return (
-    <tr className="border-b border-zinc-200 dark:border-zinc-800 last:border-b-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-      <td className="p-6 font-semibold bg-zinc-50 dark:bg-zinc-800/50 sticky left-0">
+    <tr className={`border-b border-zinc-200 dark:border-zinc-800 last:border-b-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors ${isDifferent ? "bg-amber-50/40 dark:bg-amber-900/10" : ""}`}>
+      <td className={`p-6 font-semibold sticky left-0 z-10 ${isDifferent ? "bg-amber-50 dark:bg-amber-950" : "bg-zinc-50 dark:bg-zinc-800"}`}>
         <div className="flex items-center gap-2">
           {icon}
           {label}
+          {isDifferent && <span className="sr-only">(values differ)</span>}
         </div>
       </td>
       {values.map((value, idx) => (
-        <td key={idx} className="p-6 text-center">
+        <td key={idx} className={`p-6 text-center ${best?.has(idx) ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}>
           {value}
+          {best?.has(idx) && <span className="sr-only"> (best)</span>}
         </td>
       ))}
     </tr>

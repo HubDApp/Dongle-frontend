@@ -16,6 +16,21 @@ interface TagInputProps {
 
 type TagSuggestion = { tag: string; usageCount: number };
 
+export const DEFAULT_MAX_TAG_LENGTH = 30;
+
+/** Subsequence fuzzy match: "dfi" matches "defi". */
+export function fuzzyMatch(tag: string, query: string): boolean {
+  if (!query) return true;
+  const target = tag.toLowerCase();
+  if (target.includes(query)) return true;
+  let position = 0;
+  for (const char of target) {
+    if (char === query[position]) position += 1;
+    if (position === query.length) return true;
+  }
+  return false;
+}
+
 export function TagInput({
   label,
   tags,
@@ -25,11 +40,13 @@ export function TagInput({
   id,
   suggestionsEnabled = false,
   maxTags = Infinity,
-  maxTagLength = Infinity,
+  maxTagLength = DEFAULT_MAX_TAG_LENGTH,
 }: TagInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState<TagSuggestion[]>([]);
   const [isFocused, setIsFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [pendingCreate, setPendingCreate] = useState<string | null>(null);
   const generatedId = React.useId();
   const inputId = id || generatedId;
   const errorId = `${inputId}-error`;
@@ -75,11 +92,12 @@ export function TagInput({
     const recentOrder = new Map(recent.map((tag, index) => [tag.toLowerCase(), index]));
     const available = new Map(suggestions.map((item) => [item.tag.toLowerCase(), item]));
     for (const tag of recent) {
-      if (!normalizedQuery || tag.toLowerCase().includes(normalizedQuery)) {
+      if (fuzzyMatch(tag, normalizedQuery)) {
         if (!available.has(tag.toLowerCase())) available.set(tag.toLowerCase(), { tag, usageCount: 0 });
       }
     }
     return [...available.values()]
+      .filter(({ tag }) => fuzzyMatch(tag, normalizedQuery))
       .filter(({ tag }) => !tags.some((current) => current.toLowerCase() === tag.toLowerCase()))
       .sort((left, right) => {
         const leftRecent = recentOrder.get(left.tag.toLowerCase());
@@ -109,13 +127,45 @@ export function TagInput({
       }
     }
     setInputValue("");
+    setActiveIndex(-1);
+    setPendingCreate(null);
+  };
+
+  const isExisting = (value: string) =>
+    visibleSuggestions.some(({ tag }) => tag.toLowerCase() === value.trim().toLowerCase());
+
+  /** New tags (not in suggestions) need a second confirmation when suggestions are on. */
+  const submitValue = (value: string) => {
+    const candidate = value.trim().slice(0, maxTagLength).toLowerCase();
+    if (!candidate) return;
+    if (suggestionsEnabled && !isExisting(candidate) && pendingCreate !== candidate) {
+      setPendingCreate(candidate);
+      return;
+    }
+    addTag(candidate);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
+    const optionCount = visibleSuggestions.length;
+    if (suggestionsEnabled && e.key === "ArrowDown" && optionCount > 0) {
       e.preventDefault();
+      setActiveIndex((index) => (index + 1) % optionCount);
+    } else if (suggestionsEnabled && e.key === "ArrowUp" && optionCount > 0) {
+      e.preventDefault();
+      setActiveIndex((index) => (index <= 0 ? optionCount - 1 : index - 1));
+    } else if (e.key === "Escape") {
+      setActiveIndex(-1);
+      setPendingCreate(null);
+    } else if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const active = visibleSuggestions[activeIndex];
+      if (active) {
+        addTag(active.tag);
+        return;
+      }
       const match = visibleSuggestions.find(({ tag }) => tag.toLowerCase() === normalizedQuery);
-      addTag(match?.tag ?? inputValue);
+      if (match) addTag(match.tag);
+      else submitValue(inputValue);
     } else if (e.key === "Backspace" && inputValue === "" && tags.length > 0) {
       e.preventDefault();
       onChange(tags.slice(0, -1));
@@ -207,7 +257,11 @@ export function TagInput({
           type="text"
           value={inputValue}
           maxLength={maxTagLength === Infinity ? undefined : maxTagLength}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setActiveIndex(-1);
+            setPendingCreate(null);
+          }}
           onFocus={() => setIsFocused(true)}
           onBlur={() => window.setTimeout(() => setIsFocused(false), 120)}
           onKeyDown={handleKeyDown}
@@ -217,28 +271,35 @@ export function TagInput({
           aria-expanded={suggestionsEnabled && isFocused && visibleSuggestions.length > 0}
           aria-controls={suggestionsEnabled ? listId : undefined}
           role={suggestionsEnabled ? "combobox" : undefined}
+          aria-autocomplete={suggestionsEnabled ? "list" : undefined}
+          aria-activedescendant={activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
           className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-zinc-900 dark:text-zinc-100 min-w-[120px]"
         />
       </div>
       {suggestionsEnabled && isFocused && (visibleSuggestions.length > 0 || normalizedQuery) && (
         <ul id={listId} role="listbox" className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-          {visibleSuggestions.map(({ tag, usageCount }) => (
-            <li key={tag} role="option" aria-selected="false">
-              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTag(tag)} className="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          {visibleSuggestions.map(({ tag, usageCount }, index) => (
+            <li key={tag} id={`${listId}-${index}`} role="option" aria-selected={index === activeIndex}>
+              <button type="button" tabIndex={-1} onMouseDown={(event) => event.preventDefault()} onClick={() => addTag(tag)} className={cn("flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800", index === activeIndex && "bg-zinc-100 dark:bg-zinc-800")}>
                 <span>{tag}</span><span className="text-xs text-zinc-500">{usageCount} projects</span>
               </button>
             </li>
           ))}
           {normalizedQuery && !visibleSuggestions.some(({ tag }) => tag.toLowerCase() === normalizedQuery) && (
             <li role="option" aria-selected="false">
-              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => addTag(inputValue)} className="w-full rounded px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                Create “{inputValue.trim().slice(0, maxTagLength)}”
+              <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => submitValue(inputValue)} className="w-full rounded px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                {pendingCreate
+                  ? `Confirm new tag “${pendingCreate}” (press Enter again)`
+                  : `Create “${inputValue.trim().slice(0, maxTagLength)}”`}
               </button>
             </li>
           )}
         </ul>
       )}
       </div>
+      {maxTagLength !== Infinity && inputValue.length >= maxTagLength && (
+        <span className="text-xs text-zinc-500">Tags can be at most {maxTagLength} characters</span>
+      )}
       {tags.length >= maxTags && <span className="text-xs text-zinc-500">Maximum {maxTags} tags</span>}
       {error && (
         <span id={errorId} className="text-xs font-medium text-red-500 ml-1" role="alert">

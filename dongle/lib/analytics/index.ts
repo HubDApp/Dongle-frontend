@@ -25,6 +25,7 @@ export {
   trackWalletConnect,
   trackWalletDisconnect,
   trackProjectView,
+  trackFeaturedProjectView,
   trackSearch,
   trackFilter,
   trackProjectSubmit,

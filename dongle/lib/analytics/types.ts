@@ -11,6 +11,7 @@ export type AnalyticsEventName =
   | "wallet_connect_failed"
   | "profile_sync"
   | "project_view"
+  | "featured_project_view"
   | "search"
   | "filter"
   | "project_submit"
