@@ -20,6 +20,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { LineChart, PieChart, BarChart } from "@/components/analytics";
 import type { AnalyticsResult, AnalyticsRange } from "@/lib/analytics-dashboard/metrics";
 import type { ProjectCategory } from "@/types/project";
+import { isAbortError } from "@/types/guards";
 
 const ADMIN_PURPOSE =
   "Connect an authorized admin Freighter wallet to access the analytics dashboard.";
@@ -77,6 +78,8 @@ export default function AnalyticsDashboard() {
   useEffect(() => {
     if (!isAdmin) return;
 
+    const controller = new AbortController();
+
     const fetchData = async () => {
       setLoading(true);
       setError(null);
@@ -88,22 +91,27 @@ export default function AnalyticsDashboard() {
           status,
         });
 
-        const response = await fetch(`/api/analytics?${params.toString()}`);
+        const response = await fetch(`/api/analytics?${params.toString()}`, {
+          signal: controller.signal,
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch analytics data");
         }
 
         const result = await response.json();
+        if (controller.signal.aborted) return;
         setData(result);
       } catch (err) {
+        if (isAbortError(err)) return;
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     void fetchData();
+    return () => controller.abort();
   }, [isAdmin, range, category, status]);
 
   useEffect(() => {
