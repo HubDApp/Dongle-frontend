@@ -24,6 +24,7 @@ import type { TimelineEvent, TimelineEventType } from "@/types/timeline";
 import { TIMELINE_EVENT_LABELS } from "@/types/timeline";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { isAbortError } from "@/types/guards";
 
 // ─── Event visual config ──────────────────────────────────────────────────────
 
@@ -157,18 +158,21 @@ export function ProjectTimeline({ projectId, className }: ProjectTimelineProps) 
   const [total, setTotal] = useState(0);
 
   const fetchEvents = useCallback(
-    async (targetPage: number, append = false) => {
+    async (targetPage: number, append = false, signal?: AbortSignal) => {
       try {
         const res = await fetch(
           `/api/projects/${projectId}/timeline?page=${targetPage}&pageSize=20`,
+          { signal },
         );
         if (!res.ok) throw new Error("Failed to load timeline");
         const json = await res.json();
         const data = json.data;
+        if (signal?.aborted) return;
         setTotal(data.total);
         setHasMore(data.hasMore);
         setEvents((prev) => (append ? [...prev, ...data.events] : data.events));
       } catch (err) {
+        if (isAbortError(err)) return;
         setError(err instanceof Error ? err.message : "Failed to load timeline");
       }
     },
@@ -176,8 +180,12 @@ export function ProjectTimeline({ projectId, className }: ProjectTimelineProps) 
   );
 
   useEffect(() => {
+    const controller = new AbortController();
     setIsLoading(true);
-    fetchEvents(1).finally(() => setIsLoading(false));
+    void fetchEvents(1, false, controller.signal).finally(() => {
+      if (!controller.signal.aborted) setIsLoading(false);
+    });
+    return () => controller.abort();
   }, [fetchEvents]);
 
   const handleLoadMore = async () => {

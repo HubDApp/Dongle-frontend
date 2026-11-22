@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   useParams,
   useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { projectService } from "@/services/project/project.service";
 import { projectStatusService } from "@/services/project/project-status.service";
 import { ContractAddressList } from "@/components/projects/ContractAddressList";
 import { BridgeInfoCard } from "@/components/projects/BridgeInfoCard";
+import { SimilarProjects } from "@/components/projects/SimilarProjects";
 import SnsAddressDisplay from "@/components/ui/SnsAddressDisplay";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, getProjectStatusLabel, type ProjectStatus } from "@/types/project";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
@@ -38,8 +39,10 @@ import { projectOwnerService } from "@/services/project/project-owner.service";
 import { formatDate } from "@/lib/date";
 import { getPositiveSentimentPercentage } from "@/lib/review-sentiment";
 import { reviewService, getReviewPersistenceLabel } from "@/services/review/review.service";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { useVerificationStatus } from "@/hooks/useVerificationStatus";
 import { submissionSigningService } from "@/services/submission-signing";
+import { signMessage } from "@stellar/freighter-api";
+import { applyVote, buildVoteMessage, compareByHelpfulness } from "@/lib/review-votes";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useConfirm } from "@/hooks/useConfirm";
 import WalletStatePanel,
@@ -164,25 +167,7 @@ export default function ProjectDetailPage() {
         trackProjectView(foundProject.id, {
           category: foundProject.primaryCategory,
         });
-        
-        // Fetch verification status with cancellation support
-        const fetchVerification = async () => {
-          if (!cancelled) setVerificationError(null);
-          try {
-            const status = await sorobanService.getVerificationStatus(projectId, abortController.signal);
-            if (!cancelled) {
-              setVerificationStatus(status);
-            }
-          } catch (error) {
-            if (!cancelled) {
-              console.error("Failed to fetch verification status:", error);
-              setVerificationError(
-                error instanceof Error ? error.message : "Failed to load verification status",
-              );
-            }
-          }
-        };
-        fetchVerification();
+        // Verification status is now fetched by useVerificationStatus (Issue #925)
       }
 
       if (!cancelled) {
@@ -208,19 +193,8 @@ export default function ProjectDetailPage() {
   }, [gate.publicKey, project]);
 
   const retryVerification = React.useCallback(() => {
-    setVerificationError(null);
-    setVerificationStatus(null);
-    const abortController = new AbortController();
-    void sorobanService
-      .getVerificationStatus(projectId, abortController.signal)
-      .then(setVerificationStatus)
-      .catch((err) => {
-        console.error("Failed to fetch verification status:", err);
-        setVerificationError(
-          err instanceof Error ? err.message : "Failed to load verification status",
-        );
-      });
-  }, [projectId]);
+    void refreshVerification();
+  }, [refreshVerification]);
 
   const actualRating = React.useMemo(() => {
     if (reviews.length === 0) return project?.rating || 0;
@@ -369,14 +343,14 @@ export default function ProjectDetailPage() {
     setIsClaiming(false);
   };
 
-  const handleReportReview = (review: Review) => {
+  const handleReportReview = useCallback((review: Review) => {
     if (gate.state !== "ready") {
       setShowWalletGate(true);
       return;
     }
     setReportingReview(review);
     setIsReportingReview(true);
-  };
+  }, [gate.state]);
 
   const handleReportReviewSubmit = async (data: { reason: string; explanation: string }) => {
     if (!gate.publicKey || !reportingReview) return;
@@ -422,6 +396,8 @@ export default function ProjectDetailPage() {
       list.sort((a, b) => b.rating - a.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     } else if (reviewSort === "lowest") {
       list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (reviewSort === "helpfulness") {
+      list.sort(compareByHelpfulness);
     } else if (reviewSort === "oldest") {
       list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     } else {
@@ -444,12 +420,12 @@ export default function ProjectDetailPage() {
     return "No reviews match the selected filter options.";
   }, [reviews.length, reviewSort]);
 
-  const handleEdit = (review: Review) => {
+  const handleEdit = useCallback((review: Review) => {
     setEditingReview(review);
     setIsAddingReview(true);
-  };
+  }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!gate.publicKey) return;
     const ok = await confirm({
       title: "Delete review",
@@ -462,9 +438,9 @@ export default function ProjectDetailPage() {
     if (!ok) return;
     await reviewService.deleteReview(id, gate.publicKey);
     setReviews(await reviewService.getReviewsByProject(projectId));
-  };
+  }, [confirm, gate.publicKey, projectId]);
 
-  const handleSentimentOverride = async (
+  const handleSentimentOverride = useCallback(async (
     reviewId: string,
     sentiment: ReviewSentiment,
   ) => {
@@ -477,7 +453,7 @@ export default function ProjectDetailPage() {
       current.map((review) => review.id === reviewId ? result.data : review),
     );
     toast.success("Review sentiment updated");
-  };
+  }, []);
 
   const handleSubmitReview = async (data: {
     rating: number;
@@ -565,30 +541,88 @@ export default function ProjectDetailPage() {
   };
 
   const handleVoteHelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteHelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "helpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "helpful") : review)),
+    );
+
+    const result = await reviewService.voteHelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviewsByProject(projectId));
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey, projectId]);
 
   const handleVoteUnhelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "unhelpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "unhelpful") : review)),
+    );
+
+    const result = await reviewService.voteUnhelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviewsByProject(projectId));
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey, projectId]);
+
+  const handleClearReviewSort = useCallback(() => {
+    setReviewSort("newest");
+  }, []);
 
   const handleAddUpdate = () => {
     setIsAddingUpdate(true);
@@ -1021,13 +1055,14 @@ export default function ProjectDetailPage() {
                       <select
                         aria-label="Sort reviews"
                         value={reviewSort}
-                        onChange={(e) => setReviewSort(e.target.value as "newest" | "oldest" | "highest" | "lowest" | "mine")}
+                        onChange={(e) => setReviewSort(e.target.value as "newest" | "oldest" | "highest" | "lowest" | "helpfulness" | "mine")}
                         className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       >
                         <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
                         <option value="highest">Highest Rating</option>
                         <option value="lowest">Lowest Rating</option>
+                        <option value="helpfulness">Most Helpful</option>
                         {gate.publicKey && <option value="mine">My Reviews</option>}
                       </select>
                     </div>
@@ -1308,6 +1343,9 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Similar Projects (Issues #859, #860) */}
+        <SimilarProjects project={project} />
 
         <ClaimProjectModal
           isOpen={isClaiming}

@@ -15,6 +15,7 @@ import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { useConfirm } from "@/hooks/useConfirm";
 import { formatDate } from "@/lib/date";
+import { formatCurrency } from "@/lib/i18n/format";
 import {
   AlertCircle,
   Activity,
@@ -503,7 +504,7 @@ export default function AdminDashboard() {
         metadata: { newValue: fee },
       });
     }
-    toast.success(`Verification fee updated to ${fee} XLM`);
+    toast.success(`Verification fee updated to ${formatCurrency(fee, "XLM")}`);
   };
 
   const handleResolveReport = (reportId: string) => {

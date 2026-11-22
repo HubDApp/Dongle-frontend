@@ -82,4 +82,51 @@ export const savedSearchService = {
     writeSearches(walletAddress, searches);
     return searches[index];
   },
+
+  exportSearches(walletAddress: string): string {
+    return JSON.stringify(readSearches(walletAddress), null, 2);
+  },
+
+  importSearches(
+    walletAddress: string,
+    json: string,
+  ): { success: boolean; imported: number; error?: string } {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      return { success: false, imported: 0, error: "Invalid JSON file" };
+    }
+    if (!Array.isArray(parsed)) {
+      return { success: false, imported: 0, error: "Expected an array of saved searches" };
+    }
+    const existing = readSearches(walletAddress);
+    const names = new Set(existing.map((s) => s.name.toLowerCase()));
+    const now = new Date().toISOString();
+    const incoming: SavedSearch[] = parsed
+      .filter(
+        (s): s is SavedSearch =>
+          !!s && typeof s === "object" && typeof s.name === "string" &&
+          !!s.name.trim() && typeof s.filters === "object" && s.filters !== null,
+      )
+      .filter((s) => !names.has(s.name.toLowerCase()))
+      .map((s) => ({
+        id: crypto.randomUUID(),
+        name: s.name.trim(),
+        filters: s.filters,
+        createdAt: s.createdAt || now,
+        updatedAt: now,
+      }));
+    const room = Math.max(0, MAX_SAVED_SEARCHES - existing.length);
+    const accepted = incoming.slice(0, room);
+    writeSearches(walletAddress, [...existing, ...accepted]);
+    return {
+      success: true,
+      imported: accepted.length,
+      error:
+        incoming.length > room
+          ? `Only ${room} imported — maximum ${MAX_SAVED_SEARCHES} saved searches allowed`
+          : undefined,
+    };
+  },
 };

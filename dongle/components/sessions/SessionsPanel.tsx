@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { isAbortError } from "@/types/guards";
 
 interface SessionView {
   sessionId: string;
@@ -30,22 +31,26 @@ export default function SessionsPanel() {
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/sessions", { credentials: "include" });
+      const res = await fetch("/api/auth/sessions", { credentials: "include", signal });
       if (!res.ok) throw new Error("Failed to load sessions");
       const data = (await res.json()) as { sessions: SessionView[] };
+      if (signal?.aborted) return;
       setSessions(data.sessions);
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) return;
       toast.error("Could not load sessions");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [load]);
 
   const revokeOne = useCallback(

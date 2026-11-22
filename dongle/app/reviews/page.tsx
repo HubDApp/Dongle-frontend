@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { reviewService, isReviewPersistenceApi } from "@/services/review/review.service";
 import { projectService } from "@/services/project/project.service";
 import { Review, Project as ReviewProject } from "@/types/review";
@@ -17,6 +17,9 @@ import { Spinner } from "@/components/ui/Spinner";
 import { trackReviewSubmit } from "@/lib/analytics";
 import { reviewSearchMatches } from "@/lib/review-language";
 import { useReviewPagination } from "@/hooks/useReviewPagination";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { signMessage } from "@stellar/freighter-api";
+import { applyVote, buildVoteMessage, compareByHelpfulness } from "@/lib/review-votes";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
@@ -36,11 +39,14 @@ export default function ReviewsPage() {
   const [showWalletGate, setShowWalletGate] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     void (async () => {
-      const loaded = await reviewService.getReviews();
+      const loaded = await reviewService.getReviews(controller.signal);
+      if (controller.signal.aborted) return;
       setReviews(loaded);
       setIsLoading(false);
     })();
+    return () => controller.abort();
   }, []);
 
   const handleAddReview = (project: ReviewProject) => {
@@ -53,7 +59,7 @@ export default function ReviewsPage() {
     setShowWalletGate(false);
   };
 
-  const handleEditReview = (review: Review) => {
+  const handleEditReview = useCallback((review: Review) => {
     if (gate.state !== "ready") {
       setShowWalletGate(true);
       return;
@@ -81,9 +87,9 @@ export default function ReviewsPage() {
         createdAt: new Date().toISOString(),
       }
     );
-  };
+  }, [gate.state]);
 
-  const handleDeleteReview = async (id: string) => {
+  const handleDeleteReview = useCallback(async (id: string) => {
     if (!gate.publicKey) {
       setShowWalletGate(true);
       return;
@@ -97,37 +103,97 @@ export default function ReviewsPage() {
         toast.error(result.error || "Failed to delete review");
       }
     }
-  };
+  }, [gate.publicKey]);
 
   const handleExportReviews = () => {
     downloadCsv("dongle-reviews.csv", reviewsToCsv(sortedReviews));
   };
 
   const handleVoteHelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteHelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "helpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "helpful") : review)),
+    );
+
+    const result = await reviewService.voteHelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviews());
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey]);
 
   const handleVoteUnhelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "unhelpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "unhelpful") : review)),
+    );
+
+    const result = await reviewService.voteUnhelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviews());
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
-  };
+  }, [gate.publicKey]);
+
+  const handleClearFilters = useCallback(() => {
+    setSortBy("recent");
+    setProjectFilter("all");
+    setUserFilter("all");
+  }, []);
 
   const handleSubmit = async (data: { rating: number; comment: string }) => {
     if (!gate.publicKey || !selectedProject) return;
@@ -225,14 +291,7 @@ export default function ReviewsPage() {
       case "lowest":
         return list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       case "helpfulness":
-        return list.sort((a, b) => {
-          const votesA = a.helpfulVotes?.length || 0;
-          const votesB = b.helpfulVotes?.length || 0;
-          if (votesA !== votesB) {
-            return votesB - votesA;
-          }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
+        return list.sort(compareByHelpfulness);
       case "recent":
       default:
         return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -334,19 +393,19 @@ export default function ReviewsPage() {
             {walletBlocked &&
               gate.state !== "ready" &&
               gate.state !== "account-loading" && (
-              <div className="mb-12">
-                <WalletStatePanel
-                  state={gate.state}
-                  pagePurpose={REVIEWS_PURPOSE}
-                  walletNetworkLabel={gate.walletNetworkLabel}
-                  publicKey={gate.publicKey}
-                  onConnect={gate.connectWallet}
-                  onDisconnect={gate.disconnectWallet}
-                  onRetry={gate.retryAccountLoad}
-                  compact
-                />
-              </div>
-            )}
+                <div className="mb-12">
+                  <WalletStatePanel
+                    state={gate.state}
+                    pagePurpose={REVIEWS_PURPOSE}
+                    walletNetworkLabel={gate.walletNetworkLabel}
+                    publicKey={gate.publicKey}
+                    onConnect={gate.connectWallet}
+                    onDisconnect={gate.disconnectWallet}
+                    onRetry={gate.retryAccountLoad}
+                    compact
+                  />
+                </div>
+              )}
 
             {(isAddingReview || editingReview) && selectedProject && gate.state === "ready" && (
               <div className="mb-12">

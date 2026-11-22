@@ -9,6 +9,7 @@ import {
   isOptedOut,
   type TwitterConfig,
 } from "@/services/social/twitter-bot.service";
+import { isAbortError } from "@/types/guards";
 
 interface ProjectRow {
   id: string;
@@ -30,18 +31,20 @@ export function TwitterBotAdmin() {
   const [status, setStatus] = useState<{ message: string; kind: "info" | "success" | "error" } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchConfig = useCallback(async () => {
+  const fetchConfig = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/social/tweet");
+      const res = await fetch("/api/social/tweet", { signal });
       const json = await res.json();
+      if (signal?.aborted) return;
       setConfig(json.data || null);
       const outs = listOptOutsSync();
       setOptedOut(outs.map((o) => o.projectId));
-    } catch {
+    } catch (err) {
+      if (isAbortError(err)) return;
       setStatus({ message: "Failed to load config", kind: "error" });
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
@@ -51,7 +54,9 @@ export function TwitterBotAdmin() {
   }
 
   useEffect(() => {
-    fetchConfig();
+    const controller = new AbortController();
+    void fetchConfig(controller.signal);
+    return () => controller.abort();
   }, [fetchConfig]);
 
   const toggleSetting = useCallback(

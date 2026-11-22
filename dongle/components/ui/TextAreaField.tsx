@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFormPasteDetection } from "@/hooks/useFormPasteDetection";
 import type { PasteEvent } from "@/hooks/useFormPasteDetection";
+import { getFieldPlaceholder, inferFieldType, type FieldType } from "@/lib/form-placeholder";
 
 interface TextAreaFieldProps
   extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -24,10 +25,20 @@ interface TextAreaFieldProps
   showCounter?: boolean;
   /** When true, shows a required indicator and sets aria-required. */
   required?: boolean;
+  /** Semantic field type used to derive a contextual placeholder. */
+  fieldType?: FieldType;
+  /** When true, shows a live word counter. */
+  showWordCount?: boolean;
+  /** Optional target word count rendered next to the counter. */
+  targetWordCount?: number;
+  /** Optional handler invoked with enriched paste events. */
+  onPasteDetected?: (event: PasteEvent) => void;
+  /** When true (default) native paste is prevented in favour of onPasteDetected. */
+  preventDefaultPaste?: boolean;
 }
 
 export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, ...props }, ref) => {
+  ({ label, error, helperText, className = "", id, maxLength, onChange, value, defaultValue, showCounter = true, required, placeholder, fieldType, readOnly, disabled, name, showWordCount, targetWordCount, onPasteDetected, preventDefaultPaste, ...props }, ref) => {
     const generatedId = React.useId();
     const textareaId = id || generatedId;
     const errorId = `${textareaId}-error`;
@@ -36,7 +47,7 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
 
     // Issue #524: derive contextual placeholder when none is provided
     const resolvedPlaceholder = placeholder ?? getFieldPlaceholder({
-      fieldType: fieldType ?? inferFieldType("textarea", props.name),
+      fieldType: fieldType ?? inferFieldType("textarea", name),
       maxLength,
     });
 
@@ -124,14 +135,14 @@ export const TextAreaField = React.forwardRef<HTMLTextAreaElement, TextAreaField
         ? "text-amber-500 font-medium"
         : "text-zinc-500";
 
-    const baseBorder =
-      error || isOverLimit || isAtLimit
-        ? "border-red-500/50 focus:border-red-500"
-        : isNearLimit
-        ? "border-amber-500/50 focus:border-amber-500"
-        : "border-zinc-200 dark:border-zinc-800 focus:border-blue-500/50";
+    // Disabled fields skip validation display; read-only fields validate normally.
+    const displayError =
+      !disabled &&
+      (error || (isOverLimit ? `Cannot exceed ${maxLength} characters` : undefined));
 
     const showCounterDisplay = showCounter && maxLength && !disabled;
+
+    const wordCounterId = `${textareaId}-word-counter`;
 
     const baseBorder =
       displayError || (!disabled && (isOverLimit || isAtLimit))

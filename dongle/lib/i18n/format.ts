@@ -65,9 +65,10 @@ export function formatDate(
  * formatRelativeDate(new Date(Date.now() - 3600000)) // "1 hour ago"
  */
 export function formatRelativeDate(
-  date: Date | string | number
+  date: Date | string | number,
+  locale?: string
 ): string {
-  const locale = getLocale();
+  const activeLocale = resolveFormatLocale(locale);
   const dateObj = typeof date === "string" || typeof date === "number" 
     ? new Date(date) 
     : date;
@@ -128,11 +129,11 @@ export function formatSmartDate(date: Date | string | number): string {
 
   // Use relative format for dates within the last 7 days
   if (diffDays >= 0 && diffDays < 7) {
-    return formatRelativeDate(dateObj);
+    return formatRelativeDate(dateObj, locale);
   }
 
   // Use absolute format for older dates
-  return formatDate(dateObj, { style: "medium" });
+  return formatDate(dateObj, { style: "medium", locale });
 }
 
 // ─── Number Formatting ──────────────────────────────────────────────────────
@@ -156,8 +157,8 @@ export function formatNumber(
   value: number,
   options: NumberFormatOptions = {}
 ): string {
-  const locale = getLocale();
-  const { style = "decimal", ...restOptions } = options;
+  const { style = "decimal", locale: localeOverride, ...restOptions } = options;
+  const locale = resolveFormatLocale(localeOverride);
 
   try {
     return new Intl.NumberFormat(locale, {
@@ -179,11 +180,13 @@ export function formatNumber(
  */
 export function formatPercent(
   value: number,
-  maximumFractionDigits = 2
+  maximumFractionDigits = 2,
+  locale?: string
 ): string {
   return formatNumber(value, {
     style: "percent",
     maximumFractionDigits,
+    locale,
   });
 }
 
@@ -197,11 +200,13 @@ export function formatPercent(
  */
 export function formatDecimal(
   value: number,
-  decimalPlaces: number = 2
+  decimalPlaces: number = 2,
+  locale?: string
 ): string {
   return formatNumber(value, {
     minimumFractionDigits: decimalPlaces,
     maximumFractionDigits: decimalPlaces,
+    locale,
   });
 }
 
@@ -212,11 +217,11 @@ export function formatDecimal(
  * formatCompactNumber(1234) // "1.2K"
  * formatCompactNumber(1234567) // "1.2M"
  */
-export function formatCompactNumber(value: number): string {
-  const locale = getLocale();
+export function formatCompactNumber(value: number, locale?: string): string {
+  const activeLocale = resolveFormatLocale(locale);
 
   try {
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(activeLocale, {
       notation: "compact",
       compactDisplay: "short",
     }).format(value);
@@ -229,6 +234,52 @@ export function formatCompactNumber(value: number): string {
       return `${(value / 1000).toFixed(1)}K`;
     }
     return String(value);
+  }
+}
+
+/**
+ * Format a number as a currency value
+ * 
+ * @example
+ * formatCurrency(1234.56, "USD") // "$1,234.56"
+ * formatCurrency(0.001, "XLM") // "0.001 XLM"
+ * formatCurrency(1200000, "XLM", { compact: true }) // "1.2M XLM"
+ */
+export function formatCurrency(
+  amount: number,
+  currency: "XLM" | "USD" | string = "XLM",
+  options: { compact?: boolean; locale?: string } = {}
+): string {
+  const locale = options.locale || getLocale();
+  const isXLM = currency === "XLM";
+
+  try {
+    // 1. Determine formatting options based on currency and compact requirement
+    const formatOptions: Intl.NumberFormatOptions = {
+      style: isXLM ? "decimal" : "currency",
+      currency: isXLM ? undefined : currency,
+      notation: options.compact ? "compact" : "standard",
+      compactDisplay: "short",
+      // XLM often needs more precision for small amounts
+      minimumFractionDigits: isXLM ? (amount < 1 ? 3 : 2) : 2,
+      maximumFractionDigits: isXLM ? (amount < 1 ? 7 : 2) : 2,
+    };
+
+    const formatted = new Intl.NumberFormat(locale, formatOptions).format(amount);
+
+    // 2. Handle XLM suffix manually as Intl.NumberFormat doesn't natively support XLM symbol placement well across all locales
+    if (isXLM) {
+      // For XLM, we append the code. Some locales might prefer it before, but XLM is standardly suffixed.
+      return `${formatted} XLM`;
+    }
+
+    return formatted;
+  } catch (error) {
+    console.error("Error formatting currency:", error);
+    // Simple fallback
+    const symbol = currency === "USD" ? "$" : "";
+    const suffix = currency === "XLM" ? " XLM" : ` ${currency}`;
+    return `${symbol}${amount.toLocaleString(locale)}${isXLM ? suffix : ""}`;
   }
 }
 
@@ -256,7 +307,7 @@ export function formatList(
   }
 
   try {
-    const listFormatter = new Intl.ListFormat(locale, {
+    const listFormatter = new Intl.ListFormat(activeLocale, {
       style: "long",
       type,
     });

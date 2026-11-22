@@ -1,4 +1,4 @@
-import type { NotificationStreamEvent, NotificationType } from "@/types/notification";
+import type { AppNotification, NotificationStreamEvent, NotificationType } from "@/types/notification";
 import type { NotificationPreferences } from "@/services/notifications/notification-preferences.service";
 
 export type NotificationDevice = "desktop" | "mobile";
@@ -163,4 +163,62 @@ export function groupSimilarNotifications(
     }
   }
   return [...groups.values()];
+}
+
+export interface NotificationGroup {
+  id: string;
+  type: "review" | "verification" | "update";
+  items: AppNotification[];
+}
+
+export function groupAppNotifications(
+  notifications: AppNotification[],
+  mode: "auto" | "always" | "never",
+): AppNotification[] | Array<AppNotification & { group?: NotificationGroup }> {
+  if (mode === "never") return notifications;
+
+  const grouped = new Map<string, AppNotification[]>();
+  const now = notifications.reduce((latest, item) => {
+    const time = Date.parse(item.createdAt);
+    return Number.isNaN(time) ? latest : Math.max(latest, time);
+  }, 0);
+
+  for (const item of notifications) {
+    let type: NotificationGroup["type"] | null = null;
+    if (item.type.includes("review")) type = "review";
+    else if (item.type.includes("verif") || item.type.includes("evidence") || item.type.includes("rejected")) type = "verification";
+    else if (item.type.includes("update")) type = "update";
+    if (!type) continue;
+
+    const time = Date.parse(item.createdAt);
+    if (mode === "auto" && (Number.isNaN(time) || now - time > 24 * 60 * 60 * 1000)) continue;
+    const key = `${type}:${item.projectId ?? "all"}:${item.type}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), item]);
+  }
+
+  const groupIds = new Set<string>();
+  const output: Array<AppNotification & { group?: NotificationGroup }> = [];
+  for (const [key, items] of grouped) {
+    if (mode === "always" ? items.length < 2 : items.length < 3) continue;
+    const representative = items[0];
+    groupIds.add(representative.id);
+    const type = key.startsWith("review:") ? "review" : key.startsWith("verification:") ? "verification" : "update";
+    output.push({
+      ...representative,
+      id: `group:${key}`,
+      title: representative.type === "review_approved"
+        ? `${items.length} reviews approved`
+        : representative.type === "review_rejected"
+          ? `${items.length} reviews rejected`
+          : `${items.length} ${type}${items.length === 1 ? "" : "s"}`,
+      message: `${items.length} similar ${type} notifications`,
+      group: { id: `group:${key}`, type, items },
+    });
+  }
+
+  for (const item of notifications) {
+    if (output.some((entry) => entry.group?.items.some((groupItem) => groupItem.id === item.id))) continue;
+    output.push(item);
+  }
+  return output.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }

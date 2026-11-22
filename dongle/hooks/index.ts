@@ -13,6 +13,12 @@ export type { UseFormAuditLogOptions, FormAuditLogHandle, LogActionExtras } from
 export { useModalForm } from "./useModalForm";
 export { useOnChainTransaction } from "./useOnChainTransaction";
 export { useOnlineStatus } from "./useOnlineStatus";
+export { useDeviceSync } from "./useDeviceSync";
+export type {
+  SyncStatus,
+  UseDeviceSyncOptions,
+  UseDeviceSyncResult,
+} from "./useDeviceSync";
 export { usePagination } from "./usePagination";
 export { useProjectFilters } from "./useProjectFilters";
 export type { SortOption, ProjectFiltersState } from "./useProjectFilters";
@@ -45,3 +51,7 @@ export type {
   UseFormFieldDependenciesOptions,
   UseFormFieldDependenciesReturn,
 } from "./useFormFieldDependencies";
+export { useDOMPurify, RICH_TEXT_CONFIG, PLAIN_TEXT_CONFIG } from "./useDOMPurify";
+export type { UseDOMPurifyResult } from "./useDOMPurify";
+export { useVerificationStatus, verificationSWRKey } from "./useVerificationStatus";
+export type { UseVerificationStatusResult } from "./useVerificationStatus";

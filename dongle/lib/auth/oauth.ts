@@ -7,6 +7,8 @@ export interface ProviderProfile {
   email?: string;
   name?: string;
   avatarUrl?: string;
+  /** Provider access token; kept server-side for profile refresh. */
+  accessToken?: string;
 }
 
 export function mapOAuthCallbackError(
@@ -69,8 +71,12 @@ export async function exchangeGoogleCode(code: string): Promise<ProviderProfile>
     throw new Error("Google token missing");
   }
 
+  return { ...(await fetchGoogleProfile(tokenJson.access_token)), accessToken: tokenJson.access_token };
+}
+
+export async function fetchGoogleProfile(accessToken: string): Promise<ProviderProfile> {
   const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-    headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!profileRes.ok) {
     throw new Error("Google profile fetch failed");
@@ -121,9 +127,13 @@ export async function exchangeGitHubCode(code: string): Promise<ProviderProfile>
     throw new Error("GitHub token missing");
   }
 
+  return { ...(await fetchGitHubProfile(tokenJson.access_token)), accessToken: tokenJson.access_token };
+}
+
+export async function fetchGitHubProfile(accessToken: string): Promise<ProviderProfile> {
   const profileRes = await fetch("https://api.github.com/user", {
     headers: {
-      Authorization: `Bearer ${tokenJson.access_token}`,
+      Authorization: `Bearer ${accessToken}`,
       Accept: "application/vnd.github+json",
       "User-Agent": "dongle-frontend",
     },
@@ -146,7 +156,7 @@ export async function exchangeGitHubCode(code: string): Promise<ProviderProfile>
   if (!email) {
     const emailsRes = await fetch("https://api.github.com/user/emails", {
       headers: {
-        Authorization: `Bearer ${tokenJson.access_token}`,
+        Authorization: `Bearer ${accessToken}`,
         Accept: "application/vnd.github+json",
         "User-Agent": "dongle-frontend",
       },
@@ -170,6 +180,13 @@ export async function exchangeGitHubCode(code: string): Promise<ProviderProfile>
     name: profile.name ?? profile.login,
     avatarUrl: profile.avatar_url,
   };
+}
+
+export function fetchProviderProfile(
+  provider: OAuthProvider,
+  accessToken: string,
+): Promise<ProviderProfile> {
+  return provider === "google" ? fetchGoogleProfile(accessToken) : fetchGitHubProfile(accessToken);
 }
 
 export const WALLET_REQUIRED_ACTIONS = [

@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Project } from "@/types/project";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import ProjectImage from "@/components/projects/ProjectImage";
-import { VerificationBadge, type VerificationStatus } from "@/components/projects/VerificationBadge";
-import { sorobanService } from "@/services/stellar/soroban.service";
+import { VerificationBadge } from "@/components/projects/VerificationBadge";
+import { useVerificationStatuses } from "@/hooks/useVerificationStatuses";
 import { Clock, X, Star } from "lucide-react";
+import { isAbortError } from "@/types/guards";
 
 interface RecentlyViewedProjectsProps {
   projects: Project[];
@@ -24,22 +24,27 @@ export function RecentlyViewedProjects({
   useEffect(() => {
     if (projects.length === 0) return;
 
+    const controller = new AbortController();
+
     const fetchStatuses = async () => {
       const statuses: Record<string, VerificationStatus> = {};
       await Promise.all(
         projects.map(async (project) => {
           try {
-            const status = await sorobanService.getVerificationStatus(project.id);
+            const status = await sorobanService.getVerificationStatus(project.id, controller.signal);
             statuses[project.id] = status;
-          } catch {
+          } catch (err) {
+            if (isAbortError(err)) return;
             statuses[project.id] = "NONE";
           }
         }),
       );
+      if (controller.signal.aborted) return;
       setVerificationStatuses(statuses);
     };
 
     void fetchStatuses();
+    return () => controller.abort();
   }, [projects]);
 
   if (projects.length === 0) {

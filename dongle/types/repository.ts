@@ -2,9 +2,11 @@
  * Repository metadata types and validation
  */
 
+export type RepositoryHost = "github" | "gitlab" | "bitbucket" | "gitea";
+
 export interface RepositoryMetadata {
   url: string;
-  host: "github" | "gitlab" | "bitbucket";
+  host: RepositoryHost;
   owner: string;
   repo: string;
   name?: string;
@@ -22,7 +24,7 @@ export interface RepositoryValidationResult {
   isValid: boolean;
   error?: string;
   metadata?: {
-    host: "github" | "gitlab" | "bitbucket";
+    host: RepositoryHost;
     owner: string;
     repo: string;
   };
@@ -35,6 +37,7 @@ export const SUPPORTED_HOSTS = [
   "github.com",
   "gitlab.com",
   "bitbucket.org",
+  "gitea.com",
 ] as const;
 
 export type SupportedHost = typeof SUPPORTED_HOSTS[number];

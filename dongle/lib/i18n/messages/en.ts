@@ -166,7 +166,7 @@ export const en = {
       tags: "Add a few keywords (press Enter after each) to improve discoverability.",
       description: "Summarize what the project does in 1–3 sentences. Avoid marketing fluff.",
       websiteUrl: "Link to the public homepage users should visit first.",
-      githubUrl: "Supported: GitHub, GitLab, Bitbucket. Public repos preferred.",
+      githubUrl: "Supported: GitHub, GitLab, Bitbucket, Gitea. Public repos preferred.",
       logoUrl: "Direct image URL (PNG/SVG/JPG). Square logos work best.",
       docsUrl: "Link to docs, whitepaper, or getting-started guide.",
       auditReportUrl: "Link to a public security audit report if available.",
@@ -425,6 +425,13 @@ export const en = {
     chartProjects: "Projects",
     chartReviews: "Reviews",
     chartVerification: "Verification rate",
+    chartHint:
+      "Hover or focus the chart, then use arrow keys to inspect points. Drag across the chart to zoom.",
+    chartKeyboardHint:
+      "Use the arrow keys to move between data points, Enter to drill down, and Escape to reset zoom.",
+    resetZoom: "Reset zoom",
+    exportPng: "Export PNG",
+    drilldownTitle: "Selected day",
     reviewsPerWeek: "{count} reviews/week",
     formSubmissions: {
       title: "Form Submission Analytics",
