@@ -17,6 +17,7 @@ import { SWRProvider } from "@/providers/SWRProvider";
 import { ContractHealthBanner } from "@/components/layout/ContractHealthBanner";
 import { PendingTransactionWatcher } from "@/components/notifications/PendingTransactionWatcher";
 import { TwoFAProvider } from "@/context/twofa.context";
+import { SyncProvider } from "@/context/sync.context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
