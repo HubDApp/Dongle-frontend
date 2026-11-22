@@ -9,6 +9,7 @@ export type AnalyticsEventName =
   | "wallet_connect"
   | "wallet_disconnect"
   | "wallet_connect_failed"
+  | "profile_sync"
   | "project_view"
   | "search"
   | "filter"
@@ -39,10 +40,9 @@ export type AnalyticsEventName =
   | "data_deletion_requested"
   | "data_deletion_completed"
   | "storage_quota_warning"
-  | "transactions_export"
-  | "pending_transaction_confirmed"
-  | "contract_verification_failed"
-  | "contract_method_invoked";
+  | "similar_project_click"
+  | "saved_search_apply"
+  | "search_suggestion_select";
 
 /** Flat property bag — values must be JSON-serializable primitives. */
 export type AnalyticsProperties = Record<

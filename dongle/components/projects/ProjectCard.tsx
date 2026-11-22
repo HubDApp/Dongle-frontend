@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useId, useMemo } from "react";
 import Link from "next/link";
 import { Project } from "@/types/project";
 import ProjectImage from "@/components/projects/ProjectImage";
@@ -52,9 +52,20 @@ export const ProjectCard = ({
     [healthProp, project, verificationStatus],
   );
 
+  const titleId = useId();
+  const saveTooltipId = useId();
+  const compareTooltipId = useId();
+
   const selected = isSelected(project.id);
   const isSaved = isOnWatchlist(project.id);
   const badges: SocialProofBadge[] = (socialProof?.badges[project.id] ?? []).slice(0, 2);
+
+  const saveTooltip = isSaved ? "Remove from watchlist" : "Add to watchlist";
+  const compareTooltip = selected
+    ? "Remove from comparison"
+    : !canAddMore
+    ? "Maximum 4 projects"
+    : "Add to comparison";
 
   const handleCompareToggle = (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -66,12 +77,6 @@ export const ProjectCard = ({
     }
   };
 
-  const handleCompareKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      handleCompareToggle(e);
-    }
-  };
-
   const handleToggleSaved = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -79,60 +84,17 @@ export const ProjectCard = ({
   };
 
   return (
-    <div className="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col">
-      {/* Save button */}
-      <IconButton
-        type="button"
-        onClick={handleToggleSaved}
-        disabled={!canManageWatchlist}
-        aria-pressed={isSaved}
-        aria-label={
-          isSaved
-            ? `Remove ${project.name} from watchlist`
-            : `Add ${project.name} to watchlist`
-        }
-        size="md"
-        className="absolute right-4 top-4 z-10 rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-2 text-zinc-500 shadow-sm transition-colors hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+    <article
+      aria-labelledby={titleId}
+      className="group relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 hover:shadow-xl transition-all h-full flex flex-col"
+    >
+      {/* Primary detail link — first tab stop. The card container itself is not
+          interactive; keyboard users open the project through this link. */}
+      <Link
+        href={`/projects/${project.id}`}
+        prefetch={getPrefetchValue("project-detail")}
+        className="flex h-full flex-col rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900"
       >
-        {isSaved ? <BookmarkCheck /> : <Bookmark />}
-      </IconButton>
-
-      {/* Compare toggle — rendered below the save button on the left */}
-      {showCompareCheckbox && (
-        <IconButton
-          type="button"
-          onClick={handleCompareToggle}
-          onKeyDown={handleCompareKeyDown}
-          disabled={!selected && !canAddMore}
-          aria-pressed={selected}
-          aria-label={
-            selected
-              ? `Remove ${project.name} from comparison`
-              : !canAddMore
-              ? `Cannot add ${project.name}: maximum 4 projects`
-              : `Add ${project.name} to comparison`
-          }
-          size="md"
-          className={`absolute left-4 top-4 z-10 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
-            selected
-              ? "bg-blue-500 text-white hover:bg-blue-600 hover:text-white"
-              : !canAddMore
-              ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-400 cursor-not-allowed"
-              : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-500"
-          }`}
-          title={
-            selected
-              ? "Remove from comparison"
-              : !canAddMore
-              ? "Maximum 4 projects"
-              : "Add to comparison"
-          }
-        >
-          {selected ? <Check /> : <Plus />}
-        </IconButton>
-      )}
-
-      <Link href={`/projects/${project.id}`} prefetch={getPrefetchValue("project-detail")} className="flex h-full flex-col">
         <ProjectImage
           logoUrl={project.logoUrl}
           name={project.name}
@@ -167,7 +129,7 @@ export const ProjectCard = ({
             {project.rating}
           </div>
         </div>
-        <h3 className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">
+        <h3 id={titleId} className="text-xl font-bold mb-2 group-hover:text-blue-500 transition-colors">
           {highlightTerm
             ? highlightText(project.name, highlightTerm)
             : project.name}
@@ -196,6 +158,70 @@ export const ProjectCard = ({
           <span>Added {formatDate(project.createdAt, "short")}</span>
         </div>
       </Link>
-    </div>
+
+      {/* Save button — second tab stop. Tooltip appears on hover and focus. */}
+      <span className="group/save absolute right-4 top-4 z-10">
+        <IconButton
+          type="button"
+          onClick={handleToggleSaved}
+          disabled={!canManageWatchlist}
+          aria-pressed={isSaved}
+          aria-describedby={saveTooltipId}
+          aria-label={
+            isSaved
+              ? `Remove ${project.name} from watchlist`
+              : `Add ${project.name} to watchlist`
+          }
+          size="md"
+          className="rounded-full border border-zinc-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-2 text-zinc-500 shadow-sm transition-colors hover:border-blue-400 hover:text-blue-500 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        >
+          {isSaved ? <BookmarkCheck /> : <Bookmark />}
+        </IconButton>
+        <span
+          id={saveTooltipId}
+          role="tooltip"
+          className="pointer-events-none invisible absolute right-0 top-full z-20 mt-2 w-max max-w-[12rem] rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 opacity-0 shadow-lg transition-opacity dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 group-hover/save:visible group-hover/save:opacity-100 group-focus-within/save:visible group-focus-within/save:opacity-100"
+        >
+          {saveTooltip}
+        </span>
+      </span>
+
+      {/* Compare toggle — third tab stop. Tooltip appears on hover and focus. */}
+      {showCompareCheckbox && (
+        <span className="group/compare absolute left-4 top-4 z-10">
+          <IconButton
+            type="button"
+            onClick={handleCompareToggle}
+            disabled={!selected && !canAddMore}
+            aria-pressed={selected}
+            aria-describedby={compareTooltipId}
+            aria-label={
+              selected
+                ? `Remove ${project.name} from comparison`
+                : !canAddMore
+                ? `Cannot add ${project.name}: maximum 4 projects`
+                : `Add ${project.name} to comparison`
+            }
+            size="md"
+            className={`rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+              selected
+                ? "bg-blue-500 text-white hover:bg-blue-600 hover:text-white"
+                : !canAddMore
+                ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-400 cursor-not-allowed"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-500"
+            }`}
+          >
+            {selected ? <Check /> : <Plus />}
+          </IconButton>
+          <span
+            id={compareTooltipId}
+            role="tooltip"
+            className="pointer-events-none invisible absolute left-0 top-full z-20 mt-2 w-max max-w-[12rem] rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs font-medium text-zinc-700 opacity-0 shadow-lg transition-opacity dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 group-hover/compare:visible group-hover/compare:opacity-100 group-focus-within/compare:visible group-focus-within/compare:opacity-100"
+          >
+            {compareTooltip}
+          </span>
+        </span>
+      )}
+    </article>
   );
 };

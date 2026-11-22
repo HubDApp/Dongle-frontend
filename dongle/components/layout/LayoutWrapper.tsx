@@ -27,6 +27,7 @@ function registerServiceWorker() {
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isComparisonTrayOpen, setIsComparisonTrayOpen] = useState(true);
   const { publicKey } = useWallet();
   const router = useRouter();
   const { selectedProjects } = useComparison();
@@ -49,17 +50,22 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     }
   }, [router]);
 
-  const openComparison = useCallback(() => {
+  const openBookmarks = useCallback(() => {
+    router.push("/profile");
+  }, [router]);
+
+  const toggleComparison = useCallback(() => {
     if (selectedProjects.length === 0) {
       toast.info("Add projects to compare first", { duration: 1800 });
-    } else {
-      router.push("/compare");
+      return;
     }
-  }, [router, selectedProjects.length]);
+    setIsComparisonTrayOpen((prev) => !prev);
+  }, [selectedProjects.length]);
 
   useKeyboardShortcuts({
     onFocusSearch: focusSearch,
-    onOpenComparison: openComparison,
+    onToggleBookmarks: openBookmarks,
+    onToggleComparison: toggleComparison,
     onShowHelp: () => setIsShortcutsModalOpen(true),
     onClose: () => setIsShortcutsModalOpen(false),
     isAuthenticated: Boolean(publicKey),
@@ -75,7 +81,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         {children}
       </main>
       <Footer />
-      <ComparisonFloatingButton />
+      {isComparisonTrayOpen && <ComparisonFloatingButton />}
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
         isAuthenticated={Boolean(publicKey)}

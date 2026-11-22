@@ -16,7 +16,8 @@ import { projectSubmissionService } from "@/services/project/project-submission.
 import { walletService } from "@/services/wallet/wallet.service";
 import { generateProjectIdFromName } from "@/lib/project-id";
 import { computeQualityScore, detectSuspiciousFlags } from "@/lib/submission-quality";
-import { Rocket, CheckCircle2, Plus, X, GitCompare } from "lucide-react";
+import { Rocket, CheckCircle2, Plus, X, GitCompare, AlertCircle, History as HistoryIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import TransactionProgressPanel from "@/components/transactions/TransactionProgressPanel";
@@ -36,6 +37,11 @@ import { FormValueComparison } from "@/components/ui/FormValueComparison";
 import { FormSubmissionRetry } from "@/components/ui/FormSubmissionRetry";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import { useFormAuditLog } from "@/hooks/useFormAuditLog";
+import { useFormExperiment } from "@/hooks/useFormExperiment";
+import { useFormConversion } from "@/hooks/useFormConversion";
+import { useFormCaptcha } from "@/hooks/useFormCaptcha";
+import { useFormHeatmap } from "@/hooks/useFormHeatmap";
+import { useFormSessionRecording } from "@/hooks/useFormSessionRecording";
 import { normalizeUrl, extractDomain } from "@/lib/url";
 import { validateRepositoryUrl, normalizeRepositoryUrl } from "@/lib/repository";
 import {
@@ -60,6 +66,23 @@ import { ProjectFormContext } from "@/context/project-form.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { runFormIntegrations } from "@/services/form-integrations";
 import { projectHistoryService } from "@/services/project/project-history.service";
+import { ROADMAP_STATUSES } from "@/types/roadmap";
+import type { FormTemplate } from "@/types/form-template";
+import { useFormAnalytics } from "@/hooks/useFormAnalytics";
+import { getFieldRequirements, getRequirementMessage } from "@/utils/form-requirements.util";
+import { downloadFormSubmissionPdf } from "@/utils/pdf-export.util";
+import { gdprService } from "@/services/gdpr/gdpr.service";
+import { formEventsService } from "@/services/events/form-events.service";
+import { uploadProjectRoadmap } from "@/services/project/roadmap.service";
+import { awardSubmission } from "@/services/gamification/gamification.service";
+import { findDuplicates } from "@/services/form-deduplication/engine";
+import { formTemplateService } from "@/services/form-template/form-template.service";
+import { trackConsentGiven } from "@/lib/analytics";
+import RoadmapEditor from "@/components/projects/RoadmapEditor";
+import { FormCaptcha } from "@/components/forms/FormCaptcha";
+import { FormHeatmapOverlay } from "@/components/forms/FormHeatmapOverlay";
+import { FormSessionRecordingControls } from "@/components/forms/FormSessionRecordingControls";
+import { GDPRConsent } from "@/components/gdpr/GDPRConsent";
 
 const urlSchema = z.string().transform((val, ctx) => {
   try {
@@ -217,6 +240,24 @@ const EXPORT_LABELS: Record<string, string> = {
   roadmap: "Project Roadmap",
 };
 
+const formSections = [
+  {
+    title: "Project basics",
+    description: "Tell the community what your project is.",
+    fields: ["name", "primaryCategory", "tags", "description"] as const,
+  },
+  {
+    title: "Online presence",
+    description: "Add links so people can learn more.",
+    fields: ["websiteUrl", "githubUrl", "logoUrl", "docsUrl", "auditReportUrl", "bugBountyUrl"] as const,
+  },
+  {
+    title: "Smart contracts",
+    description: "Connect the contracts associated with your project.",
+    fields: ["contractAddresses"] as const,
+  },
+] as const;
+
 type ProjectFormProps = {
   mode?: "create" | "edit";
   initialData?: Partial<ProjectFormValues> & {
@@ -246,6 +287,11 @@ export default function ProjectForm({
   const [showComparison, setShowComparison] = useState(false);
   const [submissionError, setSubmissionError] = useState<Error | string | null>(null);
   const [submissionRetryCount, setSubmissionRetryCount] = useState(0);
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [activeSection, setActiveSection] = useState(0);
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
 
   // A/B testing experiment for project submission layout and flow
   const experiment = useFormExperiment({
@@ -894,6 +940,7 @@ export default function ProjectForm({
         ref={bindFormRef}
         onSubmit={handleFormSubmit}
         onFocusCapture={() => conversion.trackStart()}
+        onBlurCapture={() => draft.forceSave()}
         className="space-y-6"
       >
         <FormHeatmapOverlay
@@ -912,6 +959,7 @@ export default function ProjectForm({
           hasDraft={draft.hasDraft}
           lastSaved={draft.lastSaved}
           isSaving={draft.isSaving}
+          isSaved={draft.isSaved}
           saveError={draft.saveError}
           onDiscard={handleDiscardDraft}
         />
@@ -1425,7 +1473,6 @@ export default function ProjectForm({
             Privacy Policy
           </Link>
         </p>
-        </>}
       </form>
       </div>
 

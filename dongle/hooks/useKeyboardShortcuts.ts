@@ -6,9 +6,11 @@
  * Application-wide keyboard shortcut manager.
  *
  * Shortcuts:
- *   /  or  Cmd/Ctrl+K  → focus search bar
- *   Cmd/Ctrl+B          → toggle bookmarks (watchlist)
- *   C                   → open comparison tray
+ *   /                   → focus search bar
+ *   Cmd/Ctrl+K          → focus search bar, or open the command palette when
+ *                         the page has no search field of its own
+ *   Cmd/Ctrl+B          → open bookmarks (profile watchlist)
+ *   C                   → toggle the comparison tray
  *   N                   → navigate to new project form (if authenticated)
  *   ?                   → show keyboard shortcut help modal
  *   Esc                 → close active modal/drawer
@@ -23,10 +25,10 @@ import { useRouter } from "next/navigation";
 export interface KeyboardShortcutHandlers {
   /** Focus the primary search bar */
   onFocusSearch?: () => void;
-  /** Toggle bookmarks / watchlist panel */
+  /** Open bookmarks (the watchlist on the profile page) */
   onToggleBookmarks?: () => void;
-  /** Open the comparison tray */
-  onOpenComparison?: () => void;
+  /** Toggle the comparison tray (show/hide the floating panel) */
+  onToggleComparison?: () => void;
   /** Navigate to the new project form; called only when the user is authenticated */
   onNewProject?: () => void;
   /** Show the keyboard shortcut help modal */
@@ -49,31 +51,45 @@ function isTypingContext(event: KeyboardEvent): boolean {
   );
 }
 
+/** Selector for the primary, page-level search field. */
+const SEARCH_FIELD_SELECTOR = 'input[type="search"], input[placeholder*="Search"]';
+
+/** True while a modal dialog (e.g. the command palette) owns the screen. */
+function isModalOpen(): boolean {
+  return Boolean(document.querySelector('[aria-modal="true"]'));
+}
+
 export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers): void {
   const router = useRouter();
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       const meta = event.metaKey || event.ctrlKey;
+      const key = event.key;
 
-      // Cmd/Ctrl+K → focus search (fires even when typing)
-      if (meta && event.key === "k") {
-        event.preventDefault();
-        handlers.onFocusSearch?.();
+      // Cmd/Ctrl+K → focus the page's search field when one exists. When the
+      // page has no search field (or a modal owns the screen) this shortcut is
+      // left to the command palette's own listener, which opens the palette.
+      if (meta && !event.altKey && key.toLowerCase() === "k") {
+        if (isModalOpen()) return;
+        if (document.querySelector(SEARCH_FIELD_SELECTOR)) {
+          event.preventDefault();
+          handlers.onFocusSearch?.();
+        }
         return;
       }
 
       // All remaining shortcuts are suppressed while typing
       if (isTypingContext(event)) return;
 
-      // Cmd/Ctrl+B → toggle bookmarks
-      if (meta && event.key === "b") {
+      // Cmd/Ctrl+B → open bookmarks
+      if (meta && key.toLowerCase() === "b") {
         event.preventDefault();
         handlers.onToggleBookmarks?.();
         return;
       }
 
-      switch (event.key) {
+      switch (key) {
         case "/":
           event.preventDefault();
           handlers.onFocusSearch?.();
@@ -81,7 +97,7 @@ export function useKeyboardShortcuts(handlers: KeyboardShortcutHandlers): void {
 
         case "c":
         case "C":
-          handlers.onOpenComparison?.();
+          handlers.onToggleComparison?.();
           break;
 
         case "n":
@@ -134,9 +150,25 @@ export function useProjectGridNavigation(
     if (!grid) return;
 
     const CARD_SELECTOR = '[data-grid-card]';
+    const FOCUSABLE_SELECTOR =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
     function getCards(): HTMLElement[] {
       return Array.from(grid!.querySelectorAll<HTMLElement>(CARD_SELECTOR));
+    }
+
+    /** Index of the card containing the currently focused element. */
+    function getFocusedIndex(cards: HTMLElement[], active: Element | null): number {
+      if (!active) return -1;
+      return cards.findIndex((card) => card === active || card.contains(active));
+    }
+
+    /** Focus the card itself when focusable, otherwise its first focusable descendant. */
+    function focusCard(card: HTMLElement): void {
+      const target = card.matches(FOCUSABLE_SELECTOR)
+        ? card
+        : card.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (target ?? card).focus();
     }
 
     /** Compute the number of columns by comparing the top offsets of cards. */
@@ -158,8 +190,7 @@ export function useProjectGridNavigation(
       const cards = getCards();
       if (!cards.length) return;
 
-      const active = document.activeElement as HTMLElement | null;
-      const currentIndex = active ? cards.indexOf(active) : -1;
+      const currentIndex = getFocusedIndex(cards, document.activeElement);
       if (currentIndex === -1) return;
 
       const cols = getColumnCount(cards);
@@ -179,7 +210,7 @@ export function useProjectGridNavigation(
 
       if (nextIndex >= 0 && nextIndex < cards.length) {
         event.preventDefault();
-        cards[nextIndex].focus();
+        focusCard(cards[nextIndex]);
       }
     }
 

@@ -17,18 +17,27 @@ import {
   type NotificationCategory,
   type NotificationFilterState,
 } from "@/lib/notifications/filters";
+import { groupAppNotifications, type NotificationGroup } from "@/lib/notifications/delivery-policy";
+import { notificationPreferencesService } from "@/services/notifications/notification-preferences.service";
+import type { AppNotification } from "@/types/notification";
 
 export default function NotificationBell() {
   const { t } = useTranslation();
   const { items, unread, status, open, setOpen, markRead, markReadMany } = useNotifications();
   const [filters, setFilters] = useState<NotificationFilterState>(DEFAULT_NOTIFICATION_FILTERS);
   const [filtersLoaded, setFiltersLoaded] = useState(false);
+  const [groupMode, setGroupMode] = useState<"auto" | "always" | "never">("auto");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setFilters(readNotificationFilters());
+    const recipient = items[0]?.recipientAddress;
+    if (recipient) {
+      setGroupMode(notificationPreferencesService.getPreferences(recipient).groupMode);
+    }
     setFiltersLoaded(true);
   }, []);
 
@@ -38,8 +47,8 @@ export default function NotificationBell() {
   }, [filters, filtersLoaded]);
 
   const filteredItems = useMemo(
-    () => filterNotifications(items, filters),
-    [items, filters],
+    () => groupAppNotifications(filterNotifications(items, filters), groupMode) as Array<AppNotification & { group?: NotificationGroup }>,
+    [items, filters, groupMode],
   );
   const importantUnread = items.filter(
     (item) => !item.read && getNotificationCategory(item.type) === "important",
@@ -136,8 +145,12 @@ export default function NotificationBell() {
               <button
                 type="button"
                 className="rounded-md px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                onClick={() => markReadMany(filteredItems.filter((item) => !item.read).map((item) => item.id))}
-                disabled={!filteredItems.some((item) => !item.read)}
+                onClick={() => markReadMany(filteredItems.flatMap((item) =>
+                  item.group ? item.group.items : [item]
+                ).filter((item) => !item.read).map((item) => item.id))}
+                disabled={!filteredItems.some((item) =>
+                  item.group ? item.group.items.some((groupItem) => !groupItem.read) : !item.read
+                )}
               >
                 {t("notifications.markFilteredRead")}
               </button>
@@ -290,6 +303,51 @@ export default function NotificationBell() {
                     item.read ? "opacity-70" : "bg-blue-50/60 dark:bg-blue-950/20"
                   }`}
                 >
+                  {item.group ? (
+                    <div>
+                      <button
+                        type="button"
+                        className="w-full text-start"
+                        aria-expanded={expandedGroups.has(item.group.id)}
+                        onClick={() => setExpandedGroups((current) => {
+                          const next = new Set(current);
+                          if (next.has(item.group!.id)) next.delete(item.group!.id);
+                          else next.add(item.group!.id);
+                          return next;
+                        })}
+                      >
+                        <p className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {item.title}
+                          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                            {item.group.items.length}
+                          </span>
+                        </p>
+                        <p className="mt-1 text-[11px] text-zinc-400">
+                          {formatSmartDate(item.createdAt)}
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        className="mt-2 text-xs font-medium text-blue-600 hover:underline"
+                        onClick={() => markReadMany(item.group!.items.filter((groupItem) => !groupItem.read).map((groupItem) => groupItem.id))}
+                        disabled={!item.group.items.some((groupItem) => !groupItem.read)}
+                      >
+                        Mark all in group as read
+                      </button>
+                      {expandedGroups.has(item.group.id) ? (
+                        <ul className="mt-2 space-y-2 border-l-2 border-zinc-200 pl-3 dark:border-zinc-700">
+                          {item.group.items.map((groupItem) => (
+                            <li key={groupItem.id} className="text-xs">
+                              <button type="button" className="w-full text-start" onClick={() => markRead(groupItem.id)}>
+                                <span className="font-medium">{groupItem.title}</span>
+                                {groupItem.message ? <span className="block text-zinc-500">{groupItem.message}</span> : null}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : (
                   <button
                     type="button"
                     className="w-full text-start"
@@ -314,6 +372,7 @@ export default function NotificationBell() {
                       {formatSmartDate(item.createdAt)}
                     </p>
                   </button>
+                  )}
                   {item.projectId ? (
                     <Link
                       href={item.type === "project_update" && item.updateId

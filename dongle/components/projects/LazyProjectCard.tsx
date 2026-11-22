@@ -41,8 +41,10 @@ export function LazyProjectCard({
   });
 
   return (
-    // data-grid-card enables arrow-key navigation via useProjectGridNavigation (#659)
-    <div ref={ref} className="min-h-[320px]" data-grid-card tabIndex={0}>
+    // data-grid-card enables arrow-key navigation via useProjectGridNavigation (#659).
+    // The wrapper is not focusable itself, so it stays out of the Tab order; the
+    // navigation hook focuses the card's detail link.
+    <div ref={ref} className="min-h-[320px]" data-grid-card>
       {isIntersecting ? (
         <Suspense fallback={null}>
           <ProjectCardDynamic

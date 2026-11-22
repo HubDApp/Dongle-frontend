@@ -53,13 +53,21 @@ export default function CommandPalette() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       // This documented global shortcut intentionally also works in text inputs.
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k" && !event.isComposing) {
-        if (document.querySelector('[aria-modal="true"]') && !dialog.current) return;
+      if (!((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k" && !event.isComposing)) return;
+      // Toggle the palette closed when it is already open.
+      if (dialog.current) {
         event.preventDefault();
-        if (event.repeat) return;
-        if (dialog.current) dismiss();
-        else openPalette();
+        if (!event.repeat) dismiss();
+        return;
       }
+      // Never hijack the shortcut from another open dialog.
+      if (document.querySelector('[aria-modal="true"]')) return;
+      // When the page has its own search field, the global shortcut focuses
+      // that instead of opening the palette.
+      if (document.querySelector('input[type="search"], input[placeholder*="Search"]')) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      openPalette();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);

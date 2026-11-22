@@ -146,10 +146,10 @@ function warnDevMode(): void {
   }
 }
 
-async function getReviews(): Promise<Review[]> {
+async function getReviews(signal?: AbortSignal): Promise<Review[]> {
   if (getPersistenceMode() === "api") {
     try {
-      return attachOwnerResponses(await reviewApiService.getReviews());
+      return attachOwnerResponses(await reviewApiService.getReviews(signal));
     } catch {
       if (typeof window !== "undefined") {
         console.warn(DEV_MODE_WARN);
@@ -352,7 +352,18 @@ async function searchReviews(params: Record<string, string | number | boolean | 
 async function voteHelpful(
   id: string,
   userAddress: string,
+  signed?: { payload: string; signature: string },
 ): Promise<{ success: boolean; data?: Review; error?: string }> {
+  if (getPersistenceMode() === "api") {
+    try {
+      return await reviewApiService.vote(id, userAddress, "helpful", signed);
+    } catch {
+      if (typeof window !== "undefined") {
+        console.warn(DEV_MODE_WARN);
+      }
+    }
+  }
+
   warnDevMode();
   const reviews = getLocalReviews();
   const index = reviews.findIndex((r) => r.id === id);
@@ -374,7 +385,18 @@ async function voteHelpful(
 async function voteUnhelpful(
   id: string,
   userAddress: string,
+  signed?: { payload: string; signature: string },
 ): Promise<{ success: boolean; data?: Review; error?: string }> {
+  if (getPersistenceMode() === "api") {
+    try {
+      return await reviewApiService.vote(id, userAddress, "unhelpful", signed);
+    } catch {
+      if (typeof window !== "undefined") {
+        console.warn(DEV_MODE_WARN);
+      }
+    }
+  }
+
   warnDevMode();
   const reviews = getLocalReviews();
   const index = reviews.findIndex((r) => r.id === id);
