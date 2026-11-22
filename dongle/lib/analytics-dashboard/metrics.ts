@@ -73,6 +73,9 @@ export interface TrendingProject {
 export interface CategoryCount {
   category: string;
   count: number;
+  previousCount: number;
+  growth: number;
+  trend: "up" | "down" | "stable";
 }
 
 export interface AnalyticsSummary {
@@ -221,13 +224,35 @@ export function computeTrending(
     .sort((a, b) => b.reviewsPerWeek - a.reviewsPerWeek || b.rating - a.rating);
 }
 
-export function computeCategories(projects: Project[]): CategoryCount[] {
+export function computeCategories(projects: Project[], now: Date = new Date()): CategoryCount[] {
   const counts = new Map<string, number>();
+  const previous = new Map<string, number>();
+  const weekStart = now.getTime() - MS_WEEK;
+  const previousStart = weekStart - MS_WEEK;
   for (const project of projects) {
+    const created = new Date(project.createdAt).getTime();
     counts.set(project.primaryCategory, (counts.get(project.primaryCategory) ?? 0) + 1);
+    if (created >= previousStart && created < weekStart) {
+      previous.set(project.primaryCategory, (previous.get(project.primaryCategory) ?? 0) + 1);
+    }
   }
   return [...counts.entries()]
-    .map(([category, count]) => ({ category, count }))
+    .map(([category, count]) => {
+      const previousCount = previous.get(category) ?? 0;
+      const currentCount = projects.filter((project) =>
+        project.primaryCategory === category &&
+        new Date(project.createdAt).getTime() >= weekStart &&
+        new Date(project.createdAt).getTime() <= now.getTime()
+      ).length;
+      const growth = currentCount - previousCount;
+      return {
+        category,
+        count,
+        previousCount,
+        growth,
+        trend: growth > 0 ? "up" : growth < 0 ? "down" : "stable",
+      } as CategoryCount;
+    })
     .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
 }
 
@@ -320,7 +345,7 @@ export function computeAnalytics(
 
   return {
     trending: computeTrending(filtered, now, days),
-    categories: computeCategories(filtered.projects),
+    categories: computeCategories(filtered.projects, now),
     summary: {
       averageRating: mean(ratings),
       medianReviewCount: median(reviewCounts),

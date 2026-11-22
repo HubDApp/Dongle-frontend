@@ -88,14 +88,36 @@ export function NotificationPreferencesComponent({
   const handleToggleEnabled = () => {
     if (!preferences) return;
 
-    const updated = notificationPreferencesService.updatePreferences(userId, {
-      enabled: !preferences.enabled,
-    });
+    const updated = notificationPreferencesService.setAllEvents(
+      userId,
+      !preferences.enabled,
+    );
     setPreferences(updated);
     toast.success(
       updated.enabled
-        ? "Notifications enabled"
-        : "Notifications disabled"
+        ? "All notifications enabled"
+        : "All notifications disabled"
+    );
+  };
+
+  const handleSetAllEvents = (enabled: boolean) => {
+    if (!preferences) return;
+
+    const events = enabled
+      ? preferences.events
+      : (Object.fromEntries(
+          Object.keys(preferences.events).map((key) => [key, false] as const),
+        ) as NotificationPreferences["events"]);
+
+    const updated = enabled
+      ? notificationPreferencesService.setAllEvents(userId, true)
+      : notificationPreferencesService.updatePreferences(userId, { events });
+
+    setPreferences(updated);
+    toast.success(
+      enabled
+        ? "All event notifications enabled"
+        : "All event notifications disabled"
     );
   };
 
@@ -169,7 +191,7 @@ export function NotificationPreferencesComponent({
           </div>
           <Button
             onClick={handleToggleEnabled}
-            variant={preferences.enabled ? "default" : "outline"}
+            variant={preferences.enabled ? "secondary" : "outline"}
           >
             {preferences.enabled ? "Disable All" : "Enable All"}
           </Button>
@@ -254,6 +276,25 @@ export function NotificationPreferencesComponent({
           </div>
 
           <div className="border-t border-zinc-200 pt-5 dark:border-zinc-800 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+            <label className="block text-sm font-medium">
+              Notification grouping
+              <select
+                aria-label="Notification grouping preference"
+                value={preferences.groupMode}
+                onChange={(event) => {
+                  const updated = notificationPreferencesService.updatePreferences(userId, {
+                    groupMode: event.target.value as NotificationPreferences["groupMode"],
+                  });
+                  setPreferences(updated);
+                }}
+                className="mt-2 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                disabled={!preferences.enabled}
+              >
+                <option value="auto">Group 3+ similar items within 24 hours</option>
+                <option value="always">Always group</option>
+                <option value="never">Never group</option>
+              </select>
+            </label>
             <label className="flex items-center gap-3 font-medium">
               <Checkbox
                 checked={preferences.batching.enabled}
@@ -421,12 +462,89 @@ export function NotificationPreferencesComponent({
 
       {/* Event Preferences */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Event Notifications</h3>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-          Choose which events you want to be notified about
-        </p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold">Event Notifications</h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Choose which events you want to be notified about. Changes save
+              immediately.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleSetAllEvents(true)}
+            >
+              Enable all
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleSetAllEvents(false)}
+            >
+              Disable all
+            </Button>
+          </div>
+        </div>
 
         <div className="space-y-4">
+          <label className="flex items-center gap-4 cursor-pointer">
+            <Checkbox
+              checked={preferences.events.projectVerifiedRejected}
+              onChange={() => handleToggleEvent("projectVerifiedRejected")}
+              disabled={!preferences.enabled}
+            />
+            <div className="flex-1">
+              <p className="font-medium">Project verified / rejected</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                When a project you submitted is verified or rejected
+              </p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-4 cursor-pointer">
+            <Checkbox
+              checked={preferences.events.reviewApprovedRejected}
+              onChange={() => handleToggleEvent("reviewApprovedRejected")}
+              disabled={!preferences.enabled}
+            />
+            <div className="flex-1">
+              <p className="font-medium">Review approved / rejected</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                When a review you submitted is approved or rejected
+              </p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-4 cursor-pointer">
+            <Checkbox
+              checked={preferences.events.verificationEvidenceRequested}
+              onChange={() => handleToggleEvent("verificationEvidenceRequested")}
+              disabled={!preferences.enabled}
+            />
+            <div className="flex-1">
+              <p className="font-medium">Verification evidence requested</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                When a reviewer asks for more evidence for your project
+              </p>
+            </div>
+          </label>
+
+          <label className="flex items-center gap-4 cursor-pointer">
+            <Checkbox
+              checked={preferences.events.claimStatusChanges}
+              onChange={() => handleToggleEvent("claimStatusChanges")}
+              disabled={!preferences.enabled}
+            />
+            <div className="flex-1">
+              <p className="font-medium">Claim status changes</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                When an ownership claim you submitted changes status
+              </p>
+            </div>
+          </label>
+
           <label className="flex items-center gap-4 cursor-pointer">
             <Checkbox
               checked={preferences.events.projectUpdates}
@@ -434,7 +552,7 @@ export function NotificationPreferencesComponent({
               disabled={!preferences.enabled}
             />
             <div className="flex-1">
-              <p className="font-medium">Project Updates</p>
+              <p className="font-medium">Project updates</p>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Notifications about projects you follow
               </p>

@@ -48,8 +48,10 @@ export interface UseDraftReturn {
   loadedDraft: DraftData | null;
   lastSaved: string | null;
   isSaving: boolean;
+  isSaved: boolean;
   saveError: string | null;
   saveDraft: (data: DraftData) => void;
+  forceSave: () => void;
   deleteDraft: () => void;
   clearDraft: () => void;
 }
@@ -69,7 +71,14 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
   const [loadedDraft, setLoadedDraft] = useState<DraftData | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Ref to hold the current draft data for force saving
+  const currentDataRef = useRef<DraftData | null>(null);
+
+  // Ref to track if component is mounted
+  const isMountedRef = useRef(true);
 
   // Ref to hold the debounce timer without causing re-renders
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -86,6 +95,7 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
       setHasDraft(true);
       setLoadedDraft(existing.data);
       setLastSaved(existing.lastSaved);
+      currentDataRef.current = existing.data;
     }, 0);
     return () => clearTimeout(id);
   }, [mode, projectId, walletAddress]);
@@ -148,9 +158,9 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
     };
   }, [walletAddress, draftId, mode, projectId]);
 
-  // ── saveDraft ─────────────────────────────────────────────────────────────
-  const saveDraft = useCallback(
-    (data: DraftData) => {
+  // ── Internal save logic ──────────────────────────────────────────────────
+  const performSave = useCallback(
+    async (data: DraftData) => {
       // Skip if there is no meaningful content
       if (!draftService.hasContent(data)) return;
 
@@ -161,12 +171,62 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
         projectId,
       };
 
-      if (!autoSave) {
-        // Immediate synchronous localStorage save (encrypted)
-        draftService.saveDraft(draft, walletAddress);
-        const ts = new Date().toISOString();
+      setIsSaving(true);
+      setSaveError(null);
+      setIsSaved(false);
+
+      try {
+        let savedDraft: ProjectDraft | null = null;
+
+        if (walletAddress) {
+          // Remote first
+          savedDraft = await draftService.saveDraftRemote(walletAddress, draft);
+          if (!isMountedRef.current) return;
+          if (!savedDraft) {
+            // Remote failed – fall back to localStorage and surface error
+            draftService.saveDraft(draft, walletAddress);
+            setSaveError("Could not sync to server; saved locally.");
+            savedDraft = draftService.getDraft(draftId, walletAddress);
+          }
+        } else {
+          // localStorage only (encrypted)
+          draftService.saveDraft(draft, walletAddress);
+          if (!isMountedRef.current) return;
+          savedDraft = draftService.getDraft(draftId, walletAddress);
+        }
+
+        const ts = savedDraft?.lastSaved ?? new Date().toISOString();
         setHasDraft(true);
         setLastSaved(ts);
+        setIsSaved(true);
+
+        // Notify other tabs
+        if (savedDraft && channelRef.current) {
+          const msg: DraftSyncMessage = {
+            type: "DRAFT_SAVED",
+            draftId,
+            draft: savedDraft,
+          };
+          channelRef.current.postMessage(msg);
+        }
+      } catch (err) {
+        setSaveError(
+          err instanceof Error ? err.message : "Failed to save draft"
+        );
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [draftId, mode, projectId, walletAddress]
+  );
+
+  // ── saveDraft ─────────────────────────────────────────────────────────────
+  const saveDraft = useCallback(
+    (data: DraftData) => {
+      currentDataRef.current = data;
+
+      if (!autoSave) {
+        void performSave(data);
         return;
       }
 
@@ -175,56 +235,28 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
         clearTimeout(debounceRef.current);
       }
 
+      // Requirement: Show "Saving..." while debouncing
+      setIsSaving(true);
+      setIsSaved(false);
+
       debounceRef.current = setTimeout(async () => {
         debounceRef.current = null;
-        setIsSaving(true);
-        setSaveError(null);
-
-        try {
-          let savedDraft: ProjectDraft | null = null;
-
-          if (walletAddress) {
-            // Remote first
-            savedDraft = await draftService.saveDraftRemote(
-              walletAddress,
-              draft
-            );
-            if (!savedDraft) {
-              // Remote failed – fall back to localStorage and surface error
-              draftService.saveDraft(draft, walletAddress);
-              setSaveError("Could not sync to server; saved locally.");
-              savedDraft = draftService.getDraft(draftId, walletAddress);
-            }
-          } else {
-            // localStorage only (encrypted)
-            draftService.saveDraft(draft, walletAddress);
-            savedDraft = draftService.getDraft(draftId, walletAddress);
-          }
-
-          const ts = savedDraft?.lastSaved ?? new Date().toISOString();
-          setHasDraft(true);
-          setLastSaved(ts);
-
-          // Notify other tabs
-          if (savedDraft && channelRef.current) {
-            const msg: DraftSyncMessage = {
-              type: "DRAFT_SAVED",
-              draftId,
-              draft: savedDraft,
-            };
-            channelRef.current.postMessage(msg);
-          }
-        } catch (err) {
-          setSaveError(
-            err instanceof Error ? err.message : "Failed to save draft"
-          );
-        } finally {
-          setIsSaving(false);
-        }
+        await performSave(data);
       }, AUTO_SAVE_DEBOUNCE_MS);
     },
-    [autoSave, draftId, mode, projectId, walletAddress]
+    [autoSave, performSave]
   );
+
+  // ── forceSave ─────────────────────────────────────────────────────────────
+  const forceSave = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (currentDataRef.current) {
+      void performSave(currentDataRef.current);
+    }
+  }, [performSave]);
 
   // ── deleteDraft ───────────────────────────────────────────────────────────
   const deleteDraft = useCallback(async () => {
@@ -244,6 +276,8 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
     setLoadedDraft(null);
     setLastSaved(null);
     setSaveError(null);
+    setIsSaving(false);
+    setIsSaved(false);
 
     // Notify other tabs
     if (channelRef.current) {
@@ -255,9 +289,21 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
   // clearDraft is an alias for deleteDraft
   const clearDraft = deleteDraft;
 
+  // ── Effects ───────────────────────────────────────────────────────────────
+
+  // Clear "Saved" status after 3 seconds
+  useEffect(() => {
+    if (isSaved) {
+      const id = setTimeout(() => setIsSaved(false), 3000);
+      return () => clearTimeout(id);
+    }
+  }, [isSaved]);
+
   // Cleanup debounce timer on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
       }
@@ -270,8 +316,10 @@ export function useDraft(options: UseDraftOptions): UseDraftReturn {
     loadedDraft,
     lastSaved,
     isSaving,
+    isSaved,
     saveError,
     saveDraft,
+    forceSave,
     deleteDraft,
     clearDraft,
   };

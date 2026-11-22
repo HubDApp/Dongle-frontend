@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +52,8 @@ export function TagInput({
   const errorId = `${inputId}-error`;
   const listId = `${inputId}-suggestions`;
   const normalizedQuery = inputValue.trim().toLowerCase();
+  const [activeTagIndex, setActiveTagIndex] = useState(0);
+  const tagRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   useEffect(() => {
     if (!suggestionsEnabled || !isFocused) return;
@@ -174,6 +176,36 @@ export function TagInput({
     onChange(tags.filter((t) => t !== tagToRemove));
   };
 
+  const handleTagKeyDown = (event: React.KeyboardEvent<HTMLLIElement>, index: number) => {
+    if (event.key === "Backspace" || event.key === "Delete") {
+      event.preventDefault();
+      const tag = tags[index];
+      if (tag === undefined) return;
+      const focusIndex = index > 0 ? index - 1 : 0;
+      removeTag(tag);
+      setActiveTagIndex(focusIndex);
+      window.setTimeout(() => {
+        tagRefs.current[focusIndex]?.focus();
+      }, 0);
+      return;
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const nextIndex = index > 0 ? index - 1 : tags.length - 1;
+      setActiveTagIndex(nextIndex);
+      tagRefs.current[nextIndex]?.focus();
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      const nextIndex = index < tags.length - 1 ? index + 1 : 0;
+      setActiveTagIndex(nextIndex);
+      tagRefs.current[nextIndex]?.focus();
+    }
+  };
+
+  const activeIndex = Math.min(activeTagIndex, Math.max(tags.length - 1, 0));
+
   return (
     <div className="flex flex-col gap-2 w-full">
       <label htmlFor={inputId} className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
@@ -188,22 +220,38 @@ export function TagInput({
             : "border-zinc-200 dark:border-zinc-800 focus-within:border-blue-500/50 focus-within:ring-2 focus-within:ring-blue-500/20"
         )}
       >
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium"
+        {tags.length > 0 && (
+          <ul
+            role="listbox"
+            aria-label={`Selected ${label}`}
+            data-keyboard="true"
+            className="flex min-w-0 flex-wrap items-center gap-2"
           >
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeTag(tag)}
-              className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-200 focus:outline-none"
-              aria-label={`Remove tag ${tag}`}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </span>
-        ))}
+            {tags.map((tag, index) => (
+              <li
+                key={tag}
+                role="option"
+                ref={(element) => {
+                  tagRefs.current[index] = element;
+                }}
+                tabIndex={index === activeIndex ? 0 : -1}
+                aria-selected={index === activeIndex}
+                onFocus={() => setActiveTagIndex(index)}
+                onKeyDown={(event) => handleTagKeyDown(event, index)}
+                className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 pl-3 pr-1.5 py-1 rounded-full text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900"
+              >
+                {tag}
+                <span
+                  aria-hidden="true"
+                  onClick={() => removeTag(tag)}
+                  className="flex cursor-pointer items-center rounded-full p-0.5 text-blue-500 hover:text-blue-700 dark:hover:text-blue-200"
+                >
+                  <X className="w-3 h-3" />
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <input
           id={inputId}
           type="text"

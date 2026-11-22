@@ -6,8 +6,10 @@ import { useWallet } from "@/context/wallet.context";
 import { useAuth } from "@/context/auth.context";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import AddressDisplay from "@/components/ui/AddressDisplay";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
-import { GitHubIcon } from "@/components/icons/GitHubIcon";
+import { WalletSelectModal } from "@/components/wallet/WalletSelectModal";
+import { WalletAccountsMenu } from "@/components/wallet/WalletAccountsMenu";
 
 function GoogleMark() {
   return (
@@ -40,27 +42,29 @@ function LoginMenuInner() {
     publicKey,
     isCorrectNetwork,
     walletNetworkLabel,
-    connectWallet,
     disconnectWallet,
   } = useWallet();
   const { user, isOAuth, isReadOnly, startOAuth, signOut } = useAuth();
   const [open, setOpen] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+
+  // Trap focus inside the open account / sign-in dropdown so Tab / Shift+Tab
+  // cycle through its items and Escape closes it, returning focus to the
+  // trigger button. This keeps the menu independent from the navbar's own
+  // mobile-menu trap.
+  useModalFocusTrap(open, panelRef, undefined, () => setOpen(false));
 
   useEffect(() => {
     if (!open) return;
     const onPointer = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
     document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
@@ -99,6 +103,7 @@ function LoginMenuInner() {
           >
             {t("wallet.disconnect")}
           </Button>
+          <WalletAccountsMenu />
         </div>
       </div>
     );
@@ -112,7 +117,7 @@ function LoginMenuInner() {
             {t("auth.readOnlyBanner")}
           </span>
         ) : null}
-        <Button onClick={connectWallet} isLoading={isConnecting} size="sm" className="rounded-full">
+        <Button onClick={() => setSelectOpen(true)} isLoading={isConnecting} size="sm" className="rounded-full">
           {t("auth.connectWallet")}
         </Button>
         <div className="relative" ref={rootRef}>
@@ -129,6 +134,7 @@ function LoginMenuInner() {
           {open ? (
             <div
               id={menuId}
+              ref={panelRef}
               className="absolute end-0 z-50 mt-2 min-w-[12rem] rounded-xl border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
             >
               <p className="truncate px-2 py-1 text-xs text-zinc-500">
@@ -145,6 +151,7 @@ function LoginMenuInner() {
             </div>
           ) : null}
         </div>
+        <WalletSelectModal open={selectOpen} onClose={() => setSelectOpen(false)} />
       </div>
     );
   }
@@ -165,6 +172,7 @@ function LoginMenuInner() {
       {open ? (
         <div
           id={menuId}
+          ref={panelRef}
           role="menu"
           className="absolute end-0 z-50 mt-2 min-w-[14rem] space-y-1 rounded-xl border border-zinc-200 bg-white p-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
@@ -175,7 +183,7 @@ function LoginMenuInner() {
             className="w-full justify-start"
             onClick={() => {
               setOpen(false);
-              void connectWallet();
+              setSelectOpen(true);
             }}
           >
             {t("wallet.connect")}
@@ -204,6 +212,7 @@ function LoginMenuInner() {
           </Button>
         </div>
       ) : null}
+      <WalletSelectModal open={selectOpen} onClose={() => setSelectOpen(false)} />
     </div>
   );
 }

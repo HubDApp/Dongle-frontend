@@ -110,8 +110,49 @@ html.dark {
 }
 
 @layer base {
+  /* ─── App-wide RTL support ─────────────────────────────────────────────────
+     The root `dir` mirrors flex/grid order and makes every logical property
+     (padding-inline, margin-inline, inset-inline, `start`/`end`) resolve to the
+     right-hand edge, so `padding-left` visually becomes `padding-right`. */
   html[dir="rtl"] {
-    text-align: start;
+    direction: rtl;
+    text-align: right;
+  }
+
+  html[dir="ltr"] {
+    direction: ltr;
+    text-align: left;
+  }
+
+  /* Mirror directional marks (arrows, chevrons, play/back icons) in RTL. */
+  html[dir="rtl"] .rtl-flip,
+  html[dir="rtl"] .direction-rtl\:flip,
+  .dongle-form[dir="rtl"] .rtl\:-scale-x-100,
+  html[dir="rtl"] .rtl\:-scale-x-100 {
+    transform: scaleX(-1);
+  }
+
+  /* Form inputs align to the trailing (right) edge so text reads naturally. */
+  html[dir="rtl"] input:not([type="checkbox"]):not([type="radio"]),
+  html[dir="rtl"] textarea,
+  html[dir="rtl"] select,
+  .dongle-form[dir="rtl"] input,
+  .dongle-form[dir="rtl"] textarea,
+  .dongle-form[dir="rtl"] select {
+    text-align: right;
+  }
+
+  /* Inherently-LTR values (emails, URLs, phone numbers, addresses) stay LTR. */
+  html[dir="rtl"] input[type="email"],
+  html[dir="rtl"] input[type="url"],
+  html[dir="rtl"] input[type="tel"],
+  html[dir="rtl"] input[dir="ltr"],
+  html[dir="rtl"] textarea[dir="ltr"],
+  html[dir="rtl"] [data-ltr],
+  html[dir="rtl"] code,
+  html[dir="rtl"] pre {
+    direction: ltr;
+    text-align: left;
   }
 
   /* Form RTL surfaces (Issue #546) — flip layout and keep inputs readable */
@@ -125,16 +166,6 @@ html.dark {
   .dongle-form.direction-ltr {
     direction: ltr;
     text-align: left;
-  }
-
-  .dongle-form[dir="rtl"] input,
-  .dongle-form[dir="rtl"] textarea,
-  .dongle-form[dir="rtl"] select {
-    text-align: right;
-  }
-
-  .dongle-form[dir="rtl"] .rtl\:-scale-x-100 {
-    transform: scaleX(-1);
   }
 
   .container {

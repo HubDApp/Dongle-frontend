@@ -18,6 +18,7 @@ export async function GET() {
       name: session.name ?? stored?.name,
       avatarUrl: session.avatarUrl ?? stored?.avatarUrl,
       walletAddress: session.walletAddress ?? stored?.walletAddress,
+      lastSyncedAt: stored?.lastSyncedAt,
     },
   });
 }

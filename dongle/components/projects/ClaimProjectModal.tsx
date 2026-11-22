@@ -25,7 +25,7 @@ const PROOF_GUIDANCE: Record<
   },
   repository: {
     placeholder: "e.g. https://github.com/your-org/your-repo",
-    hint: "Verify this repository by adding the generated token to its root dongle-verify.txt file, then enter the repository URL here.",
+    hint: "Verify this repository by adding the generated token to .well-known/dongle-verify.txt in the repository, then enter the repository URL here.",
   },
   admin_review: {
     placeholder:

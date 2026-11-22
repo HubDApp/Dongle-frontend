@@ -24,7 +24,11 @@ export default defineConfig({
         "**/vitest.*.ts",
         "**/next.config.ts",
       ],
-      include: ["lib/**/*.ts", "hooks/**/*.ts"],
+      include: [
+        "lib/**/*.ts",
+        "hooks/**/*.ts",
+        "utils/repository.util.ts",
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
