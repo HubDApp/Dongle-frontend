@@ -1,6 +1,7 @@
 "use client";
 
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
+import { DigestPreferences } from "@/components/notifications/DigestPreferences";
 import { NotificationPreferencesComponent } from "@/components/notifications/NotificationPreferences";
 import { useAuth } from "@/context/auth.context";
 import { useWallet } from "@/context/wallet.context";
@@ -21,10 +22,14 @@ export default function NotificationSettingsPage() {
               <h1 className="text-2xl font-bold">Notification settings</h1>
             </div>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Set when notifications reach you and how activity is grouped.
+              Choose which events notify you and whether to receive email
+              digests.
             </p>
           </header>
           <NotificationPreferencesComponent userId={userId} />
+          <div className="mt-6">
+            <DigestPreferences defaultEmail={user?.email ?? ""} />
+          </div>
         </div>
       </main>
     </LayoutWrapper>

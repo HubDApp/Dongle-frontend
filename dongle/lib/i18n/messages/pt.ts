@@ -497,6 +497,13 @@ export const pt: Messages = {
     chartProjects: "Projetos",
     chartReviews: "Avaliações",
     chartVerification: "Taxa de verificação",
+    chartHint:
+      "Passe o cursor ou foque o gráfico e use as setas para inspecionar os pontos. Arraste sobre o gráfico para ampliar.",
+    chartKeyboardHint:
+      "Use as setas para mover entre os pontos, Enter para ver detalhes e Escape para redefinir o zoom.",
+    resetZoom: "Redefinir zoom",
+    exportPng: "Exportar PNG",
+    drilldownTitle: "Dia selecionado",
     reviewsPerWeek: "{count} avaliações/semana",
     formSubmissions: {
       title: "Análise de Envio de Formulários",
