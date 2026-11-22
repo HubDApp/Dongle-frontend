@@ -14,6 +14,10 @@ export interface NotificationPreferences {
     push: boolean;
   };
   events: {
+    projectVerifiedRejected: boolean;
+    reviewApprovedRejected: boolean;
+    verificationEvidenceRequested: boolean;
+    claimStatusChanges: boolean;
     projectUpdates: boolean;
     reviewComments: boolean;
     reviewMentions: boolean;
@@ -50,11 +54,15 @@ const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userId" | "updatedAt">
     push: false,
   },
   events: {
+    projectVerifiedRejected: true,
+    reviewApprovedRejected: true,
+    verificationEvidenceRequested: true,
+    claimStatusChanges: true,
     projectUpdates: true,
     reviewComments: true,
     reviewMentions: true,
     verificationStatus: true,
-    newFollowers: false,
+    newFollowers: true,
     weeklyDigest: true,
   },
   doNotDisturb: false,
@@ -74,6 +82,21 @@ const DEFAULT_PREFERENCES: Omit<NotificationPreferences, "userId" | "updatedAt">
     mobile: { enabled: true, quietHours: true, batchLowPriority: true },
   },
 };
+
+function allEvents(enabled: boolean): NotificationPreferences["events"] {
+  return {
+    projectVerifiedRejected: enabled,
+    reviewApprovedRejected: enabled,
+    verificationEvidenceRequested: enabled,
+    claimStatusChanges: enabled,
+    projectUpdates: enabled,
+    reviewComments: enabled,
+    reviewMentions: enabled,
+    verificationStatus: enabled,
+    newFollowers: enabled,
+    weeklyDigest: enabled,
+  };
+}
 
 class NotificationPreferencesService {
   private preferences: Map<string, NotificationPreferences> = new Map();
@@ -152,8 +175,32 @@ class NotificationPreferencesService {
     }
 
     console.log(`[notification-prefs] Updated preferences for ${userId}`);
+    this.syncToServer(userId, updated);
 
     return updated;
+  }
+
+  /**
+   * Keep the server-side emitter in sync so disabled event types are not stored
+   * or streamed, even when the preference was changed in this browser.
+   */
+  private syncToServer(userId: string, preferences: NotificationPreferences): void {
+    if (typeof window === "undefined" || typeof fetch === "undefined") return;
+
+    void fetch("/api/notifications/preferences", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipientId: userId,
+        preferences: {
+          enabled: preferences.enabled,
+          events: preferences.events,
+        },
+      }),
+    }).catch((error) => {
+      console.warn("[notification-prefs] Failed to sync with server:", error);
+    });
   }
 
   /**
@@ -204,14 +251,7 @@ class NotificationPreferencesService {
         inApp: true,
         push: true,
       },
-      events: {
-        projectUpdates: true,
-        reviewComments: true,
-        reviewMentions: true,
-        verificationStatus: true,
-        newFollowers: true,
-        weeklyDigest: true,
-      },
+      events: allEvents(true),
     });
   }
 
@@ -219,7 +259,20 @@ class NotificationPreferencesService {
    * Disable all notifications for a user
    */
   disableAll(userId: string): NotificationPreferences {
-    return this.updatePreferences(userId, { enabled: false });
+    return this.updatePreferences(userId, {
+      enabled: false,
+      events: allEvents(false),
+    });
+  }
+
+  /**
+   * Enable or disable every event type in one action.
+   */
+  setAllEvents(userId: string, enabled: boolean): NotificationPreferences {
+    return this.updatePreferences(userId, {
+      enabled,
+      events: allEvents(enabled),
+    });
   }
 
   /**

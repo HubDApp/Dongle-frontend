@@ -5,7 +5,12 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 import TimeSeriesChart from "./TimeSeriesChart";
 import FormAnalyticsPanel from "./FormAnalyticsPanel";
 import { downloadCsv, toCsv } from "@/lib/analytics-dashboard/csv";
-import type { AnalyticsRange, AnalyticsResult, VerificationFilter } from "@/lib/analytics-dashboard/metrics";
+import type {
+  AnalyticsRange,
+  AnalyticsResult,
+  TimeSeriesPoint,
+  VerificationFilter,
+} from "@/lib/analytics-dashboard/metrics";
 import { ALL_CATEGORIES } from "@/types/project";
 import { Button } from "@/components/ui/Button";
 
@@ -33,6 +38,7 @@ export default function AnalyticsDashboard() {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [drilldown, setDrilldown] = useState<TimeSeriesPoint | null>(null);
 
   const query = useCallback(async () => {
     setLoading(true);
@@ -193,7 +199,46 @@ export default function AnalyticsDashboard() {
 
           <section className="mb-8">
             <h2 className="mb-2 text-lg font-semibold">{t("analytics.timeSeries")}</h2>
-            <TimeSeriesChart series={data.result.series} emptyLabel={t("analytics.empty")} />
+            <TimeSeriesChart
+              series={data.result.series}
+              emptyLabel={t("analytics.empty")}
+              onPointClick={setDrilldown}
+            />
+            {drilldown ? (
+              <div className="mt-4 rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold">{t("analytics.drilldownTitle")}</h3>
+                    <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                      {format.formatDate(drilldown.date)}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDrilldown(null)}
+                  >
+                    {t("common.close")}
+                  </Button>
+                </div>
+                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-zinc-500">{t("analytics.totalProjects")}</dt>
+                    <dd className="font-semibold tabular-nums">{drilldown.projects}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">{t("analytics.totalReviews")}</dt>
+                    <dd className="font-semibold tabular-nums">{drilldown.reviews}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">{t("analytics.chartVerification")}</dt>
+                    <dd className="font-semibold tabular-nums">
+                      {formatRate(drilldown.verificationRate)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
           </section>
 
           <section className="mb-8">

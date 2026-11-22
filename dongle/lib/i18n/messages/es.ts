@@ -497,6 +497,13 @@ export const es: Messages = {
     chartProjects: "Proyectos",
     chartReviews: "Reseñas",
     chartVerification: "Tasa de verificación",
+    chartHint:
+      "Pasa el cursor o enfoca el gráfico y usa las flechas para inspeccionar los puntos. Arrastra sobre el gráfico para hacer zoom.",
+    chartKeyboardHint:
+      "Usa las flechas para moverte entre puntos, Enter para ver el detalle y Escape para restablecer el zoom.",
+    resetZoom: "Restablecer zoom",
+    exportPng: "Exportar PNG",
+    drilldownTitle: "Día seleccionado",
     reviewsPerWeek: "{count} reseñas/semana",
     formSubmissions: {
       title: "Análisis de Envío de Formularios",

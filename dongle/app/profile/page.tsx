@@ -954,6 +954,14 @@ export default function ProfilePage() {
                   <Button
                     variant="outline"
                     className="w-full"
+                    onClick={() => router.push("/profile/stats")}
+                    leftIcon={<Activity className="w-4 h-4" />}
+                  >
+                    Personal Stats
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
                     onClick={() => router.push("/projects/new")}
                   >
                     Submit Project
