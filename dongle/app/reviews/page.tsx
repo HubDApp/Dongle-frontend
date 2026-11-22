@@ -17,6 +17,9 @@ import { Spinner } from "@/components/ui/Spinner";
 import { trackReviewSubmit } from "@/lib/analytics";
 import { reviewSearchMatches } from "@/lib/review-language";
 import { useReviewPagination } from "@/hooks/useReviewPagination";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { signMessage } from "@stellar/freighter-api";
+import { applyVote, buildVoteMessage, compareByHelpfulness } from "@/lib/review-votes";
 
 const REVIEWS_PURPOSE =
   "Connect Freighter to post, edit, or delete your community reviews on Dongle.";
@@ -107,27 +110,81 @@ export default function ReviewsPage() {
   };
 
   const handleVoteHelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteHelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "helpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "helpful") : review)),
+    );
+
+    const result = await reviewService.voteHelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviews());
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
   };
 
   const handleVoteUnhelpful = async (id: string) => {
-    if (!gate.publicKey) {
+    const voter = gate.publicKey;
+    if (!voter) {
       toast.error("Please connect your wallet to vote");
       return;
     }
-    const result = await reviewService.voteUnhelpful(id, gate.publicKey);
+
+    // A wallet signature is required to authorize the vote.
+    let signed: { payload: string; signature: string };
+    try {
+      const payload = buildVoteMessage(id, voter, "unhelpful");
+      const { signature, error } = await signMessage(payload);
+      if (error || !signature) {
+        toast.error("Wallet signature required to vote");
+        return;
+      }
+      signed = { payload, signature };
+    } catch {
+      toast.error("Wallet signature required to vote");
+      return;
+    }
+
+    const previous = reviews;
+    // Optimistic update — reflect the vote immediately.
+    setReviews((current) =>
+      current.map((review) => (review.id === id ? applyVote(review, voter, "unhelpful") : review)),
+    );
+
+    const result = await reviewService.voteUnhelpful(id, voter, signed);
     if (result.success) {
-      setReviews(await reviewService.getReviews());
+      if (result.data) {
+        const updated = result.data;
+        setReviews((current) => current.map((review) => (review.id === id ? updated : review)));
+      }
     } else {
+      setReviews(previous);
       toast.error(result.error || "Failed to submit vote");
     }
   };
@@ -228,14 +285,7 @@ export default function ReviewsPage() {
       case "lowest":
         return list.sort((a, b) => a.rating - b.rating || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       case "helpfulness":
-        return list.sort((a, b) => {
-          const votesA = a.helpfulVotes?.length || 0;
-          const votesB = b.helpfulVotes?.length || 0;
-          if (votesA !== votesB) {
-            return votesB - votesA;
-          }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
+        return list.sort(compareByHelpfulness);
       case "recent":
       default:
         return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
