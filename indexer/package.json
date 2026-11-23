@@ -5,8 +5,8 @@
   "description": "Soroban contract event indexer for Dongle",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node init && node src/server.js",
+    "dev": "node init && node --watch src/server.js"
   },
   "engines": {
     "node": ">=20.0.0"
