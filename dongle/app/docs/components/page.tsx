@@ -17,7 +17,7 @@ function VariantRow({ children }: { children: ReactNode }) {
 
 export default function ComponentDocsPage() {
   return (
-    <div className="min-h-screen bg-white pt-32 pb-24 dark:bg-black">
+    <main className="min-h-screen bg-white pt-32 pb-24 dark:bg-black">
       <div className="container mx-auto max-w-4xl space-y-16 px-4">
         <header className="space-y-3">
           <p className="text-sm font-medium uppercase tracking-wider text-blue-500">
@@ -114,6 +114,6 @@ export default function ComponentDocsPage() {
           </div>
         </section>
       </div>
-    </div>
+    </main>
   );
 }

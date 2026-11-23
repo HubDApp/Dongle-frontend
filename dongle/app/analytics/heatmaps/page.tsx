@@ -28,7 +28,7 @@ export default function HeatmapsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
           <MousePointerClick className="w-8 h-8 text-rose-500" />
@@ -54,6 +54,6 @@ export default function HeatmapsPage() {
       </div>
 
       <HeatmapViewer />
-    </div>
+    </main>
   );
 }

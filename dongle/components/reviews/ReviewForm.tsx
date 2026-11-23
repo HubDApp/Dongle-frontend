@@ -2,7 +2,7 @@
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { useForm, type FieldErrors } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Review, ReviewMedia, REVIEW_CONSTRAINTS } from "@/types/review";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
@@ -19,7 +19,6 @@ import { FormCaptcha } from "@/components/forms/FormCaptcha";
 import { FormAnnouncerProvider, useFormAnnouncer } from "@/components/ui/FormAnnouncer";
 import { FormErrorSummary } from "@/components/ui/FormErrorSummary";
 import { useFormAnalytics } from "@/hooks/useFormAnalytics";
-import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
 import { useReviewDraft } from "@/hooks/useReviewDraft";
 import { uploadImageToIpfs } from "@/services/ipfs/image-upload.service";
 import {
@@ -133,26 +132,6 @@ function ReviewFormInner({
     trackAuditValues({ rating, comment });
   }, [trackAuditValues, rating, comment]);
 
-  // Issue #936: move focus to the first invalid field and announce the error
-  // count to screen readers when validation fails on submit.
-  const formRef = useRef<HTMLFormElement>(null);
-  const { focusNextError, announceToSR } = useFormFocusManagement(formRef);
-  const onInvalid = React.useCallback(
-    (fieldErrors: FieldErrors<ReviewFormData>) => {
-      const count = Object.keys(fieldErrors).length;
-      window.setTimeout(() => {
-        focusNextError();
-        announceToSR(
-          count === 1
-            ? "1 field requires attention."
-            : `${count} fields require attention.`,
-          "assertive",
-        );
-      }, 0);
-    },
-    [focusNextError, announceToSR],
-  );
-
   const onSubmitForm = async (data: ReviewFormData) => {
     conversion.trackSubmitAttempt();
     setCaptchaError(null);
@@ -238,8 +217,7 @@ function ReviewFormInner({
       }}
     >
       <form
-        ref={formRef}
-        onSubmit={handleSubmit(onSubmitForm, onInvalid)}
+        onSubmit={handleSubmit(onSubmitForm)}
         onFocusCapture={() => conversion.trackStart()}
         className="space-y-6 bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl"
       >
@@ -312,11 +290,7 @@ function ReviewFormInner({
             </label>
             <div
               role="radiogroup"
-              id={ratingGroupId}
-              tabIndex={-1}
               aria-labelledby={ratingLabelId}
-              aria-invalid={errors.rating ? true : undefined}
-              aria-describedby={errors.rating ? `${ratingGroupId}-error` : undefined}
               className="flex gap-2"
               onFocus={() => analytics.fieldHandlers("rating").onFocus({} as React.FocusEvent<HTMLInputElement>)}
             >
@@ -354,11 +328,7 @@ function ReviewFormInner({
               {...register("rating", { valueAsNumber: true })}
             />
             {errors.rating && (
-              <p
-                id={`${ratingGroupId}-error`}
-                role="alert"
-                className="text-red-500 dark:text-red-400 text-sm mt-2"
-              >
+              <p className="text-red-500 dark:text-red-400 text-sm mt-2">
                 {errors.rating.message}
               </p>
             )}

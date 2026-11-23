@@ -36,13 +36,6 @@ export default function BridgeConfigEditor({
 }: BridgeConfigEditorProps) {
   const config = value ?? createEmptyBridgeConfig();
   const errors = validateBridgeConfig(config);
-  // Issue #936: split errors so chain-specific messages can be linked to the
-  // matching control via aria-describedby, and group-level ones shown as a list.
-  const rootErrors = errors.filter((err) => err.index === undefined);
-  const errorsForChain = (index: number) =>
-    errors.filter((err) => err.index === index);
-  const messageForField = (index: number, field: keyof BridgeChainConfig) =>
-    errorsForChain(index).find((err) => err.field === field)?.message;
 
   const update = useCallback(
     (patch: Partial<BridgeConfig>) => onChange({ ...config, ...patch }),
@@ -97,31 +90,19 @@ export default function BridgeConfigEditor({
 
       {config.enabled && (
         <div className="space-y-4">
-          {config.chains.map((entry, index) => {
-            const chainError = messageForField(index, "chain");
-            const addressError = messageForField(index, "bridgeAddress");
-            const urlError = messageForField(index, "bridgeUrl");
-            const auditError = messageForField(index, "auditReportUrl");
-            const chainSelectId = `bridge-chain-${index}-select`;
-            const addressId = `bridge-chain-${index}-address`;
-            const urlId = `bridge-chain-${index}-url`;
-            const auditId = `bridge-chain-${index}-audit`;
-            return (
+          {config.chains.map((entry, index) => (
             <div
               key={index}
               className="rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-3"
             >
               <div className="flex items-center justify-between">
                 <select
-                  id={chainSelectId}
                   value={entry.chain}
                   disabled={disabled}
                   onChange={(e) =>
                     updateChain(index, { chain: e.target.value as BridgeChain })
                   }
                   aria-label="Chain"
-                  aria-invalid={chainError ? true : undefined}
-                  aria-describedby={chainError ? `${chainSelectId}-error` : undefined}
                   className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm"
                 >
                   {BRIDGE_CHAINS.map((chain) => (
@@ -142,14 +123,8 @@ export default function BridgeConfigEditor({
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
-              {chainError && (
-                <p id={`${chainSelectId}-error`} role="alert" className="text-xs text-red-500">
-                  {chainError}
-                </p>
-              )}
 
               <Input
-                id={addressId}
                 placeholder={
                   entry.chain === "solana" ? "Solana program ID" : "0x… bridge address"
                 }
@@ -157,30 +132,15 @@ export default function BridgeConfigEditor({
                 disabled={disabled}
                 onChange={(e) => updateChain(index, { bridgeAddress: e.target.value })}
                 aria-label="Bridge address"
-                aria-invalid={addressError ? true : undefined}
-                aria-describedby={addressError ? `${addressId}-error` : undefined}
               />
-              {addressError && (
-                <p id={`${addressId}-error`} role="alert" className="text-xs text-red-500">
-                  {addressError}
-                </p>
-              )}
 
               <Input
-                id={urlId}
                 placeholder="https://bridge.example.com (optional)"
                 value={entry.bridgeUrl ?? ""}
                 disabled={disabled}
                 onChange={(e) => updateChain(index, { bridgeUrl: e.target.value })}
                 aria-label="Bridge URL"
-                aria-invalid={urlError ? true : undefined}
-                aria-describedby={urlError ? `${urlId}-error` : undefined}
               />
-              {urlError && (
-                <p id={`${urlId}-error`} role="alert" className="text-xs text-red-500">
-                  {urlError}
-                </p>
-              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <select
@@ -211,23 +171,13 @@ export default function BridgeConfigEditor({
               </div>
 
               {entry.audited && (
-                <>
-                  <Input
-                    id={auditId}
-                    placeholder="https://audit.example.com/report (optional)"
-                    value={entry.auditReportUrl ?? ""}
-                    disabled={disabled}
-                    onChange={(e) => updateChain(index, { auditReportUrl: e.target.value })}
-                    aria-label="Audit report URL"
-                    aria-invalid={auditError ? true : undefined}
-                    aria-describedby={auditError ? `${auditId}-error` : undefined}
-                  />
-                  {auditError && (
-                    <p id={`${auditId}-error`} role="alert" className="text-xs text-red-500">
-                      {auditError}
-                    </p>
-                  )}
-                </>
+                <Input
+                  placeholder="https://audit.example.com/report (optional)"
+                  value={entry.auditReportUrl ?? ""}
+                  disabled={disabled}
+                  onChange={(e) => updateChain(index, { auditReportUrl: e.target.value })}
+                  aria-label="Audit report URL"
+                />
               )}
 
               <label className="flex items-center gap-2 text-sm">
@@ -241,8 +191,7 @@ export default function BridgeConfigEditor({
                 Mark as experimental (shows a warning)
               </label>
             </div>
-            );
-          })}
+          ))}
 
           <Button
             type="button"
@@ -254,9 +203,9 @@ export default function BridgeConfigEditor({
             <Plus className="w-4 h-4" /> Add chain
           </Button>
 
-          {rootErrors.length > 0 && (
+          {errors.length > 0 && (
             <ul className="text-xs text-red-500 space-y-1" role="alert">
-              {rootErrors.map((err, i) => (
+              {errors.map((err, i) => (
                 <li key={i}>{err.message}</li>
               ))}
             </ul>

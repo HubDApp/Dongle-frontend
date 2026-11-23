@@ -3,7 +3,7 @@ import { AlertTriangle } from "lucide-react";
 
 export default function NotFoundPage() {
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-16 overflow-hidden">
+    <main className="relative min-h-screen flex flex-col items-center justify-center px-4 py-16 overflow-hidden">
       {/* Background Mesh/Grid */}
       <div
         className="absolute inset-0 z-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
@@ -52,6 +52,6 @@ export default function NotFoundPage() {
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -90,17 +90,17 @@ export default function ListDetail({ listId }: { listId: string }) {
     }
   };
 
-  if (loading) return <div className="container mx-auto max-w-5xl px-4 py-12 text-sm text-zinc-500">Loading list...</div>;
+  if (loading) return <main className="container mx-auto max-w-5xl px-4 py-12 text-sm text-zinc-500">Loading list...</main>;
   if (!list) return (
-    <div className="container mx-auto max-w-3xl px-4 py-20 text-center">
+    <main className="container mx-auto max-w-3xl px-4 py-20 text-center">
       <h1 className="text-2xl font-bold">List not found</h1>
       <p className="mt-2 text-sm text-zinc-500">This list may be private or the link may be invalid.</p>
       <Link href="/lists" className="mt-5 inline-block text-sm underline">Browse public lists</Link>
-    </div>
+    </main>
   );
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8">
+    <main className="container mx-auto max-w-5xl px-4 py-8">
       <Link href="/lists" className="mb-5 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"><ArrowLeft className="h-4 w-4" /> Browse lists</Link>
       <header className="border-y border-zinc-200 py-7 dark:border-zinc-800">
         <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
@@ -184,6 +184,6 @@ export default function ListDetail({ listId }: { listId: string }) {
           ))}
         </div>
       </section>
-    </div>
+    </main>
   );
 }

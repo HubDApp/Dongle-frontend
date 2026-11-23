@@ -54,7 +54,7 @@ export default function AttributionPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <main className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
           <Megaphone className="w-8 h-8 text-blue-500" />
@@ -159,6 +159,6 @@ export default function AttributionPage() {
           </table>
         </div>
       </Card>
-    </div>
+    </main>
   );
 }

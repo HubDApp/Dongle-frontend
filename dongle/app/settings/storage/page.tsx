@@ -47,7 +47,7 @@ export default function StorageSettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 pb-24 pt-28 dark:bg-zinc-950">
+    <main className="min-h-screen bg-zinc-50 px-4 pb-24 pt-28 dark:bg-zinc-950">
       <section
         className="mx-auto max-w-2xl rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
         aria-labelledby="storage-settings-title"
@@ -92,6 +92,6 @@ export default function StorageSettingsPage() {
           {status}
         </p>
       </section>
-    </div>
+    </main>
   );
 }

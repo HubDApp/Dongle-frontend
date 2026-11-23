@@ -1,10 +1,8 @@
 "use client";
 
-import { useRef } from "react";
 import { useAuth } from "@/context/auth.context";
 import { useWallet } from "@/context/wallet.context";
 import { Button } from "@/components/ui/Button";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 
 export default function WalletRequiredDialog({
@@ -17,17 +15,11 @@ export default function WalletRequiredDialog({
   const { t } = useTranslation();
   const { connectWallet, isConnecting } = useWallet();
   const { isReadOnly } = useAuth();
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
-  useModalFocusTrap(open && isReadOnly, dialogRef, undefined, onClose);
 
   if (!open || !isReadOnly) return null;
 
   return (
     <div
-      ref={dialogRef}
-      tabIndex={-1}
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="wallet-required-title"

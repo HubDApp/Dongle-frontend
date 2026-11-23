@@ -142,7 +142,7 @@ export default function ProjectHistoryPage() {
 
   if (!project && history.length === 0) {
     return (
-      <div className="min-h-screen bg-zinc-50 px-4 pb-24 pt-28 dark:bg-zinc-950">
+      <main className="min-h-screen bg-zinc-50 px-4 pb-24 pt-28 dark:bg-zinc-950">
         <div className="mx-auto max-w-5xl">
           <Button variant="outline" onClick={() => router.push(`/projects/${projectId}`)}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -154,12 +154,12 @@ export default function ProjectHistoryPage() {
             <p className="mt-2 text-zinc-500">Edits will appear here after they are saved.</p>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 px-4 pb-24 pt-28 dark:bg-zinc-950">
+    <main className="min-h-screen bg-zinc-50 px-4 pb-24 pt-28 dark:bg-zinc-950">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -295,6 +295,6 @@ export default function ProjectHistoryPage() {
           </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

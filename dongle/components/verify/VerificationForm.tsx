@@ -1,19 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useForm, useWatch, type FieldErrors } from "react-hook-form";
+import React, { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { FormField } from "@/components/ui/FormField";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
-import {
-  FormAnnouncerProvider,
-  useFormAnnouncer,
-} from "@/components/ui/FormAnnouncer";
-import { useFormAnalytics } from "@/hooks/useFormAnalytics";
-import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
 import { ShieldCheck } from "lucide-react";
 import { sorobanService } from "@/services/stellar/soroban.service";
 import { toast } from "sonner";
@@ -51,7 +45,7 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
     register,
     handleSubmit,
     control,
-    formState: { errors, isDirty },
+    formState: { errors },
     reset,
   } = useForm<VerificationFormValues>({
     resolver: zodResolver(verificationSchema),
@@ -70,26 +64,6 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
   });
 
   const projectIdHandlers = analytics.fieldHandlers("projectId");
-
-  // Issue #936: move focus to the first invalid field and announce the error
-  // count to screen readers when validation fails on submit.
-  const formRef = useRef<HTMLFormElement>(null);
-  const { focusNextError, announceToSR } = useFormFocusManagement(formRef);
-  const onInvalid = useCallback(
-    (fieldErrors: FieldErrors<VerificationFormValues>) => {
-      const count = Object.keys(fieldErrors).length;
-      window.setTimeout(() => {
-        focusNextError();
-        announceToSR(
-          count === 1
-            ? "1 field requires attention."
-            : `${count} fields require attention.`,
-          "assertive",
-        );
-      }, 0);
-    },
-    [focusNextError, announceToSR],
-  );
 
   // Announce validation errors when they surface.
   useEffect(() => {
@@ -201,11 +175,7 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
         </div>
       </div>
 
-      <form
-        ref={formRef}
-        onSubmit={handleSubmit(onSubmit, onInvalid)}
-        className="space-y-6"
-      >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <FormTimeEstimate
           fieldCount={1}
           completedFields={Number(projectId.trim().length > 0)}
@@ -241,23 +211,12 @@ function VerificationFormInner({ onSuccess }: VerificationFormProps) {
           <select
             id="verification-tier"
             {...register("tier")}
-            aria-invalid={errors.tier ? true : undefined}
-            aria-describedby={errors.tier ? "verification-tier-error" : undefined}
             className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="BRONZE">Bronze: basic contract verification (1x base fee)</option>
             <option value="SILVER">Silver: third-party audit (2x base fee)</option>
             <option value="GOLD">Gold: multiple audits, KYC, and GitHub verification (3x base fee)</option>
           </select>
-          {errors.tier && (
-            <p
-              id="verification-tier-error"
-              role="alert"
-              className="mt-2 text-sm text-red-500 dark:text-red-400"
-            >
-              {errors.tier.message}
-            </p>
-          )}
         </div>
 
         <GDPRConsent
