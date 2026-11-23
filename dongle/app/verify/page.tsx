@@ -1,13 +1,33 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import VerificationForm from "@/components/verify/VerificationForm";
 import VerificationStatus from "@/components/verify/VerificationStatus";
 import { ShieldCheck, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Spinner } from "@/components/ui/Spinner";
 import WalletGate from "@/components/wallet/WalletGate";
 import PageHeatmapRecorder from "@/components/analytics/PageHeatmapRecorder";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
+
+// ─── Code-split VerificationChecklistModal (#923) ────────────────────────────
+// Only fetched when the user opens the requirements checklist (or preloads it
+// on hover), keeping it out of the initial page bundle.
+const loadVerificationChecklistModal = () =>
+  import("@/components/verification/VerificationChecklistModal");
+
+const VerificationChecklistModal = lazy(() =>
+  loadVerificationChecklistModal().then((mod) => ({ default: mod.default })),
+);
+
+/** Loading state shown while the lazily-loaded modal chunk is fetched. */
+function VerificationChecklistModalFallback() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <Spinner size="lg" />
+    </div>
+  );
+}
 
 const VERIFY_PURPOSE =
   "Connect Freighter to submit a verification request for your Stellar project.";
@@ -16,6 +36,7 @@ export default function VerifyPage() {
   const gate = useWalletPageGate();
   const [activeTab, setActiveTab] = useState<"request" | "status">("request");
   const [trackedProjectId, setTrackedProjectId] = useState<string | undefined>();
+  const [showChecklist, setShowChecklist] = useState(false);
 
   const handleVerificationRequested = (projectId: string) => {
     setTrackedProjectId(projectId);
@@ -23,7 +44,7 @@ export default function VerifyPage() {
   };
 
   return (
-    <main className="min-h-screen pt-8 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-green-500/5 via-transparent to-transparent">
+    <div className="min-h-screen pt-8 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-green-500/5 via-transparent to-transparent">
       <PageHeatmapRecorder page="verification_form" />
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto text-center mb-12 animate-fade-in">
@@ -55,7 +76,21 @@ export default function VerifyPage() {
         <div className="mt-8 transition-all duration-300">
           {activeTab === "request" ? (
             gate.state === "ready" ? (
-              <VerificationForm onSuccess={handleVerificationRequested} />
+              <div className="max-w-lg mx-auto">
+                <div className="mb-4 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<ShieldCheck className="w-4 h-4" />}
+                    onMouseEnter={() => void loadVerificationChecklistModal()}
+                    onFocus={() => void loadVerificationChecklistModal()}
+                    onClick={() => setShowChecklist(true)}
+                  >
+                    Requirements checklist
+                  </Button>
+                </div>
+                <VerificationForm onSuccess={handleVerificationRequested} />
+              </div>
             ) : (
               <div className="max-w-lg mx-auto animate-fade-in">
                 <WalletGate
@@ -70,6 +105,16 @@ export default function VerifyPage() {
           )}
         </div>
       </div>
-    </main>
+
+      {showChecklist && (
+        <Suspense fallback={<VerificationChecklistModalFallback />}>
+          <VerificationChecklistModal
+            isOpen
+            onClose={() => setShowChecklist(false)}
+            onSubmit={() => setShowChecklist(false)}
+          />
+        </Suspense>
+      )}
+    </div>
   );
 }

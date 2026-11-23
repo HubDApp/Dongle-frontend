@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Wallet, Usb, Globe, X, AlertTriangle } from "lucide-react";
 import { useWallet } from "@/context/wallet.context";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   WALLET_META,
   WALLET_TYPES,
@@ -29,15 +30,16 @@ export function WalletSelectModal({ open, onClose, mode = "connect" }: Props) {
     useWallet();
   const [selected, setSelected] = useState<WalletType>(preferredWalletType);
   const [ledgerOk, setLedgerOk] = useState(true);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(open, dialogRef, undefined, onClose);
 
   useEffect(() => {
     if (!open) return;
     setSelected(preferredWalletType);
     setLedgerOk(isLedgerSupported());
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, preferredWalletType, onClose]);
+  }, [open, preferredWalletType]);
 
   if (!open) return null;
 
@@ -56,7 +58,7 @@ export function WalletSelectModal({ open, onClose, mode = "connect" }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="wallet-select-title">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="wallet-select-title">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 p-6 shadow-xl">
         <div className="flex items-start justify-between mb-4">

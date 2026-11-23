@@ -195,7 +195,7 @@ export function DynamicFormBuilder() {
         </form>
       </div>
 
-      <aside className="space-y-6 lg:sticky lg:top-28 lg:self-start">
+      <aside role="complementary" aria-label="Form version history" className="space-y-6 lg:sticky lg:top-28 lg:self-start">
         <FormVersionHistory
           versions={form.versions}
           changelog={form.changelog}

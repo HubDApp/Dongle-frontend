@@ -129,7 +129,7 @@ export default function CustomReportPage() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
           <FileBarChart2 className="w-8 h-8 text-indigo-500" />
@@ -405,6 +405,6 @@ export default function CustomReportPage() {
           </Card>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

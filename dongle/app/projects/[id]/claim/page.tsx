@@ -242,15 +242,15 @@ export default function ClaimProjectPage() {
 
   if (isPageLoading) {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
         <Spinner size="lg" />
-      </main>
+      </div>
     );
   }
 
   if (!project) {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-xl text-center">
           <p className="text-zinc-500">Project not found.</p>
           <Button
@@ -261,7 +261,7 @@ export default function ClaimProjectPage() {
             Back to Discover
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -269,7 +269,7 @@ export default function ClaimProjectPage() {
 
   if (gate.state !== "ready") {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-xl space-y-6">
           <button
             onClick={() => router.back()}
@@ -283,7 +283,7 @@ export default function ClaimProjectPage() {
             <WalletGate gate={gate} pagePurpose={CLAIM_PAGE_PURPOSE} />
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -291,7 +291,7 @@ export default function ClaimProjectPage() {
 
   if (submitted || existingClaim?.status === "approved") {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-xl">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-10 text-center">
             <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-6">
@@ -334,7 +334,7 @@ export default function ClaimProjectPage() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -346,7 +346,7 @@ export default function ClaimProjectPage() {
   // ── Main form ────────────────────────────────────────────────────────────
 
   return (
-    <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <div className="container mx-auto px-4 max-w-2xl space-y-6">
         {/* Back */}
         <button
@@ -561,6 +561,6 @@ export default function ClaimProjectPage() {
           </ul>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

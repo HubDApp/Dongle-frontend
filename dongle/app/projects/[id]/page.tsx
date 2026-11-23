@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import {
   useParams,
   useRouter } from "next/navigation";
@@ -75,7 +75,6 @@ import { ClaimProjectModal } from "@/components/projects/ClaimProjectModal";
 import { ProjectLifecycleStatusBadge } from "@/components/projects/ProjectLifecycleStatusBadge";
 import { UnclaimedProjectBanner } from "@/components/projects/UnclaimedProjectBanner";
 import { ReportProjectModal } from "@/components/projects/ReportProjectModal";
-import { ReportReviewModal } from "@/components/reviews/ReportReviewModal";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { useProjectFollowing } from "@/hooks/useProjectFollowing";
 import { reviewModerationService } from "@/services/review/review-moderation.service";
@@ -94,6 +93,24 @@ import { SafeExternalLink } from "@/components/ui/SafeExternalLink";
 import { recentViewsService } from "@/services/recent-views/recent-views.service";
 import { trackProjectView, trackReviewSubmit } from "@/lib/analytics";
 import { emitProjectFollowingEvent } from "@/lib/project-following/emit";
+
+// ─── Code-split ReportReviewModal (#923) ─────────────────────────────────────
+// Only fetched when a review report is requested (or preloaded on hover), so it
+// stays out of the initial page bundle.
+const loadReportReviewModal = () => import("@/components/reviews/ReportReviewModal");
+
+const ReportReviewModal = lazy(() =>
+  loadReportReviewModal().then((mod) => ({ default: mod.ReportReviewModal })),
+);
+
+/** Loading state shown while the lazily-loaded modal chunk is fetched. */
+function ReportReviewModalFallback() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <Spinner size="lg" />
+    </div>
+  );
+}
 
 const PROJECT_REVIEW_PURPOSE =
   "Connect Freighter to write or manage reviews for this project.";
@@ -706,7 +723,7 @@ export default function ProjectDetailPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-center py-24">
             <Spinner size="lg" className="mb-4" />
@@ -715,13 +732,13 @@ export default function ProjectDetailPage() {
             </p>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (!project) {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
             <AlertCircle className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
@@ -739,12 +756,12 @@ export default function ProjectDetailPage() {
             </Button>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <PageHeatmapRecorder page="project_detail" />
         <div className="container mx-auto px-4 max-w-6xl">
           {/* Back Button */}
@@ -1143,22 +1160,26 @@ export default function ProjectDetailPage() {
                     />
                   </div>
                 )}
-                <ReviewList
-                  onClearFilters={() => { setReviewSort("newest"); setSentimentFilter("all"); }}
-                  reviews={sortedReviews}
-                  currentUserAddress={gate.publicKey}
-                  isAdmin={isAdmin}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onVoteHelpful={handleVoteHelpful}
-                  onVoteUnhelpful={handleVoteUnhelpful}
-                  onReport={handleReportReview}
-                  onOverrideSentiment={(reviewId, sentiment) =>
-                    void handleSentimentOverride(reviewId, sentiment)
-                  }
-                  emptyMessage={projectEmptyMessage}
-                  emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
-                />
+                {/* Preload the (code-split) report modal when the user shows
+                    intent by hovering over the reviews list. */}
+                <div onMouseEnter={() => void loadReportReviewModal()}>
+                  <ReviewList
+                    onClearFilters={() => { setReviewSort("newest"); setSentimentFilter("all"); }}
+                    reviews={sortedReviews}
+                    currentUserAddress={gate.publicKey}
+                    isAdmin={isAdmin}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onVoteHelpful={handleVoteHelpful}
+                    onVoteUnhelpful={handleVoteUnhelpful}
+                    onReport={handleReportReview}
+                    onOverrideSentiment={(reviewId, sentiment) =>
+                      void handleSentimentOverride(reviewId, sentiment)
+                    }
+                    emptyMessage={projectEmptyMessage}
+                    emptyTitle={sortedReviews.length === 0 && reviews.length > 0 ? "No Matching Reviews" : undefined}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1361,15 +1382,19 @@ export default function ProjectDetailPage() {
           onClose={() => setIsReporting(false)}
           onSubmit={handleReportSubmit}
         />
-        <ReportReviewModal
-          isOpen={isReportingReview}
-          review={reportingReview!}
-          onClose={() => {
-            setIsReportingReview(false);
-            setReportingReview(null);
-          }}
-          onSubmit={handleReportReviewSubmit}
-        />
-      </main>
+        {isReportingReview && reportingReview && (
+          <Suspense fallback={<ReportReviewModalFallback />}>
+            <ReportReviewModal
+              isOpen={isReportingReview}
+              review={reportingReview}
+              onClose={() => {
+                setIsReportingReview(false);
+                setReportingReview(null);
+              }}
+              onSubmit={handleReportReviewSubmit}
+            />
+          </Suspense>
+        )}
+      </div>
   );
 }

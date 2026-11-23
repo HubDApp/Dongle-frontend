@@ -113,26 +113,26 @@ export default function ReviewAnalyticsPage() {
 
   if (gate.state !== "ready") {
     return (
-      <main className="container mx-auto min-h-screen max-w-2xl px-4 py-32">
+      <div className="container mx-auto min-h-screen max-w-2xl px-4 py-32">
         <WalletGate gate={gate} pagePurpose={ADMIN_PURPOSE} loadingMessage="Verifying wallet access..." />
-      </main>
+      </div>
     );
   }
 
   if (!isAdmin) {
     return (
-      <main className="container mx-auto flex min-h-screen flex-col items-center justify-center px-4 text-center">
+      <div className="container mx-auto flex min-h-screen flex-col items-center justify-center px-4 text-center">
         <AlertCircle className="mb-5 h-10 w-10 text-red-500" aria-hidden="true" />
         <h1 className="text-2xl font-bold">Access Restricted</h1>
         <p className="mt-2 max-w-md text-zinc-500 dark:text-zinc-400">
           Your wallet is not on the admin allowlist. Connect an authorized admin wallet to view review analytics.
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="container mx-auto max-w-7xl px-4 py-8">
+    <div className="container mx-auto max-w-7xl px-4 py-8">
       <header className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h1 className="flex items-center gap-3 text-3xl font-bold">
@@ -253,6 +253,6 @@ export default function ReviewAnalyticsPage() {
           </div>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

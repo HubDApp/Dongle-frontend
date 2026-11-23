@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   saveCustomSegment,
   evaluateRuleGroup,
@@ -9,6 +9,7 @@ import {
   type SegmentRuleOperator,
 } from "@/services/form-segmentation";
 import type { ProjectSubmission } from "@/types/project";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import { Plus, Trash2, X, Check, Eye } from "lucide-react";
 import { toast } from "sonner";
 
@@ -96,6 +97,10 @@ export default function CustomSegmentModal({
     }
     return [{ field: "primaryCategory", operator: "equals", value: "DeFi / DEX" }];
   });
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
 
   if (!isOpen) return null;
 
@@ -158,12 +163,19 @@ export default function CustomSegmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="custom-segment-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+    >
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800">
           <div>
-            <h2 className="text-lg font-bold">
+            <h2 id="custom-segment-title" className="text-lg font-bold">
               {initialSegment ? "Edit Custom Segment" : "Create Custom Segment"}
             </h2>
             <p className="text-xs text-zinc-500">

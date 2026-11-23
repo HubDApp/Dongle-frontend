@@ -93,8 +93,12 @@ export default function AdminDashboard({ stats, systemMetrics, onQuickAction }: 
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       {/* Sidebar */}
-      <aside className="lg:w-64 shrink-0">
-        <nav className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-4">
+      <aside role="complementary" aria-label="Admin panel" className="lg:w-64 shrink-0">
+        <nav
+          role="navigation"
+          aria-label="Dashboard sections"
+          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-4"
+        >
           <h2 className="text-lg font-bold mb-4 px-2">Admin Panel</h2>
           <ul className="space-y-1">
             {SECTIONS.map((section) => (
@@ -147,7 +151,7 @@ export default function AdminDashboard({ stats, systemMetrics, onQuickAction }: 
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
         {activeSection === "overview" && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold">Overview</h2>
@@ -247,7 +251,7 @@ export default function AdminDashboard({ stats, systemMetrics, onQuickAction }: 
             </p>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ShieldCheck,
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { FormField } from "@/components/ui/FormField";
+import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
 import { toast } from "sonner";
 import { useTwoFA } from "@/context/twofa.context";
 import { useWallet } from "@/context/wallet.context";
@@ -78,6 +79,25 @@ function TotpSetupSection() {
       toast.success("TOTP authentication enabled successfully");
     },
     [enableTOTP],
+  );
+
+  // Issue #936: move focus to the first invalid field on submit.
+  const formRef = useRef<HTMLFormElement>(null);
+  const { focusNextError, announceToSR } = useFormFocusManagement(formRef);
+  const onInvalid = useCallback(
+    (fieldErrors: FieldErrors<TotpSetupFormData>) => {
+      const count = Object.keys(fieldErrors).length;
+      window.setTimeout(() => {
+        focusNextError();
+        announceToSR(
+          count === 1
+            ? "1 field requires attention."
+            : `${count} fields require attention.`,
+          "assertive",
+        );
+      }, 0);
+    },
+    [focusNextError, announceToSR],
   );
 
   const isEnabled = config.methods.totp.enabled && config.methods.totp.totpVerified;
@@ -141,7 +161,7 @@ function TotpSetupSection() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(handleVerify)} className="space-y-3">
+      <form ref={formRef} onSubmit={handleSubmit(handleVerify, onInvalid)} className="space-y-3">
         <input type="hidden" {...register("secret")} />
 
         <FormField
@@ -336,6 +356,49 @@ export default function TwoFASetupPage() {
     [enableEmail, emailForm],
   );
 
+  // Issue #936: move focus to the first invalid field on submit for the SMS/email forms.
+  const smsFormRef = useRef<HTMLFormElement>(null);
+  const {
+    focusNextError: focusSmsError,
+    announceToSR: announceSmsToSR,
+  } = useFormFocusManagement(smsFormRef);
+  const onSmsInvalid = useCallback(
+    (fieldErrors: FieldErrors<SmsSetupFormData>) => {
+      const count = Object.keys(fieldErrors).length;
+      window.setTimeout(() => {
+        focusSmsError();
+        announceSmsToSR(
+          count === 1
+            ? "1 field requires attention."
+            : `${count} fields require attention.`,
+          "assertive",
+        );
+      }, 0);
+    },
+    [focusSmsError, announceSmsToSR],
+  );
+
+  const emailFormRef = useRef<HTMLFormElement>(null);
+  const {
+    focusNextError: focusEmailError,
+    announceToSR: announceEmailToSR,
+  } = useFormFocusManagement(emailFormRef);
+  const onEmailInvalid = useCallback(
+    (fieldErrors: FieldErrors<EmailSetupFormData>) => {
+      const count = Object.keys(fieldErrors).length;
+      window.setTimeout(() => {
+        focusEmailError();
+        announceEmailToSR(
+          count === 1
+            ? "1 field requires attention."
+            : `${count} fields require attention.`,
+          "assertive",
+        );
+      }, 0);
+    },
+    [focusEmailError, announceEmailToSR],
+  );
+
   const handleToggleGlobal = useCallback(() => {
     if (isEnabled) {
       setShowDisableConfirm(true);
@@ -521,7 +584,7 @@ export default function TwoFASetupPage() {
             </div>
 
             {activeSection === "sms" && !smsConfigured && (
-              <form onSubmit={smsForm.handleSubmit(handleEnableSMS)} className="space-y-3">
+              <form ref={smsFormRef} onSubmit={smsForm.handleSubmit(handleEnableSMS, onSmsInvalid)} className="space-y-3">
                 <FormField
                   label="Phone Number"
                   placeholder="+1234567890"
@@ -577,7 +640,7 @@ export default function TwoFASetupPage() {
             </div>
 
             {activeSection === "email" && !emailConfigured && (
-              <form onSubmit={emailForm.handleSubmit(handleEnableEmail)} className="space-y-3">
+              <form ref={emailFormRef} onSubmit={emailForm.handleSubmit(handleEnableEmail, onEmailInvalid)} className="space-y-3">
                 <FormField
                   label="Email Address"
                   placeholder="user@example.com"

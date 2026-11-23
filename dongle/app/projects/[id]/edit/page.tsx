@@ -68,7 +68,7 @@ export default function EditProjectPage() {
   // Wallet gate — show before attempting any project fetch
   if (gate.state !== "ready") {
     return (
-      <main className={pageClass}>
+      <div className={pageClass}>
         <div className="container mx-auto px-4">
           <div className="max-w-xl mx-auto animate-fade-in">              <WalletGate
                 gate={gate}
@@ -77,23 +77,23 @@ export default function EditProjectPage() {
               />
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (loading) {
     return (
-      <main className={pageClass}>
+      <div className={pageClass}>
         <div className="container mx-auto px-4">
           <FormSkeleton className="max-w-2xl mx-auto" ariaLabel="Loading project details..." />
         </div>
-      </main>
+      </div>
     );
   }
 
   if (error || !project) {
     return (
-      <main className={pageClass}>
+      <div className={pageClass}>
         <div className="container mx-auto px-4">
           <Card className="max-w-2xl mx-auto p-8 text-center">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -107,13 +107,13 @@ export default function EditProjectPage() {
             </Button>
           </Card>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (gate.publicKey && project.owner !== gate.publicKey) {
     return (
-      <main className={pageClass}>
+      <div className={pageClass}>
         <div className="container mx-auto px-4">
           <Card className="max-w-2xl mx-auto p-8 text-center">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
@@ -127,12 +127,12 @@ export default function EditProjectPage() {
             </Button>
           </Card>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className={pageClass}>
+    <div className={pageClass}>
       <div className="container mx-auto px-4">
         <ProjectForm
           mode="edit"
@@ -154,6 +154,6 @@ export default function EditProjectPage() {
           }}
         />
       </div>
-    </main>
+    </div>
   );
 }

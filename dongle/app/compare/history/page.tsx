@@ -44,7 +44,7 @@ export default function ComparisonHistoryPage() {
 
   if (history.length === 0) {
     return (
-      <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 px-4 py-12">
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 px-4 py-12">
         <div className="mx-auto max-w-3xl rounded-3xl border border-zinc-200 bg-white p-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
           <h1 className="text-3xl font-bold">Comparison History</h1>
           <p className="mt-3 text-zinc-500 dark:text-zinc-400">
@@ -56,12 +56,12 @@ export default function ComparisonHistoryPage() {
             </Button>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 px-4 py-8 dark:bg-zinc-950">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -125,6 +125,6 @@ export default function ComparisonHistoryPage() {
           ))}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

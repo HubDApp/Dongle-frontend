@@ -7,7 +7,7 @@
  * Role changes are logged in the audit trail.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AdminRole,
   AdminUser,
@@ -18,6 +18,7 @@ import {
 import { formatDate } from "@/lib/date";
 import AddressDisplay from "@/components/ui/AddressDisplay";
 import { Shield, UserCog, AlertTriangle, Check } from "lucide-react";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface RoleManagementPanelProps {
   adminUsers: AdminUser[];
@@ -49,6 +50,13 @@ export default function RoleManagementPanel({
   const [showConfirm, setShowConfirm] = useState(false);
 
   const canManageRoles = currentUserRole === "super_admin";
+
+  // Issue #939: trap focus in the role-change dialog (Esc / focus return / Tab wrap).
+  const roleDialogRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(Boolean(selectedUser), roleDialogRef, undefined, () => {
+    setSelectedUser(null);
+    setShowConfirm(false);
+  });
 
   const handleRoleChange = async () => {
     if (!selectedUser || !newRole) return;
@@ -157,8 +165,15 @@ export default function RoleManagementPanel({
       {/* Role change modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <div
+            ref={roleDialogRef}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="role-change-title"
+            className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-md w-full mx-4"
+          >
+            <h3 id="role-change-title" className="text-lg font-bold mb-4 flex items-center gap-2">
               <UserCog className="w-5 h-5 text-violet-500" />
               Change Role
             </h3>

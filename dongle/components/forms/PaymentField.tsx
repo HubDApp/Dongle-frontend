@@ -80,6 +80,27 @@ export function PaymentField({
       };
       setResult(failed);
       onError?.(failed);
+
+      // Issue #936: move focus to the first invalid card field.
+      const errorIds: Record<string, string> = {
+        number: "pay-number",
+        expMonth: "pay-exp-month",
+        expYear: "pay-exp-year",
+        cvc: "pay-cvc",
+        postalCode: "pay-postal",
+      };
+      const firstInvalidKey = [
+        "number",
+        "expMonth",
+        "expYear",
+        "cvc",
+        "postalCode",
+      ].find((key) => validation.errors[key as keyof typeof validation.errors]);
+      if (firstInvalidKey) {
+        window.setTimeout(() => {
+          document.getElementById(errorIds[firstInvalidKey])?.focus();
+        }, 0);
+      }
       return;
     }
 
@@ -148,9 +169,10 @@ export function PaymentField({
           value={formatCardNumber(number)}
           onChange={(e) => setNumber(e.target.value)}
           aria-invalid={Boolean(validation.errors.number)}
+          aria-describedby={validation.errors.number ? "pay-number-error" : undefined}
         />
         {validation.errors.number && (
-          <p className="text-xs text-red-600" role="alert">
+          <p id="pay-number-error" className="text-xs text-red-600" role="alert">
             {validation.errors.number}
           </p>
         )}
@@ -176,9 +198,12 @@ export function PaymentField({
             value={expMonth}
             onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
             aria-invalid={Boolean(validation.errors.expMonth)}
+            aria-describedby={validation.errors.expMonth ? "pay-exp-month-error" : undefined}
           />
           {validation.errors.expMonth && (
-            <p className="text-xs text-red-600">{validation.errors.expMonth}</p>
+            <p id="pay-exp-month-error" className="text-xs text-red-600" role="alert">
+              {validation.errors.expMonth}
+            </p>
           )}
         </div>
         <div className="flex flex-col gap-1">
@@ -194,9 +219,12 @@ export function PaymentField({
             value={expYear}
             onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
             aria-invalid={Boolean(validation.errors.expYear)}
+            aria-describedby={validation.errors.expYear ? "pay-exp-year-error" : undefined}
           />
           {validation.errors.expYear && (
-            <p className="text-xs text-red-600">{validation.errors.expYear}</p>
+            <p id="pay-exp-year-error" className="text-xs text-red-600" role="alert">
+              {validation.errors.expYear}
+            </p>
           )}
         </div>
         <div className="flex flex-col gap-1">
@@ -212,9 +240,12 @@ export function PaymentField({
             value={cvc}
             onChange={(e) => setCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
             aria-invalid={Boolean(validation.errors.cvc)}
+            aria-describedby={validation.errors.cvc ? "pay-cvc-error" : undefined}
           />
           {validation.errors.cvc && (
-            <p className="text-xs text-red-600">{validation.errors.cvc}</p>
+            <p id="pay-cvc-error" className="text-xs text-red-600" role="alert">
+              {validation.errors.cvc}
+            </p>
           )}
         </div>
       </div>
@@ -230,9 +261,12 @@ export function PaymentField({
             value={postalCode}
             onChange={(e) => setPostalCode(e.target.value)}
             aria-invalid={Boolean(validation.errors.postalCode)}
+            aria-describedby={validation.errors.postalCode ? "pay-postal-error" : undefined}
           />
           {validation.errors.postalCode && (
-            <p className="text-xs text-red-600">{validation.errors.postalCode}</p>
+            <p id="pay-postal-error" className="text-xs text-red-600" role="alert">
+              {validation.errors.postalCode}
+            </p>
           )}
         </div>
       )}

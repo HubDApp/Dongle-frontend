@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import type { FormEnrichmentResult } from "@/services/form-enrichment";
+import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   MapPin,
   Building,
@@ -32,6 +33,11 @@ export default function EnrichmentDetailsModal({
   isOpen,
   onClose,
 }: EnrichmentDetailsModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
+  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
+
   if (!isOpen) return null;
 
   const { geocoding, company, email, phone, accuracy } = enrichment;
@@ -50,7 +56,14 @@ export default function EnrichmentDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="enrichment-details-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+    >
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20">
@@ -59,7 +72,7 @@ export default function EnrichmentDetailsModal({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Enriched Data & Accuracy</h2>
+              <h2 id="enrichment-details-title" className="text-lg font-bold">Enriched Data & Accuracy</h2>
               <p className="text-xs text-zinc-500">
                 Metadata insights and verification checks for {projectName}
               </p>

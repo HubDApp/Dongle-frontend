@@ -103,19 +103,19 @@ export default function ProjectUpdatesPage() {
   // ── Loading state ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 flex flex-col items-center justify-center py-24">
           <Spinner size="lg" className="mb-4" />
           <p className="text-zinc-500 dark:text-zinc-400">Loading updates…</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   // ── Not found state ───────────────────────────────────────────────────────
   if (!project) {
     return (
-      <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="text-center py-24 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800">
             <AlertCircle className="w-16 h-16 text-zinc-300 dark:text-zinc-700 mx-auto mb-4" />
@@ -130,13 +130,13 @@ export default function ProjectUpdatesPage() {
             </Button>
           </div>
         </div>
-      </main>
+      </div>
     );
   }
 
   // ── Main page ─────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen pt-32 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <div className="container mx-auto px-4 max-w-3xl">
         {/* Back navigation */}
         <button
@@ -193,6 +193,6 @@ export default function ProjectUpdatesPage() {
           onDelete={handleDeleteUpdate}
         />
       </div>
-    </main>
+    </div>
   );
 }

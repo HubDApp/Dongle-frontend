@@ -34,7 +34,7 @@ export function RouteErrorFallback({
     : "Something went wrong";
 
   return (
-    <main className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16">
+    <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 py-16">
       <div className="max-w-md w-full text-center">
         <AlertTriangle
           className="mx-auto h-14 w-14 text-zinc-400 dark:text-zinc-600"
@@ -55,6 +55,6 @@ export function RouteErrorFallback({
           </Button>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

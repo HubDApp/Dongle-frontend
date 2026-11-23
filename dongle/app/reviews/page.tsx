@@ -445,17 +445,19 @@ export default function ReviewsPage() {
                     )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <label className="flex items-center gap-2">
-                      <span className="sr-only">Search reviews in any language</span>
-                      <input
-                        type="search"
-                        aria-label="Search reviews in any language"
-                        value={reviewSearch}
-                        onChange={(event) => setReviewSearch(event.target.value)}
-                        placeholder="Search reviews"
-                        className="w-40 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 dark:border-zinc-800 dark:bg-zinc-900"
-                      />
-                    </label>
+                    <div role="search" aria-label="Search reviews">
+                      <label className="flex items-center gap-2">
+                        <span className="sr-only">Search reviews in any language</span>
+                        <input
+                          type="search"
+                          aria-label="Search reviews in any language"
+                          value={reviewSearch}
+                          onChange={(event) => setReviewSearch(event.target.value)}
+                          placeholder="Search reviews"
+                          className="w-40 rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 dark:border-zinc-800 dark:bg-zinc-900"
+                        />
+                      </label>
+                    </div>
                     {gate.publicKey && (
                       <div className="flex items-center gap-2">
                         <span className="text-zinc-500 whitespace-nowrap">Show:</span>
