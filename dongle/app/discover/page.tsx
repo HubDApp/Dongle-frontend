@@ -288,7 +288,7 @@ function DiscoverContent() {
   const featuredSource = useMemo(() => projectService.getDiscoverableProjects(), []);
 
   return (
-    <div className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <PageHeatmapRecorder page="discovery" />
       <div className="container mx-auto px-4">
         <FeaturedProjectsCarousel projects={featuredSource} />
@@ -302,7 +302,7 @@ function DiscoverContent() {
             and tools built on Stellar and Soroban.
           </p>
 
-          <div role="search" aria-label="Search and filter projects" className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
             {/* Search input with autocomplete — value is the unDebounced `searchInput` so it stays responsive */}
             <SearchAutocomplete
               value={searchInput}
@@ -593,7 +593,7 @@ function DiscoverContent() {
           <ArrowUp className="h-5 w-5" aria-hidden="true" />
         </button>
       )}
-    </div>
+    </main>
   );
 }
 
@@ -603,9 +603,9 @@ export default function DiscoverPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+        <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
           <Spinner size="lg" />
-        </div>
+        </main>
       }
     >
       <DiscoverContent />

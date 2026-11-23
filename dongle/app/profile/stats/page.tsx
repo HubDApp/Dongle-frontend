@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import WalletGate from "@/components/wallet/WalletGate";
 import { useWalletPageGate } from "@/hooks/useWalletPageGate";
 import { Button } from "@/components/ui/Button";
@@ -312,220 +313,224 @@ export default function PersonalStatsPage() {
 
   if (gate.state !== "ready") {
     return (
-      <div className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
-        <div className="container mx-auto max-w-2xl px-4">
-          <WalletGate
-            gate={gate}
-            pagePurpose={PAGE_PURPOSE}
-            loadingMessage="Loading your personal stats..."
-          />
-        </div>
-      </div>
+      <LayoutWrapper>
+        <main className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
+          <div className="container mx-auto max-w-2xl px-4">
+            <WalletGate
+              gate={gate}
+              pagePurpose={PAGE_PURPOSE}
+              loadingMessage="Loading your personal stats..."
+            />
+          </div>
+        </main>
+      </LayoutWrapper>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
-      <div className="container mx-auto max-w-6xl px-4">
-        <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Link
-              href="/profile"
-              className="mb-3 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Back to profile
-            </Link>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Personal stats
-            </h1>
-            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-              Your reviews, interests, and milestones. Only you can see this
-              page.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="text-sm font-medium">
-              Date range
-              <select
-                className="mt-1 block rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                value={range}
-                onChange={(event) =>
-                  setRange(event.target.value as RangeKey)
-                }
+    <LayoutWrapper>
+      <main className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
+        <div className="container mx-auto max-w-6xl px-4">
+          <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <Link
+                href="/profile"
+                className="mb-3 inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="all">All time</option>
-              </select>
-            </label>
-            <Button
-              variant="outline"
-              onClick={exportJson}
-              leftIcon={<Download className="h-4 w-4" />}
-            >
-              Export JSON
-            </Button>
-          </div>
-        </header>
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Back to profile
+              </Link>
+              <h1 className="text-3xl font-bold tracking-tight">
+                Personal stats
+              </h1>
+              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                Your reviews, interests, and milestones. Only you can see this
+                page.
+              </p>
+            </div>
 
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Spinner size="md" />
-          </div>
-        ) : error ? (
-          <Card className="border-red-200 p-6 text-sm text-red-600 dark:border-red-900 dark:text-red-400">
-            {error}
-          </Card>
-        ) : (
-          <div className="space-y-8">
-            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <MetricCard
-                label="Reviews submitted"
-                value={String(filteredReviews.length)}
-                icon={MessageSquare}
-              />
-              <MetricCard
-                label="Average rating given"
-                value={
-                  averageRating == null ? "—" : averageRating.toFixed(1)
-                }
-                icon={Star}
-              />
-              <MetricCard
-                label="Projects viewed"
-                value={String(projectsViewed)}
-                icon={Eye}
-              />
-              <MetricCard
-                label="Time on platform"
-                value={
-                  daysOnPlatform === 0
-                    ? "Today"
-                    : `${daysOnPlatform} day${daysOnPlatform === 1 ? "" : "s"}`
-                }
-                icon={CalendarDays}
-              />
-            </section>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-sm font-medium">
+                Date range
+                <select
+                  className="mt-1 block rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  value={range}
+                  onChange={(event) =>
+                    setRange(event.target.value as RangeKey)
+                  }
+                >
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                  <option value="all">All time</option>
+                </select>
+              </label>
+              <Button
+                variant="outline"
+                onClick={exportJson}
+                leftIcon={<Download className="h-4 w-4" />}
+              >
+                Export JSON
+              </Button>
+            </div>
+          </header>
 
-            <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold">Reviews over time</h2>
-                <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Reviews you submitted in the selected date range.
-                </p>
-                <LineChart data={reviewSeries} height={220} />
-              </Card>
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <Spinner size="md" />
+            </div>
+          ) : error ? (
+            <Card className="border-red-200 p-6 text-sm text-red-600 dark:border-red-900 dark:text-red-400">
+              {error}
+            </Card>
+          ) : (
+            <div className="space-y-8">
+              <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <MetricCard
+                  label="Reviews submitted"
+                  value={String(filteredReviews.length)}
+                  icon={MessageSquare}
+                />
+                <MetricCard
+                  label="Average rating given"
+                  value={
+                    averageRating == null ? "—" : averageRating.toFixed(1)
+                  }
+                  icon={Star}
+                />
+                <MetricCard
+                  label="Projects viewed"
+                  value={String(projectsViewed)}
+                  icon={Eye}
+                />
+                <MetricCard
+                  label="Time on platform"
+                  value={
+                    daysOnPlatform === 0
+                      ? "Today"
+                      : `${daysOnPlatform} day${daysOnPlatform === 1 ? "" : "s"}`
+                  }
+                  icon={CalendarDays}
+                />
+              </section>
 
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold">Category interests</h2>
-                <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Categories from the projects you reviewed or viewed.
-                </p>
-                <PieChart data={categoryInterests} size={180} />
-              </Card>
-            </section>
+              <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Card className="p-6">
+                  <h2 className="text-lg font-semibold">Reviews over time</h2>
+                  <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Reviews you submitted in the selected date range.
+                  </p>
+                  <LineChart data={reviewSeries} height={220} />
+                </Card>
 
-            <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold">Badges & achievements</h2>
-                <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Milestones are based on your all-time activity.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {badges.map((badge) => {
-                    const Icon = badge.icon;
-                    return (
-                      <div
-                        key={badge.id}
-                        className={`flex items-start gap-3 rounded-2xl border p-4 ${
+                <Card className="p-6">
+                  <h2 className="text-lg font-semibold">Category interests</h2>
+                  <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Categories from the projects you reviewed or viewed.
+                  </p>
+                  <PieChart data={categoryInterests} size={180} />
+                </Card>
+              </section>
+
+              <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Card className="p-6">
+                  <h2 className="text-lg font-semibold">Badges & achievements</h2>
+                  <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    Milestones are based on your all-time activity.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {badges.map((badge) => {
+                      const Icon = badge.icon;
+                      return (
+                        <div
+                          key={badge.id}
+                          className={`flex items-start gap-3 rounded-2xl border p-4 ${
                             badge.earned
                               ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20"
                               : "border-zinc-200 opacity-70 dark:border-zinc-800"
                           }`}
-                      >
-                        <div className="mt-0.5 rounded-full bg-white p-2 dark:bg-zinc-900">
-                          {badge.earned ? (
-                            <Icon
-                              className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <Lock
-                              className="h-4 w-4 text-zinc-400"
-                              aria-hidden="true"
-                            />
-                          )}
+                        >
+                          <div className="mt-0.5 rounded-full bg-white p-2 dark:bg-zinc-900">
+                            {badge.earned ? (
+                              <Icon
+                                className="h-4 w-4 text-emerald-600 dark:text-emerald-400"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Lock
+                                className="h-4 w-4 text-zinc-400"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">{badge.label}</p>
+                            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                              {badge.description}
+                            </p>
+                            <p className="mt-1 text-xs font-medium">
+                              {badge.earned ? "Earned" : "Locked"}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold">{badge.label}</p>
-                          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                            {badge.description}
-                          </p>
-                          <p className="mt-1 text-xs font-medium">
-                            {badge.earned ? "Earned" : "Locked"}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
+                      );
+                    })}
+                  </div>
+                </Card>
 
-              <Card className="p-6">
-                <h2 className="text-lg font-semibold">How you compare</h2>
-                <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  A snapshot against community averages.
-                </p>
-                <div className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900">
-                      <tr>
-                        <th className="px-4 py-3">Metric</th>
-                        <th className="px-4 py-3">You</th>
-                        <th className="px-4 py-3">Community</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-t border-zinc-100 dark:border-zinc-800">
-                        <td className="px-4 py-3">Average rating given</td>
-                        <td className="px-4 py-3 font-semibold">
-                          {averageRating == null
-                            ? "—"
-                            : averageRating.toFixed(1)}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
-                          {community.averageRating == null
-                            ? "—"
-                            : community.averageRating.toFixed(1)}
-                        </td>
-                      </tr>
-                      <tr className="border-t border-zinc-100 dark:border-zinc-800">
-                        <td className="px-4 py-3">Reviews submitted</td>
-                        <td className="px-4 py-3 font-semibold">
-                          {filteredReviews.length}
-                        </td>
-                        <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
-                          {community.reviewsPerReviewer.toFixed(1)} avg /
-                          reviewer
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                {memberSince ? (
-                  <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-                    Member since {new Date(memberSince).toLocaleDateString()}.
+                <Card className="p-6">
+                  <h2 className="text-lg font-semibold">How you compare</h2>
+                  <p className="mb-4 mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    A snapshot against community averages.
                   </p>
-                ) : null}
-              </Card>
-            </section>
-          </div>
-        )}
-      </div>
-    </div>
+                  <div className="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900">
+                        <tr>
+                          <th className="px-4 py-3">Metric</th>
+                          <th className="px-4 py-3">You</th>
+                          <th className="px-4 py-3">Community</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-zinc-100 dark:border-zinc-800">
+                          <td className="px-4 py-3">Average rating given</td>
+                          <td className="px-4 py-3 font-semibold">
+                            {averageRating == null
+                              ? "—"
+                              : averageRating.toFixed(1)}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
+                            {community.averageRating == null
+                              ? "—"
+                              : community.averageRating.toFixed(1)}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-zinc-100 dark:border-zinc-800">
+                          <td className="px-4 py-3">Reviews submitted</td>
+                          <td className="px-4 py-3 font-semibold">
+                            {filteredReviews.length}
+                          </td>
+                          <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
+                            {community.reviewsPerReviewer.toFixed(1)} avg /
+                            reviewer
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {memberSince ? (
+                    <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      Member since {new Date(memberSince).toLocaleDateString()}.
+                    </p>
+                  ) : null}
+                </Card>
+              </section>
+            </div>
+          )}
+        </div>
+      </main>
+    </LayoutWrapper>
   );
 }
 

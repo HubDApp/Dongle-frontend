@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   getMergeHistory,
   restoreMerge,
@@ -8,7 +8,6 @@ import {
 } from "@/services/form-deduplication";
 import { formatDate } from "@/lib/date";
 import AddressDisplay from "@/components/ui/AddressDisplay";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import {
   RotateCcw,
   History,
@@ -38,12 +37,6 @@ export default function MergeHistoryViewer({
   useEffect(() => {
     loadHistory();
   }, []);
-
-  // Issue #939: trap focus in the snapshot dialog (Esc / focus return / Tab wrap).
-  const snapshotDialogRef = useRef<HTMLDivElement>(null);
-  useModalFocusTrap(Boolean(selectedRecord), snapshotDialogRef, undefined, () =>
-    setSelectedRecord(null),
-  );
 
   const handleRestore = async (record: MergeHistoryRecord) => {
     const confirmed = window.confirm(
@@ -194,22 +187,14 @@ export default function MergeHistoryViewer({
       {/* Details Snapshot Modal */}
       {selectedRecord && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div
-            ref={snapshotDialogRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="merge-snapshot-title"
-            className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
-          >
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800">
-              <h3 id="merge-snapshot-title" className="font-bold text-base flex items-center gap-2">
+              <h3 className="font-bold text-base flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-500" />
                 Merge Snapshot: {selectedRecord.id}
               </h3>
               <button
                 onClick={() => setSelectedRecord(null)}
-                aria-label="Close snapshot details"
                 className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500"
               >
                 ✕

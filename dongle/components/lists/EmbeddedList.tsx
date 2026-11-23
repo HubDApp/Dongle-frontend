@@ -19,10 +19,10 @@ export default function EmbeddedList({ listId }: { listId: string }) {
     [list, projects],
   );
 
-  if (!list) return <div className="p-5 text-sm text-zinc-500">Loading collection...</div>;
+  if (!list) return <main className="p-5 text-sm text-zinc-500">Loading collection...</main>;
 
   return (
-    <div className="mx-auto max-w-2xl border border-zinc-200 bg-white p-5 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100">
+    <main className="mx-auto max-w-2xl border border-zinc-200 bg-white p-5 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase text-emerald-700 dark:text-emerald-400">Curated project list</p>
@@ -41,6 +41,6 @@ export default function EmbeddedList({ listId }: { listId: string }) {
         ))}
       </ol>
       <Link href={`/lists/${list.id}`} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-400">View full list on Dongle</Link>
-    </div>
+    </main>
   );
 }

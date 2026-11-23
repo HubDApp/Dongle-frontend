@@ -15,7 +15,7 @@ export default function NewProjectPage() {
   const gate = useWalletPageGate();
 
   return (
-    <div className="min-h-screen pt-32 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-blue-500/5 via-transparent to-transparent">
+    <main className="min-h-screen pt-32 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-blue-500/5 via-transparent to-transparent">
       <PageHeatmapRecorder page="project_submission" />
       <div className="container mx-auto px-4">
         {gate.state === "ready" ? (
@@ -56,6 +56,6 @@ export default function NewProjectPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

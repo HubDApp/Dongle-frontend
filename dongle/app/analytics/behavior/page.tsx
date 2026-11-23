@@ -23,7 +23,7 @@ export default function BehaviorAnalyticsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <main className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-6 flex items-end justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">User Journey</h1>
         <Button onClick={exportCsv}>Export CSV</Button>
@@ -52,6 +52,6 @@ export default function BehaviorAnalyticsPage() {
           ))}
         </ul>
       </section>
-    </div>
+    </main>
   );
 }

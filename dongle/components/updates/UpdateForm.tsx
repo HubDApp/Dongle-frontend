@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useCallback, useId, useRef } from "react";
-import { useForm, type FieldErrors } from "react-hook-form";
+import React, { useId } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/Button";
 import { FormTimeEstimate } from "@/components/ui/FormTimeEstimate";
 import { UPDATE_TYPES, UpdateType, ProjectUpdate } from "@/types/update";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
-import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
 import { X } from "lucide-react";
 import { updateFormSchema, type UpdateFormData } from "@/lib/schemas/update.schema";
 
@@ -56,26 +55,6 @@ export default function UpdateForm({
 
   useUnsavedChanges(isDirty, isSubmitting);
 
-  // Issue #936: move focus to the first invalid field and announce the error
-  // count to screen readers when validation fails on submit.
-  const formRef = useRef<HTMLFormElement>(null);
-  const { focusNextError, announceToSR } = useFormFocusManagement(formRef);
-  const onInvalid = useCallback(
-    (fieldErrors: FieldErrors<UpdateFormData>) => {
-      const count = Object.keys(fieldErrors).length;
-      window.setTimeout(() => {
-        focusNextError();
-        announceToSR(
-          count === 1
-            ? "1 field requires attention."
-            : `${count} fields require attention.`,
-          "assertive",
-        );
-      }, 0);
-    },
-    [focusNextError, announceToSR],
-  );
-
   const onFormSubmit = (data: UpdateFormData) => {
     onSubmit({
       type: data.type,
@@ -105,7 +84,7 @@ export default function UpdateForm({
         </button>
       </div>
 
-      <form ref={formRef} onSubmit={handleSubmit(onFormSubmit, onInvalid)} className="space-y-4">
+      <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
         <FormTimeEstimate
           fieldCount={type === UPDATE_TYPES.RELEASE ? 4 : 3}
           completedFields={
@@ -121,8 +100,6 @@ export default function UpdateForm({
           <select
             id={updateTypeId}
             {...register("type")}
-            aria-invalid={errors.type ? true : undefined}
-            aria-describedby={errors.type ? `${updateTypeId}-error` : undefined}
             className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             {Object.values(UPDATE_TYPES).map((t) => (
@@ -132,9 +109,7 @@ export default function UpdateForm({
             ))}
           </select>
           {errors.type && (
-            <p id={`${updateTypeId}-error`} role="alert" className="text-red-500 text-sm mt-1">
-              {errors.type.message}
-            </p>
+            <p className="text-red-500 text-sm mt-1">{errors.type.message}</p>
           )}
         </div>
 
@@ -148,8 +123,6 @@ export default function UpdateForm({
               type="text"
               {...register("version")}
               placeholder="e.g., v1.2.0"
-              aria-invalid={errors.version ? true : undefined}
-              aria-describedby={errors.version ? `${versionId}-error` : undefined}
               className={`w-full bg-white dark:bg-zinc-900 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                 errors.version
                   ? "border-red-500"
@@ -157,9 +130,7 @@ export default function UpdateForm({
               }`}
             />
             {errors.version && (
-              <p id={`${versionId}-error`} role="alert" className="text-red-500 text-sm mt-1">
-                {errors.version.message}
-              </p>
+              <p className="text-red-500 text-sm mt-1">{errors.version.message}</p>
             )}
           </div>
         )}
@@ -174,8 +145,6 @@ export default function UpdateForm({
             {...register("title")}
             placeholder="Brief title for your update"
             maxLength={100}
-            aria-invalid={errors.title ? true : undefined}
-            aria-describedby={errors.title ? `${titleId}-error` : undefined}
             className={`w-full bg-white dark:bg-zinc-900 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
               errors.title
                 ? "border-red-500"
@@ -184,9 +153,7 @@ export default function UpdateForm({
           />
           <div className="flex justify-between mt-1">
             {errors.title ? (
-              <p id={`${titleId}-error`} role="alert" className="text-red-500 text-sm">
-                {errors.title.message}
-              </p>
+              <p className="text-red-500 text-sm">{errors.title.message}</p>
             ) : (
               <span />
             )}
@@ -203,8 +170,6 @@ export default function UpdateForm({
             {...register("content")}
             placeholder="Describe your update in detail..."
             rows={6}
-            aria-invalid={errors.content ? true : undefined}
-            aria-describedby={errors.content ? `${contentId}-error` : undefined}
             className={`w-full bg-white dark:bg-zinc-900 border rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none ${
               errors.content
                 ? "border-red-500"
@@ -212,9 +177,7 @@ export default function UpdateForm({
             }`}
           />
           {errors.content && (
-            <p id={`${contentId}-error`} role="alert" className="text-red-500 text-sm mt-1">
-              {errors.content.message}
-            </p>
+            <p className="text-red-500 text-sm mt-1">{errors.content.message}</p>
           )}
         </div>
 

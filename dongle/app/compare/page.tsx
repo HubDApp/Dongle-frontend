@@ -218,7 +218,7 @@ export default function ComparePage() {
 
   if (selectedProjects.length === 0) {
     return (
-      <div className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center py-24">
             <AlertCircle className="w-16 h-16 text-zinc-300 mx-auto mb-6" />
@@ -232,13 +232,13 @@ export default function ComparePage() {
             </Button>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (selectedProjects.length === 1) {
     return (
-      <div className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
+      <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-4">
           <div className="max-w-2xl mx-auto text-center py-24">
             <AlertCircle className="w-16 h-16 text-blue-300 mx-auto mb-6" />
@@ -256,12 +256,12 @@ export default function ComparePage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
+    <main className="min-h-screen pt-8 pb-24 bg-zinc-50 dark:bg-zinc-950">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -736,7 +736,7 @@ export default function ComparePage() {
           ))}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 

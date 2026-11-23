@@ -9,7 +9,7 @@ import { GDPRDataDeletion } from "@/components/gdpr/GDPRDataDeletion";
 
 export default function AnalyticsPage() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <main className="mx-auto max-w-5xl px-4 py-8">
       <AnalyticsDashboard />
       <FormSubmissionAnalytics />
       <FormBackupRecovery
@@ -42,6 +42,6 @@ export default function AnalyticsPage() {
           />
         </div>
       </section>
-    </div>
+    </main>
   );
 }

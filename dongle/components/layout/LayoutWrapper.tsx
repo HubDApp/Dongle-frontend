@@ -79,7 +79,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       <ProductionConfigBanner />
       <NetworkMismatchBanner />
       <NetworkSwitchModal />
-      <main role="main" className="grow pt-16">
+      <main className="grow pt-16">
         {children}
       </main>
       <Footer />

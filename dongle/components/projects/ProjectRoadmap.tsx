@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Check, Circle, Clock3, X } from "lucide-react";
 import { fetchProjectRoadmap } from "@/services/project/roadmap.service";
 import { ROADMAP_STATUSES, type RoadmapMilestone, type RoadmapStatus } from "@/types/roadmap";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 const STATUS_LABELS: Record<RoadmapStatus, string> = {
   planned: "Planned",
@@ -63,9 +62,14 @@ export default function ProjectRoadmap({ cid }: { cid?: string }) {
     };
   }, [cid]);
 
-  // Issue #939: trap focus in the milestone dialog (Esc / focus return / Tab wrap).
-  const milestoneDialogRef = useRef<HTMLElement>(null);
-  useModalFocusTrap(Boolean(selected), milestoneDialogRef, undefined, () => setSelected(null));
+  useEffect(() => {
+    if (!selected) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [selected]);
 
   const loading = Boolean(cid) && roadmapResult?.cid !== cid;
   const error = roadmapResult?.cid === cid ? roadmapResult.error : null;
@@ -165,8 +169,6 @@ export default function ProjectRoadmap({ cid }: { cid?: string }) {
           }}
         >
           <section
-            ref={milestoneDialogRef}
-            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-labelledby="roadmap-milestone-title"

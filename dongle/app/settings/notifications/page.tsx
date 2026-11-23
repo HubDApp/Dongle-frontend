@@ -1,5 +1,6 @@
 "use client";
 
+import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import { DigestPreferences } from "@/components/notifications/DigestPreferences";
 import { NotificationPreferencesComponent } from "@/components/notifications/NotificationPreferences";
 import { TransactionNotificationSettings } from "@/components/notifications/TransactionNotificationSettings";
@@ -13,24 +14,26 @@ export default function NotificationSettingsPage() {
   const userId = user?.id ?? publicKey ?? "browser-default";
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
-      <div className="container mx-auto max-w-3xl px-4">
-        <header className="mb-8 border-b border-zinc-200 pb-6 dark:border-zinc-800">
-          <div className="flex items-center gap-3">
-            <Bell className="h-6 w-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-            <h1 className="text-2xl font-bold">Notification settings</h1>
+    <LayoutWrapper>
+      <main className="min-h-screen bg-zinc-50 pb-24 pt-32 dark:bg-zinc-950">
+        <div className="container mx-auto max-w-3xl px-4">
+          <header className="mb-8 border-b border-zinc-200 pb-6 dark:border-zinc-800">
+            <div className="flex items-center gap-3">
+              <Bell className="h-6 w-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+              <h1 className="text-2xl font-bold">Notification settings</h1>
+            </div>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              Choose which events notify you and whether to receive email
+              digests.
+            </p>
+          </header>
+          <TransactionNotificationSettings />
+          <NotificationPreferencesComponent userId={userId} />
+          <div className="mt-6">
+            <DigestPreferences defaultEmail={user?.email ?? ""} />
           </div>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Choose which events notify you and whether to receive email
-            digests.
-          </p>
-        </header>
-        <TransactionNotificationSettings />
-        <NotificationPreferencesComponent userId={userId} />
-        <div className="mt-6">
-          <DigestPreferences defaultEmail={user?.email ?? ""} />
         </div>
-      </div>
-    </div>
+      </main>
+    </LayoutWrapper>
   );
 }

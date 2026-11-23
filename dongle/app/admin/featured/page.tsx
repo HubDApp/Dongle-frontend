@@ -16,7 +16,7 @@ export default function FeaturedProjectsAdminPage() {
   useEffect(() => setProjects(applyFeatured(catalog)), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isAdmin) {
-    return <div className="container mx-auto px-4 py-16 text-center">Connect an authorized admin wallet to manage featured projects.</div>;
+    return <main className="container mx-auto px-4 py-16 text-center">Connect an authorized admin wallet to manage featured projects.</main>;
   }
 
   const featuredCount = getFeaturedProjects(catalog).length;
@@ -29,7 +29,7 @@ export default function FeaturedProjectsAdminPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <main className="container mx-auto px-4 py-8">
       <h1 className="mb-2 text-3xl font-bold">Featured Projects</h1>
       <p className="mb-6 text-zinc-500">{featuredCount}/{MAX_FEATURED_PROJECTS} featured slots used.</p>
       <ul className="divide-y divide-zinc-200 rounded-2xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
@@ -47,6 +47,6 @@ export default function FeaturedProjectsAdminPage() {
           </li>
         ))}
       </ul>
-    </div>
+    </main>
   );
 }

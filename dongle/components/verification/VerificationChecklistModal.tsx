@@ -7,7 +7,7 @@
  * Users must check off all items (or skip with warning) before submitting.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -20,7 +20,6 @@ import {
   ArrowRight,
   X,
 } from "lucide-react";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ChecklistItem {
   id: string;
@@ -76,10 +75,6 @@ export default function VerificationChecklistModal({
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [skipChecklist, setSkipChecklist] = useState(false);
   const [showSkipWarning, setShowSkipWarning] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
-  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
 
   if (!isOpen) return null;
 
@@ -113,17 +108,10 @@ export default function VerificationChecklistModal({
   };
 
   return (
-    <div
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="verification-checklist-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h3 id="verification-checklist-title" className="text-xl font-bold flex items-center gap-2">
+          <h3 className="text-xl font-bold flex items-center gap-2">
             <span className="w-2 h-8 bg-violet-500 rounded-full" />
             Verification Requirements
           </h3>

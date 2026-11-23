@@ -60,7 +60,7 @@ export function SubmissionSearchPanel({
   };
 
   return (
-    <div role="search" aria-label="Search submissions" className="space-y-4 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
+    <div className="space-y-4 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40">
       {/* Basic Search & Status Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">

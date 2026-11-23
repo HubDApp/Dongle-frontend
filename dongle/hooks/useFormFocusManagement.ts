@@ -47,10 +47,9 @@ export interface UseFormFocusManagementReturn {
    */
   focusField: (fieldId: string) => boolean;
   /**
-   * Move focus to the first invalid control (Issue #936).
-   * Prefers the first control with aria-invalid="true"; falls back to the
-   * first role="alert" error with a matching aria-describedby back-reference,
-   * then to the alert element itself.
+   * Move focus to the first element that has role="alert" or an error
+   * descendant.  Falls back to the first invalid input when no alert is
+   * present in the DOM yet.
    */
   focusNextError: () => void;
   /**
@@ -120,16 +119,7 @@ export function useFormFocusManagement(
     const form = formRef.current;
     if (!form) return;
 
-    // Issue #936: prefer the first control explicitly marked invalid so focus
-    // always lands on the field itself (not just an adjacent message).
-    const invalid = form.querySelector<HTMLElement>('[aria-invalid="true"]');
-    if (invalid) {
-      invalid.focus({ preventScroll: false });
-      invalid.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      return;
-    }
-
-    // Fallback: elements with role="alert" — the error message is already visible
+    // Prefer elements with role="alert" — the error message is already visible
     const alerts = form.querySelectorAll<HTMLElement>('[role="alert"]');
     for (const alert of alerts) {
       if (alert.textContent?.trim()) {
@@ -151,6 +141,13 @@ export function useFormFocusManagement(
         alert.scrollIntoView({ behavior: "smooth", block: "nearest" });
         return;
       }
+    }
+
+    // Fallback: focus the first input with aria-invalid="true"
+    const invalid = form.querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (invalid) {
+      invalid.focus({ preventScroll: false });
+      invalid.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [formRef]);
 

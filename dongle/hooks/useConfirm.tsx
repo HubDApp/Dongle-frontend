@@ -1,34 +1,13 @@
 "use client";
 
 import React, {
-  Suspense,
   createContext,
-  lazy,
   useCallback,
   useContext,
   useRef,
   useState,
 } from "react";
-import type { ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
-import { Spinner } from "@/components/ui/Spinner";
-
-// ─── Code-split ConfirmDialog (#923) ─────────────────────────────────────────
-// The dialog is only fetched the first time a confirmation is actually
-// requested, keeping it out of the initial JS bundle.
-const ConfirmDialog = lazy(() =>
-  import("@/components/ui/ConfirmDialog").then((mod) => ({
-    default: mod.ConfirmDialog,
-  })),
-);
-
-/** Loading state shown while the lazily-loaded dialog chunk is fetched. */
-function ConfirmDialogFallback() {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <Spinner size="lg" />
-    </div>
-  );
-}
+import { ConfirmDialog, ConfirmDialogOptions } from "@/components/ui/ConfirmDialog";
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 
@@ -85,16 +64,12 @@ export function ConfirmDialogProvider({
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      {isOpen && (
-        <Suspense fallback={<ConfirmDialogFallback />}>
-          <ConfirmDialog
-            isOpen={isOpen}
-            {...options}
-            onConfirm={handleConfirm}
-            onCancel={handleCancel}
-          />
-        </Suspense>
-      )}
+      <ConfirmDialog
+        isOpen={isOpen}
+        {...options}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </ConfirmContext.Provider>
   );
 }

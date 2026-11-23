@@ -32,7 +32,7 @@ export default function FormTemplatesPage() {
   };
 
   return (
-    <div className="min-h-screen pt-32 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-blue-500/5 via-transparent to-transparent">
+    <main className="min-h-screen pt-32 pb-24 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-blue-500/5 via-transparent to-transparent">
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -72,6 +72,6 @@ export default function FormTemplatesPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

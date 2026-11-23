@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { useForm, type FieldErrors } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, ShieldCheck, Smartphone, Mail, KeyRound, HelpCircle, Copy, CheckCheck, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -9,8 +9,6 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useTwoFA } from "@/context/twofa.context";
 import { twoFAVerificationSchema, type TwoFAVerificationFormData } from "@/lib/schemas/twofa.schema";
-import { useFormFocusManagement } from "@/hooks/useFormFocusManagement";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import type { TwoFAMethod } from "@/types/twofa";
 import { toast } from "sonner";
 
@@ -88,11 +86,6 @@ export default function TwoFAVerification({
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Issue #939: the modal is always mounted as a full-screen overlay by its parent,
-  // so trap focus while it is open (Esc / focus return / Tab wrap).
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useModalFocusTrap(true, dialogRef, undefined, onCancel);
-
   const {
     register,
     handleSubmit,
@@ -112,26 +105,6 @@ export default function TwoFAVerification({
       inputRef.current.focus();
     }
   }, [selectedMethod]);
-
-  // Issue #936: move focus to the first invalid field and announce the error
-  // count to screen readers when validation fails on submit.
-  const formRef = useRef<HTMLFormElement>(null);
-  const { focusNextError, announceToSR } = useFormFocusManagement(formRef);
-  const onInvalid = useCallback(
-    (fieldErrors: FieldErrors<TwoFAVerificationFormData>) => {
-      const count = Object.keys(fieldErrors).length;
-      window.setTimeout(() => {
-        focusNextError();
-        announceToSR(
-          count === 1
-            ? "1 field requires attention."
-            : `${count} fields require attention.`,
-          "assertive",
-        );
-      }, 0);
-    },
-    [focusNextError, announceToSR],
-  );
 
   const handleSelectMethod = useCallback(
     (method: TwoFAMethod) => {
@@ -200,18 +173,11 @@ export default function TwoFAVerification({
   // If no methods are available, show a fallback
   if (availableMethods.length === 0 && selectedMethod !== "backup_code") {
     return (
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="twofa-unavailable-title"
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      >
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <Card variant="glass" padding="lg" className="w-full max-w-md animate-fade-up">
           <div className="text-center py-6">
-            <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" aria-hidden="true" />
-            <h3 id="twofa-unavailable-title" className="text-lg font-bold mb-2">2FA Not Available</h3>
+            <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+            <h3 className="text-lg font-bold mb-2">2FA Not Available</h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
               No two-factor authentication methods are configured. Please set up 2FA in your settings first.
             </p>
@@ -225,22 +191,15 @@ export default function TwoFAVerification({
   }
 
   return (
-    <div
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="twofa-verification-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <Card variant="glass" padding="lg" className="w-full max-w-md animate-fade-up">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="p-2 bg-blue-500 rounded-xl text-white">
-            <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+            <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h3 id="twofa-verification-title" className="text-lg font-bold">{title}</h3>
+            <h3 className="text-lg font-bold">{title}</h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">{description}</p>
           </div>
         </div>
@@ -306,11 +265,7 @@ export default function TwoFAVerification({
 
         {/* Verification Form */}
         {selectedMethod && (
-          <form
-            ref={formRef}
-            onSubmit={handleSubmit(onSubmitVerification, onInvalid)}
-            className="space-y-4"
-          >
+          <form onSubmit={handleSubmit(onSubmitVerification)} className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
@@ -370,26 +325,13 @@ export default function TwoFAVerification({
                     inputMode={selectedMethod === "backup_code" ? "text" : "numeric"}
                     maxLength={selectedMethod === "backup_code" ? 11 : 6}
                     error={!!errors.code?.message || !!verificationError}
-                    aria-invalid={!!errors.code?.message || !!verificationError}
-                    aria-describedby={
-                      [
-                        errors.code?.message ? "2fa-code-error" : null,
-                        verificationError ? "2fa-code-verification-error" : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" ") || undefined
-                    }
                     className="text-center text-lg tracking-widest font-mono"
                   />
                   {errors.code?.message && (
-                    <p id="2fa-code-error" role="alert" className="text-xs text-red-500 mt-1">
-                      {errors.code.message}
-                    </p>
+                    <p className="text-xs text-red-500 mt-1">{errors.code.message}</p>
                   )}
                   {verificationError && (
-                    <p id="2fa-code-verification-error" role="alert" className="text-xs text-red-500 mt-1">
-                      {verificationError}
-                    </p>
+                    <p className="text-xs text-red-500 mt-1">{verificationError}</p>
                   )}
                 </div>
 

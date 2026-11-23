@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useRef } from "react";
+import React from "react";
 import { X, History, Plus, Minus } from "lucide-react";
 import type { ReviewEditEntry } from "@/types/review-edit-history";
 import { computeDiff } from "@/types/review-edit-history";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 
 interface ReviewEditHistoryModalProps {
   isOpen: boolean;
@@ -25,17 +24,10 @@ export function ReviewEditHistoryModal({
   originalComment,
   edits,
 }: ReviewEditHistoryModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
-  useModalFocusTrap(isOpen, dialogRef, undefined, onClose);
-
   if (!isOpen) return null;
 
   return (
     <div
-      ref={dialogRef}
-      tabIndex={-1}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useWallet, EXPECTED_NETWORK_LABEL } from "@/context/wallet.context";
-import { useModalFocusTrap } from "@/hooks/useModalFocusTrap";
 import type { WalletType } from "@/services/wallet/wallet-adapters";
 
 const HIDE_KEY = "dongle_hide_network_modal";
@@ -93,7 +92,7 @@ export function NetworkSwitchModal() {
   }, [isCorrectNetwork]);
 
   const mismatch = isConnected && !isCorrectNetwork && walletNetworkLabel !== "Unknown";
-  const visible = mismatch && !dismissed && !hidePermanently;
+  if (!mismatch || dismissed || hidePermanently) return null;
 
   const close = () => {
     if (dontShow) {
@@ -107,13 +106,6 @@ export function NetworkSwitchModal() {
     setDismissed(true);
   };
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  // Issue #939: trap focus, focus the first control on open, restore focus on close, Esc to dismiss.
-  useModalFocusTrap(visible, dialogRef, undefined, close);
-
-  if (!visible) return null;
-
   const recheck = async () => {
     setChecking(true);
     const ok = await recheckNetwork();
@@ -123,7 +115,7 @@ export function NetworkSwitchModal() {
   };
 
   return (
-    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="network-switch-title">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="network-switch-title">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={close} />
       <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-xl">
         <div className="mb-3 flex items-start justify-between gap-3">
