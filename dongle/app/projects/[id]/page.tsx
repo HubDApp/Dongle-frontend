@@ -141,7 +141,7 @@ export default function ProjectDetailPage() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [isReportingReview, setIsReportingReview] = useState(false);
   const [reportingReview, setReportingReview] = useState<Review | null>(null);
-  const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "mine">("newest");
+  const [reviewSort, setReviewSort] = useState<"newest" | "oldest" | "highest" | "lowest" | "helpfulness" | "mine">("newest");
   const [sentimentFilter, setSentimentFilter] = useState<"all" | ReviewSentiment>("all");
   const [verificationStatus, setVerificationStatus] = useState<"NONE" | "PENDING" | "VERIFIED" | "REJECTED" | null>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
